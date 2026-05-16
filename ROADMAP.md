@@ -16,23 +16,24 @@ Implemented:
 - Rust workspace with `treemaker-core`, `treemaker-cli`, `treemaker-wasm`, and
   `oracle-tests`.
 - Vendored TreeMaker 5.0.1 GPL source and model-tester fixtures.
-- v4/v5 parsing for the current model-only fixture surface.
+- v3/v4/v5 parsing for the current headless fixture surface.
 - Canonical v5 writing and v4 export for the represented model parts.
-- Typed tree, node, edge, path, and condition data.
+- Typed tree, node, edge, path, condition, poly, vertex, crease, and facet data.
 - Direct ports of condition feasibility formulas.
 - Direct Rust port of the ALM nonlinear constrained optimizer.
 - Direct ports of the scale, edge-strain, and strain optimizers for the
   headless all-owned-parts scenarios used by the upstream fixtures.
+- Direct cleanup-state parity for checked-in fixtures after parse and after
+  optimizer-triggered cleanup, including border/polygon/pinned/conditioned
+  flags and stale crease-pattern invalidation.
 - CLI and wasm bindings for parsing, checking, optimizing, and saving.
 
 Explicitly incomplete:
 
-- v3 reading.
-- CP-bearing v4/v5 stream payloads.
-- Full `tmTree::CleanupAfterEdit()` lifecycle.
 - Tree polygon, subpoly, crease, vertex, facet, facet order, and fold direction
   construction.
-- Full `CPStatus` parity beyond the currently represented model surface.
+- Full post-construction `CPStatus` parity beyond the currently represented
+  model surface.
 
 ## Phase 1: Oracle Foundation
 
@@ -90,6 +91,16 @@ Done when:
 - Rust canonical summaries match C++ oracle summaries after round trips.
 
 ## Phase 3: Cleanup Lifecycle
+
+Status: complete for the checked-in fixture/oracle surface. The Rust cleanup
+path now follows the C++ `tmTree::CleanupAfterEdit()` ordering through
+condition invalidation, owned path length/feasibility refresh, conditioned
+flags, convex-hull border classification, pinned-state calculation, polygon
+network pruning, stale poly removal, orphan vertex/crease removal, root
+renumbering, cleanup-data clearing, and polygon-filled gating. The depth,
+facet-order, color, and fold-direction branches remain tied to the polygon and
+crease-pattern construction phases because the Rust port still does not build
+those structures.
 
 Goal: port `tmTree::CleanupAfterEdit()` and all invalidation/rebuild state that
 drives model feasibility and crease-pattern readiness.

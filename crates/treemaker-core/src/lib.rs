@@ -9,6 +9,10 @@ const DIST_TOL: TmFloat = 1.0e-4;
 const MIN_EDGE_LENGTH: TmFloat = 0.01;
 const DEPTH_NOT_SET: TmFloat = -999.0;
 const DEGREES: TmFloat = 0.017453292519943296;
+const PI: TmFloat = std::f64::consts::PI;
+const TWO_PI: TmFloat = 2.0 * std::f64::consts::PI;
+const CONVEXITY_TOL: TmFloat = 1.0e-4;
+const MOVE_TOL: TmFloat = 1.0e-6;
 
 #[derive(Debug, thiserror::Error)]
 pub enum TreeError {
@@ -327,6 +331,14 @@ pub struct TreeSummary {
     pub conditions: usize,
     pub leaf_nodes: usize,
     pub leaf_paths: usize,
+    pub feasible_paths: usize,
+    pub active_paths: usize,
+    pub border_nodes: usize,
+    pub border_paths: usize,
+    pub polygon_nodes: usize,
+    pub polygon_paths: usize,
+    pub pinned_nodes: usize,
+    pub pinned_edges: usize,
     pub conditioned_nodes: usize,
     pub conditioned_edges: usize,
     pub conditioned_paths: usize,
@@ -360,7 +372,7 @@ impl Tree {
             "4.0" => {
                 let mut tree = Self::read_v4(&mut reader, version)?;
                 tree.validate()?;
-                tree.cleanup_lengths_and_feasibility();
+                tree.cleanup_after_edit();
                 tree
             }
             "5.0" => {
@@ -371,7 +383,7 @@ impl Tree {
             "3.0" => {
                 let mut tree = Self::read_v3(&mut reader, version)?;
                 tree.validate()?;
-                tree.cleanup_lengths_and_feasibility();
+                tree.cleanup_after_edit();
                 tree
             }
             _ => return Err(TreeError::UnsupportedVersion(version)),
@@ -497,6 +509,14 @@ impl Tree {
             conditions: self.conditions.len(),
             leaf_nodes: self.nodes.iter().filter(|n| n.is_leaf).count(),
             leaf_paths: self.paths.iter().filter(|p| p.is_leaf).count(),
+            feasible_paths: self.paths.iter().filter(|p| p.is_feasible).count(),
+            active_paths: self.paths.iter().filter(|p| p.is_active).count(),
+            border_nodes: self.nodes.iter().filter(|n| n.is_border).count(),
+            border_paths: self.paths.iter().filter(|p| p.is_border).count(),
+            polygon_nodes: self.nodes.iter().filter(|n| n.is_polygon).count(),
+            polygon_paths: self.paths.iter().filter(|p| p.is_polygon).count(),
+            pinned_nodes: self.nodes.iter().filter(|n| n.is_pinned).count(),
+            pinned_edges: self.edges.iter().filter(|e| e.is_pinned).count(),
             conditioned_nodes: self.nodes.iter().filter(|n| n.is_conditioned).count(),
             conditioned_edges: self.edges.iter().filter(|e| e.is_conditioned).count(),
             conditioned_paths: self.paths.iter().filter(|p| p.is_conditioned).count(),
@@ -598,7 +618,7 @@ impl Tree {
                 y: state[offset + 1],
             };
         }
-        self.cleanup_lengths_and_feasibility();
+        self.cleanup_after_edit();
 
         Ok(OptimizationReport {
             kind: OptimizationKind::Scale,
@@ -688,7 +708,7 @@ impl Tree {
         for edge_id in stretchy_edges {
             self.edges[edge_id - 1].strain = state[0];
         }
-        self.cleanup_lengths_and_feasibility();
+        self.cleanup_after_edit();
 
         Ok(OptimizationReport {
             kind: OptimizationKind::Edge,
@@ -792,7 +812,7 @@ impl Tree {
         for (i, edge_id) in stretchy_edges.into_iter().enumerate() {
             self.edges[edge_id - 1].strain = state[edge_offset + i];
         }
-        self.cleanup_lengths_and_feasibility();
+        self.cleanup_after_edit();
 
         Ok(OptimizationReport {
             kind: OptimizationKind::Strain,
@@ -2347,10 +2367,40 @@ impl Tree {
         }
     }
 
-    fn cleanup_lengths_and_feasibility(&mut self) {
+    fn cleanup_after_edit(&mut self) {
+        self.is_feasible = false;
+        self.is_polygon_valid = false;
+        self.is_polygon_filled = false;
+        self.is_vertex_depth_valid = false;
+        self.is_facet_data_valid = false;
+
+        self.kill_invalid_conditions();
+
+        if self.owned_nodes.is_empty() {
+            self.needs_cleanup = false;
+            return;
+        }
+
+        for node_id in self.owned_nodes.iter().copied() {
+            let node = &mut self.nodes[node_id - 1];
+            node.loc.x = node.loc.x.clamp(0.0, self.paper_width);
+            node.loc.y = node.loc.y.clamp(0.0, self.paper_height);
+            node.is_border = false;
+            node.is_pinned = false;
+            node.is_polygon = false;
+            node.is_conditioned = false;
+        }
+
+        for edge_id in self.owned_edges.iter().copied() {
+            let edge = &mut self.edges[edge_id - 1];
+            edge.is_pinned = false;
+            edge.is_conditioned = false;
+        }
+
         let node_locs: Vec<Point> = self.nodes.iter().map(|n| n.loc).collect();
         let edge_lengths: Vec<TmFloat> = self.edges.iter().map(Edge::strained_length).collect();
-        for path in &mut self.paths {
+        for path_id in self.owned_paths.iter().copied() {
+            let path = &mut self.paths[path_id - 1];
             path.min_tree_length = path
                 .edges
                 .iter()
@@ -2361,11 +2411,7 @@ impl Tree {
                 let a = node_locs[path.nodes[0] - 1];
                 let b = node_locs[*path.nodes.last().unwrap() - 1];
                 path.act_paper_length = a.distance(b);
-                path.act_tree_length = if self.scale.abs() > DIST_TOL {
-                    path.act_paper_length / self.scale
-                } else {
-                    0.0
-                };
+                path.act_tree_length = path.act_paper_length / self.scale;
                 path.is_feasible = path.act_paper_length >= path.min_paper_length - DIST_TOL;
                 path.is_active = (path.act_paper_length - path.min_paper_length).abs() < DIST_TOL;
             } else {
@@ -2374,12 +2420,17 @@ impl Tree {
                 path.is_feasible = false;
                 path.is_active = false;
             }
+            path.is_border = false;
+            path.is_polygon = false;
+            path.is_conditioned = false;
         }
-        let leaf_paths_feasible = self
-            .paths
+
+        let leaf_nodes = self.leaf_nodes_in_owned_order();
+        let leaf_paths = self.leaf_paths_in_owned_order();
+        let leaf_paths_feasible = leaf_paths
             .iter()
-            .filter(|path| path.is_leaf)
-            .all(|path| path.is_feasible);
+            .copied()
+            .all(|path_id| self.paths[path_id - 1].is_feasible);
         let condition_feasibilities: Vec<bool> = self
             .conditions
             .iter()
@@ -2395,7 +2446,805 @@ impl Tree {
         let conditions_feasible = condition_feasibilities.into_iter().all(|feasible| feasible);
         self.is_feasible = leaf_paths_feasible && conditions_feasible;
         self.rebuild_conditioned_flags();
+        self.calc_border_nodes_and_paths(&leaf_nodes);
+        self.calc_pinned_nodes_and_edges(&leaf_nodes, &leaf_paths);
+        self.calc_polygon_network(&leaf_nodes, &leaf_paths);
+        self.calc_polygon_validity(&leaf_nodes);
+        self.kill_orphan_vertices_and_creases();
+        self.promote_first_tree_node_to_root();
+        self.renumber_part_indices();
+        self.clear_crease_pattern_cleanup_data();
+        self.calc_polygon_filled();
         self.needs_cleanup = false;
+    }
+
+    fn kill_invalid_conditions(&mut self) {
+        let mut conditions = std::mem::take(&mut self.conditions);
+        conditions.retain(|condition| self.condition_is_valid(&condition.kind));
+        for (i, condition) in conditions.iter_mut().enumerate() {
+            condition.index = i + 1;
+        }
+        self.conditions = conditions;
+    }
+
+    fn condition_is_valid(&self, kind: &ConditionKind) -> bool {
+        let node_is_leaf = |node: usize| {
+            node.checked_sub(1)
+                .and_then(|index| self.nodes.get(index))
+                .is_some_and(|node| node.is_leaf)
+        };
+        let node_exists = |node: usize| node > 0 && node <= self.nodes.len();
+        let edge_exists = |edge: usize| edge > 0 && edge <= self.edges.len();
+        let path_exists_between =
+            |node1: usize, node2: usize| self.find_leaf_path_between(node1, node2).is_some();
+
+        match *kind {
+            ConditionKind::NodeCombo { node, .. }
+            | ConditionKind::NodeFixed { node, .. }
+            | ConditionKind::NodeOnCorner { node }
+            | ConditionKind::NodeOnEdge { node }
+            | ConditionKind::NodeSymmetric { node } => node_is_leaf(node),
+            ConditionKind::NodesPaired { node1, node2 } => {
+                node_is_leaf(node1) && node_is_leaf(node2)
+            }
+            ConditionKind::NodesCollinear {
+                node1,
+                node2,
+                node3,
+            } => node_is_leaf(node1) && node_is_leaf(node2) && node_is_leaf(node3),
+            ConditionKind::EdgeLengthFixed { edge } => edge_exists(edge),
+            ConditionKind::EdgesSameStrain { edge1, edge2 } => {
+                edge_exists(edge1) && edge_exists(edge2)
+            }
+            ConditionKind::PathActive { node1, node2 }
+            | ConditionKind::PathAngleFixed { node1, node2, .. }
+            | ConditionKind::PathAngleQuant { node1, node2, .. } => {
+                node_exists(node1) && node_exists(node2) && path_exists_between(node1, node2)
+            }
+            ConditionKind::PathCombo { node1, node2, .. } => {
+                node_exists(node1) && node_exists(node2) && path_exists_between(node1, node2)
+            }
+        }
+    }
+
+    fn leaf_paths_in_owned_order(&self) -> Vec<usize> {
+        self.owned_paths
+            .iter()
+            .copied()
+            .filter(|id| self.paths[id - 1].is_leaf)
+            .collect()
+    }
+
+    fn calc_border_nodes_and_paths(&mut self, leaf_nodes: &[usize]) {
+        if leaf_nodes.len() < 3 {
+            return;
+        }
+
+        let start_pt = Point { x: -1.0, y: -1.0 };
+        let Some((&start_node, _)) = leaf_nodes
+            .iter()
+            .map(|id| (id, angle(point_sub(self.nodes[*id - 1].loc, start_pt))))
+            .min_by(|(_, a), (_, b)| a.total_cmp(b))
+        else {
+            return;
+        };
+
+        let mut border_nodes = vec![start_node];
+        let mut prev_node = start_node;
+        let mut prev_pt = start_pt;
+        let mut this_node = start_node;
+        let mut this_pt = self.nodes[this_node - 1].loc;
+
+        loop {
+            let mut best_node = None;
+            let mut best_angle = TWO_PI;
+            let mut best_dist = TmFloat::INFINITY;
+
+            for node_id in leaf_nodes.iter().copied() {
+                if node_id == prev_node || node_id == this_node {
+                    continue;
+                }
+                let the_pt = self.nodes[node_id - 1].loc;
+                let the_angle = angle_change(prev_pt, this_pt, the_pt);
+                if the_angle < -PI / 2.0 {
+                    continue;
+                }
+                let the_dist = this_pt.distance(the_pt);
+                if the_angle < best_angle - CONVEXITY_TOL
+                    || ((the_angle - best_angle).abs() < CONVEXITY_TOL && the_dist < best_dist)
+                {
+                    best_node = Some(node_id);
+                    best_angle = the_angle;
+                    best_dist = the_dist;
+                }
+            }
+
+            let Some(next_node) = best_node else {
+                return;
+            };
+            if next_node == start_node {
+                break;
+            }
+            border_nodes.push(next_node);
+            prev_node = this_node;
+            prev_pt = this_pt;
+            this_node = next_node;
+            this_pt = self.nodes[this_node - 1].loc;
+        }
+
+        if let Some(first) = border_nodes.first().copied() {
+            self.nodes[first - 1].is_border = true;
+        }
+        for i in 1..border_nodes.len() {
+            let prev = border_nodes[i - 1];
+            let next = border_nodes[i];
+            self.nodes[next - 1].is_border = true;
+            if let Some(path_id) = self.leaf_path_id_between(prev, next) {
+                self.paths[path_id - 1].is_border = true;
+            }
+        }
+        if let Some(path_id) = self.leaf_path_id_between(
+            *border_nodes.last().unwrap(),
+            *border_nodes.first().unwrap(),
+        ) {
+            self.paths[path_id - 1].is_border = true;
+        }
+    }
+
+    fn calc_pinned_nodes_and_edges(&mut self, leaf_nodes: &[usize], leaf_paths: &[usize]) {
+        for node_id in leaf_nodes.iter().copied() {
+            self.nodes[node_id - 1].is_pinned = self.calc_is_pinned_node(node_id);
+        }
+
+        for path_id in leaf_paths.iter().copied() {
+            let path = &self.paths[path_id - 1];
+            if !path.is_active || path.nodes.len() < 2 {
+                continue;
+            }
+            let node1 = path.nodes[0];
+            let node2 = *path.nodes.last().unwrap();
+            if self.nodes[node1 - 1].is_pinned && self.nodes[node2 - 1].is_pinned {
+                let edge_ids = path.edges.clone();
+                for edge_id in edge_ids {
+                    self.edges[edge_id - 1].is_pinned = true;
+                }
+            }
+        }
+    }
+
+    fn calc_is_pinned_node(&self, node_id: usize) -> bool {
+        let node = &self.nodes[node_id - 1];
+        let mut angles = Vec::new();
+        for path_id in &node.leaf_paths {
+            let path = &self.paths[*path_id - 1];
+            if !path.is_active || path.nodes.len() < 2 {
+                continue;
+            }
+            let other = if path.nodes[0] == node_id {
+                *path.nodes.last().unwrap()
+            } else {
+                path.nodes[0]
+            };
+            angles.push(angle(point_sub(self.nodes[other - 1].loc, node.loc)));
+        }
+
+        if is_tiny(node.loc.x) {
+            angles.push(-PI);
+        }
+        if is_tiny(node.loc.x - self.paper_width) {
+            angles.push(0.0);
+        }
+        if is_tiny(node.loc.y - self.paper_height) {
+            angles.push(PI / 2.0);
+        }
+        if is_tiny(node.loc.y) {
+            angles.push(-PI / 2.0);
+        }
+
+        if angles.len() < 2 {
+            return false;
+        }
+        angles.sort_by(TmFloat::total_cmp);
+        for i in 0..angles.len() - 1 {
+            if angles[i + 1] - angles[i] > PI + CONVEXITY_TOL {
+                return false;
+            }
+        }
+        angles[0] - angles[angles.len() - 1] + PI <= CONVEXITY_TOL
+    }
+
+    fn calc_polygon_network(&mut self, leaf_nodes: &[usize], leaf_paths: &[usize]) {
+        for path_id in leaf_paths.iter().copied() {
+            let path = &mut self.paths[path_id - 1];
+            path.is_polygon = path.is_active || (path.is_border && path.is_feasible);
+        }
+
+        for node_id in leaf_nodes.iter().copied() {
+            let node = &mut self.nodes[node_id - 1];
+            if node.is_pinned || node.is_border {
+                node.is_polygon = true;
+            }
+        }
+
+        for path_id in leaf_paths.iter().copied() {
+            let path = &self.paths[path_id - 1];
+            if path.is_feasible || path.nodes.len() < 2 {
+                continue;
+            }
+            let node1 = path.nodes[0];
+            let node2 = *path.nodes.last().unwrap();
+            self.nodes[node1 - 1].is_polygon = false;
+            self.nodes[node1 - 1].is_pinned = false;
+            self.nodes[node2 - 1].is_polygon = false;
+            self.nodes[node2 - 1].is_pinned = false;
+        }
+
+        loop {
+            let mut something_changed = false;
+
+            for path_id in leaf_paths.iter().copied() {
+                let path = &self.paths[path_id - 1];
+                if !path.is_polygon || path.nodes.len() < 2 {
+                    continue;
+                }
+                let node1 = path.nodes[0];
+                let node2 = *path.nodes.last().unwrap();
+                if !(self.nodes[node1 - 1].is_polygon && self.nodes[node2 - 1].is_polygon) {
+                    self.paths[path_id - 1].is_polygon = false;
+                    something_changed = true;
+                }
+            }
+
+            for node_id in leaf_nodes.iter().copied() {
+                if !self.nodes[node_id - 1].is_polygon {
+                    continue;
+                }
+                let poly_paths = self.nodes[node_id - 1]
+                    .leaf_paths
+                    .iter()
+                    .filter(|path_id| self.paths[**path_id - 1].is_polygon)
+                    .count();
+                if poly_paths < 2 {
+                    self.nodes[node_id - 1].is_polygon = false;
+                    something_changed = true;
+                }
+            }
+
+            if !something_changed {
+                break;
+            }
+        }
+
+        let doomed_polys: Vec<usize> = self
+            .polys
+            .iter()
+            .filter(|poly| !self.calc_poly_is_valid(poly.index, leaf_nodes))
+            .map(|poly| poly.index)
+            .collect();
+        if !doomed_polys.is_empty() {
+            self.delete_polys(&doomed_polys);
+        }
+    }
+
+    fn calc_polygon_validity(&mut self, leaf_nodes: &[usize]) {
+        self.is_polygon_valid = true;
+        for node_id in leaf_nodes.iter().copied() {
+            let polygon_paths = self.nodes[node_id - 1]
+                .leaf_paths
+                .iter()
+                .filter(|path_id| self.paths[**path_id - 1].is_polygon)
+                .count();
+            if polygon_paths < 2 {
+                self.is_polygon_valid = false;
+                return;
+            }
+        }
+
+        for path_id in self.owned_paths.iter().copied() {
+            let path = &self.paths[path_id - 1];
+            if !path.is_polygon {
+                continue;
+            }
+            if path.is_border {
+                if path.fwd_poly.is_none() && path.bkd_poly.is_none() {
+                    self.is_polygon_valid = false;
+                    return;
+                }
+            } else if path.fwd_poly.is_none() || path.bkd_poly.is_none() {
+                self.is_polygon_valid = false;
+                return;
+            }
+        }
+    }
+
+    fn calc_poly_is_valid(&self, poly_id: usize, leaf_nodes: &[usize]) -> bool {
+        let Some(poly) = self.polys.get(poly_id.saturating_sub(1)) else {
+            return false;
+        };
+        if poly.is_sub_poly {
+            return true;
+        }
+        if poly.node_locs.len() != poly.ring_nodes.len() {
+            return false;
+        }
+        for (i, node_id) in poly.ring_nodes.iter().copied().enumerate() {
+            let Some(node) = self.nodes.get(node_id.saturating_sub(1)) else {
+                return false;
+            };
+            if poly.node_locs[i].distance(node.loc) > MOVE_TOL {
+                return false;
+            }
+        }
+        for path_id in poly.ring_paths.iter().copied() {
+            let Some(path) = self.paths.get(path_id.saturating_sub(1)) else {
+                return false;
+            };
+            if !path.is_polygon {
+                return false;
+            }
+        }
+        if !self.poly_is_convex(poly) {
+            return false;
+        }
+        !self.poly_encloses_leaf_node(poly, leaf_nodes)
+    }
+
+    fn poly_is_convex(&self, poly: &Poly) -> bool {
+        let n = poly.ring_nodes.len();
+        if n < 3 {
+            return false;
+        }
+        for i in 0..n - 2 {
+            let Some(p1) = self
+                .nodes
+                .get(poly.ring_nodes[i].saturating_sub(1))
+                .map(|node| node.loc)
+            else {
+                return false;
+            };
+            let Some(p2) = self
+                .nodes
+                .get(poly.ring_nodes[(i + 1) % n].saturating_sub(1))
+                .map(|node| node.loc)
+            else {
+                return false;
+            };
+            let Some(p3) = self
+                .nodes
+                .get(poly.ring_nodes[(i + 2) % n].saturating_sub(1))
+                .map(|node| node.loc)
+            else {
+                return false;
+            };
+            if angle_change(p1, p2, p3) < -CONVEXITY_TOL {
+                return false;
+            }
+        }
+        true
+    }
+
+    fn poly_encloses_leaf_node(&self, poly: &Poly, leaf_nodes: &[usize]) -> bool {
+        for node_id in leaf_nodes.iter().copied() {
+            if poly.ring_nodes.contains(&node_id) {
+                continue;
+            }
+            let Some(node) = self.nodes.get(node_id.saturating_sub(1)) else {
+                continue;
+            };
+            if self.poly_convex_encloses(poly, node.loc) {
+                return true;
+            }
+        }
+        false
+    }
+
+    fn poly_convex_encloses(&self, poly: &Poly, point: Point) -> bool {
+        for path_id in poly.ring_paths.iter().copied() {
+            let Some(path) = self.paths.get(path_id.saturating_sub(1)) else {
+                return false;
+            };
+            let Some((node1, node2)) = path.nodes.first().zip(path.nodes.last()) else {
+                return false;
+            };
+            let Some(p1) = self.nodes.get(node1.saturating_sub(1)).map(|node| node.loc) else {
+                return false;
+            };
+            let Some(p2) = self.nodes.get(node2.saturating_sub(1)).map(|node| node.loc) else {
+                return false;
+            };
+            let mut q = rotate_ccw90(point_sub(p2, p1));
+            if inner(point_sub(poly.centroid, p1), q) < 0.0 {
+                q.x *= -1.0;
+                q.y *= -1.0;
+            }
+            if inner(point_sub(point, p1), q) < 0.0 {
+                return false;
+            }
+        }
+        true
+    }
+
+    fn kill_orphan_vertices_and_creases(&mut self) {
+        let mut doomed_creases: Vec<usize> = self
+            .creases
+            .iter()
+            .filter(|crease| self.crease_is_orphan(crease))
+            .map(|crease| crease.index)
+            .collect();
+
+        let doomed_vertices: Vec<usize> = self
+            .vertices
+            .iter()
+            .filter(|vertex| self.vertex_is_orphan(vertex))
+            .map(|vertex| vertex.index)
+            .collect();
+
+        for crease in &self.creases {
+            if crease
+                .vertices
+                .iter()
+                .any(|vertex_id| doomed_vertices.contains(vertex_id))
+            {
+                doomed_creases.push(crease.index);
+            }
+        }
+        doomed_creases.sort_unstable();
+        doomed_creases.dedup();
+
+        self.delete_creases(&doomed_creases);
+        self.delete_vertices(&doomed_vertices);
+    }
+
+    fn crease_is_orphan(&self, crease: &Crease) -> bool {
+        match crease.owner {
+            OwnerRef::Poly(poly_id) => poly_id > 0 && poly_id <= self.polys.len(),
+            OwnerRef::Path(path_id) => self
+                .paths
+                .get(path_id.saturating_sub(1))
+                .is_none_or(|path| !path.is_sub && !self.path_is_incident_to_filled_poly(path_id)),
+            _ => true,
+        }
+    }
+
+    fn vertex_is_orphan(&self, vertex: &Vertex) -> bool {
+        match vertex.owner {
+            OwnerRef::Node(node_id) => {
+                let Some(node) = self.nodes.get(node_id.saturating_sub(1)) else {
+                    return true;
+                };
+                if node.is_sub {
+                    return false;
+                }
+                if !node.is_leaf {
+                    return true;
+                }
+                !node
+                    .leaf_paths
+                    .iter()
+                    .copied()
+                    .any(|path_id| self.path_is_incident_to_filled_poly(path_id))
+            }
+            OwnerRef::Path(path_id) => self
+                .paths
+                .get(path_id.saturating_sub(1))
+                .is_none_or(|path| !path.is_sub && !self.path_is_incident_to_filled_poly(path_id)),
+            _ => true,
+        }
+    }
+
+    fn path_is_incident_to_filled_poly(&self, path_id: usize) -> bool {
+        let Some(path) = self.paths.get(path_id.saturating_sub(1)) else {
+            return false;
+        };
+        path.fwd_poly
+            .and_then(|poly_id| self.polys.get(poly_id.saturating_sub(1)))
+            .is_some_and(|poly| !poly.owned_nodes.is_empty())
+            || path
+                .bkd_poly
+                .and_then(|poly_id| self.polys.get(poly_id.saturating_sub(1)))
+                .is_some_and(|poly| !poly.owned_nodes.is_empty())
+    }
+
+    fn delete_polys(&mut self, doomed: &[usize]) {
+        if doomed.is_empty() {
+            return;
+        }
+
+        let mut doomed_flags = ids_to_flags(doomed, self.polys.len());
+        loop {
+            let mut changed = false;
+            for poly in &self.polys {
+                if doomed_flags[poly.index] {
+                    continue;
+                }
+                if let OwnerRef::Poly(owner) = poly.owner
+                    && doomed_flags.get(owner).copied().unwrap_or(false)
+                {
+                    doomed_flags[poly.index] = true;
+                    changed = true;
+                }
+            }
+            if !changed {
+                break;
+            }
+        }
+
+        let doomed_polys: Vec<usize> = doomed_flags
+            .iter()
+            .enumerate()
+            .skip(1)
+            .filter_map(|(id, doomed)| doomed.then_some(id))
+            .collect();
+        let doomed_facets: Vec<usize> = self
+            .facets
+            .iter()
+            .filter_map(|facet| match facet.owner {
+                OwnerRef::Poly(poly_id) if doomed_flags.get(poly_id).copied().unwrap_or(false) => {
+                    Some(facet.index)
+                }
+                _ => None,
+            })
+            .collect();
+        let doomed_creases: Vec<usize> = self
+            .creases
+            .iter()
+            .filter_map(|crease| match crease.owner {
+                OwnerRef::Poly(poly_id) if doomed_flags.get(poly_id).copied().unwrap_or(false) => {
+                    Some(crease.index)
+                }
+                _ => None,
+            })
+            .collect();
+
+        self.delete_facets(&doomed_facets);
+        self.delete_creases(&doomed_creases);
+
+        let map = keep_map(self.polys.len(), &doomed_polys);
+        for path in &mut self.paths {
+            remap_option(&mut path.fwd_poly, &map);
+            remap_option(&mut path.bkd_poly, &map);
+        }
+        for poly in &mut self.polys {
+            remap_vec(&mut poly.owned_polys, &map);
+            remap_owner(&mut poly.owner, PartKind::Poly, &map);
+        }
+        for node in &mut self.nodes {
+            remap_owner(&mut node.owner, PartKind::Poly, &map);
+        }
+        for path in &mut self.paths {
+            remap_owner(&mut path.owner, PartKind::Poly, &map);
+        }
+        for crease in &mut self.creases {
+            remap_owner(&mut crease.owner, PartKind::Poly, &map);
+        }
+        for facet in &mut self.facets {
+            remap_owner(&mut facet.owner, PartKind::Poly, &map);
+        }
+        remap_vec(&mut self.owned_polys, &map);
+
+        self.polys = self
+            .polys
+            .drain(..)
+            .filter(|poly| map[poly.index].is_some())
+            .enumerate()
+            .map(|(i, mut poly)| {
+                poly.index = i + 1;
+                poly
+            })
+            .collect();
+    }
+
+    fn delete_facets(&mut self, doomed: &[usize]) {
+        if doomed.is_empty() {
+            return;
+        }
+        let map = keep_map(self.facets.len(), doomed);
+        for crease in &mut self.creases {
+            remap_option(&mut crease.fwd_facet, &map);
+            remap_option(&mut crease.bkd_facet, &map);
+        }
+        for poly in &mut self.polys {
+            remap_vec(&mut poly.owned_facets, &map);
+        }
+        for facet in &mut self.facets {
+            remap_vec(&mut facet.head_facets, &map);
+            remap_vec(&mut facet.tail_facets, &map);
+        }
+        self.facets = self
+            .facets
+            .drain(..)
+            .filter(|facet| map[facet.index].is_some())
+            .enumerate()
+            .map(|(i, mut facet)| {
+                facet.index = i + 1;
+                facet
+            })
+            .collect();
+    }
+
+    fn delete_creases(&mut self, doomed: &[usize]) {
+        if doomed.is_empty() {
+            return;
+        }
+        let map = keep_map(self.creases.len(), doomed);
+        for vertex in &mut self.vertices {
+            remap_vec(&mut vertex.creases, &map);
+        }
+        for path in &mut self.paths {
+            remap_vec(&mut path.owned_creases, &map);
+        }
+        for poly in &mut self.polys {
+            remap_vec(&mut poly.local_root_creases, &map);
+            remap_vec(&mut poly.owned_creases, &map);
+        }
+        for facet in &mut self.facets {
+            remap_vec(&mut facet.creases, &map);
+        }
+        self.creases = self
+            .creases
+            .drain(..)
+            .filter(|crease| map[crease.index].is_some())
+            .enumerate()
+            .map(|(i, mut crease)| {
+                crease.index = i + 1;
+                crease
+            })
+            .collect();
+    }
+
+    fn delete_vertices(&mut self, doomed: &[usize]) {
+        if doomed.is_empty() {
+            return;
+        }
+        let map = keep_map(self.vertices.len(), doomed);
+        for node in &mut self.nodes {
+            remap_vec(&mut node.owned_vertices, &map);
+        }
+        for path in &mut self.paths {
+            remap_vec(&mut path.owned_vertices, &map);
+        }
+        for poly in &mut self.polys {
+            remap_vec(&mut poly.local_root_vertices, &map);
+        }
+        for vertex in &mut self.vertices {
+            remap_option(&mut vertex.left_pseudohinge_mate, &map);
+            remap_option(&mut vertex.right_pseudohinge_mate, &map);
+        }
+        for crease in &mut self.creases {
+            remap_vec(&mut crease.vertices, &map);
+        }
+        for facet in &mut self.facets {
+            remap_vec(&mut facet.vertices, &map);
+        }
+        self.vertices = self
+            .vertices
+            .drain(..)
+            .filter(|vertex| map[vertex.index].is_some())
+            .enumerate()
+            .map(|(i, mut vertex)| {
+                vertex.index = i + 1;
+                vertex
+            })
+            .collect();
+    }
+
+    fn promote_first_tree_node_to_root(&mut self) {
+        let Some(pos) = self.nodes.iter().position(|node| !node.is_sub) else {
+            return;
+        };
+        if pos == 0 {
+            return;
+        }
+        let old_order: Vec<usize> = std::iter::once(pos + 1)
+            .chain((1..=self.nodes.len()).filter(|id| *id != pos + 1))
+            .collect();
+        let mut map = vec![None; self.nodes.len() + 1];
+        for (new_index, old_index) in old_order.iter().copied().enumerate() {
+            map[old_index] = Some(new_index + 1);
+        }
+
+        let old_nodes = self.nodes.clone();
+        self.nodes = old_order
+            .iter()
+            .map(|old_index| old_nodes[*old_index - 1].clone())
+            .collect();
+
+        for node in &mut self.nodes {
+            node.index = map[node.index].expect("node reorder map");
+            remap_owner(&mut node.owner, PartKind::Node, &map);
+        }
+        for edge in &mut self.edges {
+            remap_vec(&mut edge.nodes, &map);
+        }
+        for path in &mut self.paths {
+            remap_vec(&mut path.nodes, &map);
+        }
+        for poly in &mut self.polys {
+            remap_vec(&mut poly.ring_nodes, &map);
+            remap_vec(&mut poly.inset_nodes, &map);
+            remap_vec(&mut poly.owned_nodes, &map);
+        }
+        for vertex in &mut self.vertices {
+            remap_option(&mut vertex.tree_node, &map);
+            remap_owner(&mut vertex.owner, PartKind::Node, &map);
+        }
+        for condition in &mut self.conditions {
+            condition.kind.remap_nodes(&map);
+        }
+        remap_vec(&mut self.owned_nodes, &map);
+    }
+
+    fn renumber_part_indices(&mut self) {
+        for (i, node) in self.nodes.iter_mut().enumerate() {
+            node.index = i + 1;
+        }
+        for (i, edge) in self.edges.iter_mut().enumerate() {
+            edge.index = i + 1;
+        }
+        for (i, path) in self.paths.iter_mut().enumerate() {
+            path.index = i + 1;
+        }
+        for (i, poly) in self.polys.iter_mut().enumerate() {
+            poly.index = i + 1;
+        }
+        for (i, vertex) in self.vertices.iter_mut().enumerate() {
+            vertex.index = i + 1;
+        }
+        for (i, crease) in self.creases.iter_mut().enumerate() {
+            crease.index = i + 1;
+        }
+        for (i, facet) in self.facets.iter_mut().enumerate() {
+            facet.index = i + 1;
+        }
+        for (i, condition) in self.conditions.iter_mut().enumerate() {
+            condition.index = i + 1;
+        }
+    }
+
+    fn clear_crease_pattern_cleanup_data(&mut self) {
+        for vertex in &mut self.vertices {
+            vertex.depth = DEPTH_NOT_SET;
+            vertex.discrete_depth = usize::MAX;
+        }
+        for crease in &mut self.creases {
+            crease.fold = 0;
+        }
+        for facet in &mut self.facets {
+            facet.corridor_edge = None;
+            facet.head_facets.clear();
+            facet.tail_facets.clear();
+            facet.order = usize::MAX;
+            facet.color = 0;
+        }
+    }
+
+    fn calc_polygon_filled(&mut self) {
+        self.is_polygon_filled = false;
+        if self.owned_polys.is_empty() {
+            return;
+        }
+        for poly_id in self.owned_polys.iter().copied() {
+            let Some(poly) = self.polys.get(poly_id.saturating_sub(1)) else {
+                return;
+            };
+            if poly.owned_nodes.is_empty() {
+                return;
+            }
+        }
+        self.is_polygon_filled = true;
+    }
+
+    fn leaf_path_id_between(&self, node1: usize, node2: usize) -> Option<usize> {
+        self.paths
+            .iter()
+            .find(|path| {
+                path.is_leaf
+                    && matches!(
+                        path.nodes.first().copied().zip(path.nodes.last().copied()),
+                        Some((a, b)) if (a == node1 && b == node2) || (a == node2 && b == node1)
+                    )
+            })
+            .map(|path| path.index)
     }
 
     fn rebuild_conditioned_flags(&mut self) {
@@ -3904,6 +4753,34 @@ impl ConditionKind {
             }
         }
     }
+
+    fn remap_nodes(&mut self, map: &[Option<usize>]) {
+        match self {
+            Self::NodeCombo { node, .. }
+            | Self::NodeFixed { node, .. }
+            | Self::NodeOnCorner { node }
+            | Self::NodeOnEdge { node }
+            | Self::NodeSymmetric { node } => remap_value(node, map),
+            Self::NodesPaired { node1, node2 }
+            | Self::PathActive { node1, node2 }
+            | Self::PathAngleFixed { node1, node2, .. }
+            | Self::PathAngleQuant { node1, node2, .. }
+            | Self::PathCombo { node1, node2, .. } => {
+                remap_value(node1, map);
+                remap_value(node2, map);
+            }
+            Self::NodesCollinear {
+                node1,
+                node2,
+                node3,
+            } => {
+                remap_value(node1, map);
+                remap_value(node2, map);
+                remap_value(node3, map);
+            }
+            Self::EdgeLengthFixed { .. } | Self::EdgesSameStrain { .. } => {}
+        }
+    }
 }
 
 fn push_condition(conditions: &mut Vec<Condition>, kind: ConditionKind) {
@@ -3930,6 +4807,81 @@ fn kill_v4_crease_pattern_refs(nodes: &mut [Node], paths: &mut [Path]) {
         if matches!(path.owner, OwnerRef::Poly(_)) {
             path.owner = OwnerRef::Tree;
         }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PartKind {
+    Node,
+    Path,
+    Poly,
+}
+
+fn ids_to_flags(ids: &[usize], len: usize) -> Vec<bool> {
+    let mut flags = vec![false; len + 1];
+    for id in ids {
+        if *id > 0 && *id <= len {
+            flags[*id] = true;
+        }
+    }
+    flags
+}
+
+fn keep_map(len: usize, doomed: &[usize]) -> Vec<Option<usize>> {
+    let doomed = ids_to_flags(doomed, len);
+    let mut map = vec![None; len + 1];
+    let mut next = 1;
+    for old in 1..=len {
+        if !doomed[old] {
+            map[old] = Some(next);
+            next += 1;
+        }
+    }
+    map
+}
+
+fn remap_value(value: &mut usize, map: &[Option<usize>]) {
+    if let Some(Some(mapped)) = map.get(*value) {
+        *value = *mapped;
+    }
+}
+
+fn remap_option(value: &mut Option<usize>, map: &[Option<usize>]) {
+    *value = value.and_then(|id| map.get(id).copied().flatten());
+}
+
+fn remap_vec(values: &mut Vec<usize>, map: &[Option<usize>]) {
+    let mapped = values
+        .iter()
+        .filter_map(|id| map.get(*id).copied().flatten())
+        .collect();
+    *values = mapped;
+}
+
+fn remap_owner(owner: &mut OwnerRef, kind: PartKind, map: &[Option<usize>]) {
+    match owner {
+        OwnerRef::Node(id) if kind == PartKind::Node => {
+            if let Some(mapped) = map.get(*id).copied().flatten() {
+                *id = mapped;
+            } else {
+                *owner = OwnerRef::Tree;
+            }
+        }
+        OwnerRef::Path(id) if kind == PartKind::Path => {
+            if let Some(mapped) = map.get(*id).copied().flatten() {
+                *id = mapped;
+            } else {
+                *owner = OwnerRef::Tree;
+            }
+        }
+        OwnerRef::Poly(id) if kind == PartKind::Poly => {
+            if let Some(mapped) = map.get(*id).copied().flatten() {
+                *id = mapped;
+            } else {
+                *owner = OwnerRef::Tree;
+            }
+        }
+        _ => {}
     }
 }
 
@@ -3966,6 +4918,36 @@ fn parse_condition_bool(value: &str) -> bool {
 
 fn is_tiny(value: TmFloat) -> bool {
     value.abs() < DIST_TOL
+}
+
+fn point_sub(a: Point, b: Point) -> Point {
+    Point {
+        x: a.x - b.x,
+        y: a.y - b.y,
+    }
+}
+
+fn rotate_ccw90(p: Point) -> Point {
+    Point { x: -p.y, y: p.x }
+}
+
+fn inner(a: Point, b: Point) -> TmFloat {
+    a.x * b.x + a.y * b.y
+}
+
+fn angle(p: Point) -> TmFloat {
+    p.y.atan2(p.x)
+}
+
+fn angle_change(p1: Point, p2: Point, p3: Point) -> TmFloat {
+    let a = angle(point_sub(p3, p2)) - angle(point_sub(p2, p1));
+    if a < -PI {
+        a + TWO_PI
+    } else if a >= PI {
+        a - TWO_PI
+    } else {
+        a
+    }
 }
 
 fn node_loc(tree: &Tree, index: usize) -> Option<Point> {
@@ -4142,6 +5124,23 @@ mod tests {
         assert_eq!(reparsed.summary().vertices, 2);
         assert_eq!(reparsed.summary().creases, 1);
         assert_eq!(reparsed.summary().facets, 1);
+    }
+
+    #[test]
+    fn cleanup_after_optimizer_removes_stale_crease_pattern_payload() {
+        let mut tree = Tree::from_tmd_str(FIXTURE_CP_V5).unwrap();
+        assert_eq!(tree.summary().polys, 1);
+
+        tree.optimize_scale().unwrap();
+        let summary = tree.summary();
+        assert_eq!(summary.polys, 0);
+        assert_eq!(summary.vertices, 0);
+        assert_eq!(summary.creases, 0);
+        assert_eq!(summary.facets, 0);
+        assert!(!tree.is_polygon_valid);
+        assert!(!tree.is_polygon_filled);
+        assert!(!tree.is_vertex_depth_valid);
+        assert!(!tree.is_facet_data_valid);
     }
 
     #[test]

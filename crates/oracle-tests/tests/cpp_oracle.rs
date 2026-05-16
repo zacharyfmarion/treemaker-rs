@@ -75,7 +75,7 @@ fn cpp_oracle_matches_rust_parse_and_stable_optimizer_cases_when_enabled() {
         .lines()
         .map(|line| serde_json::from_str(line).unwrap_or_else(|err| panic!("{line}: {err}")))
         .collect();
-    assert_eq!(records.len(), 13);
+    assert_eq!(records.len(), 14);
 
     for record in records
         .iter()
@@ -83,7 +83,8 @@ fn cpp_oracle_matches_rust_parse_and_stable_optimizer_cases_when_enabled() {
     {
         let file = record["file"].as_str().expect("file");
         let text = std::fs::read_to_string(root.join(FIXTURE_DIR).join(file)).expect(file);
-        let summary = Tree::from_tmd_str(&text).expect(file).summary();
+        let tree = Tree::from_tmd_str(&text).expect(file);
+        let summary = tree.summary();
 
         approx_eq(
             summary.paper_width,
@@ -108,6 +109,31 @@ fn cpp_oracle_matches_rust_parse_and_stable_optimizer_cases_when_enabled() {
             record["is_feasible"].as_bool().unwrap(),
             "{file}"
         );
+        assert_eq!(
+            tree.is_polygon_valid,
+            record["is_polygon_valid"].as_bool().unwrap(),
+            "{file}"
+        );
+        assert_eq!(
+            tree.is_polygon_filled,
+            record["is_polygon_filled"].as_bool().unwrap(),
+            "{file}"
+        );
+        assert_eq!(
+            tree.is_vertex_depth_valid,
+            record["is_vertex_depth_valid"].as_bool().unwrap(),
+            "{file}"
+        );
+        assert_eq!(
+            tree.is_facet_data_valid,
+            record["is_facet_data_valid"].as_bool().unwrap(),
+            "{file}"
+        );
+        assert_eq!(
+            tree.is_local_root_connectable,
+            record["is_local_root_connectable"].as_bool().unwrap(),
+            "{file}"
+        );
         assert_eq!(summary.nodes, as_usize(record, "nodes"), "{file}");
         assert_eq!(summary.edges, as_usize(record, "edges"), "{file}");
         assert_eq!(summary.paths, as_usize(record, "paths"), "{file}");
@@ -118,6 +144,61 @@ fn cpp_oracle_matches_rust_parse_and_stable_optimizer_cases_when_enabled() {
         assert_eq!(summary.conditions, as_usize(record, "conditions"), "{file}");
         assert_eq!(summary.leaf_nodes, as_usize(record, "leaf_nodes"), "{file}");
         assert_eq!(summary.leaf_paths, as_usize(record, "leaf_paths"), "{file}");
+        assert_eq!(
+            summary.feasible_paths,
+            as_usize(record, "feasible_paths"),
+            "{file}"
+        );
+        assert_eq!(
+            summary.active_paths,
+            as_usize(record, "active_paths"),
+            "{file}"
+        );
+        assert_eq!(
+            summary.border_nodes,
+            as_usize(record, "border_nodes"),
+            "{file}"
+        );
+        assert_eq!(
+            summary.border_paths,
+            as_usize(record, "border_paths"),
+            "{file}"
+        );
+        assert_eq!(
+            summary.polygon_nodes,
+            as_usize(record, "polygon_nodes"),
+            "{file}"
+        );
+        assert_eq!(
+            summary.polygon_paths,
+            as_usize(record, "polygon_paths"),
+            "{file}"
+        );
+        assert_eq!(
+            summary.pinned_nodes,
+            as_usize(record, "pinned_nodes"),
+            "{file}"
+        );
+        assert_eq!(
+            summary.pinned_edges,
+            as_usize(record, "pinned_edges"),
+            "{file}"
+        );
+        assert_eq!(
+            summary.conditioned_nodes,
+            as_usize(record, "conditioned_nodes"),
+            "{file}"
+        );
+        assert_eq!(
+            summary.conditioned_edges,
+            as_usize(record, "conditioned_edges"),
+            "{file}"
+        );
+        assert_eq!(
+            summary.conditioned_paths,
+            as_usize(record, "conditioned_paths"),
+            "{file}"
+        );
     }
 
     for record in records
@@ -152,6 +233,31 @@ fn cpp_oracle_matches_rust_parse_and_stable_optimizer_cases_when_enabled() {
             record["is_feasible"].as_bool().unwrap(),
             "{file}"
         );
+        assert_eq!(
+            tree.is_polygon_valid,
+            record["is_polygon_valid"].as_bool().unwrap(),
+            "{file}"
+        );
+        assert_eq!(
+            tree.is_polygon_filled,
+            record["is_polygon_filled"].as_bool().unwrap(),
+            "{file}"
+        );
+        assert_eq!(
+            tree.is_vertex_depth_valid,
+            record["is_vertex_depth_valid"].as_bool().unwrap(),
+            "{file}"
+        );
+        assert_eq!(
+            tree.is_facet_data_valid,
+            record["is_facet_data_valid"].as_bool().unwrap(),
+            "{file}"
+        );
+        assert_eq!(
+            tree.is_local_root_connectable,
+            record["is_local_root_connectable"].as_bool().unwrap(),
+            "{file}"
+        );
         approx_eq(tree.scale, as_f64(record, "scale"), 5.0e-7, file);
 
         let max_edge_strain = tree
@@ -170,6 +276,70 @@ fn cpp_oracle_matches_rust_parse_and_stable_optimizer_cases_when_enabled() {
             as_f64(record, "weighted_rms_strain_percent"),
             5.0e-7,
             file,
+        );
+
+        let summary = tree.summary();
+        assert_eq!(summary.nodes, as_usize(record, "nodes"), "{file}");
+        assert_eq!(summary.edges, as_usize(record, "edges"), "{file}");
+        assert_eq!(summary.paths, as_usize(record, "paths"), "{file}");
+        assert_eq!(summary.polys, as_usize(record, "polys"), "{file}");
+        assert_eq!(summary.vertices, as_usize(record, "vertices"), "{file}");
+        assert_eq!(summary.creases, as_usize(record, "creases"), "{file}");
+        assert_eq!(summary.facets, as_usize(record, "facets"), "{file}");
+        assert_eq!(
+            summary.feasible_paths,
+            as_usize(record, "feasible_paths"),
+            "{file}"
+        );
+        assert_eq!(
+            summary.active_paths,
+            as_usize(record, "active_paths"),
+            "{file}"
+        );
+        assert_eq!(
+            summary.border_nodes,
+            as_usize(record, "border_nodes"),
+            "{file}"
+        );
+        assert_eq!(
+            summary.border_paths,
+            as_usize(record, "border_paths"),
+            "{file}"
+        );
+        assert_eq!(
+            summary.polygon_nodes,
+            as_usize(record, "polygon_nodes"),
+            "{file}"
+        );
+        assert_eq!(
+            summary.polygon_paths,
+            as_usize(record, "polygon_paths"),
+            "{file}"
+        );
+        assert_eq!(
+            summary.pinned_nodes,
+            as_usize(record, "pinned_nodes"),
+            "{file}"
+        );
+        assert_eq!(
+            summary.pinned_edges,
+            as_usize(record, "pinned_edges"),
+            "{file}"
+        );
+        assert_eq!(
+            summary.conditioned_nodes,
+            as_usize(record, "conditioned_nodes"),
+            "{file}"
+        );
+        assert_eq!(
+            summary.conditioned_edges,
+            as_usize(record, "conditioned_edges"),
+            "{file}"
+        );
+        assert_eq!(
+            summary.conditioned_paths,
+            as_usize(record, "conditioned_paths"),
+            "{file}"
         );
     }
 }

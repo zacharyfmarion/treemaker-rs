@@ -131,6 +131,116 @@ size_t CountLeafPaths(tmTree& tree)
   return count;
 }
 
+size_t CountFeasiblePaths(tmTree& tree)
+{
+  const tmDpptrArray<tmPath>& paths = tree.GetPaths();
+  size_t count = 0;
+  for (size_t i = 0; i < paths.size(); ++i) {
+    if (paths[i]->IsFeasiblePath()) ++count;
+  }
+  return count;
+}
+
+size_t CountActivePaths(tmTree& tree)
+{
+  const tmDpptrArray<tmPath>& paths = tree.GetPaths();
+  size_t count = 0;
+  for (size_t i = 0; i < paths.size(); ++i) {
+    if (paths[i]->IsActivePath()) ++count;
+  }
+  return count;
+}
+
+size_t CountBorderNodes(tmTree& tree)
+{
+  const tmDpptrArray<tmNode>& nodes = tree.GetNodes();
+  size_t count = 0;
+  for (size_t i = 0; i < nodes.size(); ++i) {
+    if (nodes[i]->IsBorderNode()) ++count;
+  }
+  return count;
+}
+
+size_t CountBorderPaths(tmTree& tree)
+{
+  const tmDpptrArray<tmPath>& paths = tree.GetPaths();
+  size_t count = 0;
+  for (size_t i = 0; i < paths.size(); ++i) {
+    if (paths[i]->IsBorderPath()) ++count;
+  }
+  return count;
+}
+
+size_t CountPolygonNodes(tmTree& tree)
+{
+  const tmDpptrArray<tmNode>& nodes = tree.GetNodes();
+  size_t count = 0;
+  for (size_t i = 0; i < nodes.size(); ++i) {
+    if (nodes[i]->IsPolygonNode()) ++count;
+  }
+  return count;
+}
+
+size_t CountPolygonPaths(tmTree& tree)
+{
+  const tmDpptrArray<tmPath>& paths = tree.GetPaths();
+  size_t count = 0;
+  for (size_t i = 0; i < paths.size(); ++i) {
+    if (paths[i]->IsPolygonPath()) ++count;
+  }
+  return count;
+}
+
+size_t CountPinnedNodes(tmTree& tree)
+{
+  const tmDpptrArray<tmNode>& nodes = tree.GetNodes();
+  size_t count = 0;
+  for (size_t i = 0; i < nodes.size(); ++i) {
+    if (nodes[i]->IsPinnedNode()) ++count;
+  }
+  return count;
+}
+
+size_t CountPinnedEdges(tmTree& tree)
+{
+  const tmDpptrArray<tmEdge>& edges = tree.GetEdges();
+  size_t count = 0;
+  for (size_t i = 0; i < edges.size(); ++i) {
+    if (edges[i]->IsPinnedEdge()) ++count;
+  }
+  return count;
+}
+
+size_t CountConditionedNodes(tmTree& tree)
+{
+  const tmDpptrArray<tmNode>& nodes = tree.GetNodes();
+  size_t count = 0;
+  for (size_t i = 0; i < nodes.size(); ++i) {
+    if (nodes[i]->IsConditionedNode()) ++count;
+  }
+  return count;
+}
+
+size_t CountConditionedEdges(tmTree& tree)
+{
+  const tmDpptrArray<tmEdge>& edges = tree.GetEdges();
+  size_t count = 0;
+  for (size_t i = 0; i < edges.size(); ++i) {
+    if (edges[i]->IsConditionedEdge()) ++count;
+  }
+  return count;
+}
+
+size_t CountConditionedPaths(tmTree& tree)
+{
+  const tmDpptrArray<tmPath>& paths = tree.GetPaths();
+  size_t count = 0;
+  for (size_t i = 0; i < paths.size(); ++i) {
+    if (paths[i]->IsConditionedPath()) ++count;
+  }
+  return count;
+}
+
 double MaxEdgeStrain(const tmDpptrArray<tmEdge>& edges)
 {
   double maxStrain = 0.0;
@@ -190,6 +300,17 @@ void EmitSummary(const string& path)
        << "\"owned_edges\":" << tree.GetOwnedEdges().size() << ","
        << "\"paths\":" << tree.GetNumPaths() << ","
        << "\"leaf_paths\":" << CountLeafPaths(tree) << ","
+       << "\"feasible_paths\":" << CountFeasiblePaths(tree) << ","
+       << "\"active_paths\":" << CountActivePaths(tree) << ","
+       << "\"border_nodes\":" << CountBorderNodes(tree) << ","
+       << "\"border_paths\":" << CountBorderPaths(tree) << ","
+       << "\"polygon_nodes\":" << CountPolygonNodes(tree) << ","
+       << "\"polygon_paths\":" << CountPolygonPaths(tree) << ","
+       << "\"pinned_nodes\":" << CountPinnedNodes(tree) << ","
+       << "\"pinned_edges\":" << CountPinnedEdges(tree) << ","
+       << "\"conditioned_nodes\":" << CountConditionedNodes(tree) << ","
+       << "\"conditioned_edges\":" << CountConditionedEdges(tree) << ","
+       << "\"conditioned_paths\":" << CountConditionedPaths(tree) << ","
        << "\"polys\":" << tree.GetNumPolys() << ","
        << "\"vertices\":" << tree.GetNumVertices() << ","
        << "\"creases\":" << tree.GetNumCreases() << ","
@@ -286,6 +407,14 @@ void EmitOptimize(const string& path, const string& kind)
        << "\"error\":\"" << JsonEscape(error) << "\","
        << "\"scale\":" << tree.GetScale() << ","
        << "\"is_feasible\":" << BoolStr(tree.IsFeasible()) << ","
+       << "\"is_polygon_valid\":" << BoolStr(tree.IsPolygonValid()) << ","
+       << "\"is_polygon_filled\":" << BoolStr(tree.IsPolygonFilled()) << ","
+       << "\"is_vertex_depth_valid\":"
+       << BoolStr(tree.IsVertexDepthValid()) << ","
+       << "\"is_facet_data_valid\":" << BoolStr(tree.IsFacetDataValid())
+       << ","
+       << "\"is_local_root_connectable\":"
+       << BoolStr(tree.IsLocalRootConnectable()) << ","
        << "\"moving_nodes\":" << movingNodeCount << ","
        << "\"stretchy_edges\":" << stretchyEdgeCount << ","
        << "\"max_edge_strain\":" << MaxEdgeStrain(edges) << ","
@@ -294,6 +423,21 @@ void EmitOptimize(const string& path, const string& kind)
        << "\"nodes\":" << tree.GetNumNodes() << ","
        << "\"edges\":" << tree.GetNumEdges() << ","
        << "\"paths\":" << tree.GetNumPaths() << ","
+       << "\"polys\":" << tree.GetNumPolys() << ","
+       << "\"vertices\":" << tree.GetNumVertices() << ","
+       << "\"creases\":" << tree.GetNumCreases() << ","
+       << "\"facets\":" << tree.GetFacets().size() << ","
+       << "\"feasible_paths\":" << CountFeasiblePaths(tree) << ","
+       << "\"active_paths\":" << CountActivePaths(tree) << ","
+       << "\"border_nodes\":" << CountBorderNodes(tree) << ","
+       << "\"border_paths\":" << CountBorderPaths(tree) << ","
+       << "\"polygon_nodes\":" << CountPolygonNodes(tree) << ","
+       << "\"polygon_paths\":" << CountPolygonPaths(tree) << ","
+       << "\"pinned_nodes\":" << CountPinnedNodes(tree) << ","
+       << "\"pinned_edges\":" << CountPinnedEdges(tree) << ","
+       << "\"conditioned_nodes\":" << CountConditionedNodes(tree) << ","
+       << "\"conditioned_edges\":" << CountConditionedEdges(tree) << ","
+       << "\"conditioned_paths\":" << CountConditionedPaths(tree) << ","
        << "\"conditions\":" << tree.GetNumConditions()
        << "}" << endl;
 }
@@ -328,6 +472,7 @@ int RunFixtures(int argc, char** argv)
   EmitOptimize(JoinPath(fixtureDir, kFixtures[2]), "scale");
   EmitOptimize(JoinPath(fixtureDir, kFixtures[3]), "edge");
   EmitOptimize(JoinPath(fixtureDir, kFixtures[4]), "strain");
+  EmitOptimize(JoinPath(fixtureDir, kFixtures[7]), "scale");
   return 0;
 }
 

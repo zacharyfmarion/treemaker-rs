@@ -159,6 +159,66 @@ string PolyOwnerJson(tmTree& tree, tmPoly* poly)
   return "{\"kind\":\"unknown\",\"index\":0}";
 }
 
+string VertexOwnerJson(tmTree& tree, tmVertex* vertex)
+{
+  const tmDpptrArray<tmNode>& nodes = tree.GetNodes();
+  for (size_t i = 0; i < nodes.size(); ++i) {
+    tmNode* owner = nodes[i];
+    if (vertex->GetVertexOwner() == static_cast<tmVertexOwner*>(owner)) {
+      ostringstream os;
+      os << "{\"kind\":\"node\",\"index\":" << owner->GetIndex() << "}";
+      return os.str();
+    }
+  }
+  const tmDpptrArray<tmPath>& paths = tree.GetPaths();
+  for (size_t i = 0; i < paths.size(); ++i) {
+    tmPath* owner = paths[i];
+    if (vertex->GetVertexOwner() == static_cast<tmVertexOwner*>(owner)) {
+      ostringstream os;
+      os << "{\"kind\":\"path\",\"index\":" << owner->GetIndex() << "}";
+      return os.str();
+    }
+  }
+  return "{\"kind\":\"unknown\",\"index\":0}";
+}
+
+string CreaseOwnerJson(tmTree& tree, tmCrease* crease)
+{
+  const tmDpptrArray<tmPath>& paths = tree.GetPaths();
+  for (size_t i = 0; i < paths.size(); ++i) {
+    tmPath* owner = paths[i];
+    if (crease->GetCreaseOwner() == static_cast<tmCreaseOwner*>(owner)) {
+      ostringstream os;
+      os << "{\"kind\":\"path\",\"index\":" << owner->GetIndex() << "}";
+      return os.str();
+    }
+  }
+  const tmDpptrArray<tmPoly>& polys = tree.GetPolys();
+  for (size_t i = 0; i < polys.size(); ++i) {
+    tmPoly* owner = polys[i];
+    if (crease->GetCreaseOwner() == static_cast<tmCreaseOwner*>(owner)) {
+      ostringstream os;
+      os << "{\"kind\":\"poly\",\"index\":" << owner->GetIndex() << "}";
+      return os.str();
+    }
+  }
+  return "{\"kind\":\"unknown\",\"index\":0}";
+}
+
+string FacetOwnerJson(tmTree& tree, tmFacet* facet)
+{
+  const tmDpptrArray<tmPoly>& polys = tree.GetPolys();
+  for (size_t i = 0; i < polys.size(); ++i) {
+    tmPoly* owner = polys[i];
+    if (facet->GetFacetOwner() == static_cast<tmFacetOwner*>(owner)) {
+      ostringstream os;
+      os << "{\"kind\":\"poly\",\"index\":" << owner->GetIndex() << "}";
+      return os.str();
+    }
+  }
+  return "{\"kind\":\"unknown\",\"index\":0}";
+}
+
 size_t CountLeafNodes(tmTree& tree)
 {
   const tmDpptrArray<tmNode>& nodes = tree.GetNodes();
@@ -421,6 +481,81 @@ void EmitPathsDetailJson(tmTree& tree)
   cout << "]";
 }
 
+void EmitVerticesDetailJson(tmTree& tree)
+{
+  const tmDpptrArray<tmVertex>& vertices = tree.GetVertices();
+  cout << "\"vertices_detail\":[";
+  for (size_t i = 0; i < vertices.size(); ++i) {
+    tmVertex* vertex = vertices[i];
+    if (i != 0) cout << ",";
+    cout << "{"
+         << "\"index\":" << vertex->GetIndex() << ","
+         << "\"owner\":" << VertexOwnerJson(tree, vertex) << ","
+         << "\"loc\":";
+    EmitPoint(cout, vertex->GetLoc());
+    cout << ",\"elevation\":" << vertex->GetElevation() << ","
+         << "\"is_border\":" << BoolStr(vertex->IsBorderVertex()) << ","
+         << "\"tree_node\":" << PtrIndex(vertex->GetTreeNode()) << ","
+         << "\"left_pseudohinge_mate\":"
+         << PtrIndex(vertex->GetLeftPseudohingeMate()) << ","
+         << "\"right_pseudohinge_mate\":"
+         << PtrIndex(vertex->GetRightPseudohingeMate()) << ","
+         << "\"creases\":";
+    EmitIndexArray(cout, vertex->GetCreases());
+    cout << ",\"depth\":" << vertex->GetDepth() << ","
+         << "\"discrete_depth\":" << vertex->GetDiscreteDepth() << "}";
+  }
+  cout << "]";
+}
+
+void EmitCreasesDetailJson(tmTree& tree)
+{
+  const tmDpptrArray<tmCrease>& creases = tree.GetCreases();
+  cout << "\"creases_detail\":[";
+  for (size_t i = 0; i < creases.size(); ++i) {
+    tmCrease* crease = creases[i];
+    if (i != 0) cout << ",";
+    cout << "{"
+         << "\"index\":" << crease->GetIndex() << ","
+         << "\"owner\":" << CreaseOwnerJson(tree, crease) << ","
+         << "\"kind\":" << static_cast<int>(crease->GetKind()) << ","
+         << "\"vertices\":";
+    EmitIndexArray(cout, crease->GetVertices());
+    cout << ",\"fwd_facet\":" << PtrIndex(crease->GetFwdFacet()) << ","
+         << "\"bkd_facet\":" << PtrIndex(crease->GetBkdFacet()) << ","
+         << "\"fold\":" << static_cast<int>(crease->GetFold()) << "}";
+  }
+  cout << "]";
+}
+
+void EmitFacetsDetailJson(tmTree& tree)
+{
+  const tmDpptrArray<tmFacet>& facets = tree.GetFacets();
+  cout << "\"facets_detail\":[";
+  for (size_t i = 0; i < facets.size(); ++i) {
+    tmFacet* facet = facets[i];
+    if (i != 0) cout << ",";
+    cout << "{"
+         << "\"index\":" << facet->GetIndex() << ","
+         << "\"owner\":" << FacetOwnerJson(tree, facet) << ","
+         << "\"centroid\":";
+    EmitPoint(cout, facet->GetCentroid());
+    cout << ",\"is_well_formed\":" << BoolStr(facet->IsWellFormed())
+         << ",\"vertices\":";
+    EmitIndexArray(cout, facet->GetVertices());
+    cout << ",\"creases\":";
+    EmitIndexArray(cout, facet->GetCreases());
+    cout << ",\"corridor_edge\":" << PtrIndex(facet->GetCorridorEdge())
+         << ",\"tail_facets\":";
+    EmitIndexArray(cout, facet->GetTailFacets());
+    cout << ",\"head_facets\":";
+    EmitIndexArray(cout, facet->GetHeadFacets());
+    cout << ",\"order\":" << facet->GetOrder() << ","
+         << "\"color\":" << static_cast<int>(facet->GetColor()) << "}";
+  }
+  cout << "]";
+}
+
 void EmitSummary(const string& path)
 {
   tmTree tree;
@@ -651,6 +786,14 @@ void EmitBuildPolygonContents(const string& path)
   tree.KillPolysAndCreasePattern();
   tree.BuildPolysAndCreasePattern();
 
+  tmArray<tmEdge*> badEdges;
+  tmArray<tmPoly*> badPolys;
+  tmArray<tmVertex*> badVertices;
+  tmArray<tmCrease*> badCreases;
+  tmArray<tmFacet*> badFacets;
+  tmTree::CPStatus cpStatus =
+    tree.GetCPStatus(badEdges, badPolys, badVertices, badCreases, badFacets);
+
   cout << "{"
        << "\"case\":\"build_polygon_contents\","
        << "\"operation\":\"kill_polys_and_crease_pattern_then_build_polys_and_crease_pattern\","
@@ -658,6 +801,13 @@ void EmitBuildPolygonContents(const string& path)
        << "\"is_feasible\":" << BoolStr(tree.IsFeasible()) << ","
        << "\"is_polygon_valid\":" << BoolStr(tree.IsPolygonValid()) << ","
        << "\"is_polygon_filled\":" << BoolStr(tree.IsPolygonFilled()) << ","
+       << "\"is_vertex_depth_valid\":"
+       << BoolStr(tree.IsVertexDepthValid()) << ","
+       << "\"is_facet_data_valid\":" << BoolStr(tree.IsFacetDataValid())
+       << ","
+       << "\"is_local_root_connectable\":"
+       << BoolStr(tree.IsLocalRootConnectable()) << ","
+       << "\"cp_status\":\"" << CpStatusName(cpStatus) << "\","
        << "\"nodes\":" << tree.GetNumNodes() << ","
        << "\"paths\":" << tree.GetNumPaths() << ","
        << "\"polys\":" << tree.GetNumPolys() << ","
@@ -679,6 +829,12 @@ void EmitBuildPolygonContents(const string& path)
   EmitNodesDetailJson(tree);
   cout << ",";
   EmitPathsDetailJson(tree);
+  cout << ",";
+  EmitVerticesDetailJson(tree);
+  cout << ",";
+  EmitCreasesDetailJson(tree);
+  cout << ",";
+  EmitFacetsDetailJson(tree);
   cout << ",";
   EmitPolygonPathSidesJson(tree);
   cout << "}" << endl;

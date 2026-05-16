@@ -29,13 +29,15 @@ Implemented:
 - Direct ports of top-level tree polygon construction and the geometry-only
   inset/subpoly portion of `tmPoly::BuildPolyContents()`, verified against the
   C++ oracle for representative upstream fixtures.
+- Direct ports of vertex, crease, facet, corridor-edge, facet-order,
+  facet-color, and fold-direction construction for the checked-in oracle
+  surface.
 - CLI and wasm bindings for parsing, checking, optimizing, and saving.
 
 Explicitly incomplete:
 
-- Crease, vertex, facet, facet order, and fold direction construction.
-- Full post-construction `CPStatus` parity beyond the currently represented
-  model surface.
+- Public bad-part diagnostic lists for each `CPStatus` failure mode. The status
+  enum itself now matches the C++ oracle on the checked-in fixtures.
 
 ## Phase 1: Oracle Foundation
 
@@ -146,6 +148,16 @@ Done when:
 
 ## Phase 5: Crease Pattern Generation
 
+Status: complete for the checked-in oracle surface. Rust now ports the crease
+pattern generation tail of `tmPoly::BuildPolyContents()` and
+`tmTree::CleanupAfterEdit()`, including path/node vertices, axial/gusset/ridge/
+hinge/pseudohinge creases, facet rings, vertex depth, bend classification,
+local-root networks, facet-order graph splicing, facet order values, facet
+colors, and crease fold directions. The C++ oracle emits detailed
+vertex/crease/facet JSON for this phase, and the Rust oracle test compares
+owners, locations, depths, crease/facet references, corridor edges, ordering
+links, order, color, fold, and `CPStatus`.
+
 Goal: port the full crease-pattern construction pipeline.
 
 Work items:
@@ -154,7 +166,9 @@ Work items:
 - Port facet generation and facet ownership.
 - Port facet order and local-root connectivity checks.
 - Port fold direction assignment.
-- Implement full `CPStatus` reporting with bad part lists.
+- Implement full `CPStatus` status reporting.
+- Expose bad part lists in a future diagnostic API if the CLI/wasm surface
+  needs them.
 
 Done when:
 

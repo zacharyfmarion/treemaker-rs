@@ -13,6 +13,23 @@ const PI: TmFloat = std::f64::consts::PI;
 const TWO_PI: TmFloat = 2.0 * std::f64::consts::PI;
 const CONVEXITY_TOL: TmFloat = 1.0e-4;
 const MOVE_TOL: TmFloat = 1.0e-6;
+const VERTEX_TOL: TmFloat = 0.003;
+const CREASE_AXIAL: i32 = 0;
+const CREASE_GUSSET: i32 = 1;
+const CREASE_RIDGE: i32 = 2;
+const CREASE_UNFOLDED_HINGE: i32 = 3;
+const CREASE_FOLDED_HINGE: i32 = 4;
+const CREASE_PSEUDOHINGE: i32 = 5;
+const FOLD_FLAT: i32 = 0;
+const FOLD_MOUNTAIN: i32 = 1;
+const FOLD_VALLEY: i32 = 2;
+const FOLD_BORDER: i32 = 3;
+const FACET_NOT_ORIENTED: i32 = 0;
+const FACET_WHITE_UP: i32 = 1;
+const FACET_COLOR_UP: i32 = 2;
+const ROOT_FLAG_INELIGIBLE: i32 = 0;
+const ROOT_FLAG_NOT_YET: i32 = 1;
+const ROOT_FLAG_ALREADY_ADDED: i32 = 2;
 
 #[derive(Debug, thiserror::Error)]
 pub enum TreeError {
@@ -363,6 +380,39 @@ pub enum OptimizationKind {
     Strain,
 }
 
+#[derive(Debug, Clone)]
+struct RootNetwork {
+    discrete_depth: usize,
+    is_connectable: bool,
+    cc_vertices: Vec<usize>,
+    cc_creases: Vec<usize>,
+    cc_polys: Vec<usize>,
+    st_vertices: Vec<usize>,
+    st_creases: Vec<usize>,
+    cc0: Vec<usize>,
+    cc1: Vec<usize>,
+    cc2_st1: Vec<usize>,
+    cc2_st2: Vec<usize>,
+}
+
+impl RootNetwork {
+    fn new(discrete_depth: usize) -> Self {
+        Self {
+            discrete_depth,
+            is_connectable: false,
+            cc_vertices: Vec::new(),
+            cc_creases: Vec::new(),
+            cc_polys: Vec::new(),
+            st_vertices: Vec::new(),
+            st_creases: Vec::new(),
+            cc0: Vec::new(),
+            cc1: Vec::new(),
+            cc2_st1: Vec::new(),
+            cc2_st2: Vec::new(),
+        }
+    }
+}
+
 impl Tree {
     pub fn from_tmd_str(input: &str) -> Result<Self> {
         let mut reader = Reader::new(input);
@@ -541,6 +591,16 @@ impl Tree {
         }
         if !self.is_polygon_filled {
             return CPStatus::PolysNotFilled;
+        }
+        if self.owned_polys.iter().copied().any(|poly_id| {
+            self.polys[poly_id - 1]
+                .ring_paths
+                .iter()
+                .filter(|path_id| !self.paths[**path_id - 1].is_active)
+                .count()
+                > 1
+        }) {
+            return CPStatus::PolysMultipleIbps;
         }
         if !self.is_vertex_depth_valid {
             return CPStatus::VerticesLackDepth;
@@ -852,9 +912,21 @@ impl Tree {
     }
 
     pub fn build_polys_and_crease_pattern(&mut self) -> Result<()> {
-        Err(TreeError::UnsupportedOperation(
-            "crease-pattern generation is not ported yet",
-        ))
+        self.build_tree_polys()?;
+        if self
+            .edges
+            .iter()
+            .any(|edge| edge.strained_length() < MIN_EDGE_LENGTH)
+        {
+            return Ok(());
+        }
+
+        let owned_polys = self.owned_polys.clone();
+        for poly_id in owned_polys {
+            self.build_poly_contents_geometry(poly_id)?;
+        }
+        self.cleanup_after_edit();
+        Ok(())
     }
 
     #[doc(hidden)]
@@ -2699,33 +2771,37 @@ impl Tree {
     }
 
     fn build_poly_contents_geometry(&mut self, poly_id: usize) -> Result<()> {
-        if self.polys[poly_id - 1].owned_nodes.is_empty() {
-            let ring_nodes = self.polys[poly_id - 1].ring_nodes.clone();
-            let nn = ring_nodes.len();
-            if nn < 3 {
-                return Err(TreeError::InvalidOperation(
-                    "polygon contents require at least three ring nodes",
-                ));
-            }
-
-            if nn == 3 {
-                let p1 = self.nodes[ring_nodes[0] - 1].loc;
-                let p2 = self.nodes[ring_nodes[1] - 1].loc;
-                let p3 = self.nodes[ring_nodes[2] - 1].loc;
-                let node_id = self.create_sub_node(poly_id, incenter(p1, p2, p3));
-                self.nodes[node_id - 1].is_junction = true;
-                self.nodes[node_id - 1].elevation =
-                    self.nodes[ring_nodes[0] - 1].elevation + inradius(p1, p2, p3);
-                self.polys[poly_id - 1].inset_nodes = vec![node_id, node_id, node_id];
-
-                for ring_node in ring_nodes {
-                    let path_id = self.create_sub_path(poly_id, ring_node, node_id, false);
-                    self.polys[poly_id - 1].spoke_paths.push(path_id);
-                }
-            } else {
-                self.build_inset_poly_contents(poly_id)?;
-            }
+        if !self.polys[poly_id - 1].owned_nodes.is_empty() {
+            return Ok(());
         }
+
+        let ring_nodes = self.polys[poly_id - 1].ring_nodes.clone();
+        let nn = ring_nodes.len();
+        if nn < 3 {
+            return Err(TreeError::InvalidOperation(
+                "polygon contents require at least three ring nodes",
+            ));
+        }
+
+        if nn == 3 {
+            let p1 = self.nodes[ring_nodes[0] - 1].loc;
+            let p2 = self.nodes[ring_nodes[1] - 1].loc;
+            let p3 = self.nodes[ring_nodes[2] - 1].loc;
+            let node_id = self.create_sub_node(poly_id, incenter(p1, p2, p3));
+            self.nodes[node_id - 1].is_junction = true;
+            self.nodes[node_id - 1].elevation =
+                self.nodes[ring_nodes[0] - 1].elevation + inradius(p1, p2, p3);
+            self.polys[poly_id - 1].inset_nodes = vec![node_id, node_id, node_id];
+
+            for ring_node in ring_nodes {
+                let path_id = self.create_sub_path(poly_id, ring_node, node_id, false);
+                self.polys[poly_id - 1].spoke_paths.push(path_id);
+            }
+        } else {
+            self.build_inset_poly_contents(poly_id)?;
+        }
+
+        self.build_poly_creases_and_facets(poly_id)?;
         Ok(())
     }
 
@@ -3013,6 +3089,761 @@ impl Tree {
             })
     }
 
+    fn build_poly_creases_and_facets(&mut self, poly_id: usize) -> Result<()> {
+        let nn = self.polys[poly_id - 1].ring_nodes.len();
+
+        for i in 0..nn {
+            let front_node = self.polys[poly_id - 1].ring_nodes[i];
+            let back_node = self.polys[poly_id - 1].ring_nodes[(i + 1) % nn];
+            let path_id = self.polys[poly_id - 1].ring_paths[i];
+
+            if self.path_is_axial(path_id) || self.path_is_gusset(path_id) {
+                self.build_self_vertices(path_id)?;
+            }
+
+            if self.path_is_active_axial(path_id) || self.path_is_gusset(path_id) {
+                let (_, ridge_paths) =
+                    self.get_ridgeline_nodes_and_paths(poly_id, front_node, back_node)?;
+                let bottom_vertices = self.paths[path_id - 1].owned_vertices.clone();
+                let p1 = self.nodes[front_node - 1].loc;
+                let p2 = self.nodes[back_node - 1].loc;
+                for bottom_vertex in bottom_vertices {
+                    let bottom_loc = self.vertices[bottom_vertex - 1].loc;
+                    let tree_node = self.vertices[bottom_vertex - 1].tree_node;
+                    for ridge_path in ridge_paths.iter().copied() {
+                        let q1 = self.nodes[self.paths[ridge_path - 1].nodes[0] - 1].loc;
+                        let q2 =
+                            self.nodes[*self.paths[ridge_path - 1].nodes.last().unwrap() - 1].loc;
+                        if let Some(q) = project_p_to_q(p1, p2, bottom_loc, q1, q2) {
+                            let top_vertex = self.get_or_make_path_vertex(ridge_path, q, tree_node);
+                            let outermost_poly = self.outermost_poly(poly_id);
+                            self.get_or_make_crease(
+                                OwnerRef::Poly(outermost_poly),
+                                bottom_vertex,
+                                top_vertex,
+                                CREASE_UNFOLDED_HINGE,
+                            )?;
+                        }
+                    }
+                }
+            }
+        }
+
+        for i in 0..nn {
+            let front_node = self.polys[poly_id - 1].ring_nodes[i];
+            let back_node = self.polys[poly_id - 1].ring_nodes[(i + 1) % nn];
+            let path_id = self.polys[poly_id - 1].ring_paths[i];
+
+            if self.path_is_axial(path_id) || self.path_is_gusset(path_id) {
+                let ridge_vertices = self.get_ridgeline_vertices(poly_id, front_node, back_node)?;
+                if let Some((&first, rest)) = ridge_vertices.split_first() {
+                    let outermost_poly = self.outermost_poly(poly_id);
+                    let mut ridge_vertex = first;
+                    for next_ridge_vertex in rest.iter().copied() {
+                        self.get_or_make_crease(
+                            OwnerRef::Poly(outermost_poly),
+                            ridge_vertex,
+                            next_ridge_vertex,
+                            CREASE_RIDGE,
+                        )?;
+                        ridge_vertex = next_ridge_vertex;
+                    }
+                }
+
+                if self.path_is_axial(path_id) && !self.paths[path_id - 1].is_active {
+                    self.propagate_inactive_axial_hinges(poly_id, path_id, &ridge_vertices)?;
+                }
+            }
+
+            if self.path_is_axial(path_id) || self.path_is_gusset(path_id) {
+                let crease_kind = if self.path_is_axial(path_id) {
+                    CREASE_AXIAL
+                } else {
+                    CREASE_GUSSET
+                };
+                self.connect_self_vertices(path_id, crease_kind)?;
+            }
+        }
+
+        if self.polys[poly_id - 1].is_sub_poly {
+            return Ok(());
+        }
+
+        let mut facet_creases = self.polys[poly_id - 1].owned_creases.clone();
+        for path_id in self.polys[poly_id - 1].ring_paths.clone() {
+            for crease_id in self.paths[path_id - 1].owned_creases.iter().copied() {
+                push_unique(&mut facet_creases, crease_id);
+            }
+        }
+        self.build_facets_from_creases(poly_id, &facet_creases)
+    }
+
+    fn path_is_axial(&self, path_id: usize) -> bool {
+        let path = &self.paths[path_id - 1];
+        path.is_leaf && path.is_polygon
+    }
+
+    fn path_is_active_axial(&self, path_id: usize) -> bool {
+        let path = &self.paths[path_id - 1];
+        path.is_active && path.is_leaf
+    }
+
+    fn path_is_gusset(&self, path_id: usize) -> bool {
+        let path = &self.paths[path_id - 1];
+        path.is_active && !path.is_border
+    }
+
+    fn get_or_make_node_vertex(&mut self, node_id: usize) -> usize {
+        if let Some(vertex_id) = self.nodes[node_id - 1].owned_vertices.first().copied() {
+            return vertex_id;
+        }
+        let index = self.vertices.len() + 1;
+        let node = &self.nodes[node_id - 1];
+        self.vertices.push(Vertex {
+            index,
+            loc: node.loc,
+            elevation: node.elevation,
+            is_border: node.is_border,
+            tree_node: (!node.is_sub).then_some(node_id),
+            left_pseudohinge_mate: None,
+            right_pseudohinge_mate: None,
+            creases: Vec::new(),
+            depth: DEPTH_NOT_SET,
+            discrete_depth: usize::MAX,
+            cc_flag: 0,
+            st_flag: 0,
+            owner: OwnerRef::Node(node_id),
+        });
+        self.nodes[node_id - 1].owned_vertices.push(index);
+        index
+    }
+
+    fn get_or_make_path_vertex(
+        &mut self,
+        path_id: usize,
+        loc: Point,
+        tree_node: Option<usize>,
+    ) -> usize {
+        let front_node = self.paths[path_id - 1].nodes[0];
+        let back_node = *self.paths[path_id - 1].nodes.last().unwrap();
+        let vertex_id = if vertices_same_loc(loc, self.nodes[front_node - 1].loc) {
+            self.get_or_make_node_vertex(front_node)
+        } else if vertices_same_loc(loc, self.nodes[back_node - 1].loc) {
+            self.get_or_make_node_vertex(back_node)
+        } else if let Some(vertex_id) = self.paths[path_id - 1]
+            .owned_vertices
+            .iter()
+            .copied()
+            .find(|vertex_id| vertices_same_loc(loc, self.vertices[*vertex_id - 1].loc))
+        {
+            vertex_id
+        } else {
+            self.make_path_vertex(path_id, loc, tree_node)
+        };
+
+        if self.vertices[vertex_id - 1].tree_node.is_none() && tree_node.is_some() {
+            self.vertices[vertex_id - 1].tree_node = tree_node;
+        }
+        vertex_id
+    }
+
+    fn make_path_vertex(&mut self, path_id: usize, loc: Point, tree_node: Option<usize>) -> usize {
+        let front_node = self.paths[path_id - 1].nodes[0];
+        let back_node = *self.paths[path_id - 1].nodes.last().unwrap();
+        let p1 = self.nodes[front_node - 1].loc;
+        let p2 = self.nodes[back_node - 1].loc;
+        let dist_p = loc.distance(p1);
+        let x = dist_p / p2.distance(p1);
+        let elevation = (1.0 - x) * self.nodes[front_node - 1].elevation
+            + x * self.nodes[back_node - 1].elevation;
+
+        let index = self.vertices.len() + 1;
+        self.vertices.push(Vertex {
+            index,
+            loc,
+            elevation,
+            is_border: self.paths[path_id - 1].is_border,
+            tree_node,
+            left_pseudohinge_mate: None,
+            right_pseudohinge_mate: None,
+            creases: Vec::new(),
+            depth: DEPTH_NOT_SET,
+            discrete_depth: usize::MAX,
+            cc_flag: 0,
+            st_flag: 0,
+            owner: OwnerRef::Path(path_id),
+        });
+
+        let insert_at = self.paths[path_id - 1]
+            .owned_vertices
+            .iter()
+            .position(|vertex_id| dist_p < self.vertices[*vertex_id - 1].loc.distance(p1));
+        if let Some(pos) = insert_at {
+            self.paths[path_id - 1].owned_vertices.insert(pos, index);
+        } else {
+            self.paths[path_id - 1].owned_vertices.push(index);
+        }
+
+        let split = self.paths[path_id - 1]
+            .owned_creases
+            .iter()
+            .copied()
+            .find_map(|crease_id| {
+                let crease = &self.creases[crease_id - 1];
+                let front_vertex = crease.vertices[0];
+                let back_vertex = crease.vertices[1];
+                let pc1 = self.vertices[front_vertex - 1].loc;
+                let pc2 = self.vertices[back_vertex - 1].loc;
+                let pc21 = point_sub(pc2, pc1);
+                let x = inner(point_sub(loc, pc1), pc21) / mag2(pc21);
+                (x > 0.0 && x < 1.0).then_some((crease_id, front_vertex, back_vertex, crease.kind))
+            });
+        if let Some((crease_id, front_vertex, back_vertex, kind)) = split {
+            let _ = self.create_crease(OwnerRef::Path(path_id), front_vertex, index, kind);
+            let _ = self.create_crease(OwnerRef::Path(path_id), index, back_vertex, kind);
+            self.delete_creases(&[crease_id]);
+        }
+
+        index
+    }
+
+    fn build_self_vertices(&mut self, path_id: usize) -> Result<()> {
+        let front_node = self.paths[path_id - 1].nodes[0];
+        let back_node = *self.paths[path_id - 1].nodes.last().unwrap();
+        let front_vertex = self.get_or_make_node_vertex(front_node);
+        let back_vertex = self.get_or_make_node_vertex(back_node);
+
+        if !self.paths[path_id - 1].owned_vertices.is_empty() {
+            return Ok(());
+        }
+        if !self.paths[path_id - 1].is_active {
+            return Ok(());
+        }
+
+        let q1 = self.vertices[front_vertex - 1].loc;
+        let q2 = self.vertices[back_vertex - 1].loc;
+        let act_paper_length = self.paths[path_id - 1].act_paper_length;
+        if act_paper_length == 0.0 {
+            return Ok(());
+        }
+        let qu = point_div(point_sub(q2, q1), act_paper_length);
+        let (max_outset_path, max_front_reduction, _) = self.max_outset_path(path_id);
+        let mut cur_pos = -max_front_reduction;
+        let edge_ids = self.paths[max_outset_path - 1].edges.clone();
+        let node_ids = self.paths[max_outset_path - 1].nodes.clone();
+        for (i, edge_id) in edge_ids.iter().copied().enumerate() {
+            let cur_node = node_ids[i + 1];
+            cur_pos += self.edges[edge_id - 1].strained_length() * self.scale;
+            if cur_pos <= 0.0 {
+                continue;
+            }
+            if cur_pos >= act_paper_length {
+                break;
+            }
+            self.get_or_make_path_vertex(
+                path_id,
+                point_add(q1, point_mul(qu, cur_pos)),
+                Some(cur_node),
+            );
+        }
+        Ok(())
+    }
+
+    fn max_outset_path(&self, path_id: usize) -> (usize, TmFloat, TmFloat) {
+        if let Some(outset_path) = self.paths[path_id - 1].outset_path {
+            let (max_path, front, back) = self.max_outset_path(outset_path);
+            (
+                max_path,
+                front + self.paths[path_id - 1].front_reduction,
+                back + self.paths[path_id - 1].back_reduction,
+            )
+        } else {
+            (path_id, 0.0, 0.0)
+        }
+    }
+
+    fn connect_self_vertices(&mut self, path_id: usize, kind: i32) -> Result<()> {
+        let front_node = self.paths[path_id - 1].nodes[0];
+        let back_node = *self.paths[path_id - 1].nodes.last().unwrap();
+        let mut front_vertex = self
+            .nodes
+            .get(front_node - 1)
+            .and_then(|node| node.owned_vertices.first().copied())
+            .ok_or(TreeError::InvalidOperation("path front vertex missing"))?;
+        for back_vertex in self.paths[path_id - 1].owned_vertices.clone() {
+            self.get_or_make_crease(OwnerRef::Path(path_id), front_vertex, back_vertex, kind)?;
+            front_vertex = back_vertex;
+        }
+        let back_vertex = self
+            .nodes
+            .get(back_node - 1)
+            .and_then(|node| node.owned_vertices.first().copied())
+            .ok_or(TreeError::InvalidOperation("path back vertex missing"))?;
+        self.get_or_make_crease(OwnerRef::Path(path_id), front_vertex, back_vertex, kind)?;
+        Ok(())
+    }
+
+    fn get_ridgeline_nodes_and_paths(
+        &self,
+        poly_id: usize,
+        front_node: usize,
+        back_node: usize,
+    ) -> Result<(Vec<usize>, Vec<usize>)> {
+        let poly = &self.polys[poly_id - 1];
+        let front_offset = poly
+            .ring_nodes
+            .iter()
+            .position(|node| *node == front_node)
+            .ok_or(TreeError::InvalidOperation(
+                "ridgeline front node not in poly",
+            ))?;
+        let back_offset = poly
+            .ring_nodes
+            .iter()
+            .position(|node| *node == back_node)
+            .ok_or(TreeError::InvalidOperation(
+                "ridgeline back node not in poly",
+            ))?;
+
+        let mut ridge_nodes = vec![front_node];
+        let mut ridge_paths = vec![poly.spoke_paths[front_offset]];
+        match poly.owned_nodes.len() {
+            1 => ridge_nodes.push(poly.owned_nodes[0]),
+            2 => {
+                let front_inset = poly.inset_nodes[front_offset];
+                let back_inset = poly.inset_nodes[back_offset];
+                ridge_nodes.push(front_inset);
+                if front_inset != back_inset {
+                    ridge_paths.push(
+                        poly.ridge_path
+                            .ok_or(TreeError::InvalidOperation("ridgeline path missing"))?,
+                    );
+                    ridge_nodes.push(back_inset);
+                }
+            }
+            _ => {
+                let front_inset = poly.inset_nodes[front_offset];
+                let back_inset = poly.inset_nodes[back_offset];
+                if front_inset == back_inset {
+                    ridge_nodes.push(front_inset);
+                } else {
+                    let sub_poly = poly
+                        .owned_polys
+                        .iter()
+                        .copied()
+                        .find(|sub_poly_id| {
+                            let sub_poly = &self.polys[*sub_poly_id - 1];
+                            sub_poly.ring_nodes.contains(&front_inset)
+                                && sub_poly.ring_nodes.contains(&back_inset)
+                        })
+                        .ok_or(TreeError::InvalidOperation("ridgeline subpoly missing"))?;
+                    let (sub_nodes, sub_paths) =
+                        self.get_ridgeline_nodes_and_paths(sub_poly, front_inset, back_inset)?;
+                    ridge_nodes.extend(sub_nodes);
+                    ridge_paths.extend(sub_paths);
+                }
+            }
+        }
+        ridge_paths.push(poly.spoke_paths[back_offset]);
+        ridge_nodes.push(back_node);
+        Ok((ridge_nodes, ridge_paths))
+    }
+
+    fn get_ridgeline_vertices(
+        &mut self,
+        poly_id: usize,
+        front_node: usize,
+        back_node: usize,
+    ) -> Result<Vec<usize>> {
+        let (ridge_nodes, ridge_paths) =
+            self.get_ridgeline_nodes_and_paths(poly_id, front_node, back_node)?;
+        let p1 = self.nodes[front_node - 1].loc;
+        let p2 = self.nodes[back_node - 1].loc;
+        let mut vertices = Vec::new();
+        for ridge_node in ridge_nodes {
+            if self.nodes[ridge_node - 1].is_junction {
+                self.get_or_make_node_vertex(ridge_node);
+            }
+            if let Some(vertex_id) = self.nodes[ridge_node - 1].owned_vertices.first().copied() {
+                vertices.push(vertex_id);
+            }
+        }
+        for ridge_path in ridge_paths {
+            vertices.extend(self.paths[ridge_path - 1].owned_vertices.iter().copied());
+        }
+        vertices.sort_by(|a, b| {
+            sortable_ridge_vertex_value(self.vertices[*a - 1].loc, p1, p2).total_cmp(
+                &sortable_ridge_vertex_value(self.vertices[*b - 1].loc, p1, p2),
+            )
+        });
+        Ok(vertices)
+    }
+
+    fn propagate_inactive_axial_hinges(
+        &mut self,
+        poly_id: usize,
+        path_id: usize,
+        ridge_vertices: &[usize],
+    ) -> Result<()> {
+        if ridge_vertices.len() < 3 {
+            return Ok(());
+        }
+        let front_node = self.paths[path_id - 1].nodes[0];
+        let back_node = *self.paths[path_id - 1].nodes.last().unwrap();
+        let front_vertex = self
+            .nodes
+            .get(front_node - 1)
+            .and_then(|node| node.owned_vertices.first().copied())
+            .ok_or(TreeError::InvalidOperation(
+                "inactive axial front vertex missing",
+            ))?;
+        let back_vertex = self
+            .nodes
+            .get(back_node - 1)
+            .and_then(|node| node.owned_vertices.first().copied())
+            .ok_or(TreeError::InvalidOperation(
+                "inactive axial back vertex missing",
+            ))?;
+        let p1 = self.vertices[front_vertex - 1].loc;
+        let p2 = self.vertices[back_vertex - 1].loc;
+        let mut crease0 = None;
+        let mut crease1 = None;
+        let mut crease2 = None;
+
+        for m in 1..ridge_vertices.len() - 1 {
+            let ridge_vertex = ridge_vertices[m];
+            let tree_node = self.vertices[ridge_vertex - 1].tree_node;
+            let mut needs_crease = tree_node.is_some();
+            let mut kind = CREASE_UNFOLDED_HINGE;
+            if !needs_crease {
+                let prev_tree_node = self.vertices[ridge_vertices[m - 1] - 1].tree_node;
+                let next_tree_node = self.vertices[ridge_vertices[m + 1] - 1].tree_node;
+                if prev_tree_node.is_some() && prev_tree_node == next_tree_node {
+                    needs_crease = true;
+                    kind = CREASE_PSEUDOHINGE;
+                }
+            }
+            if !needs_crease {
+                continue;
+            }
+            if let Some(p) = project_q_to_p(self.vertices[ridge_vertex - 1].loc, p1, p2) {
+                let bottom_vertex = self.get_or_make_path_vertex(path_id, p, tree_node);
+                crease2 = crease1;
+                crease1 = crease0;
+                crease0 = Some(self.get_or_make_crease(
+                    OwnerRef::Poly(self.outermost_poly(poly_id)),
+                    bottom_vertex,
+                    ridge_vertex,
+                    kind,
+                )?);
+            }
+            if let (Some(c0), Some(c1), Some(c2)) = (crease0, crease1, crease2)
+                && self.creases[c0 - 1].kind == CREASE_UNFOLDED_HINGE
+                && self.creases[c1 - 1].kind == CREASE_PSEUDOHINGE
+                && self.creases[c2 - 1].kind == CREASE_UNFOLDED_HINGE
+            {
+                let mate0 = self.lower_crease_vertex(c0);
+                let mate2 = self.lower_crease_vertex(c2);
+                self.vertices[mate0 - 1].right_pseudohinge_mate = Some(mate2);
+                self.vertices[mate2 - 1].left_pseudohinge_mate = Some(mate0);
+            }
+        }
+        Ok(())
+    }
+
+    fn outermost_poly(&self, mut poly_id: usize) -> usize {
+        while let OwnerRef::Poly(owner_id) = self.polys[poly_id - 1].owner {
+            poly_id = owner_id;
+        }
+        poly_id
+    }
+
+    fn lower_crease_vertex(&self, crease_id: usize) -> usize {
+        let crease = &self.creases[crease_id - 1];
+        let v1 = crease.vertices[0];
+        let v2 = crease.vertices[1];
+        if self.vertices[v1 - 1].elevation < self.vertices[v2 - 1].elevation {
+            v1
+        } else {
+            v2
+        }
+    }
+
+    fn get_or_make_crease(
+        &mut self,
+        owner: OwnerRef,
+        vertex1: usize,
+        vertex2: usize,
+        kind: i32,
+    ) -> Result<usize> {
+        let owned_creases = self.owned_creases_for_owner(&owner);
+        if let Some(crease_id) = owned_creases.into_iter().find(|crease_id| {
+            let crease = &self.creases[*crease_id - 1];
+            matches!(
+                crease.vertices.first().copied().zip(crease.vertices.last().copied()),
+                Some((a, b)) if (a == vertex1 && b == vertex2) || (a == vertex2 && b == vertex1)
+            )
+        }) {
+            return Ok(crease_id);
+        }
+        self.create_crease(owner, vertex1, vertex2, kind)
+    }
+
+    fn create_crease(
+        &mut self,
+        owner: OwnerRef,
+        vertex1: usize,
+        vertex2: usize,
+        kind: i32,
+    ) -> Result<usize> {
+        if vertex1 == vertex2 {
+            return Err(TreeError::InvalidOperation(
+                "crease endpoints must be distinct vertices",
+            ));
+        }
+        let index = self.creases.len() + 1;
+        self.creases.push(Crease {
+            index,
+            kind,
+            vertices: vec![vertex1, vertex2],
+            fwd_facet: None,
+            bkd_facet: None,
+            fold: FOLD_FLAT,
+            cc_flag: 0,
+            st_flag: 0,
+            owner: owner.clone(),
+        });
+        match owner {
+            OwnerRef::Path(path_id) => self.paths[path_id - 1].owned_creases.push(index),
+            OwnerRef::Poly(poly_id) => self.polys[poly_id - 1].owned_creases.push(index),
+            _ => {}
+        }
+        self.vertices[vertex1 - 1].creases.push(index);
+        self.vertices[vertex2 - 1].creases.push(index);
+        Ok(index)
+    }
+
+    fn owned_creases_for_owner(&self, owner: &OwnerRef) -> Vec<usize> {
+        match *owner {
+            OwnerRef::Path(path_id) => self
+                .paths
+                .get(path_id.saturating_sub(1))
+                .map(|path| path.owned_creases.clone())
+                .unwrap_or_default(),
+            OwnerRef::Poly(poly_id) => self
+                .polys
+                .get(poly_id.saturating_sub(1))
+                .map(|poly| poly.owned_creases.clone())
+                .unwrap_or_default(),
+            _ => Vec::new(),
+        }
+    }
+
+    fn build_facets_from_creases(&mut self, poly_id: usize, crease_list: &[usize]) -> Result<()> {
+        if crease_list.is_empty() {
+            return Ok(());
+        }
+        for crease_id in crease_list.iter().copied() {
+            if self.can_start_facet_fwd(poly_id, crease_id) {
+                self.build_facet_ring(poly_id, crease_id, true)?;
+            }
+            if self.can_start_facet_bkd(poly_id, crease_id) {
+                self.build_facet_ring(poly_id, crease_id, false)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn can_start_facet_fwd(&self, poly_id: usize, crease_id: usize) -> bool {
+        let crease = &self.creases[crease_id - 1];
+        if crease.fwd_facet.is_some() {
+            return false;
+        }
+        if crease.kind != CREASE_AXIAL {
+            return true;
+        }
+        are_ccw(
+            self.vertices[crease.vertices[0] - 1].loc,
+            self.vertices[crease.vertices[1] - 1].loc,
+            self.polys[poly_id - 1].centroid,
+        )
+    }
+
+    fn can_start_facet_bkd(&self, poly_id: usize, crease_id: usize) -> bool {
+        let crease = &self.creases[crease_id - 1];
+        if crease.bkd_facet.is_some() {
+            return false;
+        }
+        if crease.kind != CREASE_AXIAL {
+            return true;
+        }
+        are_cw(
+            self.vertices[crease.vertices[0] - 1].loc,
+            self.vertices[crease.vertices[1] - 1].loc,
+            self.polys[poly_id - 1].centroid,
+        )
+    }
+
+    fn build_facet_ring(&mut self, poly_id: usize, crease_id: usize, fwd: bool) -> Result<()> {
+        let facet_id = self.create_facet(poly_id);
+        if fwd {
+            self.creases[crease_id - 1].fwd_facet = Some(facet_id);
+        } else {
+            self.creases[crease_id - 1].bkd_facet = Some(facet_id);
+        }
+
+        let first_vertex = if fwd {
+            self.creases[crease_id - 1].vertices[0]
+        } else {
+            self.creases[crease_id - 1].vertices[1]
+        };
+        let mut this_vertex = if fwd {
+            self.creases[crease_id - 1].vertices[1]
+        } else {
+            self.creases[crease_id - 1].vertices[0]
+        };
+        let mut this_crease = crease_id;
+        let mut vertices = vec![first_vertex];
+        let mut creases = vec![this_crease];
+        let mut too_many = 0;
+
+        loop {
+            let (next_crease, next_vertex) =
+                self.next_crease_and_vertex(this_crease, this_vertex)?;
+            vertices.push(this_vertex);
+            creases.push(next_crease);
+            if self.creases[next_crease - 1].vertices.first().copied() == Some(this_vertex) {
+                self.creases[next_crease - 1].fwd_facet = Some(facet_id);
+            } else {
+                self.creases[next_crease - 1].bkd_facet = Some(facet_id);
+            }
+            this_crease = next_crease;
+            this_vertex = next_vertex;
+            too_many += 1;
+            if next_vertex == first_vertex {
+                break;
+            }
+            if too_many >= 100 {
+                return Err(TreeError::InvalidOperation(
+                    "facet ring walk exceeded TreeMaker guard",
+                ));
+            }
+        }
+
+        self.facets[facet_id - 1].vertices = vertices;
+        self.facets[facet_id - 1].creases = creases;
+        self.calc_facet_contents(facet_id);
+        Ok(())
+    }
+
+    fn create_facet(&mut self, poly_id: usize) -> usize {
+        let index = self.facets.len() + 1;
+        self.facets.push(Facet {
+            index,
+            centroid: Point { x: 0.0, y: 0.0 },
+            is_well_formed: true,
+            vertices: Vec::new(),
+            creases: Vec::new(),
+            corridor_edge: None,
+            head_facets: Vec::new(),
+            tail_facets: Vec::new(),
+            order: usize::MAX,
+            color: 0,
+            owner: OwnerRef::Poly(poly_id),
+        });
+        self.polys[poly_id - 1].owned_facets.push(index);
+        index
+    }
+
+    fn next_crease_and_vertex(
+        &self,
+        this_crease: usize,
+        this_vertex: usize,
+    ) -> Result<(usize, usize)> {
+        let crease = &self.creases[this_crease - 1];
+        let mut that_vertex = crease.vertices[0];
+        if that_vertex == this_vertex {
+            that_vertex = crease.vertices[1];
+        }
+        let this_angle = angle(point_sub(
+            self.vertices[that_vertex - 1].loc,
+            self.vertices[this_vertex - 1].loc,
+        ));
+
+        let mut delta = TWO_PI;
+        let mut next_crease = None;
+        let mut next_vertex = None;
+        for candidate_crease in self.vertices[this_vertex - 1].creases.iter().copied() {
+            if candidate_crease == this_crease {
+                continue;
+            }
+            let candidate = &self.creases[candidate_crease - 1];
+            let mut candidate_vertex = candidate.vertices[0];
+            if candidate_vertex == this_vertex {
+                candidate_vertex = candidate.vertices[1];
+            }
+            let next_angle = angle(point_sub(
+                self.vertices[candidate_vertex - 1].loc,
+                self.vertices[this_vertex - 1].loc,
+            ));
+            let mut new_delta = this_angle - next_angle;
+            while new_delta < 0.0 {
+                new_delta += TWO_PI;
+            }
+            while new_delta >= TWO_PI {
+                new_delta -= TWO_PI;
+            }
+            if new_delta < delta {
+                delta = new_delta;
+                next_crease = Some(candidate_crease);
+                next_vertex = Some(candidate_vertex);
+            }
+        }
+
+        match (next_crease, next_vertex) {
+            (Some(crease), Some(vertex)) => Ok((crease, vertex)),
+            _ => Err(TreeError::InvalidOperation(
+                "facet crease walk could not advance",
+            )),
+        }
+    }
+
+    fn calc_facet_contents(&mut self, facet_id: usize) {
+        let mut centroid = Point { x: 0.0, y: 0.0 };
+        let vertices = self.facets[facet_id - 1].vertices.clone();
+        for vertex_id in vertices.iter().copied() {
+            centroid = point_add(centroid, self.vertices[vertex_id - 1].loc);
+        }
+        if !vertices.is_empty() {
+            centroid = point_div(centroid, vertices.len() as TmFloat);
+        }
+        self.facets[facet_id - 1].centroid = centroid;
+        self.facets[facet_id - 1].is_well_formed = true;
+
+        let num_vertices = self.facets[facet_id - 1].vertices.len();
+        let mut rotations = 0;
+        while self.facets[facet_id - 1]
+            .creases
+            .first()
+            .is_some_and(|crease_id| !self.crease_is_axial_or_gusset(*crease_id))
+        {
+            self.facets[facet_id - 1].vertices.rotate_left(1);
+            self.facets[facet_id - 1].creases.rotate_left(1);
+            rotations += 1;
+            if rotations >= num_vertices {
+                self.facets[facet_id - 1].is_well_formed = false;
+                break;
+            }
+        }
+    }
+
+    fn crease_is_axial_or_gusset(&self, crease_id: usize) -> bool {
+        matches!(
+            self.creases[crease_id - 1].kind,
+            CREASE_AXIAL | CREASE_GUSSET
+        )
+    }
+
     fn find_any_path_in(&self, path_ids: &[usize], node1: usize, node2: usize) -> Option<usize> {
         path_ids.iter().copied().find(|path_id| {
             self.paths
@@ -3080,6 +3911,7 @@ impl Tree {
         self.is_polygon_filled = false;
         self.is_vertex_depth_valid = false;
         self.is_facet_data_valid = false;
+        self.is_local_root_connectable = false;
 
         self.kill_invalid_conditions();
 
@@ -3162,6 +3994,29 @@ impl Tree {
         self.renumber_part_indices();
         self.clear_crease_pattern_cleanup_data();
         self.calc_polygon_filled();
+        if !self.is_polygon_filled {
+            self.needs_cleanup = false;
+            return;
+        }
+        self.calc_depth_and_bend();
+        self.calc_vertex_depth_validity();
+        if !self.is_vertex_depth_valid {
+            self.needs_cleanup = false;
+            return;
+        }
+        self.calc_facet_data_validity();
+        if !self.is_facet_data_valid {
+            self.needs_cleanup = false;
+            return;
+        }
+        self.calc_facet_corridor_edges();
+        self.calc_facet_order();
+        if !self.is_local_root_connectable {
+            self.needs_cleanup = false;
+            return;
+        }
+        self.calc_facet_color();
+        self.calc_fold_directions();
         self.needs_cleanup = false;
     }
 
@@ -3604,7 +4459,7 @@ impl Tree {
 
     fn crease_is_orphan(&self, crease: &Crease) -> bool {
         match crease.owner {
-            OwnerRef::Poly(poly_id) => poly_id > 0 && poly_id <= self.polys.len(),
+            OwnerRef::Poly(poly_id) => poly_id == 0 || poly_id > self.polys.len(),
             OwnerRef::Path(path_id) => self
                 .paths
                 .get(path_id.saturating_sub(1))
@@ -3939,6 +4794,1170 @@ impl Tree {
             }
         }
         self.is_polygon_filled = true;
+    }
+
+    fn calc_depth_and_bend(&mut self) {
+        if !self.is_polygon_valid || self.nodes.is_empty() {
+            return;
+        }
+
+        let root_node = self
+            .nodes
+            .iter()
+            .position(|node| !node.is_sub)
+            .map(|i| i + 1);
+        let Some(root_node) = root_node else {
+            return;
+        };
+        self.nodes[root_node - 1].depth = 0.0;
+        for path_id in self.owned_paths.iter().copied() {
+            let path = &self.paths[path_id - 1];
+            if path.nodes.first().copied() == Some(root_node) {
+                if let Some(back_node) = path.nodes.last().copied() {
+                    self.nodes[back_node - 1].depth = path.min_paper_length;
+                }
+            } else if path.nodes.last().copied() == Some(root_node)
+                && let Some(front_node) = path.nodes.first().copied()
+            {
+                self.nodes[front_node - 1].depth = path.min_paper_length;
+            }
+        }
+
+        for path in &mut self.paths {
+            path.min_depth = DEPTH_NOT_SET;
+            path.min_depth_dist = 0.0;
+        }
+
+        for path_id in 1..=self.paths.len() {
+            if !self.paths[path_id - 1].is_leaf {
+                continue;
+            }
+            let node_ids = self.paths[path_id - 1].nodes.clone();
+            let edge_ids = self.paths[path_id - 1].edges.clone();
+            if node_ids.is_empty() {
+                continue;
+            }
+            let mut min_depth = self.nodes[node_ids[0] - 1].depth;
+            let mut min_depth_dist = 0.0;
+            for j in 1..node_ids.len() {
+                let node_depth = self.nodes[node_ids[j] - 1].depth;
+                if min_depth > node_depth {
+                    min_depth = node_depth;
+                    min_depth_dist +=
+                        self.edges[edge_ids[j - 1] - 1].strained_length() * self.scale;
+                }
+            }
+            self.paths[path_id - 1].min_depth = min_depth;
+            self.paths[path_id - 1].min_depth_dist = min_depth_dist;
+        }
+
+        for path_id in 1..=self.paths.len() {
+            if !self.path_is_gusset(path_id) {
+                continue;
+            }
+            let (max_outset_path, max_front_reduction, _) = self.max_outset_path(path_id);
+            self.paths[path_id - 1].min_depth = self.paths[max_outset_path - 1].min_depth;
+            self.paths[path_id - 1].min_depth_dist =
+                self.paths[max_outset_path - 1].min_depth_dist - max_front_reduction;
+        }
+
+        for vertex in &mut self.vertices {
+            vertex.depth = DEPTH_NOT_SET;
+        }
+
+        for poly_id in 1..=self.polys.len() {
+            let nn = self.polys[poly_id - 1].ring_nodes.len();
+            for j in 0..nn {
+                let front_node = self.polys[poly_id - 1].ring_nodes[j];
+                let back_node = self.polys[poly_id - 1].ring_nodes[(j + 1) % nn];
+                let path_id = self.polys[poly_id - 1].ring_paths[j];
+                if !(self.path_is_active_axial(path_id) || self.path_is_gusset(path_id)) {
+                    continue;
+                }
+                if let Ok(ridge_vertices) =
+                    self.get_ridgeline_vertices(poly_id, front_node, back_node)
+                {
+                    for vertex_id in ridge_vertices {
+                        self.set_vertex_depth_from_path(path_id, vertex_id);
+                    }
+                }
+                for vertex_id in self.paths[path_id - 1].owned_vertices.clone() {
+                    self.set_vertex_depth_from_path(path_id, vertex_id);
+                }
+            }
+        }
+
+        for path_id in self.owned_paths.clone() {
+            if !self.paths[path_id - 1].is_border || self.paths[path_id - 1].is_active {
+                continue;
+            }
+            for vertex_id in self.paths[path_id - 1].owned_vertices.clone() {
+                for crease_id in self.vertices[vertex_id - 1].creases.clone() {
+                    if self.crease_is_hinge(crease_id) {
+                        let ridge_vertex = self.other_crease_vertex(crease_id, vertex_id);
+                        self.vertices[vertex_id - 1].depth = self.vertices[ridge_vertex - 1].depth;
+                        break;
+                    }
+                }
+            }
+        }
+
+        for vertex_id in 1..=self.vertices.len() {
+            if let Some(tree_node) = self.vertices[vertex_id - 1].tree_node {
+                self.vertices[vertex_id - 1].discrete_depth = self.calc_discrete_depth(tree_node);
+            } else {
+                self.vertices[vertex_id - 1].discrete_depth = usize::MAX;
+            }
+        }
+
+        if self
+            .vertices
+            .iter()
+            .any(|vertex| vertex.depth == DEPTH_NOT_SET)
+        {
+            return;
+        }
+
+        for poly_id in self.owned_polys.clone() {
+            self.calc_poly_bend(poly_id);
+        }
+    }
+
+    fn set_vertex_depth_from_path(&mut self, path_id: usize, vertex_id: usize) {
+        let path = &self.paths[path_id - 1];
+        let p = self.vertices[vertex_id - 1].loc;
+        let p1 = self.nodes[path.nodes[0] - 1].loc;
+        let p2 = self.nodes[*path.nodes.last().unwrap() - 1].loc;
+        let d = inner(point_sub(p, p1), point_sub(p2, p1)) / p2.distance(p1);
+        self.vertices[vertex_id - 1].depth = if d < path.min_depth_dist {
+            path.min_depth + path.min_depth_dist - d
+        } else {
+            path.min_depth + d - path.min_depth_dist
+        };
+    }
+
+    fn calc_discrete_depth(&self, node_id: usize) -> usize {
+        let root_node = self
+            .nodes
+            .iter()
+            .position(|node| !node.is_sub)
+            .map(|i| i + 1);
+        if root_node == Some(node_id) {
+            return 0;
+        }
+        let Some(root_node) = root_node else {
+            return usize::MAX;
+        };
+        self.find_any_path_in(&self.owned_paths, root_node, node_id)
+            .map(|path_id| self.paths[path_id - 1].edges.len())
+            .unwrap_or(usize::MAX)
+    }
+
+    fn calc_poly_bend(&mut self, poly_id: usize) {
+        for crease_id in self.polys[poly_id - 1].owned_creases.clone() {
+            self.calc_crease_bend(crease_id);
+        }
+
+        let mut all_vertices = Vec::new();
+        for crease_id in self.polys[poly_id - 1].owned_creases.clone() {
+            for vertex_id in self.creases[crease_id - 1].vertices.clone() {
+                push_unique(&mut all_vertices, vertex_id);
+            }
+        }
+        for node_id in self.polys[poly_id - 1].ring_nodes.clone() {
+            if let Some(vertex_id) = self.nodes[node_id - 1].owned_vertices.first().copied() {
+                push_unique(&mut all_vertices, vertex_id);
+            }
+        }
+
+        self.polys[poly_id - 1].local_root_vertices.clear();
+        self.polys[poly_id - 1].local_root_creases.clear();
+        let mut min_discrete_depth = usize::MAX;
+        for vertex_id in all_vertices {
+            let discrete_depth = self.vertices[vertex_id - 1].discrete_depth;
+            if min_discrete_depth > discrete_depth {
+                min_discrete_depth = discrete_depth;
+                self.polys[poly_id - 1].local_root_vertices.clear();
+                self.polys[poly_id - 1].local_root_creases.clear();
+            }
+            if min_discrete_depth == discrete_depth {
+                push_unique(&mut self.polys[poly_id - 1].local_root_vertices, vertex_id);
+                for crease_id in self.vertices[vertex_id - 1].creases.clone() {
+                    if self.crease_is_hinge(crease_id)
+                        && self.polys[poly_id - 1].owned_creases.contains(&crease_id)
+                    {
+                        push_unique(&mut self.polys[poly_id - 1].local_root_creases, crease_id);
+                    }
+                }
+            }
+        }
+    }
+
+    fn calc_crease_bend(&mut self, crease_id: usize) {
+        if !self.crease_is_hinge(crease_id)
+            || self.creases[crease_id - 1].kind == CREASE_PSEUDOHINGE
+        {
+            return;
+        }
+        let v0 = self.creases[crease_id - 1].vertices[0];
+        let v1 = self.creases[crease_id - 1].vertices[1];
+        let bottom = if self.vertices[v0 - 1].elevation > self.vertices[v1 - 1].elevation {
+            v1
+        } else {
+            v0
+        };
+        let ag_creases: Vec<usize> = self.vertices[bottom - 1]
+            .creases
+            .iter()
+            .copied()
+            .filter(|id| self.crease_is_axial_or_gusset(*id))
+            .take(2)
+            .collect();
+        if ag_creases.len() < 2 {
+            return;
+        }
+        let vertex1 = self.other_crease_vertex(ag_creases[0], bottom);
+        let vertex3 = self.other_crease_vertex(ag_creases[1], bottom);
+        let depth1 = self.vertices[vertex1 - 1].depth;
+        let depth2 = self.vertices[bottom - 1].depth;
+        let depth3 = self.vertices[vertex3 - 1].depth;
+        if (depth1 > depth2 && depth2 < depth3) || (depth1 < depth2 && depth2 > depth3) {
+            self.creases[crease_id - 1].kind = CREASE_FOLDED_HINGE;
+        } else {
+            self.creases[crease_id - 1].kind = CREASE_UNFOLDED_HINGE;
+        }
+    }
+
+    fn calc_vertex_depth_validity(&mut self) {
+        self.is_vertex_depth_valid = false;
+        if self.vertices.is_empty() {
+            return;
+        }
+        if self
+            .vertices
+            .iter()
+            .any(|vertex| vertex.depth == DEPTH_NOT_SET)
+        {
+            return;
+        }
+        self.is_vertex_depth_valid = true;
+    }
+
+    fn calc_facet_data_validity(&mut self) {
+        self.is_facet_data_valid = false;
+        if self.facets.is_empty() {
+            return;
+        }
+        if self.facets.iter().any(|facet| !facet.is_well_formed) {
+            return;
+        }
+        if self
+            .vertices
+            .iter()
+            .any(|vertex| !vertex.is_border && vertex.creases.len() % 2 != 0)
+        {
+            return;
+        }
+        self.is_facet_data_valid = true;
+    }
+
+    fn calc_facet_corridor_edges(&mut self) {
+        for poly_id in self.owned_polys.clone() {
+            self.calc_poly_facet_corridor_edges(poly_id);
+        }
+    }
+
+    fn calc_poly_facet_corridor_edges(&mut self, poly_id: usize) {
+        for facet_id in self.polys[poly_id - 1].owned_facets.clone() {
+            if self.facets[facet_id - 1].corridor_edge.is_some() {
+                continue;
+            }
+            if !self.facet_is_axial(facet_id) {
+                continue;
+            }
+            let Some(bottom_crease) = self.facet_bottom_crease(facet_id) else {
+                continue;
+            };
+            let vertices = self.creases[bottom_crease - 1].vertices.clone();
+            if vertices.len() < 2 {
+                continue;
+            }
+            let (Some(node1), Some(node2)) = (
+                self.vertices[vertices[0] - 1].tree_node,
+                self.vertices[vertices[1] - 1].tree_node,
+            ) else {
+                continue;
+            };
+            let Some(edge_id) = self.edge_between_nodes(node1, node2) else {
+                continue;
+            };
+            self.set_facet_corridor_edge(poly_id, facet_id, edge_id);
+        }
+    }
+
+    fn set_facet_corridor_edge(&mut self, poly_id: usize, facet_id: usize, edge_id: usize) {
+        self.facets[facet_id - 1].corridor_edge = Some(edge_id);
+        let crease_ids = self.facets[facet_id - 1].creases.clone();
+        for crease_id in crease_ids {
+            if self.crease_is_regular_hinge(crease_id) {
+                continue;
+            }
+            let Some(other_facet) = self.crease_other_facet(crease_id, facet_id) else {
+                continue;
+            };
+            if !self.polys[poly_id - 1].owned_facets.contains(&other_facet) {
+                continue;
+            }
+            if self.facets[other_facet - 1].corridor_edge.is_some() {
+                continue;
+            }
+            self.set_facet_corridor_edge(poly_id, other_facet, edge_id);
+        }
+    }
+
+    fn edge_between_nodes(&self, node1: usize, node2: usize) -> Option<usize> {
+        self.nodes
+            .get(node1.saturating_sub(1))?
+            .edges
+            .iter()
+            .copied()
+            .find(|edge_id| {
+                self.edges
+                    .get(edge_id.saturating_sub(1))
+                    .is_some_and(|edge| edge.nodes.contains(&node2))
+            })
+    }
+
+    fn calc_facet_order(&mut self) {
+        let mut root_networks = self.calc_root_networks();
+        let num_depth_zero = root_networks
+            .iter()
+            .filter(|network| network.discrete_depth == 0)
+            .count();
+
+        self.is_local_root_connectable = true;
+        for network in &root_networks {
+            if network.discrete_depth != 0 && !network.is_connectable {
+                self.is_local_root_connectable = false;
+            }
+        }
+        self.is_local_root_connectable &= num_depth_zero == 1;
+        if !self.is_local_root_connectable {
+            return;
+        }
+
+        for network in &root_networks {
+            self.connect_facet_graph(network);
+        }
+
+        let Some(global_index) = root_networks
+            .iter()
+            .position(|network| network.discrete_depth == 0)
+        else {
+            self.is_local_root_connectable = false;
+            return;
+        };
+        let mut global_root_network = root_networks.remove(global_index);
+
+        while !root_networks.is_empty() {
+            let mut absorbed_index = None;
+            let mut absorbed_vertex = None;
+            for (i, network) in root_networks.iter().enumerate() {
+                if let Some(vertex_id) = self.root_network_can_absorb(&global_root_network, network)
+                {
+                    absorbed_index = Some(i);
+                    absorbed_vertex = Some(vertex_id);
+                    break;
+                }
+            }
+            let (Some(index), Some(vertex_id)) = (absorbed_index, absorbed_vertex) else {
+                self.is_local_root_connectable = false;
+                return;
+            };
+            self.vertex_swap_links(vertex_id);
+            let network = root_networks.remove(index);
+            for poly_id in network.cc_polys {
+                push_unique(&mut global_root_network.cc_polys, poly_id);
+            }
+        }
+
+        self.root_network_break_one_link(&global_root_network);
+
+        for facet in &mut self.facets {
+            facet.order = usize::MAX;
+        }
+        let source_facet = self
+            .facets
+            .iter()
+            .find(|facet| self.facet_is_source(facet.index))
+            .map(|facet| facet.index);
+        let Some(source_facet) = source_facet else {
+            self.is_local_root_connectable = false;
+            return;
+        };
+        let mut next_order = 0;
+        self.calc_facet_order_recursive(source_facet, &mut next_order);
+    }
+
+    fn calc_root_networks(&mut self) -> Vec<RootNetwork> {
+        for poly_id in self.owned_polys.clone() {
+            self.calc_local_facet_order(poly_id);
+        }
+
+        let mut local_root_vertices = Vec::new();
+        let mut local_root_creases = Vec::new();
+        for poly_id in self.owned_polys.clone() {
+            for vertex_id in self.polys[poly_id - 1].local_root_vertices.clone() {
+                push_unique(&mut local_root_vertices, vertex_id);
+            }
+            for crease_id in self.polys[poly_id - 1].local_root_creases.clone() {
+                push_unique(&mut local_root_creases, crease_id);
+            }
+        }
+
+        for vertex in &mut self.vertices {
+            vertex.cc_flag = ROOT_FLAG_INELIGIBLE;
+            vertex.st_flag = ROOT_FLAG_INELIGIBLE;
+        }
+        for crease in &mut self.creases {
+            crease.cc_flag = ROOT_FLAG_INELIGIBLE;
+            crease.st_flag = ROOT_FLAG_INELIGIBLE;
+        }
+
+        for vertex_id in local_root_vertices.iter().copied() {
+            self.vertices[vertex_id - 1].cc_flag = ROOT_FLAG_NOT_YET;
+            self.vertices[vertex_id - 1].st_flag = ROOT_FLAG_NOT_YET;
+        }
+        for crease_id in local_root_creases.iter().copied() {
+            self.creases[crease_id - 1].cc_flag = ROOT_FLAG_NOT_YET;
+            self.creases[crease_id - 1].st_flag = ROOT_FLAG_NOT_YET;
+        }
+
+        let mut root_networks = Vec::new();
+        for vertex_id in local_root_vertices {
+            if root_networks
+                .iter()
+                .any(|network: &RootNetwork| network.cc_vertices.contains(&vertex_id))
+            {
+                continue;
+            }
+            let discrete_depth = self.vertices[vertex_id - 1].discrete_depth;
+            let mut network = RootNetwork::new(discrete_depth);
+            self.try_add_vertex_to_connected_component(&mut network, vertex_id);
+            root_networks.push(network);
+        }
+
+        for network in &mut root_networks {
+            if let Some(vertex_id) = network.cc_vertices.first().copied() {
+                self.try_add_vertex_to_spanning_tree(network, vertex_id);
+            }
+        }
+
+        for network in &mut root_networks {
+            self.classify_root_network_vertices(network);
+        }
+
+        root_networks
+    }
+
+    fn calc_local_facet_order(&mut self, poly_id: usize) {
+        for facet_id in self.polys[poly_id - 1].owned_facets.clone() {
+            self.facets[facet_id - 1].head_facets.clear();
+            self.facets[facet_id - 1].tail_facets.clear();
+        }
+
+        let Some(start_vertex) = self.polys[poly_id - 1]
+            .local_root_vertices
+            .iter()
+            .copied()
+            .find(|vertex_id| self.vertex_is_axial(*vertex_id))
+        else {
+            return;
+        };
+        let Some(start_crease) = self.incident_interior_crease(poly_id, start_vertex) else {
+            return;
+        };
+        let Some(start_facet) = self.crease_right_non_pseudohinge_facet(start_crease) else {
+            return;
+        };
+
+        let mut cur_facet = start_facet;
+        let mut guard = 0;
+        loop {
+            let Some(next_facet) = self.facet_right_non_pseudohinge_facet(cur_facet) else {
+                return;
+            };
+            self.facet_link_to(cur_facet, next_facet);
+            let Some(bottom_crease) = self.facet_bottom_crease(cur_facet) else {
+                return;
+            };
+            self.build_corridor_links(bottom_crease, cur_facet);
+            cur_facet = next_facet;
+            if cur_facet == start_facet {
+                break;
+            }
+            guard += 1;
+            if guard > self.facets.len().saturating_mul(4).max(100) {
+                return;
+            }
+        }
+    }
+
+    fn incident_interior_crease(&self, poly_id: usize, vertex_id: usize) -> Option<usize> {
+        self.vertices[vertex_id - 1]
+            .creases
+            .iter()
+            .copied()
+            .find(|crease_id| {
+                (self.crease_is_hinge(*crease_id)
+                    || self.creases[*crease_id - 1].kind == CREASE_RIDGE)
+                    && self.polys[poly_id - 1].owned_creases.contains(crease_id)
+            })
+    }
+
+    fn build_corridor_links(&mut self, from_crease: usize, from_facet: usize) {
+        let Some(bottom_crease) = self.facet_bottom_crease(from_facet) else {
+            return;
+        };
+        if bottom_crease == from_crease {
+            for next_crease in self.facets[from_facet - 1].creases.clone() {
+                if self.creases[next_crease - 1].kind != CREASE_RIDGE {
+                    continue;
+                }
+                let Some(next_facet) = self.crease_other_facet(next_crease, from_facet) else {
+                    continue;
+                };
+                if self.creases[bottom_crease - 1].kind == CREASE_AXIAL {
+                    if self.facet_left_facet(from_facet) == Some(next_facet) {
+                        continue;
+                    }
+                    if self.facet_right_facet(from_facet) == Some(next_facet) {
+                        continue;
+                    }
+                }
+                if self.facets_are_linked(from_facet, next_facet) {
+                    continue;
+                }
+                self.facet_link_to(from_facet, next_facet);
+                self.build_corridor_links(next_crease, next_facet);
+            }
+        } else if self.creases[bottom_crease - 1].kind == CREASE_GUSSET {
+            let Some(next_facet) = self.crease_other_facet(bottom_crease, from_facet) else {
+                return;
+            };
+            self.facet_link_to(from_facet, next_facet);
+            self.build_corridor_links(bottom_crease, next_facet);
+        } else {
+            if !self.facet_is_pseudohinge(from_facet) {
+                return;
+            }
+            let Some(mut ph_crease) = self.facet_left_crease(from_facet) else {
+                return;
+            };
+            let next_facet = if self.creases[ph_crease - 1].kind == CREASE_PSEUDOHINGE {
+                self.crease_left_facet(ph_crease)
+            } else {
+                let Some(right_crease) = self.facet_right_crease(from_facet) else {
+                    return;
+                };
+                ph_crease = right_crease;
+                if self.creases[ph_crease - 1].kind != CREASE_PSEUDOHINGE {
+                    return;
+                }
+                self.crease_right_facet(ph_crease)
+            };
+            let Some(next_facet) = next_facet else {
+                return;
+            };
+            self.facet_link_to(from_facet, next_facet);
+            let Some(next_bottom) = self.facet_bottom_crease(next_facet) else {
+                return;
+            };
+            self.build_corridor_links(next_bottom, next_facet);
+        }
+    }
+
+    fn try_add_vertex_to_connected_component(
+        &mut self,
+        network: &mut RootNetwork,
+        vertex_id: usize,
+    ) {
+        if self.vertices[vertex_id - 1].cc_flag == ROOT_FLAG_INELIGIBLE {
+            return;
+        }
+        if self.vertices[vertex_id - 1].cc_flag == ROOT_FLAG_ALREADY_ADDED {
+            return;
+        }
+        self.vertices[vertex_id - 1].cc_flag = ROOT_FLAG_ALREADY_ADDED;
+        network.cc_vertices.push(vertex_id);
+
+        for crease_id in self.vertices[vertex_id - 1].creases.clone() {
+            self.try_add_crease_to_connected_component(network, crease_id);
+        }
+        if let Some(mate_vertex) = self.vertices[vertex_id - 1].left_pseudohinge_mate {
+            self.try_add_vertex_to_connected_component(network, mate_vertex);
+        }
+        if let Some(mate_vertex) = self.vertices[vertex_id - 1].right_pseudohinge_mate {
+            self.try_add_vertex_to_connected_component(network, mate_vertex);
+        }
+
+        if let Some(node_id) = self.vertices[vertex_id - 1].tree_node
+            && self.nodes[node_id - 1].is_leaf
+        {
+            for crease_id in self.vertices[vertex_id - 1].creases.clone() {
+                if self.creases[crease_id - 1].kind != CREASE_RIDGE {
+                    continue;
+                }
+                if let OwnerRef::Poly(poly_id) = self.creases[crease_id - 1].owner {
+                    push_unique(&mut network.cc_polys, poly_id);
+                }
+            }
+        }
+    }
+
+    fn try_add_crease_to_connected_component(
+        &mut self,
+        network: &mut RootNetwork,
+        crease_id: usize,
+    ) {
+        if !self.crease_is_hinge(crease_id) {
+            return;
+        }
+        if self.creases[crease_id - 1].cc_flag == ROOT_FLAG_INELIGIBLE {
+            return;
+        }
+        if self.creases[crease_id - 1].cc_flag == ROOT_FLAG_ALREADY_ADDED {
+            return;
+        }
+        self.creases[crease_id - 1].cc_flag = ROOT_FLAG_ALREADY_ADDED;
+        network.cc_creases.push(crease_id);
+        if let OwnerRef::Poly(poly_id) = self.creases[crease_id - 1].owner {
+            push_unique(&mut network.cc_polys, poly_id);
+        }
+        let vertices = self.creases[crease_id - 1].vertices.clone();
+        for vertex_id in vertices {
+            self.try_add_vertex_to_connected_component(network, vertex_id);
+        }
+    }
+
+    fn try_add_vertex_to_spanning_tree(&mut self, network: &mut RootNetwork, vertex_id: usize) {
+        if self.vertices[vertex_id - 1].st_flag == ROOT_FLAG_INELIGIBLE {
+            return;
+        }
+        if self.vertices[vertex_id - 1].st_flag == ROOT_FLAG_ALREADY_ADDED {
+            return;
+        }
+        self.vertices[vertex_id - 1].st_flag = ROOT_FLAG_ALREADY_ADDED;
+        network.st_vertices.push(vertex_id);
+
+        for crease_id in self.vertices[vertex_id - 1].creases.clone() {
+            self.try_add_crease_to_spanning_tree(network, crease_id);
+        }
+        if let Some(mate_vertex) = self.vertices[vertex_id - 1].left_pseudohinge_mate {
+            self.try_add_vertex_to_spanning_tree(network, mate_vertex);
+        }
+        if let Some(mate_vertex) = self.vertices[vertex_id - 1].right_pseudohinge_mate {
+            self.try_add_vertex_to_spanning_tree(network, mate_vertex);
+        }
+    }
+
+    fn try_add_crease_to_spanning_tree(&mut self, network: &mut RootNetwork, crease_id: usize) {
+        if !self.crease_is_hinge(crease_id) {
+            return;
+        }
+        if self.creases[crease_id - 1].cc_flag == ROOT_FLAG_INELIGIBLE {
+            return;
+        }
+        if self.creases[crease_id - 1].st_flag == ROOT_FLAG_ALREADY_ADDED {
+            return;
+        }
+        let v1 = self.creases[crease_id - 1].vertices[0];
+        let v2 = self.creases[crease_id - 1].vertices[1];
+        let c1 = self.vertices[v1 - 1].st_flag == ROOT_FLAG_ALREADY_ADDED;
+        let c2 = self.vertices[v2 - 1].st_flag == ROOT_FLAG_ALREADY_ADDED;
+        if c1 && c2 {
+            return;
+        }
+        self.creases[crease_id - 1].st_flag = ROOT_FLAG_ALREADY_ADDED;
+        network.st_creases.push(crease_id);
+        if !c1 {
+            self.try_add_vertex_to_spanning_tree(network, v1);
+        }
+        if !c2 {
+            self.try_add_vertex_to_spanning_tree(network, v2);
+        }
+    }
+
+    fn classify_root_network_vertices(&self, network: &mut RootNetwork) {
+        for vertex_id in network.cc_vertices.iter().copied() {
+            if !self.vertex_is_axial(vertex_id) {
+                continue;
+            }
+            let cc_degree = self.vertex_degree(vertex_id, &network.cc_creases);
+            let st_degree = self.vertex_degree(vertex_id, &network.st_creases);
+            match cc_degree {
+                0 => network.cc0.push(vertex_id),
+                1 => network.cc1.push(vertex_id),
+                2 if st_degree == 1 => network.cc2_st1.push(vertex_id),
+                2 if st_degree == 2 => network.cc2_st2.push(vertex_id),
+                _ => {}
+            }
+            let axial_degree = self.vertex_num_hinge_creases(vertex_id);
+            network.is_connectable |= axial_degree == 2 && cc_degree == 1;
+        }
+    }
+
+    fn connect_facet_graph(&mut self, network: &RootNetwork) {
+        if let Some(vertex_id) = network.cc0.first().copied() {
+            for crease_id in self.vertices[vertex_id - 1].creases.clone() {
+                if self.creases[crease_id - 1].kind == CREASE_RIDGE
+                    && let (Some(fwd), Some(bkd)) = (
+                        self.creases[crease_id - 1].fwd_facet,
+                        self.creases[crease_id - 1].bkd_facet,
+                    )
+                {
+                    self.facet_unlink(fwd, bkd);
+                }
+            }
+
+            let mut needs_skip = !self.vertices[vertex_id - 1].is_border;
+            for crease_id in self.vertices[vertex_id - 1].creases.clone() {
+                if self.crease_is_border(crease_id)
+                    || self.creases[crease_id - 1].kind != CREASE_AXIAL
+                {
+                    continue;
+                }
+                if needs_skip {
+                    needs_skip = false;
+                } else if let (Some(fwd), Some(bkd)) = (
+                    self.creases[crease_id - 1].fwd_facet,
+                    self.creases[crease_id - 1].bkd_facet,
+                ) {
+                    self.facet_link(fwd, bkd);
+                }
+            }
+            return;
+        }
+
+        for vertex_id in network.cc2_st2.iter().copied() {
+            self.vertex_swap_links(vertex_id);
+        }
+    }
+
+    fn root_network_can_absorb(
+        &self,
+        global_network: &RootNetwork,
+        network: &RootNetwork,
+    ) -> Option<usize> {
+        for poly_id in global_network.cc_polys.iter().copied() {
+            for path_id in self.polys[poly_id - 1].ring_paths.iter().copied() {
+                for vertex_id in self.paths[path_id - 1].owned_vertices.iter().copied() {
+                    if self.vertices[vertex_id - 1].discrete_depth != network.discrete_depth {
+                        continue;
+                    }
+                    if network.cc1.contains(&vertex_id) {
+                        return Some(vertex_id);
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    fn root_network_break_one_link(&mut self, network: &RootNetwork) {
+        if !network.cc0.is_empty() {
+            return;
+        }
+        if let Some(vertex_id) = network.cc1.first().copied() {
+            let Some(crease_id) = self.vertex_hinge_crease(vertex_id) else {
+                return;
+            };
+            let (Some(left), Some(right)) = (
+                self.crease_left_non_pseudohinge_facet(crease_id),
+                self.crease_right_non_pseudohinge_facet(crease_id),
+            ) else {
+                return;
+            };
+            self.facet_unlink(left, right);
+            return;
+        }
+
+        let Some(vertex_id) = network.cc2_st1.first().copied() else {
+            return;
+        };
+        let hinges = self.vertex_hinge_creases(vertex_id);
+        let Some(crease_id) = hinges.first().copied() else {
+            return;
+        };
+        if let (Some(fwd), Some(bkd)) = (
+            self.creases[crease_id - 1].fwd_facet,
+            self.creases[crease_id - 1].bkd_facet,
+        ) {
+            self.facet_unlink(fwd, bkd);
+        }
+    }
+
+    fn calc_facet_order_recursive(&mut self, facet_id: usize, next_order: &mut usize) {
+        if self.facets[facet_id - 1].order != usize::MAX {
+            return;
+        }
+        if self.facets[facet_id - 1]
+            .tail_facets
+            .iter()
+            .any(|tail| self.facets[*tail - 1].order == usize::MAX)
+        {
+            return;
+        }
+        self.facets[facet_id - 1].order = *next_order;
+        *next_order += 1;
+        for head_facet in self.facets[facet_id - 1].head_facets.clone() {
+            self.calc_facet_order_recursive(head_facet, next_order);
+        }
+    }
+
+    fn calc_facet_color(&mut self) {
+        let mut source_facet = None;
+        for facet_id in 1..=self.facets.len() {
+            self.facets[facet_id - 1].color = FACET_NOT_ORIENTED;
+            if self.facet_is_source(facet_id) {
+                source_facet = Some(facet_id);
+            }
+        }
+        if let Some(source_facet) = source_facet {
+            self.calc_facet_color_recursive(source_facet, FACET_COLOR_UP);
+        }
+    }
+
+    fn calc_facet_color_recursive(&mut self, facet_id: usize, color: i32) {
+        if self.facets[facet_id - 1].color != FACET_NOT_ORIENTED {
+            return;
+        }
+        self.facets[facet_id - 1].color = color;
+        for crease_id in self.facets[facet_id - 1].creases.clone() {
+            let Some(other_facet) = self.crease_other_facet(crease_id, facet_id) else {
+                continue;
+            };
+            if self.facets[other_facet - 1].color != FACET_NOT_ORIENTED {
+                continue;
+            }
+            let other_color = match self.creases[crease_id - 1].kind {
+                CREASE_AXIAL | CREASE_GUSSET | CREASE_RIDGE | CREASE_FOLDED_HINGE
+                | CREASE_PSEUDOHINGE => opposite_facet_color(color),
+                CREASE_UNFOLDED_HINGE => color,
+                _ => continue,
+            };
+            self.calc_facet_color_recursive(other_facet, other_color);
+        }
+    }
+
+    fn calc_fold_directions(&mut self) {
+        for crease_id in 1..=self.creases.len() {
+            self.calc_crease_fold(crease_id);
+        }
+    }
+
+    fn calc_crease_fold(&mut self, crease_id: usize) {
+        let (Some(fwd), Some(bkd)) = (
+            self.creases[crease_id - 1].fwd_facet,
+            self.creases[crease_id - 1].bkd_facet,
+        ) else {
+            self.creases[crease_id - 1].fold = FOLD_BORDER;
+            return;
+        };
+        let fwd_facet = &self.facets[fwd - 1];
+        let bkd_facet = &self.facets[bkd - 1];
+        self.creases[crease_id - 1].fold = if fwd_facet.color == bkd_facet.color {
+            FOLD_FLAT
+        } else if fwd_facet.color == FACET_COLOR_UP {
+            if fwd_facet.order > bkd_facet.order {
+                FOLD_MOUNTAIN
+            } else {
+                FOLD_VALLEY
+            }
+        } else if fwd_facet.order > bkd_facet.order {
+            FOLD_VALLEY
+        } else {
+            FOLD_MOUNTAIN
+        };
+    }
+
+    fn other_crease_vertex(&self, crease_id: usize, vertex_id: usize) -> usize {
+        let crease = &self.creases[crease_id - 1];
+        if crease.vertices[0] == vertex_id {
+            crease.vertices[1]
+        } else {
+            crease.vertices[0]
+        }
+    }
+
+    fn crease_is_hinge(&self, crease_id: usize) -> bool {
+        matches!(
+            self.creases[crease_id - 1].kind,
+            CREASE_UNFOLDED_HINGE | CREASE_FOLDED_HINGE | CREASE_PSEUDOHINGE
+        )
+    }
+
+    fn crease_is_regular_hinge(&self, crease_id: usize) -> bool {
+        matches!(
+            self.creases[crease_id - 1].kind,
+            CREASE_UNFOLDED_HINGE | CREASE_FOLDED_HINGE
+        )
+    }
+
+    fn crease_is_border(&self, crease_id: usize) -> bool {
+        let crease = &self.creases[crease_id - 1];
+        crease.fwd_facet.is_none() || crease.bkd_facet.is_none()
+    }
+
+    fn crease_other_facet(&self, crease_id: usize, facet_id: usize) -> Option<usize> {
+        let crease = &self.creases[crease_id - 1];
+        if crease.fwd_facet == Some(facet_id) {
+            crease.bkd_facet
+        } else if crease.bkd_facet == Some(facet_id) {
+            crease.fwd_facet
+        } else {
+            None
+        }
+    }
+
+    fn crease_left_facet(&self, crease_id: usize) -> Option<usize> {
+        let crease = &self.creases[crease_id - 1];
+        if let Some(fwd) = crease.fwd_facet
+            && self.facet_right_crease(fwd) == Some(crease_id)
+        {
+            return Some(fwd);
+        }
+        if let Some(bkd) = crease.bkd_facet
+            && self.facet_right_crease(bkd) == Some(crease_id)
+        {
+            return Some(bkd);
+        }
+        None
+    }
+
+    fn crease_right_facet(&self, crease_id: usize) -> Option<usize> {
+        let crease = &self.creases[crease_id - 1];
+        if let Some(fwd) = crease.fwd_facet
+            && self.facet_left_crease(fwd) == Some(crease_id)
+        {
+            return Some(fwd);
+        }
+        if let Some(bkd) = crease.bkd_facet
+            && self.facet_left_crease(bkd) == Some(crease_id)
+        {
+            return Some(bkd);
+        }
+        None
+    }
+
+    fn crease_left_non_pseudohinge_facet(&self, crease_id: usize) -> Option<usize> {
+        let mut facet_id = self.crease_left_facet(crease_id)?;
+        let mut guard = 0;
+        while self.facet_is_pseudohinge(facet_id) {
+            facet_id = self.facet_left_facet(facet_id)?;
+            guard += 1;
+            if guard > self.facets.len() {
+                return None;
+            }
+        }
+        Some(facet_id)
+    }
+
+    fn crease_right_non_pseudohinge_facet(&self, crease_id: usize) -> Option<usize> {
+        let mut facet_id = self.crease_right_facet(crease_id)?;
+        let mut guard = 0;
+        while self.facet_is_pseudohinge(facet_id) {
+            facet_id = self.facet_right_facet(facet_id)?;
+            guard += 1;
+            if guard > self.facets.len() {
+                return None;
+            }
+        }
+        Some(facet_id)
+    }
+
+    fn facet_bottom_crease(&self, facet_id: usize) -> Option<usize> {
+        self.facets
+            .get(facet_id.saturating_sub(1))?
+            .creases
+            .first()
+            .copied()
+    }
+
+    fn facet_left_crease(&self, facet_id: usize) -> Option<usize> {
+        self.facets
+            .get(facet_id.saturating_sub(1))?
+            .creases
+            .last()
+            .copied()
+    }
+
+    fn facet_right_crease(&self, facet_id: usize) -> Option<usize> {
+        self.facets
+            .get(facet_id.saturating_sub(1))?
+            .creases
+            .get(1)
+            .copied()
+    }
+
+    fn facet_is_axial(&self, facet_id: usize) -> bool {
+        self.facet_bottom_crease(facet_id)
+            .is_some_and(|crease_id| self.creases[crease_id - 1].kind == CREASE_AXIAL)
+    }
+
+    fn facet_is_pseudohinge(&self, facet_id: usize) -> bool {
+        self.facet_left_crease(facet_id)
+            .is_some_and(|crease_id| self.creases[crease_id - 1].kind == CREASE_PSEUDOHINGE)
+            || self
+                .facet_right_crease(facet_id)
+                .is_some_and(|crease_id| self.creases[crease_id - 1].kind == CREASE_PSEUDOHINGE)
+    }
+
+    fn facet_left_facet(&self, facet_id: usize) -> Option<usize> {
+        self.crease_left_facet(self.facet_left_crease(facet_id)?)
+    }
+
+    fn facet_right_facet(&self, facet_id: usize) -> Option<usize> {
+        self.crease_right_facet(self.facet_right_crease(facet_id)?)
+    }
+
+    fn facet_right_non_pseudohinge_facet(&self, facet_id: usize) -> Option<usize> {
+        let mut other_facet = self.facet_right_facet(facet_id)?;
+        let mut guard = 0;
+        while self.facet_is_pseudohinge(other_facet) {
+            other_facet = self.facet_right_facet(other_facet)?;
+            guard += 1;
+            if guard > self.facets.len() {
+                return None;
+            }
+        }
+        Some(other_facet)
+    }
+
+    fn facet_is_source(&self, facet_id: usize) -> bool {
+        let facet = &self.facets[facet_id - 1];
+        !facet.head_facets.is_empty() && facet.tail_facets.is_empty()
+    }
+
+    fn facet_is_sink(&self, facet_id: usize) -> bool {
+        let facet = &self.facets[facet_id - 1];
+        !facet.tail_facets.is_empty() && facet.head_facets.is_empty()
+    }
+
+    fn facet_link_to(&mut self, tail_facet: usize, head_facet: usize) {
+        self.facets[tail_facet - 1].head_facets.push(head_facet);
+        self.facets[head_facet - 1].tail_facets.push(tail_facet);
+    }
+
+    fn facets_are_linked(&self, facet1: usize, facet2: usize) -> bool {
+        self.facets[facet1 - 1].head_facets.contains(&facet2)
+            || self.facets[facet2 - 1].head_facets.contains(&facet1)
+    }
+
+    fn facet_link(&mut self, facet1: usize, facet2: usize) {
+        if self.facet_is_sink(facet1) {
+            self.facet_link_to(facet1, facet2);
+        } else {
+            self.facet_link_to(facet2, facet1);
+        }
+    }
+
+    fn facet_unlink(&mut self, facet1: usize, facet2: usize) {
+        if let Some(pos) = self.facets[facet1 - 1]
+            .head_facets
+            .iter()
+            .position(|id| *id == facet2)
+        {
+            self.facets[facet1 - 1].head_facets.remove(pos);
+            if let Some(pos) = self.facets[facet2 - 1]
+                .tail_facets
+                .iter()
+                .position(|id| *id == facet1)
+            {
+                self.facets[facet2 - 1].tail_facets.remove(pos);
+            }
+            return;
+        }
+
+        if let Some(pos) = self.facets[facet1 - 1]
+            .tail_facets
+            .iter()
+            .position(|id| *id == facet2)
+        {
+            self.facets[facet1 - 1].tail_facets.remove(pos);
+            if let Some(pos) = self.facets[facet2 - 1]
+                .head_facets
+                .iter()
+                .position(|id| *id == facet1)
+            {
+                self.facets[facet2 - 1].head_facets.remove(pos);
+            }
+        }
+    }
+
+    fn vertex_is_axial(&self, vertex_id: usize) -> bool {
+        self.vertices[vertex_id - 1]
+            .creases
+            .iter()
+            .any(|crease_id| self.creases[*crease_id - 1].kind == CREASE_AXIAL)
+    }
+
+    fn vertex_degree(&self, vertex_id: usize, crease_list: &[usize]) -> usize {
+        self.vertices[vertex_id - 1]
+            .creases
+            .iter()
+            .filter(|crease_id| crease_list.contains(crease_id))
+            .count()
+    }
+
+    fn vertex_num_hinge_creases(&self, vertex_id: usize) -> usize {
+        self.vertices[vertex_id - 1]
+            .creases
+            .iter()
+            .filter(|crease_id| self.crease_is_hinge(**crease_id))
+            .count()
+    }
+
+    fn vertex_hinge_crease(&self, vertex_id: usize) -> Option<usize> {
+        self.vertices[vertex_id - 1]
+            .creases
+            .iter()
+            .copied()
+            .find(|crease_id| self.crease_is_hinge(*crease_id))
+    }
+
+    fn vertex_hinge_creases(&self, vertex_id: usize) -> Vec<usize> {
+        self.vertices[vertex_id - 1]
+            .creases
+            .iter()
+            .copied()
+            .filter(|crease_id| self.crease_is_hinge(*crease_id))
+            .take(2)
+            .collect()
+    }
+
+    fn vertex_swap_links(&mut self, vertex_id: usize) {
+        if !self.vertex_is_axial(vertex_id) || self.vertex_num_hinge_creases(vertex_id) < 2 {
+            return;
+        }
+        let hinge_creases = self.vertex_hinge_creases(vertex_id);
+        if hinge_creases.len() < 2 {
+            return;
+        }
+        let crease1 = hinge_creases[0];
+        let crease2 = hinge_creases[1];
+        let (Some(facet_a), Some(facet_b), Some(facet_c), Some(facet_d)) = (
+            self.crease_left_facet(crease1),
+            self.crease_right_facet(crease1),
+            self.crease_right_facet(crease2),
+            self.crease_left_facet(crease2),
+        ) else {
+            return;
+        };
+        self.facet_unlink(facet_a, facet_b);
+        self.facet_unlink(facet_c, facet_d);
+        self.facet_link_to(facet_a, facet_c);
+        self.facet_link_to(facet_d, facet_b);
     }
 
     fn leaf_path_id_between(&self, node1: usize, node2: usize) -> Option<usize> {
@@ -5737,6 +7756,42 @@ fn inradius(p1: Point, p2: Point, p3: Point) -> TmFloat {
     0.5 * (((b + c - a) * (c + a - b) * (a + b - c)) / (a + b + c)).sqrt()
 }
 
+fn vertices_same_loc(p1: Point, p2: Point) -> bool {
+    p1.distance(p2) < VERTEX_TOL
+}
+
+fn project_p_to_q(p1: Point, p2: Point, p: Point, q1: Point, q2: Point) -> Option<Point> {
+    let rq = point_sub(q2, q1);
+    let dq = mag(rq);
+    let up = normalize(point_sub(p2, p1));
+    let denom = inner(up, rq);
+    if denom == 0.0 {
+        return None;
+    }
+    let d = dq * inner(up, point_sub(p, q1)) / denom;
+    let q = point_add(q1, point_mul(normalize(rq), d));
+    (d > -0.9 * DIST_TOL && d < dq + 0.9 * DIST_TOL).then_some(q)
+}
+
+fn project_q_to_p(q: Point, p1: Point, p2: Point) -> Option<Point> {
+    let rp = point_sub(p2, p1);
+    let up = normalize(rp);
+    let d = inner(up, point_sub(q, p1));
+    let dp = inner(up, rp);
+    let p = point_add(p1, point_mul(up, d));
+    (d > -0.9 * DIST_TOL && d < dp + 0.9 * DIST_TOL).then_some(p)
+}
+
+fn sortable_ridge_vertex_value(vertex: Point, front: Point, back: Point) -> TmFloat {
+    let pu = normalize(point_sub(back, front));
+    let pv = rotate_ccw90(pu);
+    let dm = point_mul(point_add(back, front), 0.5);
+    let dp = point_sub(vertex, dm);
+    let du = inner(dp, pu);
+    let dv = inner(dp, pv);
+    du.atan2(dv)
+}
+
 fn push_unique(values: &mut Vec<usize>, value: usize) {
     if !values.contains(&value) {
         values.push(value);
@@ -5848,6 +7903,14 @@ fn validate_condition_rest_len(tag: &str, got: usize) -> Result<()> {
         });
     }
     Ok(())
+}
+
+fn opposite_facet_color(color: i32) -> i32 {
+    if color == FACET_WHITE_UP {
+        FACET_COLOR_UP
+    } else {
+        FACET_WHITE_UP
+    }
 }
 
 #[cfg(test)]
@@ -6017,11 +8080,11 @@ mod tests {
     }
 
     #[test]
-    fn unsupported_algorithm_ports_are_explicit() {
+    fn builds_polys_and_crease_pattern_payload() {
         let mut tree = Tree::from_tmd_str(FIXTURE_1).unwrap();
-        assert!(matches!(
-            tree.build_polys_and_crease_pattern(),
-            Err(TreeError::UnsupportedOperation(_))
-        ));
+        tree.build_polys_and_crease_pattern().unwrap();
+        assert!(!tree.vertices.is_empty());
+        assert!(!tree.creases.is_empty());
+        assert!(!tree.facets.is_empty());
     }
 }

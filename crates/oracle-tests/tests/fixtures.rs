@@ -1,4 +1,4 @@
-use treemaker_core::{Tree, TreeError};
+use treemaker_core::Tree;
 
 const FIXTURES: &[(&str, &str)] = &[
     (
@@ -60,15 +60,12 @@ fn v4_export_reparses() {
 }
 
 #[test]
-fn unported_algorithms_fail_loudly() {
+fn ported_algorithms_run_on_fixture_set() {
     let mut tree = Tree::from_tmd_str(FIXTURES[0].1).unwrap();
     assert!(tree.optimize_scale().unwrap().converged);
     let mut edge_tree = Tree::from_tmd_str(FIXTURES[3].1).unwrap();
     assert!(edge_tree.optimize_edges().unwrap().converged);
     let mut strain_tree = Tree::from_tmd_str(FIXTURES[4].1).unwrap();
     assert!(strain_tree.optimize_strain().unwrap().converged);
-    assert!(matches!(
-        strain_tree.build_polys_and_crease_pattern(),
-        Err(TreeError::UnsupportedOperation(_))
-    ));
+    strain_tree.build_polys_and_crease_pattern().unwrap();
 }

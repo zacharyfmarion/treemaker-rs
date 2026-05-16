@@ -75,7 +75,7 @@ fn cpp_oracle_matches_rust_parse_and_stable_optimizer_cases_when_enabled() {
         .lines()
         .map(|line| serde_json::from_str(line).unwrap_or_else(|err| panic!("{line}: {err}")))
         .collect();
-    assert_eq!(records.len(), 10);
+    assert_eq!(records.len(), 13);
 
     for record in records
         .iter()

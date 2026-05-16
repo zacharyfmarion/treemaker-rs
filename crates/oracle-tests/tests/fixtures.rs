@@ -21,6 +21,18 @@ const FIXTURES: &[(&str, &str)] = &[
         "tmModelTester_5.tmd5",
         include_str!("../../../tests/fixtures/tmModelTester_5.tmd5"),
     ),
+    (
+        "minimal_v3.tmd",
+        include_str!("../../../tests/fixtures/minimal_v3.tmd"),
+    ),
+    (
+        "minimal_cp_v4.tmd4",
+        include_str!("../../../tests/fixtures/minimal_cp_v4.tmd4"),
+    ),
+    (
+        "minimal_cp_v5.tmd5",
+        include_str!("../../../tests/fixtures/minimal_cp_v5.tmd5"),
+    ),
 ];
 
 #[test]

@@ -65,6 +65,13 @@ Done when:
 
 ## Phase 2: Stream I/O Completeness
 
+Status: complete for the checked-in fixture surface. v3 reading is implemented
+from the TreeMaker 5.0.1 stream readers, including legacy node/path condition
+translation. CP-bearing v5 payloads are represented as typed `Poly`, `Vertex`,
+`Crease`, and `Facet` data and round-trip through canonical v5 writing.
+CP-bearing v4 payloads are consumed and then discarded to match
+`tmTree::GetSelf`, which calls `KillPolysAndCreasePattern()` after reading v4.
+
 Goal: make the Rust parser/writer cover the same file format surface as
 TreeMaker 5.0.1 for headless model data.
 

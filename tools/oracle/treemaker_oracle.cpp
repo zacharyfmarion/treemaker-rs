@@ -29,7 +29,12 @@ const char* kFixtures[] = {
   "tmModelTester_3.tmd5",
   "tmModelTester_4.tmd5",
   "tmModelTester_5.tmd5",
+  "minimal_v3.tmd",
+  "minimal_cp_v4.tmd4",
+  "minimal_cp_v5.tmd5",
 };
+
+const size_t kFixtureCount = sizeof(kFixtures) / sizeof(kFixtures[0]);
 
 void InitTypesOnce()
 {
@@ -314,7 +319,7 @@ int RunFixtures(int argc, char** argv)
     }
   }
 
-  for (size_t i = 0; i < 5; ++i) {
+  for (size_t i = 0; i < kFixtureCount; ++i) {
     EmitSummary(JoinPath(fixtureDir, kFixtures[i]));
   }
 

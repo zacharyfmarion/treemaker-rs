@@ -121,29 +121,70 @@ pub struct Path {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RawPoly {
+pub struct Poly {
     pub index: usize,
     pub centroid: Point,
     pub is_sub_poly: bool,
-    pub fields: Vec<String>,
+    pub ring_nodes: Vec<usize>,
+    pub ring_paths: Vec<usize>,
+    pub cross_paths: Vec<usize>,
+    pub inset_nodes: Vec<usize>,
+    pub spoke_paths: Vec<usize>,
+    pub ridge_path: Option<usize>,
+    pub node_locs: Vec<Point>,
+    pub local_root_vertices: Vec<usize>,
+    pub local_root_creases: Vec<usize>,
+    pub owned_nodes: Vec<usize>,
+    pub owned_paths: Vec<usize>,
+    pub owned_polys: Vec<usize>,
+    pub owned_creases: Vec<usize>,
+    pub owned_facets: Vec<usize>,
+    pub owner: OwnerRef,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RawVertex {
+pub struct Vertex {
     pub index: usize,
-    pub fields: Vec<String>,
+    pub loc: Point,
+    pub elevation: TmFloat,
+    pub is_border: bool,
+    pub tree_node: Option<usize>,
+    pub left_pseudohinge_mate: Option<usize>,
+    pub right_pseudohinge_mate: Option<usize>,
+    pub creases: Vec<usize>,
+    pub depth: TmFloat,
+    pub discrete_depth: usize,
+    pub cc_flag: i32,
+    pub st_flag: i32,
+    pub owner: OwnerRef,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RawCrease {
+pub struct Crease {
     pub index: usize,
-    pub fields: Vec<String>,
+    pub kind: i32,
+    pub vertices: Vec<usize>,
+    pub fwd_facet: Option<usize>,
+    pub bkd_facet: Option<usize>,
+    pub fold: i32,
+    pub cc_flag: i32,
+    pub st_flag: i32,
+    pub owner: OwnerRef,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RawFacet {
+pub struct Facet {
     pub index: usize,
-    pub fields: Vec<String>,
+    pub centroid: Point,
+    pub is_well_formed: bool,
+    pub vertices: Vec<usize>,
+    pub creases: Vec<usize>,
+    pub corridor_edge: Option<usize>,
+    pub head_facets: Vec<usize>,
+    pub tail_facets: Vec<usize>,
+    pub order: usize,
+    pub color: i32,
+    pub owner: OwnerRef,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -243,10 +284,10 @@ pub struct Tree {
     pub nodes: Vec<Node>,
     pub edges: Vec<Edge>,
     pub paths: Vec<Path>,
-    pub polys: Vec<RawPoly>,
-    pub vertices: Vec<RawVertex>,
-    pub creases: Vec<RawCrease>,
-    pub facets: Vec<RawFacet>,
+    pub polys: Vec<Poly>,
+    pub vertices: Vec<Vertex>,
+    pub creases: Vec<Crease>,
+    pub facets: Vec<Facet>,
     pub conditions: Vec<Condition>,
     pub owned_nodes: Vec<usize>,
     pub owned_edges: Vec<usize>,
@@ -327,7 +368,12 @@ impl Tree {
                 tree.validate()?;
                 tree
             }
-            "3.0" => return Err(TreeError::UnsupportedVersion(version)),
+            "3.0" => {
+                let mut tree = Self::read_v3(&mut reader, version)?;
+                tree.validate()?;
+                tree.cleanup_lengths_and_feasibility();
+                tree
+            }
             _ => return Err(TreeError::UnsupportedVersion(version)),
         };
         Ok(tree)
@@ -369,16 +415,16 @@ impl Tree {
             out.path_v5(path);
         }
         for poly in &self.polys {
-            out.raw_part("poly", poly.index, &poly.fields);
+            out.poly_v5(poly);
         }
         for vertex in &self.vertices {
-            out.raw_part("vrtx", vertex.index, &vertex.fields);
+            out.vertex_v5(vertex);
         }
         for crease in &self.creases {
-            out.raw_part("crse", crease.index, &crease.fields);
+            out.crease_v5(crease);
         }
         for facet in &self.facets {
-            out.raw_part("fact", facet.index, &facet.fields);
+            out.facet_v5(facet);
         }
         for condition in &self.conditions {
             out.condition_v5(condition);
@@ -770,7 +816,7 @@ impl Tree {
         ))
     }
 
-    fn read_v4(reader: &mut Reader<'_>, source_version: String) -> Result<Self> {
+    fn read_v3(reader: &mut Reader<'_>, source_version: String) -> Result<Self> {
         let paper_width = reader.read_f64("paper width")?;
         let paper_height = reader.read_f64("paper height")?;
         let scale = reader.read_f64("scale")?;
@@ -780,51 +826,22 @@ impl Tree {
         let num_nodes = reader.read_usize("node count")?;
         let num_edges = reader.read_usize("edge count")?;
         let num_paths = reader.read_usize("path count")?;
-        let num_polys = reader.read_usize("poly count")?;
-        let num_vertices = reader.read_usize("vertex count")?;
-        let num_creases = reader.read_usize("crease count")?;
-        let num_conditions = reader.read_usize("condition count")?;
-        if num_polys != 0 || num_vertices != 0 || num_creases != 0 {
-            return Err(TreeError::UnsupportedOperation(
-                "v4 legacy crease-pattern payload parsing must be ported before loading CP-bearing v4 files",
-            ));
-        }
+        let _num_polys = reader.read_usize("poly count")?;
 
         let mut nodes = Vec::with_capacity(num_nodes);
         let mut edges = Vec::with_capacity(num_edges);
         let mut paths = Vec::with_capacity(num_paths);
-        let mut polys = Vec::with_capacity(num_polys);
-        let mut vertices = Vec::with_capacity(num_vertices);
-        let mut creases = Vec::with_capacity(num_creases);
+        let mut conditions = Vec::new();
 
         for _ in 0..num_nodes {
-            nodes.push(reader.read_node_v4()?);
+            nodes.push(reader.read_node_v3(&mut conditions)?);
         }
         for _ in 0..num_edges {
-            edges.push(reader.read_edge(true)?);
+            edges.push(reader.read_edge_v3()?);
         }
         for _ in 0..num_paths {
-            paths.push(reader.read_path_v4()?);
+            paths.push(reader.read_path_v3(&mut conditions)?);
         }
-        for _ in 0..num_polys {
-            polys.push(reader.read_poly_v4()?);
-        }
-        for _ in 0..num_vertices {
-            vertices.push(reader.read_vertex_v4()?);
-        }
-        for _ in 0..num_creases {
-            creases.push(reader.read_crease_v4()?);
-        }
-
-        let mut conditions = Vec::with_capacity(num_conditions);
-        for i in 0..num_conditions {
-            conditions.push(reader.read_condition_v4(i + 1)?);
-        }
-
-        let owned_nodes = reader.read_index_array("owned nodes")?;
-        let owned_edges = reader.read_index_array("owned edges")?;
-        let owned_paths = reader.read_index_array("owned paths")?;
-        let owned_polys = reader.read_index_array("owned polys")?;
 
         Ok(Self {
             source_version,
@@ -844,15 +861,98 @@ impl Tree {
             nodes,
             edges,
             paths,
-            polys,
-            vertices,
-            creases,
+            polys: Vec::new(),
+            vertices: Vec::new(),
+            creases: Vec::new(),
+            facets: Vec::new(),
+            conditions,
+            owned_nodes: (1..=num_nodes).collect(),
+            owned_edges: (1..=num_edges).collect(),
+            owned_paths: (1..=num_paths).collect(),
+            owned_polys: Vec::new(),
+        })
+    }
+
+    fn read_v4(reader: &mut Reader<'_>, source_version: String) -> Result<Self> {
+        let paper_width = reader.read_f64("paper width")?;
+        let paper_height = reader.read_f64("paper height")?;
+        let scale = reader.read_f64("scale")?;
+        let has_symmetry = reader.read_bool("has symmetry")?;
+        let sym_loc = reader.read_point("symmetry location")?;
+        let sym_angle = reader.read_f64("symmetry angle")?;
+        let num_nodes = reader.read_usize("node count")?;
+        let num_edges = reader.read_usize("edge count")?;
+        let num_paths = reader.read_usize("path count")?;
+        let num_polys = reader.read_usize("poly count")?;
+        let num_vertices = reader.read_usize("vertex count")?;
+        let num_creases = reader.read_usize("crease count")?;
+        let num_conditions = reader.read_usize("condition count")?;
+
+        let mut nodes = Vec::with_capacity(num_nodes);
+        let mut edges = Vec::with_capacity(num_edges);
+        let mut paths = Vec::with_capacity(num_paths);
+        let mut polys = Vec::with_capacity(num_polys);
+        let mut vertices = Vec::with_capacity(num_vertices);
+        let mut creases = Vec::with_capacity(num_creases);
+
+        for _ in 0..num_nodes {
+            nodes.push(reader.read_node_v4()?);
+        }
+        for _ in 0..num_edges {
+            edges.push(reader.read_edge(true)?);
+        }
+        for _ in 0..num_paths {
+            paths.push(reader.read_path_v4(num_polys)?);
+        }
+        for _ in 0..num_polys {
+            polys.push(reader.read_poly_v4(num_paths)?);
+        }
+        for index in 1..=num_vertices {
+            vertices.push(reader.read_vertex_v4(index)?);
+        }
+        for index in 1..=num_creases {
+            creases.push(reader.read_crease_v4(index)?);
+        }
+
+        let mut conditions = Vec::with_capacity(num_conditions);
+        for i in 0..num_conditions {
+            conditions.push(reader.read_condition_v4(i + 1)?);
+        }
+
+        let owned_nodes = reader.read_index_array("owned nodes")?;
+        let owned_edges = reader.read_index_array("owned edges")?;
+        let owned_paths = reader.read_index_array("owned paths")?;
+        let _owned_polys = reader.read_index_array("owned polys")?;
+
+        kill_v4_crease_pattern_refs(&mut nodes, &mut paths);
+
+        Ok(Self {
+            source_version,
+            paper_width,
+            paper_height,
+            scale,
+            has_symmetry,
+            sym_loc,
+            sym_angle,
+            is_feasible: false,
+            is_polygon_valid: false,
+            is_polygon_filled: false,
+            is_vertex_depth_valid: false,
+            is_facet_data_valid: false,
+            is_local_root_connectable: false,
+            needs_cleanup: false,
+            nodes,
+            edges,
+            paths,
+            polys: Vec::new(),
+            vertices: Vec::new(),
+            creases: Vec::new(),
             facets: Vec::new(),
             conditions,
             owned_nodes,
             owned_edges,
             owned_paths,
-            owned_polys,
+            owned_polys: Vec::new(),
         })
     }
 
@@ -878,11 +978,6 @@ impl Tree {
         let num_creases = reader.read_usize("crease count")?;
         let num_facets = reader.read_usize("facet count")?;
         let num_conditions = reader.read_usize("condition count")?;
-        if num_polys != 0 || num_vertices != 0 || num_creases != 0 || num_facets != 0 {
-            return Err(TreeError::UnsupportedOperation(
-                "typed v5 crease-pattern payload parsing is not ported yet",
-            ));
-        }
 
         let mut nodes = Vec::with_capacity(num_nodes);
         let mut edges = Vec::with_capacity(num_edges);
@@ -899,19 +994,19 @@ impl Tree {
             edges.push(reader.read_edge(false)?);
         }
         for _ in 0..num_paths {
-            paths.push(reader.read_path_v5()?);
+            paths.push(reader.read_path_v5(num_polys, num_paths)?);
         }
         for _ in 0..num_polys {
-            polys.push(reader.read_poly_v5()?);
+            polys.push(reader.read_poly_v5(num_paths)?);
         }
         for _ in 0..num_vertices {
-            vertices.push(reader.read_vertex_v5()?);
+            vertices.push(reader.read_vertex_v5(num_nodes, num_vertices)?);
         }
         for _ in 0..num_creases {
-            creases.push(reader.read_crease_v5()?);
+            creases.push(reader.read_crease_v5(num_facets)?);
         }
         for _ in 0..num_facets {
-            facets.push(reader.read_facet_v5()?);
+            facets.push(reader.read_facet_v5(num_edges)?);
         }
 
         let mut conditions = Vec::with_capacity(num_conditions);
@@ -1007,6 +1102,84 @@ impl Tree {
                 self.check_ref("crease", *id, self.creases.len())?;
             }
             self.check_owner(&path.owner)?;
+        }
+        for poly in &self.polys {
+            for id in &poly.ring_nodes {
+                self.check_ref("node", *id, self.nodes.len())?;
+            }
+            for id in &poly.inset_nodes {
+                self.check_ref("node", *id, self.nodes.len())?;
+            }
+            for id in &poly.owned_nodes {
+                self.check_ref("node", *id, self.nodes.len())?;
+            }
+            for id in poly
+                .ring_paths
+                .iter()
+                .chain(&poly.cross_paths)
+                .chain(&poly.spoke_paths)
+                .chain(&poly.owned_paths)
+            {
+                self.check_ref("path", *id, self.paths.len())?;
+            }
+            if let Some(id) = poly.ridge_path {
+                self.check_ref("path", id, self.paths.len())?;
+            }
+            for id in &poly.local_root_vertices {
+                self.check_ref("vertex", *id, self.vertices.len())?;
+            }
+            for id in poly.local_root_creases.iter().chain(&poly.owned_creases) {
+                self.check_ref("crease", *id, self.creases.len())?;
+            }
+            for id in &poly.owned_polys {
+                self.check_ref("poly", *id, self.polys.len())?;
+            }
+            for id in &poly.owned_facets {
+                self.check_ref("facet", *id, self.facets.len())?;
+            }
+            self.check_owner(&poly.owner)?;
+        }
+        for vertex in &self.vertices {
+            if let Some(id) = vertex.tree_node {
+                self.check_ref("node", id, self.nodes.len())?;
+            }
+            if let Some(id) = vertex.left_pseudohinge_mate {
+                self.check_ref("vertex", id, self.vertices.len())?;
+            }
+            if let Some(id) = vertex.right_pseudohinge_mate {
+                self.check_ref("vertex", id, self.vertices.len())?;
+            }
+            for id in &vertex.creases {
+                self.check_ref("crease", *id, self.creases.len())?;
+            }
+            self.check_owner(&vertex.owner)?;
+        }
+        for crease in &self.creases {
+            for id in &crease.vertices {
+                self.check_ref("vertex", *id, self.vertices.len())?;
+            }
+            if let Some(id) = crease.fwd_facet {
+                self.check_ref("facet", id, self.facets.len())?;
+            }
+            if let Some(id) = crease.bkd_facet {
+                self.check_ref("facet", id, self.facets.len())?;
+            }
+            self.check_owner(&crease.owner)?;
+        }
+        for facet in &self.facets {
+            for id in &facet.vertices {
+                self.check_ref("vertex", *id, self.vertices.len())?;
+            }
+            for id in &facet.creases {
+                self.check_ref("crease", *id, self.creases.len())?;
+            }
+            if let Some(id) = facet.corridor_edge {
+                self.check_ref("edge", id, self.edges.len())?;
+            }
+            for id in facet.head_facets.iter().chain(&facet.tail_facets) {
+                self.check_ref("facet", *id, self.facets.len())?;
+            }
+            self.check_owner(&facet.owner)?;
         }
         for condition in &self.conditions {
             condition.kind.validate_refs(self)?;
@@ -2221,7 +2394,33 @@ impl Tree {
         }
         let conditions_feasible = condition_feasibilities.into_iter().all(|feasible| feasible);
         self.is_feasible = leaf_paths_feasible && conditions_feasible;
+        self.rebuild_conditioned_flags();
         self.needs_cleanup = false;
+    }
+
+    fn rebuild_conditioned_flags(&mut self) {
+        let mut conditioned_nodes = vec![false; self.nodes.len()];
+        let mut conditioned_edges = vec![false; self.edges.len()];
+        let mut conditioned_paths = vec![false; self.paths.len()];
+
+        for condition in &self.conditions {
+            condition.kind.collect_conditioned_parts(
+                self,
+                &mut conditioned_nodes,
+                &mut conditioned_edges,
+                &mut conditioned_paths,
+            );
+        }
+
+        for (node, conditioned) in self.nodes.iter_mut().zip(conditioned_nodes) {
+            node.is_conditioned = conditioned;
+        }
+        for (edge, conditioned) in self.edges.iter_mut().zip(conditioned_edges) {
+            edge.is_conditioned = conditioned;
+        }
+        for (path, conditioned) in self.paths.iter_mut().zip(conditioned_paths) {
+            path.is_conditioned = conditioned;
+        }
     }
 }
 
@@ -2345,6 +2544,15 @@ impl<'a> Reader<'a> {
         })
     }
 
+    fn read_i32(&mut self, label: &'static str) -> Result<i32> {
+        let offset = self.pos;
+        let token = self.read_token(label)?;
+        token.parse::<i32>().map_err(|_| TreeError::Parse {
+            offset,
+            message: format!("expected integer for {label}, found {token:?}"),
+        })
+    }
+
     fn read_f64(&mut self, label: &'static str) -> Result<TmFloat> {
         let offset = self.pos;
         let token = self.read_token(label)?;
@@ -2377,11 +2585,104 @@ impl<'a> Reader<'a> {
         Ok(values)
     }
 
-    fn read_optional_index(&mut self, label: &'static str) -> Result<Option<usize>> {
+    fn read_optional_index_in_range(
+        &mut self,
+        label: &'static str,
+        max: usize,
+    ) -> Result<Option<usize>> {
         match self.read_usize(label)? {
             0 => Ok(None),
-            n => Ok(Some(n)),
+            n if n <= max => Ok(Some(n)),
+            _ => Ok(None),
         }
+    }
+
+    fn read_point_array(&mut self, label: &'static str) -> Result<Vec<Point>> {
+        let n = self.read_usize(label)?;
+        let mut points = Vec::with_capacity(n);
+        for _ in 0..n {
+            points.push(self.read_point(label)?);
+        }
+        Ok(points)
+    }
+
+    fn read_node_v3(&mut self, conditions: &mut Vec<Condition>) -> Result<Node> {
+        self.expect_tag("node")?;
+        let index = self.read_usize("node index")?;
+        let label = self.read_line_field("node label")?;
+        let loc = self.read_point("node location")?;
+
+        let node_is_symmetric = self.read_bool("node symmetric flag")?;
+        if node_is_symmetric {
+            push_condition(conditions, ConditionKind::NodeSymmetric { node: index });
+        }
+
+        let node_is_paired = self.read_bool("node paired flag")?;
+        let paired_node = self.read_usize("paired node")?;
+        if node_is_paired && index > paired_node {
+            push_condition(
+                conditions,
+                ConditionKind::NodesPaired {
+                    node1: index,
+                    node2: paired_node,
+                },
+            );
+        }
+
+        let x_fixed = self.read_bool("node x fixed flag")?;
+        let y_fixed = self.read_bool("node y fixed flag")?;
+        let x_fix_value = self.read_f64("node x fixed value")?;
+        let y_fix_value = self.read_f64("node y fixed value")?;
+        if x_fixed || y_fixed {
+            push_condition(
+                conditions,
+                ConditionKind::NodeFixed {
+                    node: index,
+                    x_fixed,
+                    y_fixed,
+                    x_fix_value: if x_fixed { x_fix_value } else { 0.0 },
+                    y_fix_value: if y_fixed { y_fix_value } else { 0.0 },
+                },
+            );
+        }
+
+        let node_stick_to_edge = self.read_bool("node stick-to-edge flag")?;
+        if node_stick_to_edge {
+            push_condition(conditions, ConditionKind::NodeOnEdge { node: index });
+        }
+
+        let node_is_collinear = self.read_bool("node collinear flag")?;
+        let collinear_node1 = self.read_usize("collinear node 1")?;
+        let collinear_node2 = self.read_usize("collinear node 2")?;
+        if node_is_collinear && index > collinear_node1 && index > collinear_node2 {
+            push_condition(
+                conditions,
+                ConditionKind::NodesCollinear {
+                    node1: index,
+                    node2: collinear_node1,
+                    node3: collinear_node2,
+                },
+            );
+        }
+
+        Ok(Node {
+            index,
+            label,
+            loc,
+            depth: DEPTH_NOT_SET,
+            elevation: 0.0,
+            is_leaf: self.read_bool("node leaf flag")?,
+            is_sub: false,
+            is_border: self.read_bool("node border flag")?,
+            is_pinned: self.read_bool("node pinned flag")?,
+            is_polygon: self.read_bool("node polygon flag")?,
+            is_junction: false,
+            is_conditioned: false,
+            owned_vertices: Vec::new(),
+            edges: self.read_index_array("node edges")?,
+            leaf_paths: self.read_index_array("node leaf paths")?,
+            owner: OwnerRef::Tree,
+        })
     }
 
     fn read_node_v4(&mut self) -> Result<Node> {
@@ -2428,6 +2729,20 @@ impl<'a> Reader<'a> {
         })
     }
 
+    fn read_edge_v3(&mut self) -> Result<Edge> {
+        self.expect_tag("edge")?;
+        Ok(Edge {
+            index: self.read_usize("edge index")?,
+            label: self.read_line_field("edge label")?,
+            length: self.read_f64("edge length")?,
+            strain: 0.0,
+            stiffness: 0.0,
+            is_pinned: self.read_bool("edge pinned flag")?,
+            is_conditioned: false,
+            nodes: self.read_index_array("edge nodes")?,
+        })
+    }
+
     fn read_edge(&mut self, repair_zero_stiffness: bool) -> Result<Edge> {
         self.expect_tag("edge")?;
         let index = self.read_usize("edge index")?;
@@ -2451,7 +2766,70 @@ impl<'a> Reader<'a> {
         Ok(edge)
     }
 
-    fn read_path_v4(&mut self) -> Result<Path> {
+    fn read_path_v3(&mut self, conditions: &mut Vec<Condition>) -> Result<Path> {
+        self.expect_tag("path")?;
+        let index = self.read_usize("path index")?;
+        let min_tree_length = self.read_f64("path min tree length")?;
+        let path_fixed_length = self.read_bool("path fixed length flag")?;
+        let path_fixed_length_value = self.read_f64("path fixed length value")?;
+        let path_fixed_angle = self.read_bool("path fixed angle flag")?;
+        let _path_fixed_angle_value = self.read_f64("path fixed angle value")?;
+        let is_leaf = self.read_bool("path leaf flag")?;
+        let is_active = self.read_bool("path active flag")?;
+        let is_border = self.read_bool("path border flag")?;
+        let is_polygon = self.read_bool("path polygon flag")?;
+        let _legacy_fwd_poly = self.read_usize("path fwd poly")?;
+        let _legacy_bkd_poly = self.read_usize("path bkd poly")?;
+        let nodes = self.read_index_array("path nodes")?;
+        let edges = self.read_index_array("path edges")?;
+
+        if let Some((node1, node2)) = nodes.first().copied().zip(nodes.last().copied()) {
+            if path_fixed_length && min_tree_length == path_fixed_length_value {
+                push_condition(conditions, ConditionKind::PathActive { node1, node2 });
+            }
+            if path_fixed_angle {
+                // TreeMaker 5.0.1 reads the serialized angle value, but assigns
+                // the fixed-angle boolean to the condition angle in v3 import.
+                push_condition(
+                    conditions,
+                    ConditionKind::PathAngleFixed {
+                        node1,
+                        node2,
+                        angle: 1.0,
+                    },
+                );
+            }
+        }
+
+        Ok(Path {
+            index,
+            min_tree_length,
+            min_paper_length: 0.0,
+            act_tree_length: 0.0,
+            act_paper_length: 0.0,
+            is_leaf,
+            is_sub: false,
+            is_feasible: false,
+            is_active,
+            is_border,
+            is_polygon,
+            is_conditioned: false,
+            fwd_poly: None,
+            bkd_poly: None,
+            nodes,
+            edges,
+            outset_path: None,
+            front_reduction: 0.0,
+            back_reduction: 0.0,
+            min_depth: DEPTH_NOT_SET,
+            min_depth_dist: DEPTH_NOT_SET,
+            owned_vertices: Vec::new(),
+            owned_creases: Vec::new(),
+            owner: OwnerRef::Tree,
+        })
+    }
+
+    fn read_path_v4(&mut self, poly_count: usize) -> Result<Path> {
         self.expect_tag("path")?;
         Ok(Path {
             index: self.read_usize("path index")?,
@@ -2467,8 +2845,8 @@ impl<'a> Reader<'a> {
             is_polygon: self.read_bool("path polygon flag")?,
             is_conditioned: self.read_bool("path conditioned flag")?,
             owned_vertices: self.read_index_array("path owned vertices")?,
-            fwd_poly: self.read_optional_index("path fwd poly")?,
-            bkd_poly: self.read_optional_index("path bkd poly")?,
+            fwd_poly: self.read_optional_index_in_range("path fwd poly", poly_count)?,
+            bkd_poly: self.read_optional_index_in_range("path bkd poly", poly_count)?,
             nodes: self.read_index_array("path nodes")?,
             edges: self.read_index_array("path edges")?,
             owner: self.read_path_owner()?,
@@ -2481,7 +2859,7 @@ impl<'a> Reader<'a> {
         })
     }
 
-    fn read_path_v5(&mut self) -> Result<Path> {
+    fn read_path_v5(&mut self, poly_count: usize, path_count: usize) -> Result<Path> {
         self.expect_tag("path")?;
         Ok(Path {
             index: self.read_usize("path index")?,
@@ -2496,11 +2874,11 @@ impl<'a> Reader<'a> {
             is_border: self.read_bool("path border flag")?,
             is_polygon: self.read_bool("path polygon flag")?,
             is_conditioned: self.read_bool("path conditioned flag")?,
-            fwd_poly: self.read_optional_index("path fwd poly")?,
-            bkd_poly: self.read_optional_index("path bkd poly")?,
+            fwd_poly: self.read_optional_index_in_range("path fwd poly", poly_count)?,
+            bkd_poly: self.read_optional_index_in_range("path bkd poly", poly_count)?,
             nodes: self.read_index_array("path nodes")?,
             edges: self.read_index_array("path edges")?,
-            outset_path: self.read_optional_index("path outset")?,
+            outset_path: self.read_optional_index_in_range("path outset", path_count)?,
             front_reduction: self.read_f64("path front reduction")?,
             back_reduction: self.read_f64("path back reduction")?,
             min_depth: self.read_f64("path min depth")?,
@@ -2511,101 +2889,160 @@ impl<'a> Reader<'a> {
         })
     }
 
-    fn read_poly_v4(&mut self) -> Result<RawPoly> {
+    fn read_poly_v4(&mut self, path_count: usize) -> Result<Poly> {
         self.expect_tag("poly")?;
         let index = self.read_usize("poly index")?;
         let centroid = self.read_point("poly centroid")?;
-        let mut fields = vec![
-            fmt_float(centroid.x, 10),
-            fmt_float(centroid.y, 10),
-            self.read_raw_line("poly node locs")?,
-            self.read_raw_line("poly sub flag")?,
-        ];
-        for _ in 0..8 {
-            fields.push(self.read_raw_line("poly field")?);
-        }
-        Ok(RawPoly {
+        let node_locs = self.read_point_array("poly node locations")?;
+        let is_sub_poly = self.read_bool("poly sub flag")?;
+        let owned_nodes = self.read_index_array("poly owned nodes")?;
+        let owned_paths = self.read_index_array("poly owned paths")?;
+        let owned_polys = self.read_index_array("poly owned polys")?;
+        let owned_creases = self.read_index_array("poly owned creases")?;
+        let ring_nodes = self.read_index_array("poly ring nodes")?;
+        let ring_paths = self.read_index_array("poly ring paths")?;
+        let cross_paths = self.read_index_array("poly cross paths")?;
+        let inset_nodes = self.read_index_array("poly inset nodes")?;
+        let spoke_paths = self.read_index_array("poly spoke paths")?;
+        let ridge_path = self.read_optional_index_in_range("poly ridge path", path_count)?;
+        let owner = self.read_poly_owner()?;
+        Ok(Poly {
             index,
             centroid,
-            is_sub_poly: false,
-            fields,
+            is_sub_poly,
+            ring_nodes,
+            ring_paths,
+            cross_paths,
+            inset_nodes,
+            spoke_paths,
+            ridge_path,
+            node_locs,
+            local_root_vertices: Vec::new(),
+            local_root_creases: Vec::new(),
+            owned_nodes,
+            owned_paths,
+            owned_polys,
+            owned_creases,
+            owned_facets: Vec::new(),
+            owner,
         })
     }
 
-    fn read_poly_v5(&mut self) -> Result<RawPoly> {
+    fn read_poly_v5(&mut self, path_count: usize) -> Result<Poly> {
         self.expect_tag("poly")?;
         let index = self.read_usize("poly index")?;
         let centroid = self.read_point("poly centroid")?;
         let is_sub_poly = self.read_bool("poly sub flag")?;
-        let mut fields = vec![
-            fmt_float(centroid.x, 10),
-            fmt_float(centroid.y, 10),
-            is_sub_poly.to_string(),
-        ];
-        for _ in 0..16 {
-            fields.push(self.read_raw_line("poly field")?);
-        }
-        Ok(RawPoly {
+        Ok(Poly {
             index,
             centroid,
             is_sub_poly,
-            fields,
+            ring_nodes: self.read_index_array("poly ring nodes")?,
+            ring_paths: self.read_index_array("poly ring paths")?,
+            cross_paths: self.read_index_array("poly cross paths")?,
+            inset_nodes: self.read_index_array("poly inset nodes")?,
+            spoke_paths: self.read_index_array("poly spoke paths")?,
+            ridge_path: self.read_optional_index_in_range("poly ridge path", path_count)?,
+            node_locs: self.read_point_array("poly node locations")?,
+            local_root_vertices: self.read_index_array("poly local root vertices")?,
+            local_root_creases: self.read_index_array("poly local root creases")?,
+            owned_nodes: self.read_index_array("poly owned nodes")?,
+            owned_paths: self.read_index_array("poly owned paths")?,
+            owned_polys: self.read_index_array("poly owned polys")?,
+            owned_creases: self.read_index_array("poly owned creases")?,
+            owned_facets: self.read_index_array("poly owned facets")?,
+            owner: self.read_poly_owner()?,
         })
     }
 
-    fn read_vertex_v4(&mut self) -> Result<RawVertex> {
+    fn read_vertex_v4(&mut self, index: usize) -> Result<Vertex> {
         self.expect_tag("vrtx")?;
-        Ok(RawVertex {
-            index: 0,
-            fields: vec![
-                self.read_raw_line("vertex loc x")?,
-                self.read_raw_line("vertex loc y")?,
-                self.read_raw_line("vertex creases")?,
-                self.read_raw_line("vertex owner")?,
-            ],
+        Ok(Vertex {
+            index,
+            loc: self.read_point("vertex location")?,
+            elevation: 0.0,
+            is_border: false,
+            tree_node: None,
+            left_pseudohinge_mate: None,
+            right_pseudohinge_mate: None,
+            creases: self.read_index_array("vertex creases")?,
+            depth: DEPTH_NOT_SET,
+            discrete_depth: 0,
+            cc_flag: 0,
+            st_flag: 0,
+            owner: self.read_vertex_owner()?,
         })
     }
 
-    fn read_vertex_v5(&mut self) -> Result<RawVertex> {
+    fn read_vertex_v5(&mut self, node_count: usize, vertex_count: usize) -> Result<Vertex> {
         self.expect_tag("vrtx")?;
         let index = self.read_usize("vertex index")?;
-        let mut fields = Vec::new();
-        for _ in 0..13 {
-            fields.push(self.read_raw_line("vertex field")?);
-        }
-        Ok(RawVertex { index, fields })
-    }
-
-    fn read_crease_v4(&mut self) -> Result<RawCrease> {
-        self.expect_tag("crse")?;
-        Ok(RawCrease {
-            index: 0,
-            fields: vec![
-                self.read_raw_line("crease kind")?,
-                self.read_raw_line("crease vertices")?,
-                self.read_raw_line("crease owner")?,
-            ],
+        Ok(Vertex {
+            index,
+            loc: self.read_point("vertex location")?,
+            elevation: self.read_f64("vertex elevation")?,
+            is_border: self.read_bool("vertex border flag")?,
+            tree_node: self.read_optional_index_in_range("vertex tree node", node_count)?,
+            left_pseudohinge_mate: self
+                .read_optional_index_in_range("vertex left pseudohinge mate", vertex_count)?,
+            right_pseudohinge_mate: self
+                .read_optional_index_in_range("vertex right pseudohinge mate", vertex_count)?,
+            creases: self.read_index_array("vertex creases")?,
+            depth: self.read_f64("vertex depth")?,
+            discrete_depth: self.read_usize("vertex discrete depth")?,
+            cc_flag: self.read_i32("vertex cc flag")?,
+            st_flag: self.read_i32("vertex st flag")?,
+            owner: self.read_vertex_owner()?,
         })
     }
 
-    fn read_crease_v5(&mut self) -> Result<RawCrease> {
+    fn read_crease_v4(&mut self, index: usize) -> Result<Crease> {
         self.expect_tag("crse")?;
-        let index = self.read_usize("crease index")?;
-        let mut fields = Vec::new();
-        for _ in 0..8 {
-            fields.push(self.read_raw_line("crease field")?);
-        }
-        Ok(RawCrease { index, fields })
+        Ok(Crease {
+            index,
+            kind: self.read_i32("crease kind")?,
+            vertices: self.read_index_array("crease vertices")?,
+            fwd_facet: None,
+            bkd_facet: None,
+            fold: 0,
+            cc_flag: 0,
+            st_flag: 0,
+            owner: self.read_crease_owner()?,
+        })
     }
 
-    fn read_facet_v5(&mut self) -> Result<RawFacet> {
+    fn read_crease_v5(&mut self, facet_count: usize) -> Result<Crease> {
+        self.expect_tag("crse")?;
+        let index = self.read_usize("crease index")?;
+        Ok(Crease {
+            index,
+            kind: self.read_i32("crease kind")?,
+            vertices: self.read_index_array("crease vertices")?,
+            fwd_facet: self.read_optional_index_in_range("crease fwd facet", facet_count)?,
+            bkd_facet: self.read_optional_index_in_range("crease bkd facet", facet_count)?,
+            fold: self.read_i32("crease fold")?,
+            cc_flag: self.read_i32("crease cc flag")?,
+            st_flag: self.read_i32("crease st flag")?,
+            owner: self.read_crease_owner()?,
+        })
+    }
+
+    fn read_facet_v5(&mut self, edge_count: usize) -> Result<Facet> {
         self.expect_tag("fact")?;
         let index = self.read_usize("facet index")?;
-        let mut fields = Vec::new();
-        for _ in 0..11 {
-            fields.push(self.read_raw_line("facet field")?);
-        }
-        Ok(RawFacet { index, fields })
+        Ok(Facet {
+            index,
+            centroid: self.read_point("facet centroid")?,
+            is_well_formed: self.read_bool("facet well-formed flag")?,
+            vertices: self.read_index_array("facet vertices")?,
+            creases: self.read_index_array("facet creases")?,
+            corridor_edge: self.read_optional_index_in_range("facet corridor edge", edge_count)?,
+            head_facets: self.read_index_array("facet head facets")?,
+            tail_facets: self.read_index_array("facet tail facets")?,
+            order: self.read_usize("facet order")?,
+            color: self.read_i32("facet color")?,
+            owner: self.read_facet_owner()?,
+        })
     }
 
     fn read_condition_v4(&mut self, index: usize) -> Result<Condition> {
@@ -2662,6 +3099,34 @@ impl<'a> Reader<'a> {
         } else {
             Ok(OwnerRef::Tree)
         }
+    }
+
+    fn read_poly_owner(&mut self) -> Result<OwnerRef> {
+        if self.read_usize("poly owner is poly")? == 1 {
+            Ok(OwnerRef::Poly(self.read_usize("poly owner poly")?))
+        } else {
+            Ok(OwnerRef::Tree)
+        }
+    }
+
+    fn read_vertex_owner(&mut self) -> Result<OwnerRef> {
+        if self.read_usize("vertex owner is node")? == 1 {
+            Ok(OwnerRef::Node(self.read_usize("vertex owner node")?))
+        } else {
+            Ok(OwnerRef::Path(self.read_usize("vertex owner path")?))
+        }
+    }
+
+    fn read_crease_owner(&mut self) -> Result<OwnerRef> {
+        if self.read_usize("crease owner is poly")? == 1 {
+            Ok(OwnerRef::Poly(self.read_usize("crease owner poly")?))
+        } else {
+            Ok(OwnerRef::Path(self.read_usize("crease owner path")?))
+        }
+    }
+
+    fn read_facet_owner(&mut self) -> Result<OwnerRef> {
+        Ok(OwnerRef::Poly(self.read_usize("facet owner poly")?))
     }
 
     fn skip_leading_ws(&mut self) {
@@ -2743,6 +3208,10 @@ impl Writer {
         self.line(value.to_string());
     }
 
+    fn i(&mut self, value: i32) {
+        self.line(value.to_string());
+    }
+
     fn f(&mut self, value: TmFloat) {
         self.line(fmt_float(value, self.precision));
     }
@@ -2763,12 +3232,60 @@ impl Writer {
         }
     }
 
+    fn point_array(&mut self, values: &[Point]) {
+        self.u(values.len());
+        for value in values {
+            self.point(*value);
+        }
+    }
+
     fn owner_node_or_tree(&mut self, owner: &OwnerRef) {
         match owner {
             OwnerRef::Poly(id) => {
                 self.u(1);
                 self.u(*id);
             }
+            _ => self.u(0),
+        }
+    }
+
+    fn owner_vertex(&mut self, owner: &OwnerRef) {
+        match owner {
+            OwnerRef::Node(id) => {
+                self.u(1);
+                self.u(*id);
+            }
+            OwnerRef::Path(id) => {
+                self.u(0);
+                self.u(*id);
+            }
+            _ => {
+                self.u(0);
+                self.u(0);
+            }
+        }
+    }
+
+    fn owner_crease(&mut self, owner: &OwnerRef) {
+        match owner {
+            OwnerRef::Poly(id) => {
+                self.u(1);
+                self.u(*id);
+            }
+            OwnerRef::Path(id) => {
+                self.u(0);
+                self.u(*id);
+            }
+            _ => {
+                self.u(0);
+                self.u(0);
+            }
+        }
+    }
+
+    fn owner_facet(&mut self, owner: &OwnerRef) {
+        match owner {
+            OwnerRef::Poly(id) => self.u(*id),
             _ => self.u(0),
         }
     }
@@ -2869,14 +3386,71 @@ impl Writer {
         self.owner_node_or_tree(&path.owner);
     }
 
-    fn raw_part(&mut self, tag: &str, index: usize, fields: &[String]) {
-        self.s(tag);
-        if index != 0 {
-            self.u(index);
-        }
-        for field in fields {
-            self.line(field);
-        }
+    fn poly_v5(&mut self, poly: &Poly) {
+        self.s("poly");
+        self.u(poly.index);
+        self.point(poly.centroid);
+        self.b(poly.is_sub_poly);
+        self.array(&poly.ring_nodes);
+        self.array(&poly.ring_paths);
+        self.array(&poly.cross_paths);
+        self.array(&poly.inset_nodes);
+        self.array(&poly.spoke_paths);
+        self.u(poly.ridge_path.unwrap_or(0));
+        self.point_array(&poly.node_locs);
+        self.array(&poly.local_root_vertices);
+        self.array(&poly.local_root_creases);
+        self.array(&poly.owned_nodes);
+        self.array(&poly.owned_paths);
+        self.array(&poly.owned_polys);
+        self.array(&poly.owned_creases);
+        self.array(&poly.owned_facets);
+        self.owner_node_or_tree(&poly.owner);
+    }
+
+    fn vertex_v5(&mut self, vertex: &Vertex) {
+        self.s("vrtx");
+        self.u(vertex.index);
+        self.point(vertex.loc);
+        self.f(vertex.elevation);
+        self.b(vertex.is_border);
+        self.u(vertex.tree_node.unwrap_or(0));
+        self.u(vertex.left_pseudohinge_mate.unwrap_or(0));
+        self.u(vertex.right_pseudohinge_mate.unwrap_or(0));
+        self.array(&vertex.creases);
+        self.f(vertex.depth);
+        self.u(vertex.discrete_depth);
+        self.i(vertex.cc_flag);
+        self.i(vertex.st_flag);
+        self.owner_vertex(&vertex.owner);
+    }
+
+    fn crease_v5(&mut self, crease: &Crease) {
+        self.s("crse");
+        self.u(crease.index);
+        self.i(crease.kind);
+        self.array(&crease.vertices);
+        self.u(crease.fwd_facet.unwrap_or(0));
+        self.u(crease.bkd_facet.unwrap_or(0));
+        self.i(crease.fold);
+        self.i(crease.cc_flag);
+        self.i(crease.st_flag);
+        self.owner_crease(&crease.owner);
+    }
+
+    fn facet_v5(&mut self, facet: &Facet) {
+        self.s("fact");
+        self.u(facet.index);
+        self.point(facet.centroid);
+        self.b(facet.is_well_formed);
+        self.array(&facet.vertices);
+        self.array(&facet.creases);
+        self.u(facet.corridor_edge.unwrap_or(0));
+        self.array(&facet.head_facets);
+        self.array(&facet.tail_facets);
+        self.u(facet.order);
+        self.i(facet.color);
+        self.owner_facet(&facet.owner);
     }
 
     fn condition_v4(&mut self, condition: &Condition) {
@@ -3286,6 +3860,83 @@ impl ConditionKind {
             }
         }
     }
+
+    fn collect_conditioned_parts(
+        &self,
+        tree: &Tree,
+        nodes: &mut [bool],
+        edges: &mut [bool],
+        paths: &mut [bool],
+    ) {
+        match *self {
+            Self::NodeCombo { node, .. }
+            | Self::NodeFixed { node, .. }
+            | Self::NodeOnCorner { node }
+            | Self::NodeOnEdge { node }
+            | Self::NodeSymmetric { node } => mark_1_based(nodes, node),
+            Self::NodesPaired { node1, node2 } => {
+                mark_1_based(nodes, node1);
+                mark_1_based(nodes, node2);
+            }
+            Self::PathActive { node1, node2 }
+            | Self::PathAngleFixed { node1, node2, .. }
+            | Self::PathAngleQuant { node1, node2, .. }
+            | Self::PathCombo { node1, node2, .. } => {
+                mark_1_based(nodes, node1);
+                mark_1_based(nodes, node2);
+                if let Some(path) = tree.find_leaf_path_between(node1, node2) {
+                    mark_1_based(paths, path.index);
+                }
+            }
+            Self::NodesCollinear {
+                node1,
+                node2,
+                node3,
+            } => {
+                mark_1_based(nodes, node1);
+                mark_1_based(nodes, node2);
+                mark_1_based(nodes, node3);
+            }
+            Self::EdgeLengthFixed { edge } => mark_1_based(edges, edge),
+            Self::EdgesSameStrain { edge1, edge2 } => {
+                mark_1_based(edges, edge1);
+                mark_1_based(edges, edge2);
+            }
+        }
+    }
+}
+
+fn push_condition(conditions: &mut Vec<Condition>, kind: ConditionKind) {
+    conditions.push(Condition {
+        index: conditions.len() + 1,
+        is_feasible: true,
+        kind,
+    });
+}
+
+fn kill_v4_crease_pattern_refs(nodes: &mut [Node], paths: &mut [Path]) {
+    for node in nodes {
+        node.owned_vertices.clear();
+        if matches!(node.owner, OwnerRef::Poly(_)) {
+            node.owner = OwnerRef::Tree;
+        }
+    }
+    for path in paths {
+        path.owned_vertices.clear();
+        path.owned_creases.clear();
+        path.fwd_poly = None;
+        path.bkd_poly = None;
+        path.outset_path = None;
+        if matches!(path.owner, OwnerRef::Poly(_)) {
+            path.owner = OwnerRef::Tree;
+        }
+    }
+}
+
+fn mark_1_based(flags: &mut [bool], index: usize) {
+    if let Some(flag) = index.checked_sub(1).and_then(|pos| flags.get_mut(pos)) {
+        *flag = true;
+    }
 }
 
 fn bool_stream(value: bool) -> String {
@@ -3417,6 +4068,9 @@ mod tests {
     const FIXTURE_2: &str = include_str!("../../../tests/fixtures/tmModelTester_2.tmd5");
     const FIXTURE_4: &str = include_str!("../../../tests/fixtures/tmModelTester_4.tmd5");
     const FIXTURE_5: &str = include_str!("../../../tests/fixtures/tmModelTester_5.tmd5");
+    const FIXTURE_V3: &str = include_str!("../../../tests/fixtures/minimal_v3.tmd");
+    const FIXTURE_CP_V4: &str = include_str!("../../../tests/fixtures/minimal_cp_v4.tmd4");
+    const FIXTURE_CP_V5: &str = include_str!("../../../tests/fixtures/minimal_cp_v5.tmd5");
 
     #[test]
     fn parses_v4_fixture_summary() {
@@ -3437,6 +4091,73 @@ mod tests {
         let tree5 = Tree::from_tmd_str(FIXTURE_5).unwrap();
         assert!(tree2.summary().nodes > 10);
         assert!(tree5.summary().conditions > 0);
+    }
+
+    #[test]
+    fn parses_v3_and_translates_legacy_conditions() {
+        let tree = Tree::from_tmd_str(FIXTURE_V3).unwrap();
+        let summary = tree.summary();
+        assert_eq!(summary.source_version, "3.0");
+        assert_eq!(summary.nodes, 2);
+        assert_eq!(summary.edges, 1);
+        assert_eq!(summary.paths, 1);
+        assert_eq!(summary.conditions, 3);
+        assert_eq!(summary.conditioned_nodes, 2);
+        assert_eq!(summary.conditioned_paths, 1);
+        assert_eq!(summary.conditions_by_tag.get("CNfn"), Some(&2));
+        assert_eq!(summary.conditions_by_tag.get("CNap"), Some(&1));
+        assert!(summary.is_feasible);
+    }
+
+    #[test]
+    fn v3_fixed_angle_preserves_501_import_behavior() {
+        let text = FIXTURE_V3.replacen("false\n0.0000000000\ntrue", "true\n45.0000000000\ntrue", 1);
+        let tree = Tree::from_tmd_str(&text).unwrap();
+        let angle = tree.conditions.iter().find_map(|condition| {
+            if let ConditionKind::PathAngleFixed { angle, .. } = condition.kind {
+                Some(angle)
+            } else {
+                None
+            }
+        });
+        assert_eq!(angle, Some(1.0));
+    }
+
+    #[test]
+    fn parses_and_round_trips_v5_crease_pattern_payload() {
+        let tree = Tree::from_tmd_str(FIXTURE_CP_V5).unwrap();
+        let summary = tree.summary();
+        assert_eq!(summary.source_version, "5.0");
+        assert_eq!(summary.polys, 1);
+        assert_eq!(summary.vertices, 2);
+        assert_eq!(summary.creases, 1);
+        assert_eq!(summary.facets, 1);
+        assert_eq!(tree.polys[0].ring_nodes, vec![1, 2]);
+        assert_eq!(tree.vertices[0].owner, OwnerRef::Node(1));
+        assert_eq!(tree.creases[0].owner, OwnerRef::Path(1));
+        assert_eq!(tree.facets[0].owner, OwnerRef::Poly(1));
+
+        let reparsed = Tree::from_tmd_str(&tree.to_tmd5_string()).unwrap();
+        assert_eq!(reparsed.summary().polys, 1);
+        assert_eq!(reparsed.summary().vertices, 2);
+        assert_eq!(reparsed.summary().creases, 1);
+        assert_eq!(reparsed.summary().facets, 1);
+    }
+
+    #[test]
+    fn consumes_and_discards_v4_crease_pattern_payload() {
+        let tree = Tree::from_tmd_str(FIXTURE_CP_V4).unwrap();
+        let summary = tree.summary();
+        assert_eq!(summary.source_version, "4.0");
+        assert_eq!(summary.nodes, 2);
+        assert_eq!(summary.edges, 1);
+        assert_eq!(summary.paths, 1);
+        assert_eq!(summary.polys, 0);
+        assert_eq!(summary.vertices, 0);
+        assert_eq!(summary.creases, 0);
+        assert_eq!(tree.nodes[0].owned_vertices.len(), 0);
+        assert_eq!(tree.paths[0].fwd_poly, None);
+        assert_eq!(tree.paths[0].owned_vertices.len(), 0);
     }
 
     #[test]

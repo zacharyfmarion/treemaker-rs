@@ -136,7 +136,10 @@ fn run_fixtures(dir: &Path) -> Result<()> {
     let mut count = 0usize;
     for entry in entries {
         let path = entry.path();
-        if path.extension().and_then(|ext| ext.to_str()) != Some("tmd5") {
+        let Some(ext) = path.extension().and_then(|ext| ext.to_str()) else {
+            continue;
+        };
+        if !matches!(ext, "tmd" | "tmd4" | "tmd5") {
             continue;
         }
         let tree = read_tree(&path)?;

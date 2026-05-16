@@ -3,7 +3,8 @@ use wasm_bindgen::JsValue;
 use wasm_bindgen_test::*;
 
 use treemaker_wasm::{
-    build_crease_pattern, free_tree, load_tmd, optimize_scale, save_tmd5, tree_summary,
+    build_crease_pattern, cp_status_report, free_tree, load_tmd, optimize_scale, save_tmd5,
+    tree_summary,
 };
 
 const FIXTURE_1: &str = include_str!("../../../tests/fixtures/tmModelTester_1.tmd5");
@@ -26,6 +27,9 @@ fn load_optimize_build_save_and_free() {
     assert_eq!(built["vertices"], 4);
     assert_eq!(built["creases"], 6);
     assert_eq!(built["facets"], 3);
+    let report = json(cp_status_report(build_handle).expect("cp status report"));
+    assert_eq!(report["status"], "polys_multiple_ibps");
+    assert_eq!(report["bad_polys"][0], 1);
 
     let saved = save_tmd5(build_handle).expect("save tmd5");
     assert!(saved.starts_with("tree\n5.0\n"));

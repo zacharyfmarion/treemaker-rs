@@ -28,6 +28,7 @@ unless redistributable source and license terms are provided.
 cargo test --workspace
 cargo run -p treemaker-cli -- inspect tests/fixtures/tmModelTester_1.tmd5
 cargo run -p treemaker-cli -- check tests/fixtures/tmModelTester_1.tmd5
+cargo run -p treemaker-cli -- check tests/fixtures/tmModelTester_1.tmd5 --details --format json
 cargo run -p treemaker-cli -- optimize tests/fixtures/tmModelTester_1.tmd5 --kind scale --out /tmp/out.tmd5
 cargo run -p treemaker-cli -- build-cp tests/fixtures/tmModelTester_1.tmd5 --out /tmp/cp.tmd5
 cargo run -p treemaker-cli -- export-v4 tests/fixtures/tmModelTester_1.tmd5 --out /tmp/out.tmd4

@@ -252,6 +252,37 @@ fn cpp_oracle_matches_rust_parse_and_stable_optimizer_cases_when_enabled() {
             as_usize(record, "conditioned_paths"),
             "{file}"
         );
+        let cp_report = tree.cp_status_report();
+        assert_eq!(
+            cp_report.status,
+            oracle_cp_status(record["cp_status"].as_str().expect("cp_status")),
+            "{file}"
+        );
+        assert_eq!(
+            cp_report.bad_edges.len(),
+            as_usize(record, "bad_edges"),
+            "{file}"
+        );
+        assert_eq!(
+            cp_report.bad_polys.len(),
+            as_usize(record, "bad_polys"),
+            "{file}"
+        );
+        assert_eq!(
+            cp_report.bad_vertices.len(),
+            as_usize(record, "bad_vertices"),
+            "{file}"
+        );
+        assert_eq!(
+            cp_report.bad_creases.len(),
+            as_usize(record, "bad_creases"),
+            "{file}"
+        );
+        assert_eq!(
+            cp_report.bad_facets.len(),
+            as_usize(record, "bad_facets"),
+            "{file}"
+        );
     }
 
     for record in records

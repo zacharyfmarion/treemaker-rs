@@ -97,6 +97,17 @@ fn inspect_and_check_emit_json_summaries() {
     assert_eq!(check.status.code(), Some(2));
     let summary: Value = serde_json::from_slice(&check.stdout).expect("check json");
     assert_eq!(summary["is_feasible"], false);
+
+    let details = run([
+        OsString::from("check"),
+        fixture("tmModelTester_1.tmd5").into_os_string(),
+        OsString::from("--details"),
+        OsString::from("--format"),
+        OsString::from("json"),
+    ]);
+    assert_success(&details);
+    let report: Value = serde_json::from_slice(&details.stdout).expect("check details json");
+    assert_eq!(report["status"], "polys_not_valid");
 }
 
 #[test]

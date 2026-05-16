@@ -39,6 +39,13 @@ pub fn check(handle: u32) -> std::result::Result<JsValue, JsValue> {
 }
 
 #[wasm_bindgen]
+pub fn cp_status_report(handle: u32) -> std::result::Result<JsValue, JsValue> {
+    with_tree(handle, |tree| {
+        serde_wasm_bindgen::to_value(&tree.cp_status_report()).map_err(to_js_value)
+    })
+}
+
+#[wasm_bindgen]
 pub fn optimize_scale(handle: u32) -> std::result::Result<JsValue, JsValue> {
     with_tree_mut(handle, |tree| {
         let report = tree.optimize_scale().map_err(to_js_error)?;

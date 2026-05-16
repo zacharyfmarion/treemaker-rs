@@ -29,6 +29,8 @@ enum Command {
         file: PathBuf,
         #[arg(long, value_enum, default_value_t = OutputFormat::Text)]
         format: OutputFormat,
+        #[arg(long)]
+        details: bool,
     },
     Optimize {
         file: PathBuf,
@@ -73,9 +75,17 @@ fn main() -> Result<()> {
             let tree = read_tree(&file)?;
             print_value(format, &tree.summary())?;
         }
-        Command::Check { file, format } => {
+        Command::Check {
+            file,
+            format,
+            details,
+        } => {
             let tree = read_tree(&file)?;
-            print_value(format, &tree.summary())?;
+            if details {
+                print_value(format, &tree.cp_status_report())?;
+            } else {
+                print_value(format, &tree.summary())?;
+            }
             if !tree.is_feasible() {
                 std::process::exit(2);
             }

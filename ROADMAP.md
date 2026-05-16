@@ -205,3 +205,30 @@ Done when:
 - `wasm-pack build crates/treemaker-wasm --target bundler`
 - Oracle parity tests pass for the checked-in fixtures when the C++ oracle is
   enabled.
+
+## Phase 7: CPStatus Diagnostics
+
+Status: complete for the C++ `GetCPStatus()` diagnostic surface that is
+represented by the Rust model. `Tree::cp_status_report()` now returns the
+status plus offending edge, poly, vertex, crease, and facet IDs. The CLI exposes
+this through `check --details`, and wasm exposes `cp_status_report(handle)` with
+the same structured JSON shape. Oracle tests compare diagnostic counts against
+the C++ model summaries for the checked-in fixtures.
+
+Goal: expose the bad-part lists behind TreeMaker's CP status checks without
+changing the lightweight `Tree::cp_status()` API.
+
+Work items:
+
+- Port the bad-edge, bad-poly, bad-vertex, bad-crease, and bad-facet collection
+  logic from `tmTree::GetCPStatus()`.
+- Preserve C++ behavior where `POLYS_NOT_VALID` returns only a status and no
+  bad part lists.
+- Add CLI and wasm accessors for diagnostic consumers.
+- Compare diagnostic counts with the C++ oracle on the checked-in fixture set.
+
+Done when:
+
+- `Tree::cp_status_report()` reports the same status and bad-part counts as the
+  C++ oracle for every checked-in fixture summary.
+- CLI and wasm tests cover the diagnostic report surface.

@@ -342,6 +342,16 @@ pub enum CPStatus {
     NotLocalRootConnectable,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CPStatusReport {
+    pub status: CPStatus,
+    pub bad_edges: Vec<usize>,
+    pub bad_polys: Vec<usize>,
+    pub bad_vertices: Vec<usize>,
+    pub bad_creases: Vec<usize>,
+    pub bad_facets: Vec<usize>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TreeSummary {
     pub source_version: String,
@@ -423,6 +433,44 @@ impl RootNetwork {
             cc2_st1: Vec::new(),
             cc2_st2: Vec::new(),
         }
+    }
+}
+
+impl CPStatusReport {
+    fn new(status: CPStatus) -> Self {
+        Self {
+            status,
+            bad_edges: Vec::new(),
+            bad_polys: Vec::new(),
+            bad_vertices: Vec::new(),
+            bad_creases: Vec::new(),
+            bad_facets: Vec::new(),
+        }
+    }
+
+    fn with_bad_edges(mut self, bad_edges: Vec<usize>) -> Self {
+        self.bad_edges = bad_edges;
+        self
+    }
+
+    fn with_bad_polys(mut self, bad_polys: Vec<usize>) -> Self {
+        self.bad_polys = bad_polys;
+        self
+    }
+
+    fn with_bad_vertices(mut self, bad_vertices: Vec<usize>) -> Self {
+        self.bad_vertices = bad_vertices;
+        self
+    }
+
+    fn with_bad_creases(mut self, bad_creases: Vec<usize>) -> Self {
+        self.bad_creases = bad_creases;
+        self
+    }
+
+    fn with_bad_facets(mut self, bad_facets: Vec<usize>) -> Self {
+        self.bad_facets = bad_facets;
+        self
     }
 }
 
@@ -625,6 +673,87 @@ impl Tree {
             return CPStatus::NotLocalRootConnectable;
         }
         CPStatus::HasFullCp
+    }
+
+    pub fn cp_status_report(&self) -> CPStatusReport {
+        let bad_edges: Vec<_> = self
+            .edges
+            .iter()
+            .filter(|edge| edge.strained_length() < MIN_EDGE_LENGTH)
+            .map(|edge| edge.index)
+            .collect();
+        if !bad_edges.is_empty() {
+            return CPStatusReport::new(CPStatus::EdgesTooShort).with_bad_edges(bad_edges);
+        }
+
+        if !self.is_polygon_valid {
+            return CPStatusReport::new(CPStatus::PolysNotValid);
+        }
+
+        if !self.is_polygon_filled {
+            let bad_polys = self
+                .owned_polys
+                .iter()
+                .copied()
+                .filter(|poly_id| self.polys[*poly_id - 1].owned_nodes.is_empty())
+                .collect();
+            return CPStatusReport::new(CPStatus::PolysNotFilled).with_bad_polys(bad_polys);
+        }
+
+        let bad_polys: Vec<_> = self
+            .owned_polys
+            .iter()
+            .copied()
+            .filter(|poly_id| {
+                self.polys[*poly_id - 1]
+                    .ring_paths
+                    .iter()
+                    .filter(|path_id| !self.paths[**path_id - 1].is_active)
+                    .count()
+                    > 1
+            })
+            .collect();
+        if !bad_polys.is_empty() {
+            return CPStatusReport::new(CPStatus::PolysMultipleIbps).with_bad_polys(bad_polys);
+        }
+
+        if !self.is_vertex_depth_valid {
+            let bad_vertices = self
+                .vertices
+                .iter()
+                .filter(|vertex| vertex.depth == DEPTH_NOT_SET)
+                .map(|vertex| vertex.index)
+                .collect();
+            return CPStatusReport::new(CPStatus::VerticesLackDepth)
+                .with_bad_vertices(bad_vertices);
+        }
+
+        if !self.is_facet_data_valid {
+            let bad_vertices = self
+                .vertices
+                .iter()
+                .filter(|vertex| !vertex.is_border && vertex.creases.len() % 2 != 0)
+                .map(|vertex| vertex.index)
+                .collect();
+            let bad_facets = self
+                .facets
+                .iter()
+                .filter(|facet| !facet.is_well_formed)
+                .map(|facet| facet.index)
+                .collect();
+            return CPStatusReport::new(CPStatus::FacetsNotValid)
+                .with_bad_vertices(bad_vertices)
+                .with_bad_facets(bad_facets);
+        }
+
+        if !self.is_local_root_connectable {
+            let (bad_vertices, bad_creases) = self.why_not_local_root_connectable();
+            return CPStatusReport::new(CPStatus::NotLocalRootConnectable)
+                .with_bad_vertices(bad_vertices)
+                .with_bad_creases(bad_creases);
+        }
+
+        CPStatusReport::new(CPStatus::HasFullCp)
     }
 
     pub fn optimize_scale(&mut self) -> Result<OptimizationReport> {
@@ -5273,6 +5402,45 @@ impl Tree {
         root_networks
     }
 
+    fn why_not_local_root_connectable(&self) -> (Vec<usize>, Vec<usize>) {
+        let mut tree = self.clone();
+        let root_networks = tree.calc_root_networks();
+        let mut bad_vertices = Vec::new();
+        let mut bad_creases = Vec::new();
+        let mut zero_depth_network: Option<usize> = None;
+
+        for (network_index, network) in root_networks.iter().enumerate() {
+            if network.discrete_depth == 0 {
+                if let Some(zero_index) = zero_depth_network {
+                    let zero_network = &root_networks[zero_index];
+                    for vertex_id in network.cc_vertices.iter().copied() {
+                        push_unique(&mut bad_vertices, vertex_id);
+                    }
+                    for crease_id in network.cc_creases.iter().copied() {
+                        push_unique(&mut bad_creases, crease_id);
+                    }
+                    for vertex_id in zero_network.cc_vertices.iter().copied() {
+                        push_unique(&mut bad_vertices, vertex_id);
+                    }
+                    for crease_id in zero_network.cc_creases.iter().copied() {
+                        push_unique(&mut bad_creases, crease_id);
+                    }
+                } else {
+                    zero_depth_network = Some(network_index);
+                }
+            } else if !network.is_connectable {
+                for vertex_id in network.cc_vertices.iter().copied() {
+                    push_unique(&mut bad_vertices, vertex_id);
+                }
+                for crease_id in network.cc_creases.iter().copied() {
+                    push_unique(&mut bad_creases, crease_id);
+                }
+            }
+        }
+
+        (bad_vertices, bad_creases)
+    }
+
     fn calc_local_facet_order(&mut self, poly_id: usize) {
         for facet_id in self.polys[poly_id - 1].owned_facets.clone() {
             self.facets[facet_id - 1].head_facets.clear();
@@ -8099,5 +8267,18 @@ mod tests {
         assert!(!tree.vertices.is_empty());
         assert!(!tree.creases.is_empty());
         assert!(!tree.facets.is_empty());
+    }
+
+    #[test]
+    fn cp_status_report_identifies_bad_parts() {
+        let mut tree = Tree::from_tmd_str(FIXTURE_1).unwrap();
+        tree.build_polys_and_crease_pattern().unwrap();
+        let report = tree.cp_status_report();
+        assert_eq!(report.status, CPStatus::PolysMultipleIbps);
+        assert_eq!(report.bad_polys, vec![1]);
+        assert!(report.bad_edges.is_empty());
+        assert!(report.bad_vertices.is_empty());
+        assert!(report.bad_creases.is_empty());
+        assert!(report.bad_facets.is_empty());
     }
 }

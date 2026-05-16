@@ -604,11 +604,12 @@ struct PlotRect {
 
 fn plot_rect(x: TmFloat, y: TmFloat, w: TmFloat, h: TmFloat) -> PlotRect {
     let pad = 58.0;
+    let size = (w - 2.0 * pad).min(h - 2.0 * pad - 10.0);
     PlotRect {
-        x: x + pad,
+        x: x + (w - size) / 2.0,
         y: y + pad,
-        w: w - 2.0 * pad,
-        h: h - 2.0 * pad - 10.0,
+        w: size,
+        h: size,
     }
 }
 

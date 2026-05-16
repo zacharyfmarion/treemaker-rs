@@ -22,6 +22,35 @@ The parity baseline is TreeMaker 5.0.1's distributable ALM backend. The
 proprietary CFSQP/RFSQP optimizer backends are intentionally out of scope
 unless redistributable source and license terms are provided.
 
+## Licensing and Optimizer Backends
+
+This port is intended to remain GPL-compatible and is currently declared as
+`GPL-2.0-or-later` in the Cargo workspace. The vendored TreeMaker 5.0.1 source
+is distributed with the GNU GPL v2 license text, and the Free Software
+Directory records TreeMaker as `GPLv2orlater`.
+
+The Rust crates are direct ports/translations of the TreeMaker model code, so
+publishing this repository should preserve the GPL notices and provide the
+corresponding source for any distributed binaries or wasm packages.
+
+TreeMaker's nonlinear optimizer abstraction had adapters for multiple backends:
+
+- `ALM`: Augmented Lagrangian Multiplier code written for TreeMaker and enabled
+  by default in the public TreeMaker 5.0.1 source. This is the Rust parity
+  baseline.
+- `CFSQP`: a faster external FSQP optimizer used by TreeMaker 4, but not
+  redistributable with the public TreeMaker 5 source.
+- `RFSQP`: an evaluation/proprietary FSQP-family backend noted in TreeMaker's
+  source comments as not redistributable.
+- `wnlib`: freely distributable but not enabled by default in TreeMaker 5.0.1,
+  and historically less reliable for complete convergence in Lang's notes.
+
+CFSQP/RFSQP would only affect the numerical optimization step. They do not
+change the file format, tree data structures, polygon construction, or crease
+pattern construction algorithms. If redistributable source and compatible
+license terms are provided later, they can be added as optional optimizer
+backends, but they are not required for 5.0.1 ALM parity.
+
 ## Useful commands
 
 ```sh

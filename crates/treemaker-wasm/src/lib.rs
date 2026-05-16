@@ -1,5 +1,6 @@
+use serde::Serialize;
 use std::cell::RefCell;
-use treemaker_core::Tree;
+use treemaker_core::{Tree, TreeError};
 use wasm_bindgen::prelude::*;
 
 thread_local! {
@@ -80,7 +81,7 @@ pub fn free_tree(handle: u32) -> std::result::Result<(), JsValue> {
         let mut trees = trees.borrow_mut();
         let slot = trees
             .get_mut(handle as usize)
-            .ok_or_else(|| JsValue::from_str("invalid TreeHandle"))?;
+            .ok_or_else(|| js_error("invalid_handle", "invalid TreeHandle"))?;
         *slot = None;
         Ok(())
     })
@@ -95,7 +96,7 @@ fn with_tree<T>(
         let tree = trees
             .get(handle as usize)
             .and_then(Option::as_ref)
-            .ok_or_else(|| JsValue::from_str("invalid TreeHandle"))?;
+            .ok_or_else(|| js_error("invalid_handle", "invalid TreeHandle"))?;
         f(tree)
     })
 }
@@ -109,15 +110,29 @@ fn with_tree_mut<T>(
         let tree = trees
             .get_mut(handle as usize)
             .and_then(Option::as_mut)
-            .ok_or_else(|| JsValue::from_str("invalid TreeHandle"))?;
+            .ok_or_else(|| js_error("invalid_handle", "invalid TreeHandle"))?;
         f(tree)
     })
 }
 
-fn to_js_error(error: impl std::fmt::Display) -> JsValue {
-    JsValue::from_str(&error.to_string())
+#[derive(Serialize)]
+struct JsErrorEnvelope {
+    code: &'static str,
+    message: String,
+}
+
+fn to_js_error(error: TreeError) -> JsValue {
+    js_error(error.code(), error.to_string())
 }
 
 fn to_js_value(error: impl std::fmt::Display) -> JsValue {
-    JsValue::from_str(&error.to_string())
+    js_error("js_value", error.to_string())
+}
+
+fn js_error(code: &'static str, message: impl Into<String>) -> JsValue {
+    serde_wasm_bindgen::to_value(&JsErrorEnvelope {
+        code,
+        message: message.into(),
+    })
+    .unwrap_or_else(|_| JsValue::from_str(code))
 }

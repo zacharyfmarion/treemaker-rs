@@ -178,6 +178,13 @@ Done when:
 
 ## Phase 6: Public Surface Hardening
 
+Status: complete for the current public surface. The CLI has command-level
+coverage for help/version/datadir, inspect, check, optimize, build-cp,
+export-v4, and run-fixtures. The wasm crate has `wasm-pack test --node`
+coverage for load, summary, optimize, build CP, save, free, and structured
+error envelopes. The README documents the ALM-only optimizer baseline and keeps
+proprietary CFSQP/RFSQP backends out of scope without redistributable source.
+
 Goal: make the port reliable as a native CLI library and wasm package.
 
 Work items:

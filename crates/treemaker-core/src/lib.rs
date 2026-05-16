@@ -51,6 +51,19 @@ pub enum TreeError {
     InvalidOperation(&'static str),
 }
 
+impl TreeError {
+    pub fn code(&self) -> &'static str {
+        match self {
+            TreeError::Parse { .. } => "parse",
+            TreeError::BadReference { .. } => "bad_reference",
+            TreeError::UnsupportedVersion(_) => "unsupported_version",
+            TreeError::UnsupportedOperation(_) => "unsupported_operation",
+            TreeError::OptimizerConvergence(_) => "optimizer_convergence",
+            TreeError::InvalidOperation(_) => "invalid_operation",
+        }
+    }
+}
+
 pub type Result<T> = std::result::Result<T, TreeError>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]

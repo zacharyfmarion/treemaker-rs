@@ -10,6 +10,11 @@ repository.workspace = true
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+serde.workspace = true
 serde-wasm-bindgen.workspace = true
 treemaker-core = { path = "../treemaker-core" }
 wasm-bindgen.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+wasm-bindgen-test.workspace = true

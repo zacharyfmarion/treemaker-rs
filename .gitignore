@@ -1,4 +1,5 @@
 /target/
+artifacts/
 **/pkg/
 tools/oracle/build/
 .DS_Store

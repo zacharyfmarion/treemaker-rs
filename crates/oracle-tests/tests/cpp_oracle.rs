@@ -440,7 +440,13 @@ fn cpp_oracle_matches_rust_build_tree_polys_when_enabled() {
         oracle = root.join(oracle);
     }
 
-    for file in ["tmModelTester_1.tmd5", "tmModelTester_4.tmd5"] {
+    for file in [
+        "tmModelTester_1.tmd5",
+        "tmModelTester_4.tmd5",
+        "generated/triad-optimized.tmd5",
+        "generated/mirrored-fork-optimized.tmd5",
+        "generated/asymmetric-antler-optimized.tmd5",
+    ] {
         let output = Command::new(&oracle)
             .current_dir(&root)
             .args([
@@ -632,7 +638,13 @@ fn cpp_oracle_matches_rust_polygon_contents_when_enabled() {
         oracle = root.join(oracle);
     }
 
-    for file in ["tmModelTester_1.tmd5", "tmModelTester_4.tmd5"] {
+    for file in [
+        "tmModelTester_1.tmd5",
+        "tmModelTester_4.tmd5",
+        "generated/triad-optimized.tmd5",
+        "generated/mirrored-fork-optimized.tmd5",
+        "generated/asymmetric-antler-optimized.tmd5",
+    ] {
         let output = Command::new(&oracle)
             .current_dir(&root)
             .args([

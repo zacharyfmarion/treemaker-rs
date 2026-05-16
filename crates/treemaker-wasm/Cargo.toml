@@ -1,0 +1,15 @@
+[package]
+name = "treemaker-wasm"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "wasm-bindgen package for the TreeMaker 5.0.1 Rust port"
+repository.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+serde-wasm-bindgen.workspace = true
+treemaker-core = { path = "../treemaker-core" }
+wasm-bindgen.workspace = true

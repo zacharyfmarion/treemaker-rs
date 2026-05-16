@@ -1,0 +1,18 @@
+[package]
+name = "treemaker-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Headless CLI for the TreeMaker 5.0.1 Rust port"
+repository.workspace = true
+
+[[bin]]
+name = "treemaker"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+treemaker-core = { path = "../treemaker-core" }

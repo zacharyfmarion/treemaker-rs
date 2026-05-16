@@ -1,0 +1,11 @@
+[package]
+name = "oracle-tests"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Fixture and oracle tests for the TreeMaker 5.0.1 Rust port"
+repository.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+treemaker-core = { path = "../treemaker-core" }

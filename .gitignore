@@ -1,0 +1,4 @@
+/target/
+**/pkg/
+tools/oracle/build/
+.DS_Store

@@ -26,12 +26,14 @@ Implemented:
 - Direct cleanup-state parity for checked-in fixtures after parse and after
   optimizer-triggered cleanup, including border/polygon/pinned/conditioned
   flags and stale crease-pattern invalidation.
+- Direct ports of top-level tree polygon construction and the geometry-only
+  inset/subpoly portion of `tmPoly::BuildPolyContents()`, verified against the
+  C++ oracle for representative upstream fixtures.
 - CLI and wasm bindings for parsing, checking, optimizing, and saving.
 
 Explicitly incomplete:
 
-- Tree polygon, subpoly, crease, vertex, facet, facet order, and fold direction
-  construction.
+- Crease, vertex, facet, facet order, and fold direction construction.
 - Full post-construction `CPStatus` parity beyond the currently represented
   model surface.
 
@@ -119,6 +121,13 @@ Done when:
   parsing and after each optimizer.
 
 ## Phase 4: Polygon And Subpoly Construction
+
+Status: complete for the checked-in oracle surface. Rust now ports
+`tmTree::BuildTreePolys()`, `tmPolyOwner::BuildPolysFromPaths()`, polygon
+content calculation, cross-path calculation, and the geometry/inset/subpoly
+portion of `tmPoly::BuildPolyContents()` through spoke/ridge path creation.
+The crease-building code that follows in C++ `BuildPolyContents()` remains in
+Phase 5.
 
 Goal: port TreeMaker polygon generation directly from the C++ geometry code.
 

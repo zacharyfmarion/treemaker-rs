@@ -825,15 +825,55 @@ impl Tree {
     }
 
     pub fn build_tree_polys(&mut self) -> Result<()> {
-        Err(TreeError::UnsupportedOperation(
-            "tree polygon construction is not ported yet",
-        ))
+        let leaf_paths = self.leaf_paths_in_owned_order();
+        let border_nodes: Vec<usize> = self
+            .owned_nodes
+            .iter()
+            .copied()
+            .filter(|id| self.nodes[*id - 1].is_border)
+            .collect();
+        self.build_polys_from_paths(&leaf_paths, &border_nodes, OwnerRef::Tree)?;
+
+        let leaf_nodes = self.leaf_nodes_in_owned_order();
+        let doomed: Vec<usize> = self
+            .owned_polys
+            .iter()
+            .copied()
+            .filter(|poly_id| {
+                let Some(poly) = self.polys.get(poly_id.saturating_sub(1)) else {
+                    return true;
+                };
+                !self.poly_is_convex(poly) || self.poly_encloses_leaf_node(poly, &leaf_nodes)
+            })
+            .collect();
+        self.delete_polys(&doomed);
+        self.cleanup_after_edit();
+        Ok(())
     }
 
     pub fn build_polys_and_crease_pattern(&mut self) -> Result<()> {
         Err(TreeError::UnsupportedOperation(
             "crease-pattern generation is not ported yet",
         ))
+    }
+
+    #[doc(hidden)]
+    pub fn build_polygon_contents_for_oracle_tests(&mut self) -> Result<()> {
+        self.build_tree_polys()?;
+        if self
+            .edges
+            .iter()
+            .any(|edge| edge.strained_length() < MIN_EDGE_LENGTH)
+        {
+            return Ok(());
+        }
+
+        let owned_polys = self.owned_polys.clone();
+        for poly_id in owned_polys {
+            self.build_poly_contents_geometry(poly_id)?;
+        }
+        self.cleanup_after_edit();
+        Ok(())
     }
 
     fn read_v3(reader: &mut Reader<'_>, source_version: String) -> Result<Self> {
@@ -2365,6 +2405,673 @@ impl Tree {
                 kind,
             ),
         }
+    }
+
+    fn build_polys_from_paths(
+        &mut self,
+        path_list: &[usize],
+        border_nodes: &[usize],
+        owner: OwnerRef,
+    ) -> Result<()> {
+        let mut polygon_paths = Vec::new();
+        for path_id in path_list.iter().copied() {
+            if !self.paths[path_id - 1].is_polygon {
+                continue;
+            }
+            for existing_path in polygon_paths.iter().copied() {
+                if self.paths_intersect_interior(path_id, existing_path) {
+                    self.paths[path_id - 1].is_polygon = false;
+                    break;
+                }
+            }
+            if self.paths[path_id - 1].is_polygon {
+                polygon_paths.push(path_id);
+            }
+        }
+
+        if polygon_paths.is_empty() || border_nodes.is_empty() {
+            return Ok(());
+        }
+
+        let centroid = self.node_centroid(border_nodes);
+        for path_id in polygon_paths.iter().copied() {
+            if self.can_start_poly_fwd(path_id, centroid) {
+                self.build_poly_ring(path_id, true, owner.clone())?;
+            }
+            if self.can_start_poly_bkd(path_id, centroid) {
+                self.build_poly_ring(path_id, false, owner.clone())?;
+            }
+        }
+
+        let owned_polys = self.owned_polys_for_owner(&owner);
+        for poly_id in owned_polys {
+            if self.polys[poly_id - 1].cross_paths.is_empty() {
+                self.calc_poly_cross_paths(poly_id);
+            }
+        }
+        Ok(())
+    }
+
+    fn owned_polys_for_owner(&self, owner: &OwnerRef) -> Vec<usize> {
+        match *owner {
+            OwnerRef::Tree => self.owned_polys.clone(),
+            OwnerRef::Poly(poly_id) => self
+                .polys
+                .get(poly_id.saturating_sub(1))
+                .map(|poly| poly.owned_polys.clone())
+                .unwrap_or_default(),
+            _ => Vec::new(),
+        }
+    }
+
+    fn can_start_poly_fwd(&self, path_id: usize, centroid: Point) -> bool {
+        let path = &self.paths[path_id - 1];
+        if path.fwd_poly.is_some() {
+            return false;
+        }
+        if !path.is_border {
+            return true;
+        }
+        let (Some(front), Some(back)) = (path.nodes.first(), path.nodes.last()) else {
+            return false;
+        };
+        are_ccw(
+            self.nodes[*front - 1].loc,
+            self.nodes[*back - 1].loc,
+            centroid,
+        )
+    }
+
+    fn can_start_poly_bkd(&self, path_id: usize, centroid: Point) -> bool {
+        let path = &self.paths[path_id - 1];
+        if path.bkd_poly.is_some() {
+            return false;
+        }
+        if !path.is_border {
+            return true;
+        }
+        let (Some(front), Some(back)) = (path.nodes.first(), path.nodes.last()) else {
+            return false;
+        };
+        are_cw(
+            self.nodes[*front - 1].loc,
+            self.nodes[*back - 1].loc,
+            centroid,
+        )
+    }
+
+    fn build_poly_ring(&mut self, path_id: usize, fwd: bool, owner: OwnerRef) -> Result<()> {
+        let poly_id = self.create_poly(owner);
+        if fwd {
+            self.paths[path_id - 1].fwd_poly = Some(poly_id);
+        } else {
+            self.paths[path_id - 1].bkd_poly = Some(poly_id);
+        }
+
+        let path = &self.paths[path_id - 1];
+        let first_node = if fwd {
+            path.nodes[0]
+        } else {
+            *path
+                .nodes
+                .last()
+                .ok_or(TreeError::InvalidOperation("polygon path has no nodes"))?
+        };
+        let mut this_node = if fwd {
+            *path
+                .nodes
+                .last()
+                .ok_or(TreeError::InvalidOperation("polygon path has no nodes"))?
+        } else {
+            path.nodes[0]
+        };
+        let mut this_path = path_id;
+        let mut ring_nodes = vec![first_node];
+        let mut ring_paths = vec![this_path];
+
+        let mut too_many = 0;
+        loop {
+            let (next_path, next_node) = self.next_polygon_path_and_node(this_path, this_node)?;
+            ring_nodes.push(this_node);
+            ring_paths.push(next_path);
+            if self.paths[next_path - 1].nodes.first().copied() == Some(this_node) {
+                self.paths[next_path - 1].fwd_poly = Some(poly_id);
+            } else {
+                self.paths[next_path - 1].bkd_poly = Some(poly_id);
+            }
+            this_path = next_path;
+            this_node = next_node;
+            too_many += 1;
+            if next_node == first_node {
+                break;
+            }
+            if too_many >= 100 {
+                return Err(TreeError::InvalidOperation(
+                    "polygon ring walk exceeded TreeMaker guard",
+                ));
+            }
+        }
+
+        self.polys[poly_id - 1].ring_nodes = ring_nodes;
+        self.polys[poly_id - 1].ring_paths = ring_paths;
+        self.calc_poly_contents(poly_id);
+        Ok(())
+    }
+
+    fn create_poly(&mut self, owner: OwnerRef) -> usize {
+        let index = self.polys.len() + 1;
+        self.polys.push(Poly {
+            index,
+            centroid: Point { x: 0.0, y: 0.0 },
+            is_sub_poly: matches!(owner, OwnerRef::Poly(_)),
+            ring_nodes: Vec::new(),
+            ring_paths: Vec::new(),
+            cross_paths: Vec::new(),
+            inset_nodes: Vec::new(),
+            spoke_paths: Vec::new(),
+            ridge_path: None,
+            node_locs: Vec::new(),
+            local_root_vertices: Vec::new(),
+            local_root_creases: Vec::new(),
+            owned_nodes: Vec::new(),
+            owned_paths: Vec::new(),
+            owned_polys: Vec::new(),
+            owned_creases: Vec::new(),
+            owned_facets: Vec::new(),
+            owner: owner.clone(),
+        });
+        match owner {
+            OwnerRef::Tree => self.owned_polys.push(index),
+            OwnerRef::Poly(poly_id) => {
+                if let Some(poly) = self.polys.get_mut(poly_id.saturating_sub(1)) {
+                    poly.owned_polys.push(index);
+                }
+            }
+            _ => {}
+        }
+        index
+    }
+
+    fn next_polygon_path_and_node(
+        &self,
+        this_path: usize,
+        this_node: usize,
+    ) -> Result<(usize, usize)> {
+        let path = &self.paths[this_path - 1];
+        let mut that_node = path.nodes[0];
+        if that_node == this_node {
+            that_node = *path
+                .nodes
+                .last()
+                .ok_or(TreeError::InvalidOperation("polygon path has no nodes"))?;
+        }
+        let this_angle = angle(point_sub(
+            self.nodes[that_node - 1].loc,
+            self.nodes[this_node - 1].loc,
+        ));
+
+        let mut delta = TWO_PI;
+        let mut next_path = None;
+        let mut next_node = None;
+        for candidate_path in self.nodes[this_node - 1].leaf_paths.iter().copied() {
+            if candidate_path == this_path || !self.paths[candidate_path - 1].is_polygon {
+                continue;
+            }
+            let candidate = &self.paths[candidate_path - 1];
+            let mut candidate_node = candidate.nodes[0];
+            if candidate_node == this_node {
+                candidate_node = *candidate
+                    .nodes
+                    .last()
+                    .ok_or(TreeError::InvalidOperation("polygon path has no nodes"))?;
+            }
+            let candidate_angle = angle(point_sub(
+                self.nodes[candidate_node - 1].loc,
+                self.nodes[this_node - 1].loc,
+            ));
+            let mut new_delta = this_angle - candidate_angle;
+            while new_delta < 0.0 {
+                new_delta += TWO_PI;
+            }
+            while new_delta >= TWO_PI {
+                new_delta -= TWO_PI;
+            }
+            if new_delta < delta {
+                delta = new_delta;
+                next_path = Some(candidate_path);
+                next_node = Some(candidate_node);
+            }
+        }
+
+        match (next_path, next_node) {
+            (Some(path), Some(node)) => Ok((path, node)),
+            _ => Err(TreeError::InvalidOperation(
+                "polygon path walk could not advance",
+            )),
+        }
+    }
+
+    fn calc_poly_contents(&mut self, poly_id: usize) {
+        let ring_nodes = self.polys[poly_id - 1].ring_nodes.clone();
+        let mut centroid = Point { x: 0.0, y: 0.0 };
+        let mut node_locs = Vec::with_capacity(ring_nodes.len());
+        for node_id in ring_nodes {
+            let loc = self.nodes[node_id - 1].loc;
+            node_locs.push(loc);
+            centroid.x += loc.x;
+            centroid.y += loc.y;
+        }
+        if !node_locs.is_empty() {
+            centroid.x /= node_locs.len() as TmFloat;
+            centroid.y /= node_locs.len() as TmFloat;
+        }
+        let poly = &mut self.polys[poly_id - 1];
+        poly.node_locs = node_locs;
+        poly.centroid = centroid;
+    }
+
+    fn calc_poly_cross_paths(&mut self, poly_id: usize) {
+        let ring_nodes = self.polys[poly_id - 1].ring_nodes.clone();
+        let owner_paths = match self.polys[poly_id - 1].owner {
+            OwnerRef::Tree => self.owned_paths.clone(),
+            OwnerRef::Poly(owner_id) => self
+                .polys
+                .get(owner_id.saturating_sub(1))
+                .map(|poly| poly.owned_paths.clone())
+                .unwrap_or_default(),
+            _ => Vec::new(),
+        };
+        let mut cross_paths = Vec::new();
+        let nn = ring_nodes.len();
+        for i in 2..nn {
+            for j in 0..i - 1 {
+                if i == nn - 1 && j == 0 {
+                    continue;
+                }
+                if let Some(path_id) =
+                    self.find_any_path_in(&owner_paths, ring_nodes[i], ring_nodes[j])
+                {
+                    push_unique(&mut cross_paths, path_id);
+                }
+            }
+        }
+        self.polys[poly_id - 1].cross_paths = cross_paths;
+    }
+
+    fn build_poly_contents_geometry(&mut self, poly_id: usize) -> Result<()> {
+        if self.polys[poly_id - 1].owned_nodes.is_empty() {
+            let ring_nodes = self.polys[poly_id - 1].ring_nodes.clone();
+            let nn = ring_nodes.len();
+            if nn < 3 {
+                return Err(TreeError::InvalidOperation(
+                    "polygon contents require at least three ring nodes",
+                ));
+            }
+
+            if nn == 3 {
+                let p1 = self.nodes[ring_nodes[0] - 1].loc;
+                let p2 = self.nodes[ring_nodes[1] - 1].loc;
+                let p3 = self.nodes[ring_nodes[2] - 1].loc;
+                let node_id = self.create_sub_node(poly_id, incenter(p1, p2, p3));
+                self.nodes[node_id - 1].is_junction = true;
+                self.nodes[node_id - 1].elevation =
+                    self.nodes[ring_nodes[0] - 1].elevation + inradius(p1, p2, p3);
+                self.polys[poly_id - 1].inset_nodes = vec![node_id, node_id, node_id];
+
+                for ring_node in ring_nodes {
+                    let path_id = self.create_sub_path(poly_id, ring_node, node_id, false);
+                    self.polys[poly_id - 1].spoke_paths.push(path_id);
+                }
+            } else {
+                self.build_inset_poly_contents(poly_id)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn build_inset_poly_contents(&mut self, poly_id: usize) -> Result<()> {
+        let ring_nodes = self.polys[poly_id - 1].ring_nodes.clone();
+        let nn = ring_nodes.len();
+        let mut r = vec![Point { x: 0.0, y: 0.0 }; nn];
+        let mut rp = vec![Point { x: 0.0, y: 0.0 }; nn];
+        let mut rn = vec![Point { x: 0.0, y: 0.0 }; nn];
+        let mut mr = vec![0.0; nn];
+
+        for i in 0..nn {
+            let ip = (i + nn - 1) % nn;
+            let inext = (i + 1) % nn;
+            let nip = self.nodes[ring_nodes[ip] - 1].loc;
+            let nii = self.nodes[ring_nodes[i] - 1].loc;
+            let nin = self.nodes[ring_nodes[inext] - 1].loc;
+            rp[i] = normalize(point_sub(nip, nii));
+            rn[i] = normalize(point_sub(nin, nii));
+            let bis = normalize(rotate_ccw90(point_sub(rn[i], rp[i])));
+            r[i] = point_div(bis, inner(bis, rotate_ccw90(rn[i])));
+            mr[i] = inner(r[i], rp[i]);
+        }
+
+        let owner_paths = self.owner_paths_for_poly(poly_id);
+        let h = self.calc_poly_inset_distance(poly_id, &owner_paths, &r, &rn, &mr)?;
+
+        let mut inset_nodes = Vec::with_capacity(nn);
+        for i in 0..nn {
+            let p = point_add(self.nodes[ring_nodes[i] - 1].loc, point_mul(r[i], h));
+            inset_nodes.push(self.get_or_make_inset_node(poly_id, p));
+        }
+        self.polys[poly_id - 1].inset_nodes = inset_nodes.clone();
+
+        let owned_nodes = self.polys[poly_id - 1].owned_nodes.clone();
+        for node_id in owned_nodes.iter().copied() {
+            self.nodes[node_id - 1].elevation = self.nodes[ring_nodes[0] - 1].elevation + h;
+        }
+
+        match owned_nodes.len() {
+            0 => {
+                return Err(TreeError::InvalidOperation(
+                    "polygon inset produced no owned nodes",
+                ));
+            }
+            1 | 2 => {
+                self.create_spoke_paths(poly_id, &ring_nodes, &inset_nodes);
+                if owned_nodes.len() == 2 {
+                    let ridge =
+                        self.create_sub_path(poly_id, owned_nodes[0], owned_nodes[1], false);
+                    self.polys[poly_id - 1].ridge_path = Some(ridge);
+                }
+            }
+            _ => {
+                for dij in 1..nn {
+                    for i in 0..=nn - dij {
+                        let j = (i + dij) % nn;
+                        let ni = ring_nodes[i];
+                        let nj = ring_nodes[j];
+                        let rni = inset_nodes[i];
+                        let rnj = inset_nodes[j];
+                        if rni == rnj || self.find_leaf_path_between_any(rni, rnj).is_some() {
+                            continue;
+                        }
+
+                        let outset_path = self
+                            .find_any_path_in(&owner_paths, ni, nj)
+                            .ok_or(TreeError::InvalidOperation("missing outset path"))?;
+                        let i_reduction = h * mr[i];
+                        let j_reduction = h * mr[j];
+
+                        let (front, back, front_reduction, back_reduction) =
+                            if self.paths[outset_path - 1].nodes.first().copied() == Some(ni) {
+                                (rni, rnj, i_reduction, j_reduction)
+                            } else {
+                                (rnj, rni, j_reduction, i_reduction)
+                            };
+                        let path_id = self.create_sub_path(poly_id, front, back, true);
+                        let min_paper_length = self.paths[outset_path - 1].min_paper_length
+                            - (front_reduction + back_reduction);
+                        let act_paper_length =
+                            self.nodes[rni - 1].loc.distance(self.nodes[rnj - 1].loc);
+                        let outset_active = self.paths[outset_path - 1].is_active;
+                        let path = &mut self.paths[path_id - 1];
+                        path.outset_path = Some(outset_path);
+                        path.front_reduction = front_reduction;
+                        path.back_reduction = back_reduction;
+                        path.min_paper_length = min_paper_length;
+                        path.act_paper_length = act_paper_length;
+                        path.min_tree_length = min_paper_length / self.scale;
+                        path.act_tree_length = act_paper_length / self.scale;
+                        path.is_active =
+                            outset_active || is_tiny(act_paper_length - min_paper_length);
+                        path.is_border = dij == 1;
+                        path.is_polygon = path.is_active || path.is_border;
+                    }
+                }
+
+                let owned_paths = self.polys[poly_id - 1].owned_paths.clone();
+                self.build_polys_from_paths(&owned_paths, &inset_nodes, OwnerRef::Poly(poly_id))?;
+
+                let owned_polys = self.polys[poly_id - 1].owned_polys.clone();
+                for sub_poly_id in owned_polys {
+                    self.build_poly_contents_geometry(sub_poly_id)?;
+                }
+
+                self.create_spoke_paths(poly_id, &ring_nodes, &inset_nodes);
+            }
+        }
+
+        Ok(())
+    }
+
+    fn calc_poly_inset_distance(
+        &self,
+        poly_id: usize,
+        owner_paths: &[usize],
+        r: &[Point],
+        rn: &[Point],
+        mr: &[TmFloat],
+    ) -> Result<TmFloat> {
+        let ring_nodes = &self.polys[poly_id - 1].ring_nodes;
+        let nn = ring_nodes.len();
+        let mut h = 1.0e10;
+
+        for i in 0..nn - 1 {
+            for j in i + 1..nn {
+                if are_parallel(r[i], r[j]) && inner(r[i], r[j]) > 0.0 {
+                    continue;
+                }
+
+                let ni = self.nodes[ring_nodes[i] - 1].loc;
+                let nj = self.nodes[ring_nodes[j] - 1].loc;
+                if j == i + 1 || (i == 0 && j == nn - 1) {
+                    let Some(bi) = line_intersection_point_exact(ni, r[i], nj, r[j]) else {
+                        return Err(TreeError::InvalidOperation(
+                            "adjacent inset bisectors are parallel",
+                        ));
+                    };
+                    let h1 = inner(point_sub(bi, ni), rotate_ccw90(rn[i]));
+                    if h1 > 0.0 && h > h1 {
+                        h = h1;
+                    }
+                } else {
+                    let path_id = self
+                        .find_any_path_in(owner_paths, ring_nodes[i], ring_nodes[j])
+                        .ok_or(TreeError::InvalidOperation("missing poly cross path"))?;
+                    let lij = self.paths[path_id - 1].min_paper_length;
+                    let u = point_sub(ni, nj);
+                    let v = point_sub(r[i], r[j]);
+                    let w = mr[i] + mr[j];
+                    let a = mag2(v) - w.powi(2);
+                    let b = inner(u, v) + lij * w;
+                    let c = mag2(u) - lij.powi(2);
+                    let d = b.powi(2) - a * c;
+                    if d < 0.0 {
+                        continue;
+                    }
+
+                    let sd = d.sqrt();
+                    for h1 in [(-b + sd) / a, (-b - sd) / a] {
+                        let lijp = lij - h1 * w;
+                        if lijp > 0.0 && h1 > 0.0 && h > h1 {
+                            h = h1;
+                        }
+                    }
+                }
+            }
+        }
+
+        if h == 1.0e10 {
+            return Err(TreeError::InvalidOperation(
+                "polygon inset distance was not found",
+            ));
+        }
+        Ok(h)
+    }
+
+    fn create_spoke_paths(&mut self, poly_id: usize, ring_nodes: &[usize], inset_nodes: &[usize]) {
+        for (ring_node, inset_node) in ring_nodes.iter().copied().zip(inset_nodes.iter().copied()) {
+            let path_id = self.create_sub_path(poly_id, ring_node, inset_node, false);
+            self.polys[poly_id - 1].spoke_paths.push(path_id);
+        }
+    }
+
+    fn create_sub_node(&mut self, poly_id: usize, loc: Point) -> usize {
+        let index = self.nodes.len() + 1;
+        self.nodes.push(Node {
+            index,
+            label: String::new(),
+            loc,
+            depth: DEPTH_NOT_SET,
+            elevation: 0.0,
+            is_leaf: false,
+            is_sub: true,
+            is_border: false,
+            is_pinned: false,
+            is_polygon: false,
+            is_junction: false,
+            is_conditioned: false,
+            owned_vertices: Vec::new(),
+            edges: Vec::new(),
+            leaf_paths: Vec::new(),
+            owner: OwnerRef::Poly(poly_id),
+        });
+        self.polys[poly_id - 1].owned_nodes.push(index);
+        index
+    }
+
+    fn get_or_make_inset_node(&mut self, poly_id: usize, loc: Point) -> usize {
+        let owned_nodes = self.polys[poly_id - 1].owned_nodes.clone();
+        for node_id in owned_nodes {
+            if self.nodes[node_id - 1].loc.distance(loc) < DIST_TOL {
+                self.nodes[node_id - 1].is_junction = true;
+                return node_id;
+            }
+        }
+        self.create_sub_node(poly_id, loc)
+    }
+
+    fn create_sub_path(
+        &mut self,
+        poly_id: usize,
+        front_node: usize,
+        back_node: usize,
+        connect_leaf_path: bool,
+    ) -> usize {
+        let index = self.paths.len() + 1;
+        self.paths.push(Path {
+            index,
+            min_tree_length: 0.0,
+            min_paper_length: 0.0,
+            act_tree_length: 0.0,
+            act_paper_length: 0.0,
+            is_leaf: false,
+            is_sub: true,
+            is_feasible: false,
+            is_active: false,
+            is_border: false,
+            is_polygon: false,
+            is_conditioned: false,
+            fwd_poly: None,
+            bkd_poly: None,
+            nodes: vec![front_node, back_node],
+            edges: Vec::new(),
+            outset_path: None,
+            front_reduction: 0.0,
+            back_reduction: 0.0,
+            min_depth: DEPTH_NOT_SET,
+            min_depth_dist: DEPTH_NOT_SET,
+            owned_vertices: Vec::new(),
+            owned_creases: Vec::new(),
+            owner: OwnerRef::Poly(poly_id),
+        });
+        self.polys[poly_id - 1].owned_paths.push(index);
+        if connect_leaf_path {
+            self.nodes[front_node - 1].leaf_paths.push(index);
+            self.nodes[back_node - 1].leaf_paths.push(index);
+        }
+        index
+    }
+
+    fn owner_paths_for_poly(&self, poly_id: usize) -> Vec<usize> {
+        match self.polys[poly_id - 1].owner {
+            OwnerRef::Tree => self.owned_paths.clone(),
+            OwnerRef::Poly(owner_id) => self
+                .polys
+                .get(owner_id.saturating_sub(1))
+                .map(|poly| poly.owned_paths.clone())
+                .unwrap_or_default(),
+            _ => Vec::new(),
+        }
+    }
+
+    fn find_leaf_path_between_any(&self, node1: usize, node2: usize) -> Option<usize> {
+        self.nodes[node1 - 1]
+            .leaf_paths
+            .iter()
+            .copied()
+            .find(|path_id| {
+                self.paths
+                    .get(path_id.saturating_sub(1))
+                    .and_then(|path| path.nodes.first().copied().zip(path.nodes.last().copied()))
+                    .is_some_and(|(a, b)| a == node2 || b == node2)
+            })
+    }
+
+    fn find_any_path_in(&self, path_ids: &[usize], node1: usize, node2: usize) -> Option<usize> {
+        path_ids.iter().copied().find(|path_id| {
+            self.paths
+                .get(path_id.saturating_sub(1))
+                .and_then(|path| path.nodes.first().copied().zip(path.nodes.last().copied()))
+                .is_some_and(|(a, b)| (a == node1 && b == node2) || (a == node2 && b == node1))
+        })
+    }
+
+    fn paths_intersect_interior(&self, path1: usize, path2: usize) -> bool {
+        let path1 = &self.paths[path1 - 1];
+        let path2 = &self.paths[path2 - 1];
+        let Some((path1_front, path1_back)) = path1
+            .nodes
+            .first()
+            .copied()
+            .zip(path1.nodes.last().copied())
+        else {
+            return false;
+        };
+        let Some((path2_front, path2_back)) = path2
+            .nodes
+            .first()
+            .copied()
+            .zip(path2.nodes.last().copied())
+        else {
+            return false;
+        };
+        if path1_front == path2_front
+            || path1_front == path2_back
+            || path1_back == path2_front
+            || path1_back == path2_back
+        {
+            return false;
+        }
+
+        let p = self.nodes[path1_front - 1].loc;
+        let rp = point_sub(self.nodes[path1_back - 1].loc, p);
+        let q = self.nodes[path2_front - 1].loc;
+        let rq = point_sub(self.nodes[path2_back - 1].loc, q);
+        let Some((tp, tq)) = line_intersection_params(p, rp, q, rq) else {
+            return false;
+        };
+        if tp <= 0.0 || tp >= 1.0 || tq <= 0.0 || tq >= 1.0 {
+            return false;
+        }
+        true
+    }
+
+    fn node_centroid(&self, node_ids: &[usize]) -> Point {
+        let mut centroid = Point { x: 0.0, y: 0.0 };
+        for node_id in node_ids {
+            let loc = self.nodes[*node_id - 1].loc;
+            centroid.x += loc.x;
+            centroid.y += loc.y;
+        }
+        centroid.x /= node_ids.len() as TmFloat;
+        centroid.y /= node_ids.len() as TmFloat;
+        centroid
     }
 
     fn cleanup_after_edit(&mut self) {
@@ -4927,12 +5634,113 @@ fn point_sub(a: Point, b: Point) -> Point {
     }
 }
 
+fn point_add(a: Point, b: Point) -> Point {
+    Point {
+        x: a.x + b.x,
+        y: a.y + b.y,
+    }
+}
+
+fn point_mul(a: Point, scale: TmFloat) -> Point {
+    Point {
+        x: a.x * scale,
+        y: a.y * scale,
+    }
+}
+
+fn point_div(a: Point, scale: TmFloat) -> Point {
+    Point {
+        x: a.x / scale,
+        y: a.y / scale,
+    }
+}
+
 fn rotate_ccw90(p: Point) -> Point {
     Point { x: -p.y, y: p.x }
 }
 
 fn inner(a: Point, b: Point) -> TmFloat {
     a.x * b.x + a.y * b.y
+}
+
+fn mag2(p: Point) -> TmFloat {
+    p.x.powi(2) + p.y.powi(2)
+}
+
+fn mag(p: Point) -> TmFloat {
+    mag2(p).sqrt()
+}
+
+fn normalize(p: Point) -> Point {
+    point_div(p, mag(p))
+}
+
+fn orientation_2d(p1: Point, p2: Point, p3: Point) -> TmFloat {
+    let p13 = point_sub(p1, p3);
+    let p23 = point_sub(p2, p3);
+    p13.x * p23.y - p13.y * p23.x
+}
+
+fn are_cw(p1: Point, p2: Point, p3: Point) -> bool {
+    orientation_2d(p1, p2, p3) < 0.0
+}
+
+fn are_ccw(p1: Point, p2: Point, p3: Point) -> bool {
+    orientation_2d(p1, p2, p3) > 0.0
+}
+
+fn are_parallel(p: Point, q: Point) -> bool {
+    inner(p, rotate_ccw90(q)) == 0.0
+}
+
+fn line_intersection_params(
+    p: Point,
+    rp: Point,
+    q: Point,
+    rq: Point,
+) -> Option<(TmFloat, TmFloat)> {
+    let eps = TmFloat::EPSILON.sqrt();
+    let rrpq = inner(rotate_ccw90(rp), rq);
+    if rrpq.abs() < eps {
+        return None;
+    }
+    let rqp = rotate_ccw90(point_sub(q, p));
+    Some((inner(rqp, rq) / rrpq, inner(rqp, rp) / rrpq))
+}
+
+fn line_intersection_point_exact(p: Point, rp: Point, q: Point, rq: Point) -> Option<Point> {
+    let rrpq = inner(rotate_ccw90(rp), rq);
+    if rrpq == 0.0 {
+        return None;
+    }
+    let tp = inner(rotate_ccw90(point_sub(q, p)), rq) / rrpq;
+    Some(point_add(p, point_mul(rp, tp)))
+}
+
+fn incenter(p1: Point, p2: Point, p3: Point) -> Point {
+    let l12 = p1.distance(p2);
+    let l23 = p2.distance(p3);
+    let l31 = p3.distance(p1);
+    point_div(
+        point_add(
+            point_add(point_mul(p3, l12), point_mul(p1, l23)),
+            point_mul(p2, l31),
+        ),
+        l12 + l23 + l31,
+    )
+}
+
+fn inradius(p1: Point, p2: Point, p3: Point) -> TmFloat {
+    let a = p1.distance(p2);
+    let b = p2.distance(p3);
+    let c = p3.distance(p1);
+    0.5 * (((b + c - a) * (c + a - b) * (a + b - c)) / (a + b + c)).sqrt()
+}
+
+fn push_unique(values: &mut Vec<usize>, value: usize) {
+    if !values.contains(&value) {
+        values.push(value);
+    }
 }
 
 fn angle(p: Point) -> TmFloat {

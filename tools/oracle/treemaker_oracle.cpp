@@ -111,6 +111,54 @@ void ReadTree(tmTree& tree, const string& path)
   tree.GetSelf(fin);
 }
 
+size_t PtrIndex(const tmPart* part)
+{
+  return part ? part->GetIndex() : 0;
+}
+
+template <class ArrayT>
+void EmitIndexArray(ostream& os, const ArrayT& values)
+{
+  os << "[";
+  for (size_t i = 0; i < values.size(); ++i) {
+    if (i != 0) os << ",";
+    os << PtrIndex(values[i]);
+  }
+  os << "]";
+}
+
+void EmitPoint(ostream& os, const tmPoint& point)
+{
+  os << "[" << point.x << "," << point.y << "]";
+}
+
+void EmitPointArray(ostream& os, const tmArray<tmPoint>& values)
+{
+  os << "[";
+  for (size_t i = 0; i < values.size(); ++i) {
+    if (i != 0) os << ",";
+    EmitPoint(os, values[i]);
+  }
+  os << "]";
+}
+
+string PolyOwnerJson(tmTree& tree, tmPoly* poly)
+{
+  if (poly->GetPolyOwner() == static_cast<tmPolyOwner*>(&tree)) {
+    return "{\"kind\":\"tree\",\"index\":0}";
+  }
+  const tmDpptrArray<tmPoly>& polys = tree.GetPolys();
+  for (size_t i = 0; i < polys.size(); ++i) {
+    tmPoly* owner = polys[i];
+    if (poly->GetPolyOwner() == static_cast<tmPolyOwner*>(owner)) {
+      ostringstream os;
+      os << "{\"kind\":\"poly\",\"index\":" << owner->GetIndex() << "}";
+      return os.str();
+    }
+  }
+  return "{\"kind\":\"unknown\",\"index\":0}";
+}
+
 size_t CountLeafNodes(tmTree& tree)
 {
   const tmDpptrArray<tmNode>& nodes = tree.GetNodes();
@@ -262,6 +310,115 @@ double WeightedRmsStrainPercent(const tmDpptrArray<tmEdge>& edges)
   }
   ss /= edges.size();
   return 100.0 * sqrt(ss);
+}
+
+void EmitPolysJson(tmTree& tree)
+{
+  const tmDpptrArray<tmPoly>& polys = tree.GetPolys();
+  cout << "\"polys_detail\":[";
+  for (size_t i = 0; i < polys.size(); ++i) {
+    tmPoly* poly = polys[i];
+    if (i != 0) cout << ",";
+    cout << "{"
+         << "\"index\":" << poly->GetIndex() << ","
+         << "\"is_sub_poly\":" << BoolStr(poly->IsSubPoly()) << ","
+         << "\"owner\":" << PolyOwnerJson(tree, poly) << ","
+         << "\"centroid\":";
+    EmitPoint(cout, poly->GetCentroid());
+    cout << ",\"ring_nodes\":";
+    EmitIndexArray(cout, poly->GetRingNodes());
+    cout << ",\"ring_paths\":";
+    EmitIndexArray(cout, poly->GetRingPaths());
+    cout << ",\"cross_paths\":";
+    EmitIndexArray(cout, poly->GetCrossPaths());
+    cout << ",\"inset_nodes\":";
+    EmitIndexArray(cout, poly->GetInsetNodes());
+    cout << ",\"spoke_paths\":";
+    EmitIndexArray(cout, poly->GetSpokePaths());
+    cout << ",\"ridge_path\":" << PtrIndex(poly->GetRidgePath()) << ","
+         << "\"node_locs\":";
+    EmitPointArray(cout, poly->GetNodeLocs());
+    cout << ",\"owned_nodes\":";
+    EmitIndexArray(cout, poly->GetOwnedNodes());
+    cout << ",\"owned_paths\":";
+    EmitIndexArray(cout, poly->GetOwnedPaths());
+    cout << ",\"owned_polys\":";
+    EmitIndexArray(cout, poly->GetOwnedPolys());
+    cout << "}";
+  }
+  cout << "]";
+}
+
+void EmitPolygonPathSidesJson(tmTree& tree)
+{
+  const tmDpptrArray<tmPath>& paths = tree.GetPaths();
+  bool first = true;
+  cout << "\"polygon_path_sides\":[";
+  for (size_t i = 0; i < paths.size(); ++i) {
+    tmPath* path = paths[i];
+    if (!path->IsPolygonPath()) continue;
+    if (!first) cout << ",";
+    first = false;
+    cout << "{"
+         << "\"index\":" << path->GetIndex() << ","
+         << "\"nodes\":";
+    EmitIndexArray(cout, path->GetNodes());
+    cout << ",\"is_border\":" << BoolStr(path->IsBorderPath()) << ","
+         << "\"fwd_poly\":" << PtrIndex(path->GetFwdPoly()) << ","
+         << "\"bkd_poly\":" << PtrIndex(path->GetBkdPoly()) << "}";
+  }
+  cout << "]";
+}
+
+void EmitNodesDetailJson(tmTree& tree)
+{
+  const tmDpptrArray<tmNode>& nodes = tree.GetNodes();
+  cout << "\"nodes_detail\":[";
+  for (size_t i = 0; i < nodes.size(); ++i) {
+    tmNode* node = nodes[i];
+    if (i != 0) cout << ",";
+    cout << "{"
+         << "\"index\":" << node->GetIndex() << ","
+         << "\"loc\":";
+    EmitPoint(cout, node->GetLoc());
+    cout << ",\"elevation\":" << node->GetElevation() << ","
+         << "\"is_sub\":" << BoolStr(node->IsSubNode()) << ","
+         << "\"is_junction\":" << BoolStr(node->IsJunctionNode()) << ","
+         << "\"leaf_paths\":";
+    EmitIndexArray(cout, node->GetLeafPaths());
+    cout << "}";
+  }
+  cout << "]";
+}
+
+void EmitPathsDetailJson(tmTree& tree)
+{
+  const tmDpptrArray<tmPath>& paths = tree.GetPaths();
+  cout << "\"paths_detail\":[";
+  for (size_t i = 0; i < paths.size(); ++i) {
+    tmPath* path = paths[i];
+    if (i != 0) cout << ",";
+    cout << "{"
+         << "\"index\":" << path->GetIndex() << ","
+         << "\"nodes\":";
+    EmitIndexArray(cout, path->GetNodes());
+    cout << ",\"min_tree_length\":" << path->GetMinTreeLength() << ","
+         << "\"min_paper_length\":" << path->GetMinPaperLength() << ","
+         << "\"act_tree_length\":" << path->GetActTreeLength() << ","
+         << "\"act_paper_length\":" << path->GetActPaperLength() << ","
+         << "\"is_leaf\":" << BoolStr(path->IsLeafPath()) << ","
+         << "\"is_sub\":" << BoolStr(path->IsSubPath()) << ","
+         << "\"is_feasible\":" << BoolStr(path->IsFeasiblePath()) << ","
+         << "\"is_active\":" << BoolStr(path->IsActivePath()) << ","
+         << "\"is_border\":" << BoolStr(path->IsBorderPath()) << ","
+         << "\"is_polygon\":" << BoolStr(path->IsPolygonPath()) << ","
+         << "\"fwd_poly\":" << PtrIndex(path->GetFwdPoly()) << ","
+         << "\"bkd_poly\":" << PtrIndex(path->GetBkdPoly()) << ","
+         << "\"outset_path\":" << PtrIndex(path->GetOutsetPath()) << ","
+         << "\"front_reduction\":" << path->GetFrontReduction() << ","
+         << "\"back_reduction\":" << path->GetBackReduction() << "}";
+  }
+  cout << "]";
 }
 
 void EmitSummary(const string& path)
@@ -442,11 +599,98 @@ void EmitOptimize(const string& path, const string& kind)
        << "}" << endl;
 }
 
+void EmitBuildTreePolys(const string& path)
+{
+  tmTree tree;
+  ReadTree(tree, path);
+  tree.KillPolysAndCreasePattern();
+  tree.BuildTreePolys();
+
+  tmArray<tmEdge*> badEdges;
+  tmArray<tmPoly*> badPolys;
+  tmArray<tmVertex*> badVertices;
+  tmArray<tmCrease*> badCreases;
+  tmArray<tmFacet*> badFacets;
+  tmTree::CPStatus cpStatus =
+    tree.GetCPStatus(badEdges, badPolys, badVertices, badCreases, badFacets);
+
+  cout << "{"
+       << "\"case\":\"build_tree_polys\","
+       << "\"operation\":\"kill_polys_and_crease_pattern_then_build_tree_polys\","
+       << "\"file\":\"" << JsonEscape(BaseName(path)) << "\","
+       << "\"is_feasible\":" << BoolStr(tree.IsFeasible()) << ","
+       << "\"is_polygon_valid\":" << BoolStr(tree.IsPolygonValid()) << ","
+       << "\"is_polygon_filled\":" << BoolStr(tree.IsPolygonFilled()) << ","
+       << "\"cp_status\":\"" << CpStatusName(cpStatus) << "\","
+       << "\"nodes\":" << tree.GetNumNodes() << ","
+       << "\"paths\":" << tree.GetNumPaths() << ","
+       << "\"polys\":" << tree.GetNumPolys() << ","
+       << "\"owned_polys\":" << tree.GetOwnedPolys().size() << ","
+       << "\"vertices\":" << tree.GetNumVertices() << ","
+       << "\"creases\":" << tree.GetNumCreases() << ","
+       << "\"facets\":" << tree.GetFacets().size() << ","
+       << "\"polygon_nodes\":" << CountPolygonNodes(tree) << ","
+       << "\"polygon_paths\":" << CountPolygonPaths(tree) << ","
+       << "\"border_nodes\":" << CountBorderNodes(tree) << ","
+       << "\"border_paths\":" << CountBorderPaths(tree) << ","
+       << "\"active_paths\":" << CountActivePaths(tree) << ","
+       << "\"feasible_paths\":" << CountFeasiblePaths(tree) << ","
+       << "\"owned_poly_ids\":";
+  EmitIndexArray(cout, tree.GetOwnedPolys());
+  cout << ",";
+  EmitPolysJson(tree);
+  cout << ",";
+  EmitPolygonPathSidesJson(tree);
+  cout << "}" << endl;
+}
+
+void EmitBuildPolygonContents(const string& path)
+{
+  tmTree tree;
+  ReadTree(tree, path);
+  tree.KillPolysAndCreasePattern();
+  tree.BuildPolysAndCreasePattern();
+
+  cout << "{"
+       << "\"case\":\"build_polygon_contents\","
+       << "\"operation\":\"kill_polys_and_crease_pattern_then_build_polys_and_crease_pattern\","
+       << "\"file\":\"" << JsonEscape(BaseName(path)) << "\","
+       << "\"is_feasible\":" << BoolStr(tree.IsFeasible()) << ","
+       << "\"is_polygon_valid\":" << BoolStr(tree.IsPolygonValid()) << ","
+       << "\"is_polygon_filled\":" << BoolStr(tree.IsPolygonFilled()) << ","
+       << "\"nodes\":" << tree.GetNumNodes() << ","
+       << "\"paths\":" << tree.GetNumPaths() << ","
+       << "\"polys\":" << tree.GetNumPolys() << ","
+       << "\"owned_polys\":" << tree.GetOwnedPolys().size() << ","
+       << "\"vertices\":" << tree.GetNumVertices() << ","
+       << "\"creases\":" << tree.GetNumCreases() << ","
+       << "\"facets\":" << tree.GetFacets().size() << ","
+       << "\"polygon_nodes\":" << CountPolygonNodes(tree) << ","
+       << "\"polygon_paths\":" << CountPolygonPaths(tree) << ","
+       << "\"border_nodes\":" << CountBorderNodes(tree) << ","
+       << "\"border_paths\":" << CountBorderPaths(tree) << ","
+       << "\"active_paths\":" << CountActivePaths(tree) << ","
+       << "\"feasible_paths\":" << CountFeasiblePaths(tree) << ","
+       << "\"owned_poly_ids\":";
+  EmitIndexArray(cout, tree.GetOwnedPolys());
+  cout << ",";
+  EmitPolysJson(tree);
+  cout << ",";
+  EmitNodesDetailJson(tree);
+  cout << ",";
+  EmitPathsDetailJson(tree);
+  cout << ",";
+  EmitPolygonPathSidesJson(tree);
+  cout << "}" << endl;
+}
+
 void Usage(ostream& os)
 {
   os << "Usage:\n"
      << "  treemaker-oracle summary <file>\n"
      << "  treemaker-oracle optimize <scale|edge|strain> <file>\n"
+     << "  treemaker-oracle build-tree-polys <file>\n"
+     << "  treemaker-oracle build-polygon-contents <file>\n"
      << "  treemaker-oracle run-fixtures [--fixture-dir <dir>]\n";
 }
 
@@ -506,6 +750,24 @@ int main(int argc, char** argv)
         return 2;
       }
       EmitOptimize(argv[3], argv[2]);
+      return 0;
+    }
+
+    if (command == "build-tree-polys") {
+      if (argc != 3) {
+        Usage(cerr);
+        return 2;
+      }
+      EmitBuildTreePolys(argv[2]);
+      return 0;
+    }
+
+    if (command == "build-polygon-contents") {
+      if (argc != 3) {
+        Usage(cerr);
+        return 2;
+      }
+      EmitBuildPolygonContents(argv[2]);
       return 0;
     }
 

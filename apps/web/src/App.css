@@ -1,0 +1,109 @@
+.app-layout {
+  display: grid;
+  grid-template-rows: 36px minmax(0, 1fr);
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--bg-primary);
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 0 var(--space-3);
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.toolbar__brand,
+.toolbar__actions {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.toolbar__brand {
+  gap: var(--space-2);
+}
+
+.toolbar__title {
+  color: var(--text-primary);
+  font-size: 0.78rem;
+  font-weight: 750;
+  letter-spacing: 0;
+}
+
+.toolbar__status,
+.toolbar__dirty {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 7px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  font-size: 0.68rem;
+  line-height: 1;
+  text-transform: capitalize;
+}
+
+.toolbar__status[data-status='ready'] {
+  color: var(--status-success);
+  border-color: color-mix(in srgb, var(--status-success) 45%, var(--border-default));
+}
+
+.toolbar__dirty {
+  color: var(--status-warning);
+  border-color: color-mix(in srgb, var(--status-warning) 50%, var(--border-default));
+}
+
+.toolbar__actions {
+  justify-content: flex-end;
+  gap: var(--space-1);
+}
+
+.toolbar__separator {
+  width: 1px;
+  height: 18px;
+  margin: 0 var(--space-1);
+  background: var(--border-default);
+}
+
+.dockview-theme-treemaker {
+  --dv-paneview-header-border-color: var(--border-default);
+  --dv-tabs-and-actions-container-background-color: var(--bg-primary);
+  --dv-tabs-and-actions-container-height: 28px;
+  --dv-tabs-and-actions-container-font-size: 11px;
+  --dv-activegroup-visiblepanel-tab-background-color: var(--bg-secondary);
+  --dv-activegroup-hiddenpanel-tab-background-color: var(--bg-primary);
+  --dv-inactivegroup-visiblepanel-tab-background-color: var(--bg-elevated);
+  --dv-inactivegroup-hiddenpanel-tab-background-color: var(--bg-primary);
+  --dv-tab-divider-color: var(--border-default);
+  --dv-activegroup-visiblepanel-tab-color: var(--text-primary);
+  --dv-activegroup-hiddenpanel-tab-color: var(--text-secondary);
+  --dv-inactivegroup-visiblepanel-tab-color: var(--text-secondary);
+  --dv-inactivegroup-hiddenpanel-tab-color: var(--text-tertiary);
+  --dv-background-color: var(--bg-primary);
+  --dv-group-view-background-color: var(--bg-secondary);
+  --dv-separator-border: var(--border-default);
+  --dv-drag-over-background-color: color-mix(in srgb, var(--accent-primary) 18%, transparent);
+  --dv-drag-over-border-color: var(--accent-primary);
+}
+
+.dockview-theme-treemaker .dv-tabs-and-actions-container {
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.dockview-theme-treemaker .dv-split-view-container .dv-sash-container .dv-sash {
+  --dv-sash-size: 6px;
+}
+
+.dockview-theme-treemaker .dv-split-view-container .dv-sash-container .dv-sash:not(.disabled):hover,
+.dockview-theme-treemaker .dv-split-view-container .dv-sash-container .dv-sash:not(.disabled):active {
+  background-color: var(--accent-primary);
+  transition: background-color 0.15s ease;
+  transition-delay: 0.18s;
+}

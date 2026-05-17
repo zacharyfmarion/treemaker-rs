@@ -1,5 +1,9 @@
 /target/
 artifacts/
 **/pkg/
+node_modules/
+**/node_modules/
+**/dist/
+coverage/
 tools/oracle/build/
 .DS_Store

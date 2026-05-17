@@ -41,7 +41,7 @@ themes.
 
 ### Phase 1: Roadmap And Web Shell
 
-Status: in progress.
+Status: complete for the initial browser shell.
 
 Goal: create the project structure for a browser-first GUI that can build in
 CI and leaves room for Tauri.

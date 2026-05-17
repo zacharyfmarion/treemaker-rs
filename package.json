@@ -1,0 +1,13 @@
+{
+  "name": "treemaker-rs-workspace",
+  "private": true,
+  "workspaces": [
+    "apps/web"
+  ],
+  "scripts": {
+    "dev:web": "npm --workspace @treemaker/web run dev",
+    "build:web": "npm --workspace @treemaker/web run build",
+    "test:web": "npm --workspace @treemaker/web run test",
+    "typecheck:web": "npm --workspace @treemaker/web run typecheck"
+  }
+}

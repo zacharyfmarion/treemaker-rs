@@ -1,20 +1,24 @@
 .app-layout {
   display: grid;
-  grid-template-rows: 36px minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   width: 100vw;
   height: 100vh;
+  min-width: 0;
   overflow: hidden;
   background: var(--bg-primary);
 }
 
 .toolbar {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
   gap: var(--space-3);
-  padding: 0 var(--space-3);
+  min-width: 0;
+  min-height: 36px;
+  padding: 3px var(--space-3);
   background: var(--bg-primary);
   border-bottom: 1px solid var(--border-subtle);
+  box-sizing: border-box;
 }
 
 .toolbar__brand,
@@ -26,9 +30,11 @@
 
 .toolbar__brand {
   gap: var(--space-2);
+  overflow: hidden;
 }
 
 .toolbar__title {
+  flex: 0 0 auto;
   color: var(--text-primary);
   font-size: 0.78rem;
   font-weight: 750;
@@ -41,6 +47,7 @@
 .toolbar__error {
   display: inline-flex;
   align-items: center;
+  min-width: 0;
   height: 20px;
   padding: 0 7px;
   border: 1px solid var(--border-default);
@@ -49,7 +56,10 @@
   background: var(--bg-secondary);
   font-size: 0.68rem;
   line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
   text-transform: capitalize;
+  white-space: nowrap;
 }
 
 .toolbar__error {
@@ -103,7 +113,10 @@
 
 .toolbar__actions {
   justify-content: flex-end;
+  flex-wrap: wrap;
   gap: var(--space-1);
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .toolbar__separator {
@@ -111,6 +124,54 @@
   height: 18px;
   margin: 0 var(--space-1);
   background: var(--border-default);
+}
+
+@media (max-width: 680px) {
+  .toolbar {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-1);
+    padding: 5px var(--space-2);
+  }
+
+  .toolbar__brand,
+  .toolbar__actions {
+    width: 100%;
+  }
+
+  .toolbar__brand {
+    gap: var(--space-1);
+  }
+
+  .toolbar__actions {
+    justify-content: flex-start;
+  }
+
+  .toolbar__separator {
+    display: none;
+  }
+
+  .toolbar__message,
+  .toolbar__error {
+    max-width: 42vw;
+  }
+}
+
+@media (max-width: 460px) {
+  .toolbar__title {
+    display: none;
+  }
+
+  .toolbar__status,
+  .toolbar__dirty,
+  .toolbar__message,
+  .toolbar__error {
+    max-width: 44vw;
+    padding: 0 6px;
+  }
+
+  .toolbar__actions .ui-control--sm {
+    padding: 0 8px;
+  }
 }
 
 .dockview-theme-treemaker {

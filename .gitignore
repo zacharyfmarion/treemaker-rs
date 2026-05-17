@@ -3,7 +3,9 @@ artifacts/
 **/pkg/
 node_modules/
 **/node_modules/
-**/dist/
+**/dist/*
+!apps/web/dist/
+!apps/web/dist/.gitkeep
 coverage/
 apps/web/src/generated/
 tools/oracle/build/

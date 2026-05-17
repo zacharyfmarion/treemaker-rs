@@ -223,6 +223,27 @@
   text-align: right;
 }
 
+.control-row__input {
+  width: 100%;
+  min-width: 72px;
+  height: 26px;
+  padding: 0 7px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.74rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.control-row__input:focus {
+  border-color: var(--accent-primary);
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-primary) 22%, transparent);
+}
+
 .metric-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -342,6 +363,14 @@
   min-height: 360px;
 }
 
+.design-canvas[data-tool='node'] {
+  cursor: crosshair;
+}
+
+.design-canvas[data-tool='edge'] {
+  cursor: cell;
+}
+
 .paper-shadow {
   fill: rgba(0, 0, 0, 0.28);
 }
@@ -356,6 +385,11 @@
   fill: none;
   stroke: #111417;
   stroke-width: 4;
+}
+
+.paper-hit-area {
+  fill: transparent;
+  pointer-events: all;
 }
 
 .tree-path {
@@ -406,6 +440,11 @@
   fill: var(--accent-primary);
   stroke: #0d1114;
   stroke-width: 3;
+}
+
+.tree-node--pending-edge {
+  stroke: var(--status-warning);
+  stroke-width: 4;
 }
 
 .leaf-radius {

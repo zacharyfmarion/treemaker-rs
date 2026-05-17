@@ -22,6 +22,7 @@ function Toolbar() {
   const optimizeScale = useWorkspaceStore((state) => state.optimizeScale);
   const buildCreasePattern = useWorkspaceStore((state) => state.buildCreasePattern);
   const status = useWorkspaceStore((state) => state.status);
+  const project = useWorkspaceStore((state) => state.project);
   const engineReady = useWorkspaceStore((state) => state.engineReady);
   const error = useWorkspaceStore((state) => state.error);
   const dirty = useWorkspaceStore((state) => state.dirty);
@@ -29,7 +30,7 @@ function Toolbar() {
     status === 'loading_engine' ||
     status === 'optimizing' ||
     status === 'building_crease_pattern';
-  const canOptimize = engineReady && !busy && status !== 'error';
+  const canOptimize = engineReady && project.edges.length > 0 && !busy && status !== 'error';
   const canBuild =
     engineReady && !busy && (status === 'optimized' || status === 'crease_pattern_ready');
 
@@ -93,6 +94,7 @@ function Toolbar() {
 
 export default function App() {
   const initEngine = useWorkspaceStore((state) => state.initEngine);
+  const deleteSelection = useWorkspaceStore((state) => state.deleteSelection);
   const setDockviewApi = useLayoutStore((state) => state.setDockviewApi);
   const loadLayout = useLayoutStore((state) => state.loadLayout);
   const saveLayout = useLayoutStore((state) => state.saveLayout);
@@ -100,6 +102,21 @@ export default function App() {
   useEffect(() => {
     void initEngine();
   }, [initEngine]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target;
+      const isEditing =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement;
+      if (isEditing || (event.key !== 'Delete' && event.key !== 'Backspace')) return;
+      event.preventDefault();
+      void deleteSelection();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [deleteSelection]);
 
   const onReady = useCallback(
     (event: DockviewReadyEvent) => {

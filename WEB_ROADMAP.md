@@ -88,7 +88,9 @@ Done when:
 
 ### Phase 3: Tree Drawing MVP
 
-Status: not started.
+Status: started; the Design pane can create blank designs, add nodes, connect
+edges, drag nodes, delete selections, and edit node/edge basics through the
+inspector.
 
 Goal: make the central Design pane a real editor for drawing trees.
 

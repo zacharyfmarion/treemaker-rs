@@ -1,7 +1,15 @@
+import { useRef, useState, type PointerEvent } from 'react';
 import { CircleDot, MousePointer2, Plus, Waypoints, ZoomIn } from 'lucide-react';
 import { IconButton } from '../ui/IconButton';
 import { SegmentedControl } from '../ui/SegmentedControl';
-import { formatNumber, paperToSvg, type PlotRect } from '../../lib/geometry';
+import {
+  clampPaperPoint,
+  formatNumber,
+  paperToSvg,
+  svgToPaper,
+  type PlotRect,
+  type Point,
+} from '../../lib/geometry';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import type { ToolMode } from '../../lib/sampleProject';
 
@@ -15,13 +23,91 @@ const toolOptions: Array<{ value: ToolMode; label: string; title: string }> = [
 ];
 
 export function DesignPanel() {
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const [dragging, setDragging] = useState<{
+    id: number;
+    start: Point;
+    loc: Point;
+    moved: boolean;
+  } | null>(null);
   const project = useWorkspaceStore((state) => state.project);
   const selection = useWorkspaceStore((state) => state.selection);
   const select = useWorkspaceStore((state) => state.select);
   const toolMode = useWorkspaceStore((state) => state.toolMode);
   const setToolMode = useWorkspaceStore((state) => state.setToolMode);
+  const addNodeAt = useWorkspaceStore((state) => state.addNodeAt);
+  const addEdge = useWorkspaceStore((state) => state.addEdge);
+  const moveNode = useWorkspaceStore((state) => state.moveNode);
 
   const findNode = (id: number) => project.nodes.find((node) => node.id === id);
+  const displayLoc = (id: number, loc: Point) => (dragging?.id === id ? dragging.loc : loc);
+
+  const eventToPaper = (event: PointerEvent): Point => {
+    const svg = svgRef.current;
+    if (!svg) return { x: 0, y: 0 };
+    const bounds = svg.getBoundingClientRect();
+    const point = {
+      x: ((event.clientX - bounds.left) / bounds.width) * VIEWBOX,
+      y: ((event.clientY - bounds.top) / bounds.height) * VIEWBOX,
+    };
+    return clampPaperPoint(svgToPaper(point, PAPER_RECT));
+  };
+
+  const onPaperPointerDown = (event: PointerEvent<SVGRectElement>) => {
+    if (event.button !== 0) return;
+    if (toolMode === 'node') {
+      const connectTo = selection.kind === 'node' ? selection.id : undefined;
+      void addNodeAt(eventToPaper(event), connectTo);
+      return;
+    }
+    select({ kind: 'tree' });
+  };
+
+  const onNodePointerDown = (event: PointerEvent<SVGGElement>, nodeId: number) => {
+    if (event.button !== 0) return;
+    event.stopPropagation();
+    if (toolMode === 'edge') {
+      if (selection.kind === 'node' && selection.id !== nodeId) {
+        void addEdge(selection.id, nodeId);
+      } else {
+        select({ kind: 'node', id: nodeId });
+      }
+      return;
+    }
+    select({ kind: 'node', id: nodeId });
+    if (toolMode === 'select') {
+      const node = findNode(nodeId);
+      if (!node) return;
+      event.currentTarget.setPointerCapture(event.pointerId);
+      setDragging({ id: nodeId, start: node.loc, loc: node.loc, moved: false });
+    }
+  };
+
+  const onNodePointerMove = (event: PointerEvent<SVGGElement>, nodeId: number) => {
+    if (dragging?.id !== nodeId) return;
+    event.stopPropagation();
+    const loc = eventToPaper(event);
+    const dx = loc.x - dragging.start.x;
+    const dy = loc.y - dragging.start.y;
+    setDragging({
+      id: nodeId,
+      start: dragging.start,
+      loc,
+      moved: dragging.moved || Math.hypot(dx, dy) > 0.003,
+    });
+  };
+
+  const finishDrag = (event: PointerEvent<SVGGElement>, nodeId: number) => {
+    if (dragging?.id !== nodeId) return;
+    event.stopPropagation();
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    const loc = dragging.loc;
+    const moved = dragging.moved;
+    setDragging(null);
+    if (moved) void moveNode(nodeId, loc);
+  };
 
   return (
     <section className="panel-shell design-panel">
@@ -46,11 +132,12 @@ export function DesignPanel() {
       </div>
       <div className="panel-body design-panel__body">
         <svg
+          ref={svgRef}
           className="design-canvas"
+          data-tool={toolMode}
           viewBox={`0 0 ${VIEWBOX} ${VIEWBOX}`}
           role="img"
           aria-label="Tree design canvas"
-          onClick={() => select({ kind: 'tree' })}
         >
           <defs>
             <pattern id="paper-grid" width="58.8" height="58.8" patternUnits="userSpaceOnUse">
@@ -72,12 +159,20 @@ export function DesignPanel() {
             height={PAPER_RECT.height}
             fill="url(#paper-grid)"
           />
+          <rect
+            className="paper-hit-area"
+            x={PAPER_RECT.x}
+            y={PAPER_RECT.y}
+            width={PAPER_RECT.width}
+            height={PAPER_RECT.height}
+            onPointerDown={onPaperPointerDown}
+          />
           {project.paths.map((path) => {
             const a = findNode(path.nodes[0]);
             const b = findNode(path.nodes[1]);
             if (!a || !b) return null;
-            const p1 = paperToSvg(a.loc, PAPER_RECT);
-            const p2 = paperToSvg(b.loc, PAPER_RECT);
+            const p1 = paperToSvg(displayLoc(a.id, a.loc), PAPER_RECT);
+            const p2 = paperToSvg(displayLoc(b.id, b.loc), PAPER_RECT);
             const className = path.isActive
               ? 'tree-path tree-path--active'
               : path.isFeasible
@@ -98,11 +193,11 @@ export function DesignPanel() {
             const a = findNode(edge.nodes[0]);
             const b = findNode(edge.nodes[1]);
             if (!a || !b) return null;
-            const p1 = paperToSvg(a.loc, PAPER_RECT);
-            const p2 = paperToSvg(b.loc, PAPER_RECT);
+            const p1 = paperToSvg(displayLoc(a.id, a.loc), PAPER_RECT);
+            const p2 = paperToSvg(displayLoc(b.id, b.loc), PAPER_RECT);
             const active = selection.kind === 'edge' && selection.id === edge.id;
             return (
-              <g key={edge.id} onClick={(event) => {
+              <g key={edge.id} onPointerDown={(event) => {
                 event.stopPropagation();
                 select({ kind: 'edge', id: edge.id });
               }}>
@@ -120,17 +215,21 @@ export function DesignPanel() {
             );
           })}
           {project.nodes.map((node) => {
-            const point = paperToSvg(node.loc, PAPER_RECT);
+            const point = paperToSvg(displayLoc(node.id, node.loc), PAPER_RECT);
             const active = selection.kind === 'node' && selection.id === node.id;
+            const pendingEdge = toolMode === 'edge' && active;
             const incidentEdge = project.edges.find((edge) => edge.nodes.includes(node.id));
             const radius = node.isLeaf
               ? Math.max(22, (incidentEdge?.length ?? 1) * project.scale * PAPER_RECT.width)
               : 0;
             return (
-              <g key={node.id} onClick={(event) => {
-                event.stopPropagation();
-                select({ kind: 'node', id: node.id });
-              }}>
+              <g
+                key={node.id}
+                onPointerDown={(event) => onNodePointerDown(event, node.id)}
+                onPointerMove={(event) => onNodePointerMove(event, node.id)}
+                onPointerUp={(event) => finishDrag(event, node.id)}
+                onPointerCancel={(event) => finishDrag(event, node.id)}
+              >
                 {node.isLeaf && (
                   <circle
                     className="leaf-radius"
@@ -140,7 +239,11 @@ export function DesignPanel() {
                   />
                 )}
                 <circle
-                  className={active ? 'tree-node tree-node--selected' : 'tree-node'}
+                  className={[
+                    'tree-node',
+                    active ? 'tree-node--selected' : '',
+                    pendingEdge ? 'tree-node--pending-edge' : '',
+                  ].join(' ')}
                   data-leaf={node.isLeaf || undefined}
                   cx={point.x}
                   cy={point.y}

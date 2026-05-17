@@ -4,6 +4,7 @@ import { useWorkspaceStore } from '../../store/workspaceStore';
 
 export function FilesPanel() {
   const createNewProject = useWorkspaceStore((state) => state.createNewProject);
+  const loadStarterProject = useWorkspaceStore((state) => state.loadStarterProject);
 
   return (
     <section className="panel-shell files-panel">
@@ -29,7 +30,7 @@ export function FilesPanel() {
           <button
             type="button"
             className="example-item"
-            onClick={() => void createNewProject()}
+            onClick={() => void loadStarterProject()}
           >
             <span className="example-item__title">Three terminal flaps</span>
             <span className="example-item__meta">Scale 0.100 | Nodes 4</span>

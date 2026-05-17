@@ -38,15 +38,13 @@ Implemented:
 
 Remaining confidence work:
 
-- Broaden the parity corpus beyond the checked-in upstream fixtures and the
-  generated examples. The port should be tested against real-world `.tmd`,
-  `.tmd4`, and `.tmd5` files from existing TreeMaker users before claiming
-  every historical file works.
-- Add cross-platform oracle runs in CI, especially Linux and macOS, because ALM
-  floating-point convergence already shows small local-compiler drift in two
-  upstream scale-optimization records.
-- Stress/fuzz parse and round-trip behavior for malformed and unusual but valid
-  stream files.
+- Run the external corpus harness against real-world `.tmd`, `.tmd4`, and
+  `.tmd5` files from existing TreeMaker users before claiming every historical
+  file works. The harness is present; the private corpus is intentionally not
+  committed.
+- Ubuntu oracle CI is present. macOS oracle CI remains optional if the extra
+  platform-cost tradeoff becomes worth it for tracking ALM floating-point
+  drift.
 - Keep CFSQP/RFSQP out of scope unless redistributable source and compatible
   license terms are provided. Those backends are not required for TreeMaker
   5.0.1 ALM parity.
@@ -247,11 +245,11 @@ Done when:
 
 ## Phase 8: Corpus, CI, And Stress Confidence
 
-Status: planned. The current parity suite is strong for checked-in upstream
-fixtures and deterministic generated examples, but not yet broad enough to
-claim every historical TreeMaker file and edge case works. This phase keeps
-large/user corpora external, adds a lean Linux oracle CI path, expands
-deterministic generated families, and adds bounded parser/model stress tests.
+Status: complete for the checked-in and locally-gated confidence harnesses.
+Large/user corpora remain external by design, Ubuntu CI now builds and runs the
+C++ ALM oracle, generated families cover broader topology/condition cases, and
+bounded parser/model stress tests exercise valid random trees plus malformed
+fixture mutations.
 
 Goal: harden confidence in the completed TreeMaker 5.0.1 ALM port without
 checking private or large user files into git.

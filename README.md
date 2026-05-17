@@ -16,7 +16,8 @@ surface, v5 serialization, v4 export, typed condition parsing/feasibility, ALM
 scale/edge/strain optimization, polygon construction, crease-pattern
 generation, `CPStatus`, summary/check APIs, fixture tests, CLI, and wasm
 bindings are implemented and checked against the vendored C++ oracle on the
-checked-in fixtures.
+checked-in fixtures and deterministic generated families. External corpus and
+bounded stress harnesses are included for broader local confidence.
 
 The parity baseline is TreeMaker 5.0.1's distributable ALM backend. The
 proprietary CFSQP/RFSQP optimizer backends are intentionally out of scope
@@ -65,8 +66,16 @@ cargo run -p treemaker-cli -- check tests/fixtures/tmModelTester_1.tmd5 --detail
 cargo run -p treemaker-cli -- optimize tests/fixtures/tmModelTester_1.tmd5 --kind scale --out /tmp/out.tmd5
 cargo run -p treemaker-cli -- build-cp tests/fixtures/tmModelTester_1.tmd5 --out /tmp/cp.tmd5
 cargo run -p treemaker-cli -- export-v4 tests/fixtures/tmModelTester_1.tmd5 --out /tmp/out.tmd4
+cargo run -p treemaker-cli -- corpus tests/fixtures --format json
+cargo run -p treemaker-cli -- corpus /path/to/private/corpus --oracle tools/oracle/build/treemaker-oracle
 tools/oracle/build_oracle.sh
 TREEMAKER_CPP_ORACLE=tools/oracle/build/treemaker-oracle cargo test -p oracle-tests --test cpp_oracle
+TREEMAKER_CPP_ORACLE=tools/oracle/build/treemaker-oracle cargo test -p oracle-tests --test generated_families
+TREEMAKER_CORPUS_DIR=/path/to/private/corpus TREEMAKER_CPP_ORACLE=tools/oracle/build/treemaker-oracle cargo test -p oracle-tests --test corpus -- --nocapture
 wasm-pack build crates/treemaker-wasm --target bundler
 wasm-pack test --node crates/treemaker-wasm
 ```
+
+The default GitHub Actions workflow is intentionally native-only on Ubuntu:
+format, clippy, workspace tests, C++ oracle build, and Linux oracle parity.
+WASM builds remain an explicit local/release check rather than default CI.

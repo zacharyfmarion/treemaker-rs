@@ -30,6 +30,7 @@ can obtain the corresponding source code under the same GPL terms.
 | `third_party/treemaker-5.0.1` | TreeMaker GPL source distribution | Vendored as the behavioral baseline and C++ oracle source. Preserve notices. |
 | `third_party/treemaker-5.0.1/Source/tmModel/wnlib` | Unrestricted per TreeMaker's bundled license notice | The TreeMaker license file says the `wnlib` directory may be distributed with no restrictions. |
 | `tests/fixtures` | GPL-compatible TreeMaker fixture data | Fixtures are copied or generated from the TreeMaker parity workflow; keep them with the GPL source distribution. |
+| `tests/corpus` | Documentation only | Real-user corpora stay external unless redistribution permission is explicit. |
 | `crates/treemaker-wasm/LICENSE.txt` | GPL v2 text | Included so the generated wasm/npm package carries the license text. |
 | `crates/treemaker-wasm/pkg` | Generated GPL package output | Ignored by git; if published, publish with license/source availability. |
 | `target/` and other build outputs | Generated from GPL source | Ignored by git; distribution triggers GPL source obligations. |
@@ -80,6 +81,10 @@ generated from `cargo metadata` against the checked-in `Cargo.lock`.
 | `anyhow` | `1.0.102` | `MIT OR Apache-2.0` |
 | `async-trait` | `0.1.89` | `MIT OR Apache-2.0` |
 | `autocfg` | `1.5.0` | `Apache-2.0 OR MIT` |
+| `bit-set` | `0.8.0` | `Apache-2.0 OR MIT` |
+| `bit-vec` | `0.8.0` | `Apache-2.0 OR MIT` |
+| `bitflags` | `2.11.1` | `MIT OR Apache-2.0` |
+| `block-buffer` | `0.10.4` | `MIT OR Apache-2.0` |
 | `bumpalo` | `3.20.2` | `MIT OR Apache-2.0` |
 | `cast` | `0.3.0` | `MIT OR Apache-2.0` |
 | `cc` | `1.2.62` | `MIT OR Apache-2.0` |
@@ -89,15 +94,34 @@ generated from `cargo metadata` against the checked-in `Cargo.lock`.
 | `clap_derive` | `4.6.1` | `MIT OR Apache-2.0` |
 | `clap_lex` | `1.1.0` | `MIT OR Apache-2.0` |
 | `colorchoice` | `1.0.5` | `MIT OR Apache-2.0` |
+| `cpufeatures` | `0.2.17` | `MIT OR Apache-2.0` |
+| `crypto-common` | `0.1.7` | `MIT OR Apache-2.0` |
+| `digest` | `0.10.7` | `MIT OR Apache-2.0` |
+| `equivalent` | `1.0.2` | `Apache-2.0 OR MIT` |
+| `errno` | `0.3.14` | `MIT OR Apache-2.0` |
+| `fastrand` | `2.4.1` | `Apache-2.0 OR MIT` |
 | `find-msvc-tools` | `0.1.9` | `MIT OR Apache-2.0` |
+| `fnv` | `1.0.7` | `Apache-2.0 / MIT` |
+| `foldhash` | `0.1.5` | `Zlib` |
 | `futures-core` | `0.3.32` | `MIT OR Apache-2.0` |
 | `futures-task` | `0.3.32` | `MIT OR Apache-2.0` |
 | `futures-util` | `0.3.32` | `MIT OR Apache-2.0` |
+| `generic-array` | `0.14.7` | `MIT` |
+| `getrandom` | `0.3.4` | `MIT OR Apache-2.0` |
+| `getrandom` | `0.4.2` | `MIT OR Apache-2.0` |
+| `hashbrown` | `0.15.5` | `MIT OR Apache-2.0` |
+| `hashbrown` | `0.17.1` | `MIT OR Apache-2.0` |
 | `heck` | `0.5.0` | `MIT OR Apache-2.0` |
+| `id-arena` | `2.3.0` | `MIT/Apache-2.0` |
+| `indexmap` | `2.14.0` | `Apache-2.0 OR MIT` |
 | `is_terminal_polyfill` | `1.70.2` | `MIT OR Apache-2.0` |
 | `itoa` | `1.0.18` | `MIT OR Apache-2.0` |
 | `js-sys` | `0.3.98` | `MIT OR Apache-2.0` |
+| `leb128fmt` | `0.1.0` | `MIT OR Apache-2.0` |
+| `libc` | `0.2.186` | `MIT OR Apache-2.0` |
 | `libm` | `0.2.16` | `MIT` |
+| `linux-raw-sys` | `0.12.1` | `Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT` |
+| `log` | `0.4.29` | `MIT OR Apache-2.0` |
 | `memchr` | `2.8.0` | `Unlicense OR MIT` |
 | `minicov` | `0.3.8` | `Apache-2.0/MIT` |
 | `nu-ansi-term` | `0.50.3` | `MIT` |
@@ -106,24 +130,47 @@ generated from `cargo metadata` against the checked-in `Cargo.lock`.
 | `once_cell_polyfill` | `1.70.2` | `MIT OR Apache-2.0` |
 | `oorandom` | `11.1.5` | `MIT` |
 | `pin-project-lite` | `0.2.17` | `Apache-2.0 OR MIT` |
+| `ppv-lite86` | `0.2.21` | `MIT OR Apache-2.0` |
+| `prettyplease` | `0.2.37` | `MIT OR Apache-2.0` |
 | `proc-macro2` | `1.0.106` | `MIT OR Apache-2.0` |
+| `proptest` | `1.11.0` | `MIT OR Apache-2.0` |
+| `quick-error` | `1.2.3` | `MIT/Apache-2.0` |
 | `quote` | `1.0.45` | `MIT OR Apache-2.0` |
+| `r-efi` | `5.3.0` | `MIT OR Apache-2.0 OR LGPL-2.1-or-later` |
+| `r-efi` | `6.0.0` | `MIT OR Apache-2.0 OR LGPL-2.1-or-later` |
+| `rand` | `0.9.4` | `MIT OR Apache-2.0` |
+| `rand_chacha` | `0.9.0` | `MIT OR Apache-2.0` |
+| `rand_core` | `0.9.5` | `MIT OR Apache-2.0` |
+| `rand_xorshift` | `0.4.0` | `MIT OR Apache-2.0` |
+| `regex-syntax` | `0.8.10` | `MIT OR Apache-2.0` |
+| `rustix` | `1.1.4` | `Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT` |
 | `rustversion` | `1.0.22` | `MIT OR Apache-2.0` |
+| `rusty-fork` | `0.3.1` | `MIT/Apache-2.0` |
 | `same-file` | `1.0.6` | `Unlicense/MIT` |
+| `semver` | `1.0.28` | `MIT OR Apache-2.0` |
 | `serde` | `1.0.228` | `MIT OR Apache-2.0` |
 | `serde-wasm-bindgen` | `0.6.5` | `MIT` |
 | `serde_core` | `1.0.228` | `MIT OR Apache-2.0` |
 | `serde_derive` | `1.0.228` | `MIT OR Apache-2.0` |
 | `serde_json` | `1.0.149` | `MIT OR Apache-2.0` |
+| `sha2` | `0.10.9` | `MIT OR Apache-2.0` |
 | `shlex` | `1.3.0` | `MIT OR Apache-2.0` |
 | `slab` | `0.4.12` | `MIT` |
 | `strsim` | `0.11.1` | `MIT` |
 | `syn` | `2.0.117` | `MIT OR Apache-2.0` |
+| `tempfile` | `3.27.0` | `MIT OR Apache-2.0` |
 | `thiserror` | `2.0.18` | `MIT OR Apache-2.0` |
 | `thiserror-impl` | `2.0.18` | `MIT OR Apache-2.0` |
+| `typenum` | `1.20.0` | `MIT OR Apache-2.0` |
+| `unarray` | `0.1.4` | `MIT OR Apache-2.0` |
 | `unicode-ident` | `1.0.24` | `(MIT OR Apache-2.0) AND Unicode-3.0` |
+| `unicode-xid` | `0.2.6` | `MIT OR Apache-2.0` |
 | `utf8parse` | `0.2.2` | `Apache-2.0 OR MIT` |
+| `version_check` | `0.9.5` | `MIT/Apache-2.0` |
+| `wait-timeout` | `0.2.1` | `MIT/Apache-2.0` |
 | `walkdir` | `2.5.0` | `Unlicense/MIT` |
+| `wasip2` | `1.0.3+wasi-0.2.9` | `Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT` |
+| `wasip3` | `0.4.0+wasi-0.3.0-rc-2026-01-06` | `Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT` |
 | `wasm-bindgen` | `0.2.121` | `MIT OR Apache-2.0` |
 | `wasm-bindgen-futures` | `0.4.71` | `MIT OR Apache-2.0` |
 | `wasm-bindgen-macro` | `0.2.121` | `MIT OR Apache-2.0` |
@@ -132,10 +179,23 @@ generated from `cargo metadata` against the checked-in `Cargo.lock`.
 | `wasm-bindgen-test` | `0.3.71` | `MIT OR Apache-2.0` |
 | `wasm-bindgen-test-macro` | `0.3.71` | `MIT OR Apache-2.0` |
 | `wasm-bindgen-test-shared` | `0.2.121` | `MIT OR Apache-2.0` |
+| `wasm-encoder` | `0.244.0` | `Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT` |
+| `wasm-metadata` | `0.244.0` | `Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT` |
+| `wasmparser` | `0.244.0` | `Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT` |
 | `winapi-util` | `0.1.11` | `Unlicense OR MIT` |
 | `windows-link` | `0.2.1` | `MIT OR Apache-2.0` |
 | `windows-sys` | `0.61.2` | `MIT OR Apache-2.0` |
+| `wit-bindgen` | `0.51.0` | `Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT` |
+| `wit-bindgen` | `0.57.1` | `Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT` |
+| `wit-bindgen-core` | `0.51.0` | `Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT` |
+| `wit-bindgen-rust` | `0.51.0` | `Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT` |
+| `wit-bindgen-rust-macro` | `0.51.0` | `Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT` |
+| `wit-component` | `0.244.0` | `Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT` |
+| `wit-parser` | `0.244.0` | `Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT` |
+| `zerocopy` | `0.8.48` | `BSD-2-Clause OR Apache-2.0 OR MIT` |
+| `zerocopy-derive` | `0.8.48` | `BSD-2-Clause OR Apache-2.0 OR MIT` |
 | `zmij` | `1.0.21` | `MIT` |
+
 
 ## Source References
 

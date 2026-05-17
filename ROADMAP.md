@@ -244,3 +244,42 @@ Done when:
 - `Tree::cp_status_report()` reports the same status and bad-part counts as the
   C++ oracle for every checked-in fixture summary.
 - CLI and wasm tests cover the diagnostic report surface.
+
+## Phase 8: Corpus, CI, And Stress Confidence
+
+Status: planned. The current parity suite is strong for checked-in upstream
+fixtures and deterministic generated examples, but not yet broad enough to
+claim every historical TreeMaker file and edge case works. This phase keeps
+large/user corpora external, adds a lean Linux oracle CI path, expands
+deterministic generated families, and adds bounded parser/model stress tests.
+
+Goal: harden confidence in the completed TreeMaker 5.0.1 ALM port without
+checking private or large user files into git.
+
+Work items:
+
+- Add Ubuntu GitHub Actions CI for native Rust checks and the C++ ALM oracle.
+- Refactor oracle-test comparison helpers so generated and corpus tests reuse
+  the same detailed Rust/C++ assertions as the official fixture tests.
+- Add deterministic generated tree-family oracle tests for deeper branching,
+  many terminals, symmetry, pinned/conditioned parts, border/corner constraints,
+  angle constraints, and intentionally diagnostic CP states.
+- Add a corpus CLI and gated integration test that recursively scans external
+  `.tmd`, `.tmd4`, and `.tmd5` directories, de-duplicates by SHA-256, parses
+  with Rust, round-trips through canonical v5, and optionally compares C++
+  oracle summaries.
+- Add bounded fuzz/stress tests for valid-by-construction trees and malformed
+  fixture mutations.
+- Document corpus handling, CI commands, added dependencies, and licensing
+  implications for any new crates.
+
+Done when:
+
+- Ubuntu CI runs `cargo fmt --check`, clippy, workspace tests, C++ oracle build,
+  and oracle parity tests.
+- Generated family tests compare detailed polygon, vertex, crease, facet,
+  order, color, fold, and `CPStatus` data against the C++ oracle.
+- The corpus command and `TREEMAKER_CORPUS_DIR`-gated test can validate a local
+  private corpus without committing corpus files.
+- Stress tests are deterministic and CI-bounded.
+- The full local validation set in the README passes.

@@ -9,6 +9,8 @@ OUT="$BUILD/treemaker-oracle"
 mkdir -p "$BUILD"
 
 c++ -std=gnu++98 -O2 \
+  -include stddef.h \
+  -include string.h \
   -I"$SRC" \
   -I"$SRC/tmModel" \
   -I"$SRC/tmModel/tmPtrClasses" \

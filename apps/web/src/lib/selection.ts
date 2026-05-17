@@ -1,7 +1,15 @@
 import type { Selection, TreeProject } from './sampleProject';
 
 export function emptyMultiSelection(): Extract<Selection, { kind: 'multi' }> {
-  return { kind: 'multi', nodes: [], edges: [], paths: [], creases: [], facets: [] };
+  return {
+    kind: 'multi',
+    nodes: [],
+    edges: [],
+    paths: [],
+    creases: [],
+    facets: [],
+    conditions: [],
+  };
 }
 
 function uniqueSorted(ids: number[]): number[] {
@@ -38,6 +46,12 @@ export function selectedFacetIds(selection: Selection): number[] {
   return [];
 }
 
+export function selectedConditionIds(selection: Selection): number[] {
+  if (selection.kind === 'condition') return [selection.id];
+  if (selection.kind === 'multi') return selection.conditions;
+  return [];
+}
+
 export function isNodeSelected(selection: Selection, id: number): boolean {
   return selectedNodeIds(selection).includes(id);
 }
@@ -56,6 +70,10 @@ export function isCreaseSelected(selection: Selection, id: number): boolean {
 
 export function isFacetSelected(selection: Selection, id: number): boolean {
   return selectedFacetIds(selection).includes(id);
+}
+
+export function isConditionSelected(selection: Selection, id: number): boolean {
+  return selectedConditionIds(selection).includes(id);
 }
 
 export function selectedEditablePartCount(selection: Selection): number {
@@ -108,7 +126,8 @@ export function selectionSize(selection: Selection): number {
         selection.edges.length +
         selection.paths.length +
         selection.creases.length +
-        selection.facets.length
+        selection.facets.length +
+        selection.conditions.length
       );
     default:
       return 1;
@@ -123,6 +142,7 @@ export function selectionSummary(selection: Selection): string {
     selection.paths.length ? `${selection.paths.length} paths` : '',
     selection.creases.length ? `${selection.creases.length} creases` : '',
     selection.facets.length ? `${selection.facets.length} facets` : '',
+    selection.conditions.length ? `${selection.conditions.length} conditions` : '',
   ].filter(Boolean);
   return parts.join(', ') || 'selection';
 }
@@ -135,6 +155,7 @@ export function selectEverything(project: TreeProject): Selection {
     paths: project.paths.map((path) => path.id),
     creases: project.creases.map((crease) => crease.id),
     facets: project.facets.map((facet) => facet.id),
+    conditions: project.conditions.map((condition) => condition.id),
   };
   return selectionSize(selection) === 0 ? { kind: 'tree' } : selection;
 }

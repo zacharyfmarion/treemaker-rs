@@ -259,7 +259,7 @@ Done when:
 
 ### Phase 9: Conditions And Advanced Controls
 
-Status: not started.
+Status: started.
 
 Goal: expose TreeMaker constraints without recreating the old menu-heavy UX.
 
@@ -270,6 +270,20 @@ Work items:
   paired/symmetric nodes, active paths, angle constraints, fixed edge lengths,
   and same-strain edges.
 - Add condition diagnostics and selection affordances.
+
+Implemented or started:
+
+- Conditions pane in the default Dockview layout.
+- Paper and symmetry controls backed by engine edits.
+- Design-pane symmetry and conditioned-part overlays.
+- Quick-add controls for the common node, edge, and path conditions.
+- Condition list, selection, remove, clear, and feasibility display.
+
+Remaining:
+
+- Per-condition editing forms.
+- Remove condition commands scoped to selected nodes, edges, and paths.
+- More detailed diagnostics for infeasible or over-constrained systems.
 
 Done when:
 

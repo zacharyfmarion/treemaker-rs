@@ -79,11 +79,13 @@ pub fn setup_menu(app: &App) -> Result<(), Box<dyn std::error::Error>> {
 
     let view_design = MenuItemBuilder::with_id("view.design", "Design").build(app)?;
     let view_cp = MenuItemBuilder::with_id("view.creasePattern", "Crease Pattern").build(app)?;
+    let view_conditions = MenuItemBuilder::with_id("view.conditions", "Conditions").build(app)?;
     let view_reset = MenuItemBuilder::with_id("view.resetLayout", "Reset Layout").build(app)?;
 
     let view_menu = SubmenuBuilder::new(app, "View")
         .item(&view_design)
         .item(&view_cp)
+        .item(&view_conditions)
         .separator()
         .item(&view_reset)
         .build()?;

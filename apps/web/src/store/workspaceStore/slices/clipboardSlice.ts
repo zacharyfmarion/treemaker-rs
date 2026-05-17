@@ -190,7 +190,15 @@ export const createClipboardSlice: WorkspaceSliceCreator<ClipboardSlice> = (set,
         selection:
           pastedNodes.length === 1
             ? { kind: 'node', id: pastedNodes[0] }
-            : { kind: 'multi', nodes: pastedNodes, edges: [], paths: [], creases: [], facets: [] },
+            : {
+                kind: 'multi',
+                nodes: pastedNodes,
+                edges: [],
+                paths: [],
+                creases: [],
+                facets: [],
+                conditions: [],
+              },
         status: statusAfterEdit(latestSnapshot),
         dirty: true,
         error: null,

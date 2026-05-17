@@ -197,6 +197,8 @@ Done when:
 
 ## Phase 6: Conditions And Symmetry
 
+Status: started.
+
 Priority: high for serious TreeMaker users.
 
 Goal: expose TreeMaker constraints as clear, inspectable design rules.
@@ -220,6 +222,22 @@ Features:
 - Condition list panel.
 - Condition inspector for every condition type.
 - Condition overlays and feasibility diagnostics.
+
+Implemented or started:
+
+- Paper width/height controls.
+- Symmetry enablement, location, angle controls, and design overlay.
+- Condition creation for fixed nodes, paper edge/corner nodes, symmetry-line
+  nodes, paired nodes, collinear nodes, fixed edge length, same-strain edges,
+  active paths, fixed path angles, and quantized path angles.
+- Condition list with selection, feasibility state, and removal.
+- Conditioned node, edge, and path overlays in the design pane.
+
+Remaining:
+
+- Dedicated inspector editors for every existing condition type.
+- Remove-by-selected-node/edge/path commands.
+- Richer feasibility diagnostics tied to optimizer warnings.
 
 Done when:
 

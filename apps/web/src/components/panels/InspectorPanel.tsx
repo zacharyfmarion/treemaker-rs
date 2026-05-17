@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Activity, Circle, GitBranch, MousePointer2, Square, Waypoints } from 'lucide-react';
 import { formatNumber } from '../../lib/geometry';
+import { conditionDetail, conditionTitle } from '../../lib/conditionLabels';
 import { selectedNodeIds, selectionSummary } from '../../lib/selection';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 
@@ -22,6 +23,10 @@ export function InspectorPanel() {
     selection.kind === 'crease' ? project.creases.find((crease) => crease.id === selection.id) : null;
   const selectedFacet =
     selection.kind === 'facet' ? project.facets.find((facet) => facet.id === selection.id) : null;
+  const selectedCondition =
+    selection.kind === 'condition'
+      ? project.conditions.find((condition) => condition.id === selection.id)
+      : null;
   const selectedPath =
     selection.kind === 'path' ? project.paths.find((path) => path.id === selection.id) : null;
   const selectedNodes = selectedNodeIds(selection);
@@ -58,6 +63,7 @@ export function InspectorPanel() {
             />
             <Row label="Leaf" value={selectedNode.isLeaf ? 'Yes' : 'No'} />
             <Row label="Pinned" value={selectedNode.isPinned ? 'Yes' : 'No'} />
+            <Row label="Conditioned" value={selectedNode.isConditioned ? 'Yes' : 'No'} />
           </>
         )}
         {selectedEdge && (
@@ -77,6 +83,7 @@ export function InspectorPanel() {
               onCommit={(length) => void updateEdge(selectedEdge.id, { length })}
             />
             <Row label="Strain" value={formatNumber(selectedEdge.strain)} />
+            <Row label="Conditioned" value={selectedEdge.isConditioned ? 'Yes' : 'No'} />
             <NumberRow
               label="Stiffness"
               value={selectedEdge.stiffness}
@@ -100,6 +107,7 @@ export function InspectorPanel() {
             <Row label="Active" value={selectedPath.isActive ? 'Yes' : 'No'} />
             <Row label="Feasible" value={selectedPath.isFeasible ? 'Yes' : 'No'} />
             <Row label="Border" value={selectedPath.isBorder ? 'Yes' : 'No'} />
+            <Row label="Conditioned" value={selectedPath.isConditioned ? 'Yes' : 'No'} />
           </>
         )}
         {selectedFacet && (
@@ -107,6 +115,14 @@ export function InspectorPanel() {
             <div className="inspector-heading"><Activity size={15} /> Facet {selectedFacet.id}</div>
             <Row label="Vertices" value={String(selectedFacet.vertices.length)} />
             <Row label="Color" value={selectedFacet.color} />
+          </>
+        )}
+        {selectedCondition && (
+          <>
+            <div className="inspector-heading"><Activity size={15} /> Condition {selectedCondition.id}</div>
+            <Row label="Type" value={conditionTitle(selectedCondition.kind)} />
+            <Row label="Detail" value={conditionDetail(selectedCondition.kind)} />
+            <Row label="Feasible" value={selectedCondition.isFeasible ? 'Yes' : 'No'} />
           </>
         )}
         {selection.kind === 'multi' && (
@@ -134,6 +150,7 @@ export function InspectorPanel() {
             <Row label="Nodes" value={String(project.nodes.length)} />
             <Row label="Edges" value={String(project.edges.length)} />
             <Row label="Creases" value={String(project.creases.length)} />
+            <Row label="Conditions" value={String(project.conditions.length)} />
           </>
         )}
       </div>

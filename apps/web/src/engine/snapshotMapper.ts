@@ -55,6 +55,8 @@ export function projectFromSnapshot(snapshot: TreeSnapshot, titleOverride?: stri
     paper: {
       width: snapshot.paper.width,
       height: snapshot.paper.height,
+      symLoc: snapshot.paper.sym_loc,
+      symAngle: snapshot.paper.sym_angle,
     },
     scale: snapshot.paper.scale,
     hasSymmetry: snapshot.paper.has_symmetry,
@@ -66,6 +68,7 @@ export function projectFromSnapshot(snapshot: TreeSnapshot, titleOverride?: stri
         loc: node.loc,
         isLeaf: node.is_leaf,
         isPinned: node.is_pinned,
+        isConditioned: node.is_conditioned,
       })),
     edges: snapshot.edges.map((edge) => ({
       id: edge.id,
@@ -74,6 +77,7 @@ export function projectFromSnapshot(snapshot: TreeSnapshot, titleOverride?: stri
       length: edge.length,
       strain: edge.strain,
       stiffness: edge.stiffness,
+      isConditioned: edge.is_conditioned,
     })),
     paths: snapshot.paths
       .filter((path) => path.is_leaf && path.nodes.length >= 2)
@@ -83,6 +87,7 @@ export function projectFromSnapshot(snapshot: TreeSnapshot, titleOverride?: stri
         isActive: path.is_active,
         isFeasible: path.is_feasible,
         isBorder: path.is_border,
+        isConditioned: path.is_conditioned,
       })),
     creases: snapshot.creases.flatMap((crease) => {
       const a = vertexLocs.get(crease.vertices[0]);
@@ -111,5 +116,10 @@ export function projectFromSnapshot(snapshot: TreeSnapshot, titleOverride?: stri
         },
       ];
     }),
+    conditions: snapshot.conditions.map((condition) => ({
+      id: condition.index,
+      isFeasible: condition.is_feasible,
+      kind: condition.kind,
+    })),
   };
 }

@@ -26,6 +26,7 @@ describe('selection helpers', () => {
       paths: [],
       creases: [],
       facets: [],
+      conditions: [],
     });
   });
 
@@ -38,5 +39,6 @@ describe('selection helpers', () => {
     expect(selection.paths).toHaveLength(3);
     expect(selection.creases).toHaveLength(6);
     expect(selection.facets).toHaveLength(3);
+    expect(selection.conditions).toHaveLength(0);
   });
 });

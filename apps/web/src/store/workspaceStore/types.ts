@@ -1,5 +1,6 @@
 import type { StateCreator } from 'zustand';
 import type {
+  ConditionKind,
   OptimizationReport,
   TreeEdit,
   WasmErrorEnvelope,
@@ -103,6 +104,20 @@ export interface EditingSliceActions {
 
 export type EditingSlice = EditingSliceState & EditingSliceActions;
 
+export interface ConditionSliceActions {
+  updatePaper: (update: { width?: number; height?: number }) => Promise<void>;
+  setSymmetry: (update: {
+    hasSymmetry?: boolean;
+    symLoc?: Point;
+    symAngle?: number;
+  }) => Promise<void>;
+  addCondition: (kind: ConditionKind) => Promise<void>;
+  deleteCondition: (id: number) => Promise<void>;
+  clearConditions: () => Promise<void>;
+}
+
+export type ConditionSlice = ConditionSliceActions;
+
 export interface ClipboardNode {
   sourceId: number;
   label: string;
@@ -148,7 +163,13 @@ export interface CreasePatternSliceActions {
 
 export type CreasePatternSlice = CreasePatternSliceState & CreasePatternSliceActions;
 
-export type WorkspaceState = ProjectSlice & HistorySlice & EditingSlice & ClipboardSlice & CreasePatternSlice;
+export type WorkspaceState =
+  ProjectSlice &
+  HistorySlice &
+  EditingSlice &
+  ClipboardSlice &
+  ConditionSlice &
+  CreasePatternSlice;
 
 export type WorkspaceSliceCreator<T> = StateCreator<
   WorkspaceState,

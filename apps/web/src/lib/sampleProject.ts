@@ -1,4 +1,5 @@
 import type { Point } from './geometry';
+import type { ConditionKind } from '../engine/types';
 
 export type Selection =
   | { kind: 'tree' }
@@ -7,6 +8,7 @@ export type Selection =
   | { kind: 'path'; id: number }
   | { kind: 'crease'; id: number }
   | { kind: 'facet'; id: number }
+  | { kind: 'condition'; id: number }
   | {
       kind: 'multi';
       nodes: number[];
@@ -14,6 +16,7 @@ export type Selection =
       paths: number[];
       creases: number[];
       facets: number[];
+      conditions: number[];
     };
 
 export type AppStatus =
@@ -34,6 +37,7 @@ export interface TreeNode {
   loc: Point;
   isLeaf: boolean;
   isPinned: boolean;
+  isConditioned: boolean;
 }
 
 export interface TreeEdge {
@@ -43,6 +47,7 @@ export interface TreeEdge {
   length: number;
   strain: number;
   stiffness: number;
+  isConditioned: boolean;
 }
 
 export interface TreePath {
@@ -51,6 +56,7 @@ export interface TreePath {
   isActive: boolean;
   isFeasible: boolean;
   isBorder: boolean;
+  isConditioned: boolean;
 }
 
 export interface CreaseLine {
@@ -66,9 +72,15 @@ export interface FacetShape {
   color: 'white' | 'color' | 'unset';
 }
 
+export interface TreeCondition {
+  id: number;
+  isFeasible: boolean;
+  kind: ConditionKind;
+}
+
 export interface TreeProject {
   title: string;
-  paper: { width: number; height: number };
+  paper: { width: number; height: number; symLoc: Point; symAngle: number };
   scale: number;
   hasSymmetry: boolean;
   nodes: TreeNode[];
@@ -76,12 +88,13 @@ export interface TreeProject {
   paths: TreePath[];
   creases: CreaseLine[];
   facets: FacetShape[];
+  conditions: TreeCondition[];
 }
 
 export function createEmptyProject(): TreeProject {
   return {
     title: 'Untitled',
-    paper: { width: 1, height: 1 },
+    paper: { width: 1, height: 1, symLoc: { x: 0.5, y: 0.5 }, symAngle: 90 },
     scale: 0.1,
     hasSymmetry: false,
     nodes: [],
@@ -89,30 +102,59 @@ export function createEmptyProject(): TreeProject {
     paths: [],
     creases: [],
     facets: [],
+    conditions: [],
   };
 }
 
 export function createSampleProject(): TreeProject {
   return {
     title: 'Untitled tree',
-    paper: { width: 1, height: 1 },
+    paper: { width: 1, height: 1, symLoc: { x: 0.5, y: 0.5 }, symAngle: 90 },
     scale: 0.1,
     hasSymmetry: false,
     nodes: [
-      { id: 1, label: 'root', loc: { x: 0.5, y: 0.46 }, isLeaf: false, isPinned: false },
-      { id: 2, label: 't0', loc: { x: 0.2, y: 0.2 }, isLeaf: true, isPinned: false },
-      { id: 3, label: 't1', loc: { x: 0.82, y: 0.22 }, isLeaf: true, isPinned: false },
-      { id: 4, label: 't2', loc: { x: 0.5, y: 0.82 }, isLeaf: true, isPinned: false },
+      {
+        id: 1,
+        label: 'root',
+        loc: { x: 0.5, y: 0.46 },
+        isLeaf: false,
+        isPinned: false,
+        isConditioned: false,
+      },
+      {
+        id: 2,
+        label: 't0',
+        loc: { x: 0.2, y: 0.2 },
+        isLeaf: true,
+        isPinned: false,
+        isConditioned: false,
+      },
+      {
+        id: 3,
+        label: 't1',
+        loc: { x: 0.82, y: 0.22 },
+        isLeaf: true,
+        isPinned: false,
+        isConditioned: false,
+      },
+      {
+        id: 4,
+        label: 't2',
+        loc: { x: 0.5, y: 0.82 },
+        isLeaf: true,
+        isPinned: false,
+        isConditioned: false,
+      },
     ],
     edges: [
-      { id: 1, label: 'e1', nodes: [1, 2], length: 1, strain: 0, stiffness: 1 },
-      { id: 2, label: 'e2', nodes: [1, 3], length: 1, strain: 0, stiffness: 1 },
-      { id: 3, label: 'e3', nodes: [1, 4], length: 1, strain: 0, stiffness: 1 },
+      { id: 1, label: 'e1', nodes: [1, 2], length: 1, strain: 0, stiffness: 1, isConditioned: false },
+      { id: 2, label: 'e2', nodes: [1, 3], length: 1, strain: 0, stiffness: 1, isConditioned: false },
+      { id: 3, label: 'e3', nodes: [1, 4], length: 1, strain: 0, stiffness: 1, isConditioned: false },
     ],
     paths: [
-      { id: 1, nodes: [2, 3], isActive: true, isFeasible: true, isBorder: true },
-      { id: 2, nodes: [3, 4], isActive: true, isFeasible: true, isBorder: true },
-      { id: 3, nodes: [2, 4], isActive: true, isFeasible: true, isBorder: true },
+      { id: 1, nodes: [2, 3], isActive: true, isFeasible: true, isBorder: true, isConditioned: false },
+      { id: 2, nodes: [3, 4], isActive: true, isFeasible: true, isBorder: true, isConditioned: false },
+      { id: 3, nodes: [2, 4], isActive: true, isFeasible: true, isBorder: true, isConditioned: false },
     ],
     facets: [
       {
@@ -199,5 +241,6 @@ export function createSampleProject(): TreeProject {
         kind: 'pseudohinge',
       },
     ],
+    conditions: [],
   };
 }

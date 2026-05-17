@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { createCreasePatternSlice } from './slices/creasePatternSlice';
 import { createClipboardSlice } from './slices/clipboardSlice';
+import { createConditionSlice } from './slices/conditionSlice';
 import { createEditingSlice } from './slices/editingSlice';
 import { createHistorySlice } from './slices/historySlice';
 import { createProjectSlice } from './slices/projectSlice';
@@ -14,6 +15,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       ...createHistorySlice(...args),
       ...createEditingSlice(...args),
       ...createClipboardSlice(...args),
+      ...createConditionSlice(...args),
       ...createCreasePatternSlice(...args),
     }),
     { name: 'treemaker-workspace' }

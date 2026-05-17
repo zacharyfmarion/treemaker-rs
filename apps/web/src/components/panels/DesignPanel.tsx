@@ -48,6 +48,14 @@ export function DesignPanel() {
 
   const findNode = (id: number) => project.nodes.find((node) => node.id === id);
   const displayLoc = (id: number, loc: Point) => (dragging?.id === id ? dragging.loc : loc);
+  const symmetryCenter = paperToSvg(project.paper.symLoc, PAPER_RECT);
+  const symmetryAngle = (project.paper.symAngle * Math.PI) / 180;
+  const symmetryLine = {
+    x1: symmetryCenter.x - Math.cos(symmetryAngle) * VIEWBOX,
+    y1: symmetryCenter.y + Math.sin(symmetryAngle) * VIEWBOX,
+    x2: symmetryCenter.x + Math.cos(symmetryAngle) * VIEWBOX,
+    y2: symmetryCenter.y - Math.sin(symmetryAngle) * VIEWBOX,
+  };
 
   const eventToPaper = (event: PointerEvent): Point => {
     const svg = svgRef.current;
@@ -174,6 +182,15 @@ export function DesignPanel() {
             height={PAPER_RECT.height}
             onPointerDown={onPaperPointerDown}
           />
+          {project.hasSymmetry && (
+            <line
+              className="symmetry-line"
+              x1={symmetryLine.x1}
+              y1={symmetryLine.y1}
+              x2={symmetryLine.x2}
+              y2={symmetryLine.y2}
+            />
+          )}
           {project.paths.map((path) => {
             const a = findNode(path.nodes[0]);
             const b = findNode(path.nodes[1]);
@@ -185,11 +202,12 @@ export function DesignPanel() {
               : path.isFeasible
                 ? 'tree-path tree-path--feasible'
                 : 'tree-path tree-path--bad';
+            const conditioned = path.isConditioned ? 'tree-path--conditioned' : '';
             const active = isPathSelected(selection, path.id);
             return (
               <line
                 key={path.id}
-                className={`${className} ${active ? 'tree-path--selected' : ''}`}
+                className={`${className} ${conditioned} ${active ? 'tree-path--selected' : ''}`}
                 x1={p1.x}
                 y1={p1.y}
                 x2={p2.x}
@@ -218,7 +236,11 @@ export function DesignPanel() {
                 );
               }}>
                 <line
-                  className={active ? 'tree-edge tree-edge--selected' : 'tree-edge'}
+                  className={[
+                    'tree-edge',
+                    edge.isConditioned ? 'tree-edge--conditioned' : '',
+                    active ? 'tree-edge--selected' : '',
+                  ].join(' ')}
                   x1={p1.x}
                   y1={p1.y}
                   x2={p2.x}
@@ -257,6 +279,7 @@ export function DesignPanel() {
                 <circle
                   className={[
                     'tree-node',
+                    node.isConditioned ? 'tree-node--conditioned' : '',
                     active ? 'tree-node--selected' : '',
                     pendingEdge ? 'tree-node--pending-edge' : '',
                   ].join(' ')}

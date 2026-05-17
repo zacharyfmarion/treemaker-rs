@@ -21,6 +21,7 @@ export const MENU_ACTION_IDS = [
   'edit.deselectAll',
   'view.design',
   'view.creasePattern',
+  'view.conditions',
   'view.resetLayout',
   'optimize.scale',
   'cp.build',
@@ -137,6 +138,9 @@ export function createMenuActionHandler(deps: MenuActionDependencies) {
         return true;
       case 'view.creasePattern':
         deps.layout.activatePanel('crease-pattern');
+        return true;
+      case 'view.conditions':
+        deps.layout.activatePanel('conditions');
         return true;
       case 'view.resetLayout':
         deps.layout.resetLayout();

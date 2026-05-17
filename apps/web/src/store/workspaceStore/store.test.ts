@@ -18,6 +18,8 @@ describe('workspace store slices', () => {
     expect(state.saveProject).toBeTypeOf('function');
     expect(state.undo).toBeTypeOf('function');
     expect(state.copySelection).toBeTypeOf('function');
+    expect(state.updatePaper).toBeTypeOf('function');
+    expect(state.addCondition).toBeTypeOf('function');
     expect(state.addNodeAt).toBeTypeOf('function');
     expect(state.buildCreasePattern).toBeTypeOf('function');
   });

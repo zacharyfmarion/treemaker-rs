@@ -33,7 +33,7 @@ export function DiagnosticsPanel() {
           <Metric label="Nodes" value={project.nodes.length} />
           <Metric label="Edges" value={project.edges.length} />
           <Metric label="Paths" value={project.paths.length} />
-          <Metric label="Scale" value={formatNumber(project.scale, 3)} />
+          <Metric label="Conditions" value={project.conditions.length} />
         </div>
         <div className="status-row" data-tone={error ? 'bad' : engineReady ? 'good' : 'warn'}>
           {engineIcon}

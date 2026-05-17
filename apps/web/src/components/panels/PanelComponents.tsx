@@ -5,6 +5,7 @@ import { InspectorPanel } from './InspectorPanel';
 import { CreasePatternPanel } from './CreasePatternPanel';
 import { DiagnosticsPanel } from './DiagnosticsPanel';
 import { FilesPanel } from './FilesPanel';
+import { ConditionsPanel } from './ConditionsPanel';
 
 export const panelComponents: Record<string, FC<IDockviewPanelProps>> = {
   design: DesignPanel,
@@ -12,4 +13,5 @@ export const panelComponents: Record<string, FC<IDockviewPanelProps>> = {
   'crease-pattern': CreasePatternPanel,
   diagnostics: DiagnosticsPanel,
   files: FilesPanel,
+  conditions: ConditionsPanel,
 };

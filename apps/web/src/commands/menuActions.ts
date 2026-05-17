@@ -25,6 +25,12 @@ export type MenuActionId = (typeof MENU_ACTION_IDS)[number];
 
 export interface WorkspaceCommands {
   createNewProject(): Promise<void>;
+  openProject(fileService?: FileService): Promise<boolean>;
+  saveProject(fileService?: FileService): Promise<boolean>;
+  saveProjectAs(fileService?: FileService): Promise<boolean>;
+  exportV4(fileService?: FileService): Promise<boolean>;
+  exportSvg(fileService?: FileService): Promise<boolean>;
+  exportPng(fileService?: FileService): Promise<boolean>;
   deleteSelection(): Promise<void>;
   optimizeScale(): Promise<void>;
   buildCreasePattern(): Promise<void>;
@@ -57,10 +63,6 @@ export function isMenuActionId(id: string): id is MenuActionId {
   return (MENU_ACTION_IDS as readonly string[]).includes(id);
 }
 
-function logFileResult(message: string): void {
-  console.info(message);
-}
-
 export function createMenuActionHandler(deps: MenuActionDependencies) {
   return async (id: string): Promise<boolean> => {
     if (!isMenuActionId(id)) {
@@ -70,9 +72,20 @@ export function createMenuActionHandler(deps: MenuActionDependencies) {
 
     const fileCommand = FILE_ACTIONS[id];
     if (fileCommand) {
-      const result = await deps.fileService.run(fileCommand);
-      logFileResult(result.message);
-      return result.status === 'handled';
+      switch (fileCommand) {
+        case 'openProject':
+          return deps.workspace.openProject(deps.fileService);
+        case 'saveProject':
+          return deps.workspace.saveProject(deps.fileService);
+        case 'saveProjectAs':
+          return deps.workspace.saveProjectAs(deps.fileService);
+        case 'exportV4':
+          return deps.workspace.exportV4(deps.fileService);
+        case 'exportSvg':
+          return deps.workspace.exportSvg(deps.fileService);
+        case 'exportPng':
+          return deps.workspace.exportPng(deps.fileService);
+      }
     }
 
     switch (id) {

@@ -16,6 +16,7 @@ import { Button } from './components/ui/Button';
 import { panelComponents } from './components/panels/PanelComponents';
 import { handleMenuAction } from './commands/menuActions';
 import { useTauriMenuListener } from './menus/tauriMenuListener';
+import { isDesktopRuntime } from './platform/runtime';
 import { applyWindowTitle, formatWindowTitle } from './platform/windowTitle';
 import { applyDefaultLayout, useLayoutStore } from './store/layoutStore';
 import { useWorkspaceStore } from './store/workspaceStore';
@@ -26,6 +27,7 @@ function Toolbar() {
   const engineReady = useWorkspaceStore((state) => state.engineReady);
   const error = useWorkspaceStore((state) => state.error);
   const dirty = useWorkspaceStore((state) => state.dirty);
+  const projectMessage = useWorkspaceStore((state) => state.projectMessage);
   const busy =
     status === 'loading_engine' ||
     status === 'optimizing' ||
@@ -42,6 +44,7 @@ function Toolbar() {
           {status.replaceAll('_', ' ')}
         </span>
         {dirty && <span className="toolbar__dirty">Unsaved</span>}
+        {projectMessage && <span className="toolbar__message">{projectMessage}</span>}
         {error && (
           <span className="toolbar__error" title={error.message}>
             {error.message}
@@ -121,6 +124,41 @@ export default function App() {
     const title = formatWindowTitle({ projectTitle: project.title, dirty });
     void applyWindowTitle(title);
   }, [dirty, project.title]);
+
+  useEffect(() => {
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!useWorkspaceStore.getState().dirty) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, []);
+
+  useEffect(() => {
+    let unlisten: (() => void) | null = null;
+
+    if (!isDesktopRuntime()) return undefined;
+    import('@tauri-apps/api/window')
+      .then(({ getCurrentWindow }) =>
+        getCurrentWindow().onCloseRequested((event) => {
+          if (!useWorkspaceStore.getState().dirty) return;
+          if (!window.confirm('Discard unsaved changes?')) {
+            event.preventDefault();
+          }
+        })
+      )
+      .then((dispose) => {
+        unlisten = dispose;
+      })
+      .catch((error) => {
+        console.warn('Failed to register Tauri close guard', error);
+      });
+
+    return () => {
+      unlisten?.();
+    };
+  }, []);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {

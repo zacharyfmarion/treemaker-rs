@@ -2,11 +2,14 @@ import { expose } from 'comlink';
 import init, {
   apply_edit,
   build_crease_pattern,
+  export_v4,
   free_tree,
+  load_tmd,
   new_design,
   optimize_edges,
   optimize_scale,
   optimize_strain,
+  save_tmd5,
   tree_snapshot,
 } from '../generated/treemaker-wasm/treemaker_wasm';
 import type {
@@ -53,6 +56,9 @@ const api = {
   async newDesign(config?: { paper_width?: number; paper_height?: number }): Promise<number> {
     return call(() => new_design(config ?? null));
   },
+  async loadTmd(text: string): Promise<number> {
+    return call(() => load_tmd(text));
+  },
   async snapshot(handle: number): Promise<TreeSnapshot> {
     return call(() => tree_snapshot(handle) as TreeSnapshot);
   },
@@ -73,6 +79,12 @@ const api = {
       build_crease_pattern(handle);
       return tree_snapshot(handle) as TreeSnapshot;
     });
+  },
+  async saveTmd5(handle: number): Promise<string> {
+    return call(() => save_tmd5(handle));
+  },
+  async exportV4(handle: number): Promise<string> {
+    return call(() => export_v4(handle));
   },
   async freeTree(handle: number): Promise<void> {
     return call(() => free_tree(handle));

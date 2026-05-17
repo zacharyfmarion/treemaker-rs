@@ -215,7 +215,7 @@ Done when:
 
 ### Phase 7: Web And Desktop Files, Examples, And Persistence
 
-Status: not started.
+Status: complete.
 
 Goal: make the app usable across sessions in both browser and Tauri.
 

@@ -13,7 +13,7 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
   async function requireActiveTree() {
     const result = await ensureTreeHandle();
     if (result.initializedSnapshot) {
-      set(projectStateFromSnapshot(result.initializedSnapshot));
+      set(projectStateFromSnapshot(result.initializedSnapshot, get().project.title));
     }
     return result;
   }
@@ -33,7 +33,7 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
           edge_length: connectTo === undefined ? undefined : 1,
         });
         set({
-          project: projectFromSnapshot(report.snapshot),
+          project: projectFromSnapshot(report.snapshot, get().project.title),
           selection: nextSelectionForEdit(
             { type: 'add_node', loc, connect_to: connectTo },
             report.snapshot,
@@ -45,6 +45,7 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
           error: null,
           lastOptimization: null,
         });
+        void get().autosaveProject();
       } catch (error) {
         set({ status: 'error', error: engineError(error) });
       }
@@ -57,13 +58,14 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
         const edit: TreeEdit = { type: 'move_node', id, loc };
         const report = await api.applyEdit(treeHandle, edit);
         set({
-          project: projectFromSnapshot(report.snapshot),
+          project: projectFromSnapshot(report.snapshot, get().project.title),
           selection: nextSelectionForEdit(edit, report.snapshot),
           status: statusAfterEdit(report.snapshot),
           dirty: true,
           error: null,
           lastOptimization: null,
         });
+        void get().autosaveProject();
       } catch (error) {
         set({ status: 'error', error: engineError(error) });
       }
@@ -81,7 +83,7 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
           length: 1,
         });
         set({
-          project: projectFromSnapshot(report.snapshot),
+          project: projectFromSnapshot(report.snapshot, get().project.title),
           selection: report.created_edge
             ? { kind: 'edge', id: report.created_edge }
             : { kind: 'node', id: node2 },
@@ -90,6 +92,7 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
           error: null,
           lastOptimization: null,
         });
+        void get().autosaveProject();
       } catch (error) {
         set({ status: 'error', error: engineError(error) });
       }
@@ -102,11 +105,12 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
         const edit: TreeEdit = { type: 'update_node_label', id, label };
         const report = await api.applyEdit(treeHandle, edit);
         set({
-          project: projectFromSnapshot(report.snapshot),
+          project: projectFromSnapshot(report.snapshot, get().project.title),
           selection: nextSelectionForEdit(edit, report.snapshot),
           dirty: true,
           error: null,
         });
+        void get().autosaveProject();
       } catch (error) {
         set({ status: 'error', error: engineError(error) });
       }
@@ -119,13 +123,14 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
         const edit: TreeEdit = { type: 'update_edge', id, ...update };
         const report = await api.applyEdit(treeHandle, edit);
         set({
-          project: projectFromSnapshot(report.snapshot),
+          project: projectFromSnapshot(report.snapshot, get().project.title),
           selection: nextSelectionForEdit(edit, report.snapshot),
           status: statusAfterEdit(report.snapshot),
           dirty: true,
           error: null,
           lastOptimization: null,
         });
+        void get().autosaveProject();
       } catch (error) {
         set({ status: 'error', error: engineError(error) });
       }
@@ -143,13 +148,14 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
             : { type: 'delete_edge', id: selection.id };
         const report = await api.applyEdit(treeHandle, edit);
         set({
-          project: projectFromSnapshot(report.snapshot),
+          project: projectFromSnapshot(report.snapshot, get().project.title),
           selection: { kind: 'tree' },
           status: statusAfterEdit(report.snapshot),
           dirty: true,
           error: null,
           lastOptimization: null,
         });
+        void get().autosaveProject();
       } catch (error) {
         set({ status: 'error', error: engineError(error) });
       }

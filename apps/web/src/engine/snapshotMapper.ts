@@ -45,10 +45,10 @@ function facetColor(color: number): FacetShape['color'] {
   }
 }
 
-export function projectFromSnapshot(snapshot: TreeSnapshot): TreeProject {
+export function projectFromSnapshot(snapshot: TreeSnapshot, titleOverride?: string): TreeProject {
   const vertexLocs = new Map(snapshot.vertices.map((vertex) => [vertex.id, vertex.loc]));
   const title =
-    snapshot.summary.creases > 0 ? 'Generated crease pattern' : 'Editable tree design';
+    titleOverride ?? (snapshot.summary.creases > 0 ? 'Generated crease pattern' : 'Untitled');
 
   return {
     title,

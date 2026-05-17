@@ -6,6 +6,12 @@ function createDeps() {
   return {
     workspace: {
       createNewProject: vi.fn().mockResolvedValue(undefined),
+      openProject: vi.fn().mockResolvedValue(true),
+      saveProject: vi.fn().mockResolvedValue(true),
+      saveProjectAs: vi.fn().mockResolvedValue(true),
+      exportV4: vi.fn().mockResolvedValue(true),
+      exportSvg: vi.fn().mockResolvedValue(true),
+      exportPng: vi.fn().mockResolvedValue(true),
       deleteSelection: vi.fn().mockResolvedValue(undefined),
       optimizeScale: vi.fn().mockResolvedValue(undefined),
       buildCreasePattern: vi.fn().mockResolvedValue(undefined),
@@ -43,14 +49,9 @@ describe('menu actions', () => {
 
   it('routes file commands through the selected file service', async () => {
     const deps = createDeps();
-    deps.fileService = {
-      surface: 'desktop',
-      supportsNativeDialogs: true,
-      run: vi.fn().mockResolvedValue({ status: 'handled', message: 'saved' }),
-    };
 
     await expect(createMenuActionHandler(deps)('file.saveAs')).resolves.toBe(true);
-    expect(deps.fileService.run).toHaveBeenCalledWith('saveProjectAs');
+    expect(deps.workspace.saveProjectAs).toHaveBeenCalledWith(deps.fileService);
   });
 
   it('returns false for unknown ids', async () => {

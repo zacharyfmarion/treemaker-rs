@@ -70,7 +70,7 @@ export interface TreeProject {
 
 export function createEmptyProject(): TreeProject {
   return {
-    title: 'Editable tree design',
+    title: 'Untitled',
     paper: { width: 1, height: 1 },
     scale: 0.1,
     hasSymmetry: false,

@@ -148,6 +148,11 @@ pub fn save_tmd5(handle: u32) -> std::result::Result<String, JsValue> {
 }
 
 #[wasm_bindgen]
+pub fn export_v4(handle: u32) -> std::result::Result<String, JsValue> {
+    with_tree(handle, |tree| Ok(tree.export_v4_string()))
+}
+
+#[wasm_bindgen]
 pub fn free_tree(handle: u32) -> std::result::Result<(), JsValue> {
     TREES.with(|trees| {
         let mut trees = trees.borrow_mut();

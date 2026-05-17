@@ -77,6 +77,8 @@ Done when:
 
 ## Phase 2: Saveable Web And Desktop MVP
 
+Status: complete.
+
 Priority: highest after the Tauri shell.
 
 Goal: make work durable and shareable in both runtime surfaces.

@@ -37,6 +37,7 @@
 
 .toolbar__status,
 .toolbar__dirty,
+.toolbar__message,
 .toolbar__error {
   display: inline-flex;
   align-items: center;
@@ -88,6 +89,16 @@
 .toolbar__dirty {
   color: var(--status-warning);
   border-color: color-mix(in srgb, var(--status-warning) 50%, var(--border-default));
+}
+
+.toolbar__message {
+  max-width: min(30vw, 320px);
+  overflow: hidden;
+  color: var(--status-info);
+  text-overflow: ellipsis;
+  text-transform: none;
+  white-space: nowrap;
+  border-color: color-mix(in srgb, var(--status-info) 45%, var(--border-default));
 }
 
 .toolbar__actions {

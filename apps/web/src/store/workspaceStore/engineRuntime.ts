@@ -90,6 +90,18 @@ export async function createBlankTree(api: EngineClient): Promise<TreeSnapshot> 
   }
 }
 
+export async function loadTreeFromText(api: EngineClient, text: string): Promise<TreeSnapshot> {
+  const nextHandle = await api.loadTmd(text);
+  try {
+    const snapshot = await api.snapshot(nextHandle);
+    await replaceHandle(nextHandle);
+    return snapshot;
+  } catch (error) {
+    await api.freeTree(nextHandle).catch(() => undefined);
+    throw error;
+  }
+}
+
 export async function initializeBlankTree(api: EngineClient): Promise<TreeSnapshot> {
   if (handle !== null) return api.snapshot(handle);
   blankPromise ??= createBlankTree(api).finally(() => {
@@ -136,9 +148,9 @@ export function nextSelectionForEdit(
   return { kind: 'tree' };
 }
 
-export function projectStateFromSnapshot(snapshot: TreeSnapshot) {
+export function projectStateFromSnapshot(snapshot: TreeSnapshot, title?: string) {
   return {
-    project: projectFromSnapshot(snapshot),
+    project: projectFromSnapshot(snapshot, title),
     engineReady: true,
     status: 'ready' as const,
     error: null,

@@ -12,9 +12,22 @@ import type {
   ToolMode,
   TreeProject,
 } from '../../lib/sampleProject';
+import type { FileService } from '../../platform/fileService';
+
+export interface RecentProject {
+  id: string;
+  title: string;
+  filename: string;
+  savedAt: string;
+  text: string;
+}
 
 export interface ProjectSliceState {
   project: TreeProject;
+  currentFilePath: string | null;
+  currentFileName: string;
+  projectMessage: string | null;
+  recentProjects: RecentProject[];
   status: AppStatus;
   dirty: boolean;
   engineReady: boolean;
@@ -26,6 +39,20 @@ export interface ProjectSliceActions {
   initEngine: () => Promise<void>;
   createNewProject: () => Promise<void>;
   loadStarterProject: () => Promise<void>;
+  loadProjectText: (
+    text: string,
+    source?: { title?: string; filename?: string; path?: string | null; dirty?: boolean }
+  ) => Promise<void>;
+  openProject: (fileService?: FileService) => Promise<boolean>;
+  saveProject: (fileService?: FileService) => Promise<boolean>;
+  saveProjectAs: (fileService?: FileService) => Promise<boolean>;
+  exportV4: (fileService?: FileService) => Promise<boolean>;
+  exportSvg: (fileService?: FileService) => Promise<boolean>;
+  exportPng: (fileService?: FileService) => Promise<boolean>;
+  loadExampleProject: (id: string) => Promise<void>;
+  loadRecentProject: (id: string) => Promise<void>;
+  autosaveProject: () => Promise<void>;
+  clearProjectMessage: () => void;
 }
 
 export type ProjectSlice = ProjectSliceState & ProjectSliceActions;

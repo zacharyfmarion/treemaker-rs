@@ -586,6 +586,36 @@
   margin-bottom: var(--space-3);
 }
 
+.file-actions--exports {
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.file-summary {
+  display: grid;
+  gap: 5px;
+  margin-bottom: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  font-size: 0.74rem;
+}
+
+.file-summary span:first-child {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.files-panel__section-title {
+  margin: var(--space-3) 0 var(--space-2);
+  color: var(--text-tertiary);
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
 .example-list {
   display: grid;
   gap: var(--space-2);

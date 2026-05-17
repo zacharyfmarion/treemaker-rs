@@ -3,7 +3,7 @@ use wasm_bindgen::JsValue;
 use wasm_bindgen_test::*;
 
 use treemaker_wasm::{
-    apply_edit, build_crease_pattern, cp_status_report, free_tree, load_tmd, new_design,
+    apply_edit, build_crease_pattern, cp_status_report, export_v4, free_tree, load_tmd, new_design,
     optimize_scale, save_tmd5, tree_design, tree_snapshot, tree_summary,
 };
 
@@ -33,6 +33,8 @@ fn load_optimize_build_save_and_free() {
 
     let saved = save_tmd5(build_handle).expect("save tmd5");
     assert!(saved.starts_with("tree\n5.0\n"));
+    let v4 = export_v4(build_handle).expect("export v4");
+    assert!(v4.replace('\r', "\n").starts_with("tree\n4.0\n"));
 
     free_tree(build_handle).expect("free handle");
     let err = tree_summary(build_handle).expect_err("freed handle should error");

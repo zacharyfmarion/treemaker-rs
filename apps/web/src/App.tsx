@@ -2,6 +2,7 @@ import { useCallback, useEffect } from 'react';
 import { DockviewDefaultTab, DockviewReact } from 'dockview';
 import type { DockviewReadyEvent, IDockviewPanelHeaderProps } from 'dockview';
 import 'dockview/dist/styles/dockview.css';
+import { Toaster } from 'sonner';
 import {
   FilePlus,
   FolderOpen,
@@ -10,6 +11,8 @@ import {
   Sparkles,
   Play,
 } from 'lucide-react';
+import { MenuBar } from './components/MenuBar';
+import { GlobalToasts } from './components/GlobalToasts';
 import { TooltipProvider } from './components/ui/Tooltip';
 import { IconButton } from './components/ui/IconButton';
 import { Button } from './components/ui/Button';
@@ -20,14 +23,13 @@ import { isDesktopRuntime } from './platform/runtime';
 import { applyWindowTitle, formatWindowTitle } from './platform/windowTitle';
 import { applyDefaultLayout, useLayoutStore } from './store/layoutStore';
 import { useWorkspaceStore } from './store/workspaceStore';
+import './styles/sonner.css';
 
 function Toolbar() {
   const status = useWorkspaceStore((state) => state.status);
   const project = useWorkspaceStore((state) => state.project);
   const engineReady = useWorkspaceStore((state) => state.engineReady);
-  const error = useWorkspaceStore((state) => state.error);
-  const dirty = useWorkspaceStore((state) => state.dirty);
-  const projectMessage = useWorkspaceStore((state) => state.projectMessage);
+  const isDesktop = isDesktopRuntime();
   const busy =
     status === 'loading_engine' ||
     status === 'optimizing' ||
@@ -39,17 +41,7 @@ function Toolbar() {
   return (
     <header className="toolbar">
       <div className="toolbar__brand">
-        <span className="toolbar__title">TreeMaker</span>
-        <span className="toolbar__status" data-status={status}>
-          {status.replaceAll('_', ' ')}
-        </span>
-        {dirty && <span className="toolbar__dirty">Unsaved</span>}
-        {projectMessage && <span className="toolbar__message">{projectMessage}</span>}
-        {error && (
-          <span className="toolbar__error" title={error.message}>
-            {error.message}
-          </span>
-        )}
+        {isDesktop ? <span className="toolbar__title">TreeMaker</span> : <MenuBar />}
       </div>
       <div className="toolbar__actions">
         <IconButton
@@ -251,6 +243,15 @@ export default function App() {
           disableFloatingGroups
         />
       </div>
+      <GlobalToasts />
+      <Toaster
+        theme="dark"
+        position="bottom-right"
+        closeButton
+        richColors
+        visibleToasts={5}
+        toastOptions={{ duration: 4000 }}
+      />
     </TooltipProvider>
   );
 }

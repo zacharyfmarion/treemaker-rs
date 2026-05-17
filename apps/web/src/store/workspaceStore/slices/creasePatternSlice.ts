@@ -72,6 +72,7 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
           status: 'crease_pattern_ready',
           error: null,
           dirty: true,
+          projectMessage: 'Built crease pattern',
         });
         get().commitHistoryCheckpoint(checkpoint, 'Build crease pattern');
         void get().autosaveProject();

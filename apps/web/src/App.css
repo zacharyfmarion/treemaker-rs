@@ -30,7 +30,7 @@
 
 .toolbar__brand {
   gap: var(--space-2);
-  overflow: hidden;
+  overflow: visible;
 }
 
 .toolbar__title {
@@ -39,76 +39,6 @@
   font-size: 0.78rem;
   font-weight: 750;
   letter-spacing: 0;
-}
-
-.toolbar__status,
-.toolbar__dirty,
-.toolbar__message,
-.toolbar__error {
-  display: inline-flex;
-  align-items: center;
-  min-width: 0;
-  height: 20px;
-  padding: 0 7px;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-sm);
-  color: var(--text-secondary);
-  background: var(--bg-secondary);
-  font-size: 0.68rem;
-  line-height: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  text-transform: capitalize;
-  white-space: nowrap;
-}
-
-.toolbar__error {
-  max-width: min(34vw, 360px);
-  overflow: hidden;
-  color: var(--status-danger);
-  text-overflow: ellipsis;
-  text-transform: none;
-  white-space: nowrap;
-  border-color: color-mix(in srgb, var(--status-danger) 48%, var(--border-default));
-}
-
-.toolbar__status[data-status='ready'] {
-  color: var(--status-success);
-  border-color: color-mix(in srgb, var(--status-success) 45%, var(--border-default));
-}
-
-.toolbar__status[data-status='optimized'],
-.toolbar__status[data-status='crease_pattern_ready'] {
-  color: var(--status-success);
-  border-color: color-mix(in srgb, var(--status-success) 45%, var(--border-default));
-}
-
-.toolbar__status[data-status='loading_engine'],
-.toolbar__status[data-status='optimizing'],
-.toolbar__status[data-status='building_crease_pattern'],
-.toolbar__status[data-status='needs_optimization'] {
-  color: var(--status-warning);
-  border-color: color-mix(in srgb, var(--status-warning) 50%, var(--border-default));
-}
-
-.toolbar__status[data-status='error'] {
-  color: var(--status-danger);
-  border-color: color-mix(in srgb, var(--status-danger) 48%, var(--border-default));
-}
-
-.toolbar__dirty {
-  color: var(--status-warning);
-  border-color: color-mix(in srgb, var(--status-warning) 50%, var(--border-default));
-}
-
-.toolbar__message {
-  max-width: min(30vw, 320px);
-  overflow: hidden;
-  color: var(--status-info);
-  text-overflow: ellipsis;
-  text-transform: none;
-  white-space: nowrap;
-  border-color: color-mix(in srgb, var(--status-info) 45%, var(--border-default));
 }
 
 .toolbar__actions {
@@ -149,26 +79,9 @@
   .toolbar__separator {
     display: none;
   }
-
-  .toolbar__message,
-  .toolbar__error {
-    max-width: 42vw;
-  }
 }
 
 @media (max-width: 460px) {
-  .toolbar__title {
-    display: none;
-  }
-
-  .toolbar__status,
-  .toolbar__dirty,
-  .toolbar__message,
-  .toolbar__error {
-    max-width: 44vw;
-    padding: 0 6px;
-  }
-
   .toolbar__actions .ui-control--sm {
     padding: 0 8px;
   }

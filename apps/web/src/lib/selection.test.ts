@@ -4,6 +4,7 @@ import {
   isEdgeSelected,
   isNodeSelected,
   selectEverything,
+  selectionCoversAllNodes,
   selectionSummary,
   toggleEdgeSelection,
   toggleNodeSelection,
@@ -40,5 +41,39 @@ describe('selection helpers', () => {
     expect(selection.creases).toHaveLength(6);
     expect(selection.facets).toHaveLength(3);
     expect(selection.conditions).toHaveLength(0);
+    expect(selectionCoversAllNodes(selection, createSampleProject())).toBe(true);
+  });
+
+  it('detects when a node selection clears the whole design', () => {
+    const project = createSampleProject();
+
+    expect(
+      selectionCoversAllNodes(
+        {
+          kind: 'multi',
+          nodes: [1, 2, 3, 4],
+          edges: [],
+          paths: [],
+          creases: [],
+          facets: [],
+          conditions: [],
+        },
+        project
+      )
+    ).toBe(true);
+    expect(
+      selectionCoversAllNodes(
+        {
+          kind: 'multi',
+          nodes: [1, 2, 3],
+          edges: [],
+          paths: [],
+          creases: [],
+          facets: [],
+          conditions: [],
+        },
+        project
+      )
+    ).toBe(false);
   });
 });

@@ -80,6 +80,12 @@ export function selectedEditablePartCount(selection: Selection): number {
   return selectedNodeIds(selection).length + selectedEdgeIds(selection).length;
 }
 
+export function selectionCoversAllNodes(selection: Selection, project: TreeProject): boolean {
+  if (project.nodes.length === 0) return false;
+  const selected = new Set(selectedNodeIds(selection));
+  return project.nodes.every((node) => selected.has(node.id));
+}
+
 export function toggleNodeSelection(selection: Selection, id: number): Selection {
   const multi = selection.kind === 'multi' ? selection : emptyMultiSelection();
   const nodes = multi.nodes.includes(id)

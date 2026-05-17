@@ -4,8 +4,10 @@ import {
   selectEverything,
   selectedEdgeIds,
   selectedNodeIds,
+  selectionCoversAllNodes,
 } from '../../../lib/selection';
 import {
+  createBlankTree,
   engineError,
   ensureTreeHandle,
   nextSelectionForEdit,
@@ -160,6 +162,22 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
       const checkpoint = await get().beginHistoryCheckpoint();
       try {
         const { api, treeHandle } = await requireActiveTree();
+        if (selectionCoversAllNodes(selection, get().project)) {
+          const snapshot = await createBlankTree(api);
+          set({
+            project: projectFromSnapshot(snapshot, get().project.title),
+            selection: { kind: 'tree' },
+            status: statusAfterEdit(snapshot),
+            dirty: true,
+            error: null,
+            lastOptimization: null,
+            projectMessage: 'Cleared design',
+          });
+          get().commitHistoryCheckpoint(checkpoint, 'Clear design');
+          void get().autosaveProject();
+          return;
+        }
+
         let snapshot: TreeSnapshot | null = null;
         for (const id of edgeIds) {
           const report = await api.applyEdit(treeHandle, { type: 'delete_edge', id });

@@ -71,6 +71,12 @@ treemaker export-v4 crease-pattern.tmd5 --out legacy.tmd4
 
 The main API entry point is [`Tree`](https://docs.rs/treemaker-core/latest/treemaker_core/struct.Tree.html).
 
+## Web App
+
+A browser-first GUI is being built in this repository so the app can evolve
+alongside the Rust/WASM engine APIs it needs. The current plan and phase status
+live in [`WEB_ROADMAP.md`](WEB_ROADMAP.md).
+
 ## What Works Today
 
 Version `0.1.0` supports the TreeMaker 5.0.1 model engine surface:

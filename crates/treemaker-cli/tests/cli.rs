@@ -169,3 +169,53 @@ fn run_fixtures_reports_all_checked_in_fixtures() {
     assert!(stdout.contains("tmModelTester_5.tmd5"));
     assert!(stdout.contains("parsed 8 fixture(s)"));
 }
+
+#[test]
+fn corpus_reports_recursive_fixtures_and_max_files() {
+    let output = run([
+        OsString::from("corpus"),
+        repo_root().join("tests/fixtures").into_os_string(),
+        OsString::from("--format"),
+        OsString::from("json"),
+    ]);
+    assert_success(&output);
+    let report: Value = serde_json::from_slice(&output.stdout).expect("corpus json");
+    assert_eq!(report["scanned_files"], 11);
+    assert_eq!(report["unique_files"], 11);
+    assert_eq!(report["duplicates"], 0);
+    assert_eq!(report["parsed"], 11);
+    assert_eq!(report["roundtripped"], 11);
+    assert_eq!(report["failed"], 0);
+
+    let text = run([
+        OsString::from("corpus"),
+        repo_root().join("tests/fixtures").into_os_string(),
+        OsString::from("--max-files"),
+        OsString::from("2"),
+    ]);
+    assert_success(&text);
+    let stdout = String::from_utf8_lossy(&text.stdout);
+    assert!(stdout.contains("scanned=2"));
+    assert!(stdout.contains("failed=0"));
+}
+
+#[test]
+fn corpus_dedupes_by_sha256() {
+    let dir = temp_dir("corpus-duplicates");
+    fs::copy(fixture("tmModelTester_1.tmd5"), dir.join("a.tmd5")).expect("copy a");
+    fs::copy(fixture("tmModelTester_1.tmd5"), dir.join("b.tmd5")).expect("copy b");
+
+    let output = run([
+        OsString::from("corpus"),
+        dir.into_os_string(),
+        OsString::from("--format"),
+        OsString::from("json"),
+    ]);
+    assert_success(&output);
+    let report: Value = serde_json::from_slice(&output.stdout).expect("corpus json");
+    assert_eq!(report["scanned_files"], 2);
+    assert_eq!(report["unique_files"], 1);
+    assert_eq!(report["duplicates"], 1);
+    assert_eq!(report["parsed"], 1);
+    assert_eq!(report["failed"], 0);
+}

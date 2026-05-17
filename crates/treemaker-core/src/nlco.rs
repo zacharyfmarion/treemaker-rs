@@ -1013,14 +1013,6 @@ impl NlcoAlm {
         self.num_bounds = self.lower_bounds.len();
     }
 
-    pub fn num_equalities(&self) -> usize {
-        self.equalities.len()
-    }
-
-    pub fn num_inequalities(&self) -> usize {
-        self.inequalities.len()
-    }
-
     pub fn minimize(&mut self, x: &mut [f64]) -> i32 {
         assert_ne!(self.size, 0);
         assert_eq!(x.len(), self.size);

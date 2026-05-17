@@ -1,8 +1,39 @@
+//! Headless TreeMaker 5.0.1 model engine.
+//!
+//! `treemaker-core` is a Rust port of the model-only TreeMaker engine: stream
+//! I/O, tree/path feasibility, ALM optimization, polygon construction, crease
+//! pattern construction, and CP diagnostics. It does not include GUI,
+//! wxWidgets, printing, menus, or proprietary optimizer backends.
+//!
+//! The primary entry point is [`Tree`].
+//!
+//! ```no_run
+//! use treemaker_core::Tree;
+//!
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let text = std::fs::read_to_string("model.tmd5")?;
+//! let mut tree = Tree::from_tmd_str(&text)?;
+//!
+//! let summary = tree.summary();
+//! println!("nodes={}, paths={}", summary.nodes, summary.paths);
+//!
+//! tree.optimize_scale()?;
+//! tree.build_polys_and_crease_pattern()?;
+//!
+//! std::fs::write("out.tmd5", tree.to_tmd5_string())?;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! Numeric optimization parity is tolerance-based. The behavioral baseline is
+//! TreeMaker 5.0.1 with the distributable ALM backend.
+
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-pub mod nlco;
+mod nlco;
 
+/// Floating-point type used by TreeMaker geometry and optimization.
 pub type TmFloat = f64;
 
 const DIST_TOL: TmFloat = 1.0e-4;
@@ -31,6 +62,7 @@ const ROOT_FLAG_INELIGIBLE: i32 = 0;
 const ROOT_FLAG_NOT_YET: i32 = 1;
 const ROOT_FLAG_ALREADY_ADDED: i32 = 2;
 
+/// Structured error returned by parsing, validation, optimization, and build operations.
 #[derive(Debug, thiserror::Error)]
 pub enum TreeError {
     #[error("parse error at byte {offset}: {message}")]
@@ -52,6 +84,7 @@ pub enum TreeError {
 }
 
 impl TreeError {
+    /// Stable machine-readable code for CLI, wasm, and API consumers.
     pub fn code(&self) -> &'static str {
         match self {
             TreeError::Parse { .. } => "parse",
@@ -64,8 +97,10 @@ impl TreeError {
     }
 }
 
+/// Crate-local result type.
 pub type Result<T> = std::result::Result<T, TreeError>;
 
+/// Two-dimensional point in paper coordinates.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct Point {
     pub x: TmFloat,
@@ -80,6 +115,7 @@ impl Point {
     }
 }
 
+/// Owner reference using TreeMaker's 1-based external indices.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum OwnerRef {
     Tree,
@@ -88,6 +124,7 @@ pub enum OwnerRef {
     Poly(usize),
 }
 
+/// TreeMaker node record.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Node {
     pub index: usize,
@@ -108,6 +145,7 @@ pub struct Node {
     pub owner: OwnerRef,
 }
 
+/// TreeMaker edge record.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Edge {
     pub index: usize,
@@ -121,11 +159,13 @@ pub struct Edge {
 }
 
 impl Edge {
+    /// Edge length after applying TreeMaker strain.
     pub fn strained_length(&self) -> TmFloat {
         self.length * (1.0 + self.strain)
     }
 }
 
+/// TreeMaker path record between a pair of nodes.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Path {
     pub index: usize,
@@ -154,6 +194,7 @@ pub struct Path {
     pub owner: OwnerRef,
 }
 
+/// Polygon or subpolygon generated during crease-pattern construction.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Poly {
     pub index: usize,
@@ -176,6 +217,7 @@ pub struct Poly {
     pub owner: OwnerRef,
 }
 
+/// Crease-pattern vertex.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Vertex {
     pub index: usize,
@@ -193,6 +235,7 @@ pub struct Vertex {
     pub owner: OwnerRef,
 }
 
+/// Crease-pattern crease.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Crease {
     pub index: usize,
@@ -206,6 +249,7 @@ pub struct Crease {
     pub owner: OwnerRef,
 }
 
+/// Crease-pattern facet.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Facet {
     pub index: usize,
@@ -221,6 +265,7 @@ pub struct Facet {
     pub owner: OwnerRef,
 }
 
+/// TreeMaker condition wrapper.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Condition {
     pub index: usize,
@@ -228,6 +273,7 @@ pub struct Condition {
     pub kind: ConditionKind,
 }
 
+/// Supported TreeMaker condition variants.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ConditionKind {
@@ -299,6 +345,7 @@ pub enum ConditionKind {
     },
 }
 
+/// Complete TreeMaker model state.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Tree {
     pub source_version: String,
@@ -329,6 +376,7 @@ pub struct Tree {
     pub owned_polys: Vec<usize>,
 }
 
+/// High-level crease-pattern status, matching TreeMaker's `GetCPStatus()`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum CPStatus {
@@ -342,6 +390,7 @@ pub enum CPStatus {
     NotLocalRootConnectable,
 }
 
+/// Detailed crease-pattern status report with offending part IDs when available.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CPStatusReport {
     pub status: CPStatus,
@@ -352,6 +401,7 @@ pub struct CPStatusReport {
     pub bad_facets: Vec<usize>,
 }
 
+/// Stable summary of a [`Tree`] suitable for CLI/wasm output and regression tests.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TreeSummary {
     pub source_version: String,
@@ -385,6 +435,7 @@ pub struct TreeSummary {
     pub conditions_by_tag: BTreeMap<String, usize>,
 }
 
+/// Report returned by optimization operations.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct OptimizationReport {
     pub kind: OptimizationKind,
@@ -395,6 +446,7 @@ pub struct OptimizationReport {
     pub message: String,
 }
 
+/// Optimizer kind used for an [`OptimizationReport`].
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum OptimizationKind {
@@ -475,6 +527,7 @@ impl CPStatusReport {
 }
 
 impl Tree {
+    /// Parse a TreeMaker v3, v4, or v5 document from its ASCII stream format.
     pub fn from_tmd_str(input: &str) -> Result<Self> {
         let mut reader = Reader::new(input);
         reader.expect_tag("tree")?;
@@ -502,6 +555,7 @@ impl Tree {
         Ok(tree)
     }
 
+    /// Serialize this tree to canonical TreeMaker v5 text.
     pub fn to_tmd5_string(&self) -> String {
         let mut out = Writer::new(10, "\n");
         out.s("tree");
@@ -559,6 +613,7 @@ impl Tree {
         out.finish()
     }
 
+    /// Export this tree to TreeMaker v4 text for compatibility.
     pub fn export_v4_string(&self) -> String {
         let mut out = Writer::new(6, "\r");
         out.s("tree");
@@ -595,6 +650,7 @@ impl Tree {
         out.finish()
     }
 
+    /// Return a stable structural and status summary.
     pub fn summary(&self) -> TreeSummary {
         let mut conditions_by_tag = BTreeMap::new();
         for condition in &self.conditions {
@@ -635,10 +691,12 @@ impl Tree {
         }
     }
 
+    /// Return the current feasibility flag.
     pub fn is_feasible(&self) -> bool {
         self.is_feasible
     }
 
+    /// Return the current high-level crease-pattern status.
     pub fn cp_status(&self) -> CPStatus {
         if self
             .edges
@@ -675,6 +733,7 @@ impl Tree {
         CPStatus::HasFullCp
     }
 
+    /// Return crease-pattern status plus bad part IDs where TreeMaker reports them.
     pub fn cp_status_report(&self) -> CPStatusReport {
         let bad_edges: Vec<_> = self
             .edges
@@ -756,6 +815,7 @@ impl Tree {
         CPStatusReport::new(CPStatus::HasFullCp)
     }
 
+    /// Run TreeMaker's ALM scale optimizer.
     pub fn optimize_scale(&mut self) -> Result<OptimizationReport> {
         let old_scale = self.scale;
         let leaf_nodes = self.leaf_nodes_in_owned_order();
@@ -832,6 +892,7 @@ impl Tree {
         })
     }
 
+    /// Run TreeMaker's ALM edge-strain maximization optimizer.
     pub fn optimize_edges(&mut self) -> Result<OptimizationReport> {
         let old_scale = self.scale;
         let moving_nodes = self.moving_nodes_for_edge_optimizer();
@@ -922,6 +983,7 @@ impl Tree {
         })
     }
 
+    /// Run TreeMaker's ALM strain minimization optimizer.
     pub fn optimize_strain(&mut self) -> Result<OptimizationReport> {
         let old_scale = self.scale;
         let moving_nodes = self.moving_nodes_for_strain_optimizer();
@@ -1026,6 +1088,7 @@ impl Tree {
         })
     }
 
+    /// Build TreeMaker polygons without building full crease-pattern contents.
     pub fn build_tree_polys(&mut self) -> Result<()> {
         let leaf_paths = self.leaf_paths_in_owned_order();
         let border_nodes: Vec<usize> = self
@@ -1053,6 +1116,7 @@ impl Tree {
         Ok(())
     }
 
+    /// Build polygons, vertices, creases, facets, facet order, color, and fold data.
     pub fn build_polys_and_crease_pattern(&mut self) -> Result<()> {
         self.build_tree_polys()?;
         if self
@@ -1071,6 +1135,7 @@ impl Tree {
         Ok(())
     }
 
+    #[doc(hidden)]
     #[doc(hidden)]
     pub fn build_polygon_contents_for_oracle_tests(&mut self) -> Result<()> {
         self.build_tree_polys()?;
@@ -8098,13 +8163,13 @@ fn opposite_facet_color(color: i32) -> i32 {
 mod tests {
     use super::*;
 
-    const FIXTURE_1: &str = include_str!("../../../tests/fixtures/tmModelTester_1.tmd5");
-    const FIXTURE_2: &str = include_str!("../../../tests/fixtures/tmModelTester_2.tmd5");
-    const FIXTURE_4: &str = include_str!("../../../tests/fixtures/tmModelTester_4.tmd5");
-    const FIXTURE_5: &str = include_str!("../../../tests/fixtures/tmModelTester_5.tmd5");
-    const FIXTURE_V3: &str = include_str!("../../../tests/fixtures/minimal_v3.tmd");
-    const FIXTURE_CP_V4: &str = include_str!("../../../tests/fixtures/minimal_cp_v4.tmd4");
-    const FIXTURE_CP_V5: &str = include_str!("../../../tests/fixtures/minimal_cp_v5.tmd5");
+    const FIXTURE_1: &str = include_str!("../testdata/tmModelTester_1.tmd5");
+    const FIXTURE_2: &str = include_str!("../testdata/tmModelTester_2.tmd5");
+    const FIXTURE_4: &str = include_str!("../testdata/tmModelTester_4.tmd5");
+    const FIXTURE_5: &str = include_str!("../testdata/tmModelTester_5.tmd5");
+    const FIXTURE_V3: &str = include_str!("../testdata/minimal_v3.tmd");
+    const FIXTURE_CP_V4: &str = include_str!("../testdata/minimal_cp_v4.tmd4");
+    const FIXTURE_CP_V5: &str = include_str!("../testdata/minimal_cp_v5.tmd5");
 
     #[test]
     fn parses_v4_fixture_summary() {

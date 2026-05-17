@@ -270,11 +270,11 @@ fn tree_path(
 
 fn fixture_texts() -> Vec<&'static str> {
     vec![
-        include_str!("../../../tests/fixtures/minimal_v3.tmd"),
-        include_str!("../../../tests/fixtures/minimal_cp_v4.tmd4"),
-        include_str!("../../../tests/fixtures/minimal_cp_v5.tmd5"),
-        include_str!("../../../tests/fixtures/tmModelTester_1.tmd5"),
-        include_str!("../../../tests/fixtures/tmModelTester_5.tmd5"),
+        include_str!("../testdata/minimal_v3.tmd"),
+        include_str!("../testdata/minimal_cp_v4.tmd4"),
+        include_str!("../testdata/minimal_cp_v5.tmd5"),
+        include_str!("../testdata/tmModelTester_1.tmd5"),
+        include_str!("../testdata/tmModelTester_5.tmd5"),
     ]
 }
 

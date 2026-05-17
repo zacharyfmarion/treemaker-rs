@@ -7,7 +7,7 @@ use treemaker_wasm::{
     tree_summary,
 };
 
-const FIXTURE_1: &str = include_str!("../../../tests/fixtures/tmModelTester_1.tmd5");
+const FIXTURE_1: &str = include_str!("../testdata/tmModelTester_1.tmd5");
 
 #[wasm_bindgen_test]
 fn load_optimize_build_save_and_free() {

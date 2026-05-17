@@ -1,3 +1,10 @@
+//! `wasm-bindgen` wrapper around `treemaker-core`.
+//!
+//! The wasm API stores loaded trees behind integer handles so JavaScript can
+//! call into the engine without copying the whole model for every operation.
+//! Error values are serialized objects with the same stable `code` values as
+//! native [`treemaker_core::TreeError`].
+
 use serde::Serialize;
 use std::cell::RefCell;
 use treemaker_core::{Tree, TreeError};

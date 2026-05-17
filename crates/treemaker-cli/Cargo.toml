@@ -5,6 +5,12 @@ edition.workspace = true
 license.workspace = true
 description = "Headless CLI for the TreeMaker 5.0.1 Rust port"
 repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/treemaker-cli"
+readme = "README.md"
+keywords = ["origami", "treemaker", "crease-pattern"]
+categories = ["command-line-utilities", "algorithms"]
+include = ["Cargo.toml", "LICENSE.txt", "README.md", "src/**"]
 
 [[bin]]
 name = "treemaker"
@@ -16,5 +22,5 @@ clap.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
-treemaker-core = { path = "../treemaker-core" }
+treemaker-core = { version = "0.1.0", path = "../treemaker-core" }
 walkdir.workspace = true

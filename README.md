@@ -1,4 +1,4 @@
-# tree-maker-rust
+# treemaker-rs
 
 Rust/WASM port of the model side of Robert J. Lang's TreeMaker 5.0.1.
 
@@ -79,3 +79,52 @@ wasm-pack test --node crates/treemaker-wasm
 The default GitHub Actions workflow is intentionally native-only on Ubuntu:
 format, clippy, workspace tests, C++ oracle build, and Linux oracle parity.
 WASM builds remain an explicit local/release check rather than default CI.
+
+## Rust API
+
+Add the engine crate to a Rust project:
+
+```sh
+cargo add treemaker-core
+```
+
+```rust
+use treemaker_core::Tree;
+
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+let text = std::fs::read_to_string("model.tmd5")?;
+let mut tree = Tree::from_tmd_str(&text)?;
+
+println!("{:#?}", tree.summary());
+
+tree.optimize_scale()?;
+tree.build_polys_and_crease_pattern()?;
+
+std::fs::write("out.tmd5", tree.to_tmd5_string())?;
+# Ok(())
+# }
+```
+
+The public API is intentionally engine-shaped and parity-first. Model records
+such as nodes, edges, paths, polygons, vertices, creases, facets, and conditions
+are exposed as typed Rust structs with TreeMaker's 1-based external indices
+preserved for file compatibility.
+
+## Publishing
+
+The intended crates.io order is:
+
+```sh
+cargo publish -p treemaker-core --dry-run
+cargo publish -p treemaker-core
+cargo publish -p treemaker-cli --dry-run
+cargo publish -p treemaker-cli
+cargo publish -p treemaker-wasm --dry-run
+cargo publish -p treemaker-wasm
+```
+
+`oracle-tests` is an internal workspace crate and is not published. For npm,
+publish the generated `treemaker-wasm` package separately through `wasm-pack`
+after the Rust release is tagged.
+
+See `RELEASE.md` for the full release checklist and intervention points.

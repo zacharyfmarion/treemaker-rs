@@ -18,17 +18,17 @@ Current exact/anchored surface:
 - Condition stream data is typed and feasibility formulas are direct ports of
   the corresponding `tmCondition*::CalcFeasibility()` methods and
   `tmConstraintFns`.
-- `tmNLCO_alm` is ported as `treemaker_core::nlco::NlcoAlm`, including the ALM
+- `tmNLCO_alm` is ported internally in `treemaker-core`, including the ALM
   constants, BFGS inner loop, line search, bound handling, and documented C++
   quirks needed by optimizer parity.
 - `tmScaleOptimizer`, `tmEdgeOptimizer`, and `tmStrainOptimizer` are ported for
   the headless all-owned-parts usage exercised by `tmModelTester`.
 
-Still to port directly:
+Release caveats:
 
-- v3 reading.
-- `CleanupAfterEdit()` beyond length/feasibility recalculation.
-- `BuildTreePolys()`, `BuildPolysAndCreasePattern()`, facet order, and fold
-  direction assignment.
-- CP-bearing v4/v5 stream payloads; they currently error rather than preserving
-  untyped crease-pattern structures.
+- Public parity targets TreeMaker 5.0.1's distributable ALM optimizer. CFSQP
+  and RFSQP remain out of scope without redistributable source and compatible
+  license terms.
+- Real-world corpus files are not committed; use the external corpus harness in
+  `treemaker-cli` before making claims about a private archive of historical
+  user files.

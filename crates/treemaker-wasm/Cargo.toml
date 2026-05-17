@@ -5,6 +5,20 @@ edition.workspace = true
 license.workspace = true
 description = "wasm-bindgen package for the TreeMaker 5.0.1 Rust port"
 repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/treemaker-wasm"
+readme = "README.md"
+keywords = ["origami", "treemaker", "crease-pattern"]
+categories = ["wasm", "algorithms"]
+include = [
+    "Cargo.toml",
+    "LICENSE.txt",
+    "README.md",
+    "src/**",
+    "testdata/**",
+    "tests/**",
+    "!pkg/**",
+]
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -12,7 +26,7 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 serde.workspace = true
 serde-wasm-bindgen.workspace = true
-treemaker-core = { path = "../treemaker-core" }
+treemaker-core = { version = "0.1.0", path = "../treemaker-core" }
 wasm-bindgen.workspace = true
 
 [dev-dependencies]

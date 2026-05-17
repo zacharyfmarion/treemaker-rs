@@ -55,12 +55,8 @@ export function DesignPanel() {
 
   const onPaperPointerDown = (event: PointerEvent<SVGRectElement>) => {
     if (event.button !== 0) return;
-    if (toolMode === 'node') {
-      const connectTo = selection.kind === 'node' ? selection.id : undefined;
-      void addNodeAt(eventToPaper(event), connectTo);
-      return;
-    }
-    select({ kind: 'tree' });
+    const connectTo = selection.kind === 'node' ? selection.id : undefined;
+    void addNodeAt(eventToPaper(event), connectTo);
   };
 
   const onNodePointerDown = (event: PointerEvent<SVGGElement>, nodeId: number) => {

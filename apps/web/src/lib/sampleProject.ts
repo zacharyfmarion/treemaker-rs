@@ -68,6 +68,20 @@ export interface TreeProject {
   facets: FacetShape[];
 }
 
+export function createEmptyProject(): TreeProject {
+  return {
+    title: 'Editable tree design',
+    paper: { width: 1, height: 1 },
+    scale: 0.1,
+    hasSymmetry: false,
+    nodes: [],
+    edges: [],
+    paths: [],
+    creases: [],
+    facets: [],
+  };
+}
+
 export function createSampleProject(): TreeProject {
   return {
     title: 'Untitled tree',

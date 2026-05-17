@@ -9,7 +9,7 @@ import type {
 } from '../engine/types';
 import type { Point } from '../lib/geometry';
 import {
-  createSampleProject,
+  createEmptyProject,
   type AppStatus,
   type CreaseColorMode,
   type Selection,
@@ -53,7 +53,7 @@ interface WorkspaceState {
 let worker: Worker | null = null;
 let engine: EngineClient | null = null;
 let handle: number | null = null;
-let starterPromise: Promise<TreeSnapshot> | null = null;
+let blankPromise: Promise<TreeSnapshot> | null = null;
 
 function engineError(error: unknown): WasmErrorEnvelope {
   if (
@@ -128,18 +128,18 @@ async function createBlankTree(api: EngineClient): Promise<TreeSnapshot> {
   }
 }
 
-async function initializeStarterTree(api: EngineClient): Promise<TreeSnapshot> {
+async function initializeBlankTree(api: EngineClient): Promise<TreeSnapshot> {
   if (handle !== null) return api.snapshot(handle);
-  starterPromise ??= createStarterTree(api).finally(() => {
-    starterPromise = null;
+  blankPromise ??= createBlankTree(api).finally(() => {
+    blankPromise = null;
   });
-  return starterPromise;
+  return blankPromise;
 }
 
 async function requireHandle(): Promise<{ api: EngineClient; treeHandle: number }> {
   const api = await getEngine();
   if (handle === null) {
-    const snapshot = await initializeStarterTree(api);
+    const snapshot = await initializeBlankTree(api);
     useWorkspaceStore.setState({
       project: projectFromSnapshot(snapshot),
       engineReady: true,
@@ -176,7 +176,7 @@ function nextSelectionForEdit(
 }
 
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
-  project: createSampleProject(),
+  project: createEmptyProject(),
   selection: { kind: 'tree' },
   toolMode: 'select',
   creaseColorMode: 'mvf',
@@ -190,7 +190,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     set({ status: 'loading_engine', error: null });
     try {
       const api = await getEngine();
-      const snapshot = await initializeStarterTree(api);
+      const snapshot = await initializeBlankTree(api);
       set({
         project: projectFromSnapshot(snapshot),
         selection: { kind: 'tree' },

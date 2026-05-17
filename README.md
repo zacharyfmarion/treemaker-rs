@@ -51,6 +51,10 @@ pattern construction algorithms. If redistributable source and compatible
 license terms are provided later, they can be added as optional optimizer
 backends, but they are not required for 5.0.1 ALM parity.
 
+See `LICENSING.md` for the full repository licensing guide, including vendored
+source notices, optimizer backend status, publishing obligations, and the Rust
+dependency license inventory.
+
 ## Useful commands
 
 ```sh

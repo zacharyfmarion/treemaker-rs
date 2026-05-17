@@ -176,7 +176,7 @@ Done when:
 
 ### Phase 6: Tauri Shell And Platform Bridge
 
-Status: not started.
+Status: complete.
 
 Goal: create a working desktop shell before file workflows become browser-only.
 
@@ -193,6 +193,8 @@ Work items:
 - Emit Tauri `menu-action` events for native menu selections.
 - Add frontend runtime detection for `web` and `desktop`.
 - Add frontend feature visibility helpers for browser-only and desktop-only UI.
+- Split workspace state into Cascade-style Zustand slices instead of growing a
+  monolithic store.
 - Add `useTauriMenuListener` or equivalent to subscribe to native menu events.
 - Add a command dispatcher that handles menu IDs from both web UI and native
   menus.

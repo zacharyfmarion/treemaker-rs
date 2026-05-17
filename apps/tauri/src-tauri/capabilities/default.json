@@ -1,0 +1,12 @@
+{
+  "identifier": "default",
+  "description": "Default permissions for TreeMaker",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:event:default",
+    "core:window:allow-destroy",
+    "core:window:allow-set-title",
+    "dialog:default"
+  ]
+}

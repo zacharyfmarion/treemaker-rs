@@ -41,6 +41,8 @@ Done when:
 
 ## Phase 1: Tauri Shell And Platform Bridge
 
+Status: complete.
+
 Priority: highest.
 
 Goal: make desktop parity real before file workflows harden around browser-only

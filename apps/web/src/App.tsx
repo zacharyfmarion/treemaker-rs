@@ -14,13 +14,13 @@ import { TooltipProvider } from './components/ui/Tooltip';
 import { IconButton } from './components/ui/IconButton';
 import { Button } from './components/ui/Button';
 import { panelComponents } from './components/panels/PanelComponents';
+import { handleMenuAction } from './commands/menuActions';
+import { useTauriMenuListener } from './menus/tauriMenuListener';
+import { applyWindowTitle, formatWindowTitle } from './platform/windowTitle';
 import { applyDefaultLayout, useLayoutStore } from './store/layoutStore';
 import { useWorkspaceStore } from './store/workspaceStore';
 
 function Toolbar() {
-  const createNewProject = useWorkspaceStore((state) => state.createNewProject);
-  const optimizeScale = useWorkspaceStore((state) => state.optimizeScale);
-  const buildCreasePattern = useWorkspaceStore((state) => state.buildCreasePattern);
   const status = useWorkspaceStore((state) => state.status);
   const project = useWorkspaceStore((state) => state.project);
   const engineReady = useWorkspaceStore((state) => state.engineReady);
@@ -54,14 +54,24 @@ function Toolbar() {
           title="New"
           tooltipSide="bottom"
           disabled={busy}
-          onClick={() => void createNewProject()}
+          onClick={() => void handleMenuAction('file.new')}
         >
           <FilePlus size={15} />
         </IconButton>
-        <IconButton size="sm" title="Open" tooltipSide="bottom" disabled>
+        <IconButton
+          size="sm"
+          title="Open"
+          tooltipSide="bottom"
+          onClick={() => void handleMenuAction('file.open')}
+        >
           <FolderOpen size={15} />
         </IconButton>
-        <IconButton size="sm" title="Save" tooltipSide="bottom" disabled>
+        <IconButton
+          size="sm"
+          title="Save"
+          tooltipSide="bottom"
+          onClick={() => void handleMenuAction('file.save')}
+        >
           <Save size={15} />
         </IconButton>
         <span className="toolbar__separator" />
@@ -69,7 +79,7 @@ function Toolbar() {
           size="sm"
           variant="secondary"
           disabled={!canOptimize}
-          onClick={() => void optimizeScale()}
+          onClick={() => void handleMenuAction('optimize.scale')}
         >
           <Sparkles size={14} />
           Optimize
@@ -78,7 +88,7 @@ function Toolbar() {
           size="sm"
           variant="primary"
           disabled={!canBuild}
-          onClick={() => void buildCreasePattern()}
+          onClick={() => void handleMenuAction('cp.build')}
         >
           <Play size={14} />
           Build CP
@@ -95,13 +105,22 @@ function Toolbar() {
 export default function App() {
   const initEngine = useWorkspaceStore((state) => state.initEngine);
   const deleteSelection = useWorkspaceStore((state) => state.deleteSelection);
+  const project = useWorkspaceStore((state) => state.project);
+  const dirty = useWorkspaceStore((state) => state.dirty);
   const setDockviewApi = useLayoutStore((state) => state.setDockviewApi);
   const loadLayout = useLayoutStore((state) => state.loadLayout);
   const saveLayout = useLayoutStore((state) => state.saveLayout);
 
+  useTauriMenuListener();
+
   useEffect(() => {
     void initEngine();
   }, [initEngine]);
+
+  useEffect(() => {
+    const title = formatWindowTitle({ projectTitle: project.title, dirty });
+    void applyWindowTitle(title);
+  }, [dirty, project.title]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="TreeMaker">
+  <rect width="256" height="256" rx="56" fill="#f7f3e8"/>
+  <path d="M128 44 42 202h172L128 44Z" fill="#0f766e"/>
+  <path d="M128 44v158M82 128h92M106 84l68 118M150 84 82 202" stroke="#fff7ed" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="128" cy="44" r="13" fill="#dc2626"/>
+  <circle cx="42" cy="202" r="13" fill="#dc2626"/>
+  <circle cx="214" cy="202" r="13" fill="#dc2626"/>
+</svg>

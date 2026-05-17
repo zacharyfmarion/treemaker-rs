@@ -1,0 +1,59 @@
+import { describe, expect, it, vi } from 'vitest';
+import { createFileService } from '../platform/fileService';
+import { createMenuActionHandler, isMenuActionId } from './menuActions';
+
+function createDeps() {
+  return {
+    workspace: {
+      createNewProject: vi.fn().mockResolvedValue(undefined),
+      deleteSelection: vi.fn().mockResolvedValue(undefined),
+      optimizeScale: vi.fn().mockResolvedValue(undefined),
+      buildCreasePattern: vi.fn().mockResolvedValue(undefined),
+      select: vi.fn(),
+    },
+    layout: {
+      activatePanel: vi.fn(),
+      resetLayout: vi.fn(),
+    },
+    fileService: createFileService('web'),
+    quit: vi.fn(),
+    about: vi.fn(),
+  };
+}
+
+describe('menu actions', () => {
+  it('recognizes shared command ids', () => {
+    expect(isMenuActionId('file.new')).toBe(true);
+    expect(isMenuActionId('cp.build')).toBe(true);
+    expect(isMenuActionId('not.real')).toBe(false);
+  });
+
+  it('dispatches document and layout commands', async () => {
+    const deps = createDeps();
+    const handle = createMenuActionHandler(deps);
+
+    await expect(handle('file.new')).resolves.toBe(true);
+    await expect(handle('view.creasePattern')).resolves.toBe(true);
+    await expect(handle('cp.build')).resolves.toBe(true);
+
+    expect(deps.workspace.createNewProject).toHaveBeenCalledOnce();
+    expect(deps.layout.activatePanel).toHaveBeenCalledWith('crease-pattern');
+    expect(deps.workspace.buildCreasePattern).toHaveBeenCalledOnce();
+  });
+
+  it('routes file commands through the selected file service', async () => {
+    const deps = createDeps();
+    deps.fileService = {
+      surface: 'desktop',
+      supportsNativeDialogs: true,
+      run: vi.fn().mockResolvedValue({ status: 'handled', message: 'saved' }),
+    };
+
+    await expect(createMenuActionHandler(deps)('file.saveAs')).resolves.toBe(true);
+    expect(deps.fileService.run).toHaveBeenCalledWith('saveProjectAs');
+  });
+
+  it('returns false for unknown ids', async () => {
+    await expect(createMenuActionHandler(createDeps())('unknown')).resolves.toBe(false);
+  });
+});

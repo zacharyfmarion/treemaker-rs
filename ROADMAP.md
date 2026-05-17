@@ -32,12 +32,24 @@ Implemented:
 - Direct ports of vertex, crease, facet, corridor-edge, facet-order,
   facet-color, and fold-direction construction for the checked-in oracle
   surface.
-- CLI and wasm bindings for parsing, checking, optimizing, and saving.
+- `CPStatus` diagnostic bad-part lists exposed through core, CLI, and wasm.
+- CLI and wasm bindings for parsing, checking, optimizing, building crease
+  patterns, reporting diagnostics, and saving.
 
-Explicitly incomplete:
+Remaining confidence work:
 
-- Public bad-part diagnostic lists for each `CPStatus` failure mode. The status
-  enum itself now matches the C++ oracle on the checked-in fixtures.
+- Broaden the parity corpus beyond the checked-in upstream fixtures and the
+  generated examples. The port should be tested against real-world `.tmd`,
+  `.tmd4`, and `.tmd5` files from existing TreeMaker users before claiming
+  every historical file works.
+- Add cross-platform oracle runs in CI, especially Linux and macOS, because ALM
+  floating-point convergence already shows small local-compiler drift in two
+  upstream scale-optimization records.
+- Stress/fuzz parse and round-trip behavior for malformed and unusual but valid
+  stream files.
+- Keep CFSQP/RFSQP out of scope unless redistributable source and compatible
+  license terms are provided. Those backends are not required for TreeMaker
+  5.0.1 ALM parity.
 
 ## Phase 1: Oracle Foundation
 

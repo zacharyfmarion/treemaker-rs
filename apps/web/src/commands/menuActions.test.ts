@@ -19,6 +19,8 @@ function createDeps() {
       pasteClipboard: vi.fn().mockResolvedValue(undefined),
       deleteSelection: vi.fn().mockResolvedValue(undefined),
       optimizeScale: vi.fn().mockResolvedValue(undefined),
+      optimizeEdges: vi.fn().mockResolvedValue(undefined),
+      optimizeStrain: vi.fn().mockResolvedValue(undefined),
       buildCreasePattern: vi.fn().mockResolvedValue(undefined),
       select: vi.fn(),
       selectAll: vi.fn(),
@@ -48,10 +50,12 @@ describe('menu actions', () => {
     await expect(handle('file.new')).resolves.toBe(true);
     await expect(handle('view.creasePattern')).resolves.toBe(true);
     await expect(handle('cp.build')).resolves.toBe(true);
+    await expect(handle('optimize.edges')).resolves.toBe(true);
 
     expect(deps.workspace.createNewProject).toHaveBeenCalledOnce();
     expect(deps.layout.activatePanel).toHaveBeenCalledWith('crease-pattern');
     expect(deps.workspace.buildCreasePattern).toHaveBeenCalledOnce();
+    expect(deps.workspace.optimizeEdges).toHaveBeenCalledOnce();
   });
 
   it('dispatches edit commands through workspace actions', async () => {

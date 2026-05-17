@@ -137,8 +137,8 @@ Done when:
 
 ### Phase 4: Optimization Workflow
 
-Status: started; the browser app now runs the engine in a Web Worker and can
-optimize the starter tree from the toolbar.
+Status: started; the shared app now runs scale, edge, and strain optimization
+from the toolbar or native Tauri menu.
 
 Goal: run optimization from the browser without freezing the UI.
 
@@ -149,6 +149,19 @@ Work items:
 - Surface busy state, errors, optimization reports, feasibility, and active
   path overlays.
 - Add Edge and Strain optimization after Scale is reliable in the UI.
+
+Implemented or started:
+
+- Scale, edge, and strain optimization commands use the same worker/runtime
+  bridge.
+- Optimization commands are routed through web buttons, keyboard-safe command
+  dispatch, native Tauri menus, history, and autosave.
+
+Remaining:
+
+- Selection-scoped optimization.
+- Progress reporting and cancellation.
+- Deeper feasibility diagnostics for constrained designs.
 
 Done when:
 

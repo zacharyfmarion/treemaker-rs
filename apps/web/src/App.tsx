@@ -85,7 +85,25 @@ function Toolbar() {
           onClick={() => void handleMenuAction('optimize.scale')}
         >
           <Sparkles size={14} />
-          Optimize
+          Scale
+        </Button>
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={!canOptimize}
+          onClick={() => void handleMenuAction('optimize.edges')}
+        >
+          <Sparkles size={14} />
+          Edges
+        </Button>
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={!canOptimize}
+          onClick={() => void handleMenuAction('optimize.strain')}
+        >
+          <Sparkles size={14} />
+          Strain
         </Button>
         <Button
           size="sm"

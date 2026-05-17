@@ -93,12 +93,17 @@ pub fn setup_menu(app: &App) -> Result<(), Box<dyn std::error::Error>> {
     let optimize_scale = MenuItemBuilder::with_id("optimize.scale", "Optimize Scale")
         .accelerator("CmdOrCtrl+R")
         .build(app)?;
+    let optimize_edges = MenuItemBuilder::with_id("optimize.edges", "Optimize Edges").build(app)?;
+    let optimize_strain =
+        MenuItemBuilder::with_id("optimize.strain", "Optimize Strain").build(app)?;
     let build_cp = MenuItemBuilder::with_id("cp.build", "Build Crease Pattern")
         .accelerator("CmdOrCtrl+B")
         .build(app)?;
 
     let design_menu = SubmenuBuilder::new(app, "Design")
         .item(&optimize_scale)
+        .item(&optimize_edges)
+        .item(&optimize_strain)
         .item(&build_cp)
         .build()?;
 

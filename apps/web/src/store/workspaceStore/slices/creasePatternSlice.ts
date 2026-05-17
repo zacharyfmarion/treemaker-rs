@@ -1,6 +1,12 @@
 import { projectFromSnapshot } from '../../../engine/snapshotMapper';
+import type { OptimizationReport } from '../../../engine/types';
 import { useLayoutStore } from '../../layoutStore';
-import { engineError, ensureTreeHandle, projectStateFromSnapshot } from '../engineRuntime';
+import {
+  engineError,
+  ensureTreeHandle,
+  projectStateFromSnapshot,
+  type EngineClient,
+} from '../engineRuntime';
 import type { CreasePatternSlice, WorkspaceSliceCreator } from '../types';
 
 export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice> = (
@@ -15,28 +21,44 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
     return result;
   }
 
+  async function runOptimization(
+    label: string,
+    optimize: (api: EngineClient, treeHandle: number) => Promise<OptimizationReport>
+  ) {
+    set({ status: 'optimizing', error: null });
+    const checkpoint = await get().beginHistoryCheckpoint();
+    try {
+      const { api, treeHandle } = await requireActiveTree();
+      const report = await optimize(api, treeHandle);
+      const snapshot = await api.snapshot(treeHandle);
+      set({
+        project: projectFromSnapshot(snapshot, get().project.title),
+        status: report.is_feasible ? 'optimized' : 'needs_optimization',
+        error: null,
+        lastOptimization: report,
+        dirty: true,
+        projectMessage: label,
+      });
+      get().commitHistoryCheckpoint(checkpoint, label);
+      void get().autosaveProject();
+    } catch (error) {
+      set({ status: 'error', error: engineError(error) });
+    }
+  }
+
   return {
     creaseColorMode: 'mvf',
 
     optimizeScale: async () => {
-      set({ status: 'optimizing', error: null });
-      const checkpoint = await get().beginHistoryCheckpoint();
-      try {
-        const { api, treeHandle } = await requireActiveTree();
-        const report = await api.optimizeScale(treeHandle);
-        const snapshot = await api.snapshot(treeHandle);
-        set({
-          project: projectFromSnapshot(snapshot, get().project.title),
-          status: report.is_feasible ? 'optimized' : 'needs_optimization',
-          error: null,
-          lastOptimization: report,
-          dirty: true,
-        });
-        get().commitHistoryCheckpoint(checkpoint, 'Optimize scale');
-        void get().autosaveProject();
-      } catch (error) {
-        set({ status: 'error', error: engineError(error) });
-      }
+      await runOptimization('Optimize scale', (api, treeHandle) => api.optimizeScale(treeHandle));
+    },
+
+    optimizeEdges: async () => {
+      await runOptimization('Optimize edges', (api, treeHandle) => api.optimizeEdges(treeHandle));
+    },
+
+    optimizeStrain: async () => {
+      await runOptimization('Optimize strain', (api, treeHandle) => api.optimizeStrain(treeHandle));
     },
 
     buildCreasePattern: async () => {

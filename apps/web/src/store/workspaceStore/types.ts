@@ -157,6 +157,8 @@ export interface CreasePatternSliceState {
 
 export interface CreasePatternSliceActions {
   optimizeScale: () => Promise<void>;
+  optimizeEdges: () => Promise<void>;
+  optimizeStrain: () => Promise<void>;
   buildCreasePattern: () => Promise<void>;
   setCreaseColorMode: (mode: CreaseColorMode) => void;
 }

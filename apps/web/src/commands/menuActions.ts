@@ -24,6 +24,8 @@ export const MENU_ACTION_IDS = [
   'view.conditions',
   'view.resetLayout',
   'optimize.scale',
+  'optimize.edges',
+  'optimize.strain',
   'cp.build',
   'help.about',
 ] as const;
@@ -45,6 +47,8 @@ export interface WorkspaceCommands {
   pasteClipboard(): Promise<void>;
   deleteSelection(): Promise<void>;
   optimizeScale(): Promise<void>;
+  optimizeEdges(): Promise<void>;
+  optimizeStrain(): Promise<void>;
   buildCreasePattern(): Promise<void>;
   select(selection: { kind: 'tree' }): void;
   selectAll(): void;
@@ -147,6 +151,12 @@ export function createMenuActionHandler(deps: MenuActionDependencies) {
         return true;
       case 'optimize.scale':
         await deps.workspace.optimizeScale();
+        return true;
+      case 'optimize.edges':
+        await deps.workspace.optimizeEdges();
+        return true;
+      case 'optimize.strain':
+        await deps.workspace.optimizeStrain();
         return true;
       case 'cp.build':
         await deps.workspace.buildCreasePattern();

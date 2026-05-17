@@ -174,6 +174,8 @@ Done when:
 
 ## Phase 5: Full Optimization Workflow
 
+Status: started.
+
 Priority: high.
 
 Goal: bring the original optimization power into a non-blocking shared UI.
@@ -189,6 +191,19 @@ Features:
 - Clear feasibility states and failure reasons.
 - Diagnostics for equality/variable overconstraint warnings.
 - Active path and infeasible path overlays.
+
+Implemented or started:
+
+- Scale, edge, and strain optimization commands are available in web and
+  desktop.
+- Native Tauri menu actions and web toolbar commands share the same dispatcher.
+- Optimization runs participate in undo/redo history and autosave.
+
+Remaining:
+
+- Selection-scoped optimization controls.
+- Progress reporting and cancellation.
+- Better failure diagnostics for over-constrained systems.
 
 Done when:
 

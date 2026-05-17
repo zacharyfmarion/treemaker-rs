@@ -1,9 +1,9 @@
 # TreeMaker Product Roadmap
 
-This roadmap tracks the browser and eventual desktop product surface for
+This roadmap tracks the shared web and desktop product surface for
 TreeMaker. `ROADMAP.md` tracks the Rust engine port. `WEB_ROADMAP.md` tracks
-implementation phases for the web app. This file is the product backlog: what
-the app should let a user do, in the order we should make it useful.
+implementation phases for the shared GUI. This file is the product backlog:
+what the app should let a user do, in the order we should make it useful.
 
 The original wxWidgets TreeMaker app is a feature reference, not a UX template.
 The new app should preserve the important origami-design capabilities while
@@ -13,8 +13,7 @@ presenting them as a modern pane-based design tool.
 
 A user should be able to start from a blank tree, draw and constrain a design,
 optimize it, generate a crease pattern, inspect problems, save/reopen the work,
-and export a usable pattern from either the browser or the later Tauri desktop
-app.
+and export a usable pattern from either the browser or the Tauri desktop app.
 
 ## Phase 0: Current Browser Spine
 
@@ -40,29 +39,65 @@ Done when:
 - A user can draw a simple three-leaf tree from a blank document, optimize it,
   build a visible crease pattern, and understand whether the action succeeded.
 
-## Phase 1: Saveable Browser MVP
+## Phase 1: Tauri Shell And Platform Bridge
 
 Priority: highest.
 
-Goal: make browser work durable and shareable.
+Goal: make desktop parity real before file workflows harden around browser-only
+assumptions.
+
+Features:
+
+- Tauri v2 shell under an app workspace that wraps the existing shared frontend.
+- Desktop dev/build scripts that run the same Vite app used by browser mode.
+- Runtime detection for `web` vs `desktop`.
+- Platform feature flags so UI can hide browser-only or desktop-only controls.
+- Shared command IDs for file, edit, view, help, optimize, and CP actions.
+- Native Tauri menu that emits frontend `menu-action` events, following the
+  Cascade pattern.
+- Web menu or toolbar commands that dispatch through the same frontend command
+  layer as native menu events.
+- Initial Tauri capabilities for core, events, windows, and dialogs.
+- File-service interface with browser and Tauri implementations, even if the
+  first commands are stubs.
+- Window title and dirty-state plumbing hooks.
+- Unit tests for runtime detection, feature visibility, command routing, and
+  menu-action dispatch.
+
+Done when:
+
+- `npm run dev:desktop` launches the current app in Tauri.
+- `npm run dev:web`, `npm run build:web`, and `npm run test:web` still pass.
+- Native File menu actions reach the same frontend command dispatcher used by
+  browser UI controls.
+- Save/open/export can be implemented once against the platform bridge instead
+  of separately for browser and desktop.
+
+## Phase 2: Saveable Web And Desktop MVP
+
+Priority: highest after the Tauri shell.
+
+Goal: make work durable and shareable in both runtime surfaces.
 
 Features:
 
 - Open/import `.tmd`, `.tmd4`, and `.tmd5`.
-- Save/download canonical `.tmd5`.
+- Save canonical `.tmd5` using browser download or native save dialogs.
+- Save As canonical `.tmd5` using browser picker/download or native save-as.
 - Export legacy `.tmd4`.
 - Preserve imported crease-pattern payloads until the first structural edit.
 - Autosave recent browser projects.
-- Unsaved-change warnings.
+- Recent desktop files once the native path exists.
+- Unsaved-change warnings in browser unload and desktop close/menu flows.
 - Example gallery using checked-in generated families.
 - Project title and basic document metadata.
 
 Done when:
 
-- A browser-only user can load an existing TreeMaker file, edit it, optimize,
-  build CP, save, reload, and get the same design back.
+- A user can load an existing TreeMaker file, edit it, optimize, build CP, save,
+  reload, and get the same design back in both browser and Tauri.
 
-## Phase 2: History, Clipboard, And Selection
+## Phase 3: History, Clipboard, And Selection
 
 Priority: highest after files.
 
@@ -84,7 +119,7 @@ Done when:
 - A user can experiment without fear, select the parts they mean, and recover
   from mistakes without rebuilding the design.
 
-## Phase 3: Core Tree Editing Tools
+## Phase 4: Core Tree Editing Tools
 
 Priority: high.
 
@@ -117,11 +152,11 @@ Done when:
 - Common model cleanup and refinement operations from the original app are
   available from contextual commands or inspector actions.
 
-## Phase 4: Full Optimization Workflow
+## Phase 5: Full Optimization Workflow
 
 Priority: high.
 
-Goal: bring the original optimization power into a non-blocking browser UI.
+Goal: bring the original optimization power into a non-blocking shared UI.
 
 Features:
 
@@ -140,7 +175,7 @@ Done when:
 - A user can choose the right optimization type, see progress, cancel safely,
   and understand why an optimization failed or produced strain.
 
-## Phase 5: Conditions And Symmetry
+## Phase 6: Conditions And Symmetry
 
 Priority: high for serious TreeMaker users.
 
@@ -171,7 +206,7 @@ Done when:
 - Designs from TreeMaker tutorials that rely on symmetry and constraints can be
   built in the new app without opening the old app.
 
-## Phase 6: Crease Pattern Workspace
+## Phase 7: Crease Pattern Workspace
 
 Priority: medium-high.
 
@@ -195,7 +230,7 @@ Done when:
 - A user can generate a CP, inspect every relevant part, diagnose bad output,
   and export a pattern suitable for downstream use.
 
-## Phase 7: View Settings And Navigation
+## Phase 8: View Settings And Navigation
 
 Priority: medium.
 
@@ -221,30 +256,30 @@ Done when:
 - Dense designs remain readable because users can quickly switch visual layers
   for the task at hand.
 
-## Phase 8: Desktop App With Tauri
+## Phase 9: Desktop Integration Hardening
 
-Priority: medium after browser MVP.
+Priority: medium after save/open parity.
 
-Goal: wrap the same app in a native desktop shell without forking product logic.
+Goal: make the Tauri app feel like a normal local design tool after the shell
+and platform bridge are already in place.
 
 Features:
 
-- Tauri v2 app shell.
-- Native open/save/save-as dialogs.
 - Native recent files.
-- Native app menus and keyboard shortcuts.
+- Native menu polish and keyboard shortcut parity.
 - Window title and modified-state integration.
 - Close guards for unsaved work.
 - Native print path where useful.
 - Preferences storage.
-- Platform bridge shared by browser and desktop modes.
+- File association and double-click open, if practical.
+- Release bundle metadata, signing/notarization notes, and updater strategy.
 
 Done when:
 
 - The desktop app feels like a normal local design tool while sharing the same
   editor, engine worker, and roadmap as the browser app.
 
-## Phase 9: Help, Learning, And Release Polish
+## Phase 10: Help, Learning, And Release Polish
 
 Priority: medium.
 

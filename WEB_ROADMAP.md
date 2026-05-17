@@ -2,11 +2,11 @@
 
 This file tracks the GUI/web-app work for `treemaker-rs`. The Rust engine
 roadmap remains in `ROADMAP.md`; this roadmap is for product, UI, browser,
-WASM, and eventual Tauri desktop work.
+WASM, and Tauri desktop work.
 
 ## Current Decision
 
-Build the first web app in this repository.
+Build the shared web and Tauri app in this repository.
 
 Why:
 
@@ -14,6 +14,9 @@ Why:
   APIs, so keeping app and engine together avoids version skew.
 - The repository is already the canonical home of the Rust/WASM port, which
   makes development and parity testing easier.
+- Tauri should share the same `apps/web` frontend from the start so file,
+  command, menu, and dirty-state behavior do not drift between browser and
+  desktop modes.
 - Discoverability can be handled through README links, hosted demos, and later
   package/release artifacts without splitting the source too early.
 
@@ -37,14 +40,39 @@ Dockview panes, compact toolbars, quiet inspector panels, icon buttons,
 segmented controls, Radix-style primitives, Zustand stores, and CSS token
 themes.
 
+From this point forward, build browser and Tauri parity together. Browser mode
+is still the easiest development target, but the desktop shell should exist
+before save/open/export behavior is finalized.
+
+## Cascade Reference Pattern
+
+Cascade keeps the frontend shared and wraps it with a small Tauri app:
+
+- `apps/web` remains the Vite/React app.
+- `apps/tauri/src-tauri/tauri.conf.json` points Tauri dev/build commands at the
+  web app and uses the web `dist` output for desktop builds.
+- Tauri builds native menus in Rust with stable IDs such as `file.open`,
+  `file.save`, and `view.resetLayout`, then emits a `menu-action` event.
+- The web app listens for `menu-action` only in desktop runtime and passes the
+  ID to the same frontend command dispatcher used by web controls.
+- Runtime detection is a tiny platform module that checks Tauri globals and
+  returns `web` or `desktop`.
+- Platform feature helpers decide whether desktop-only or browser-only UI is
+  visible.
+- Tauri capabilities explicitly allow core, event, window, and dialog behavior.
+
+TreeMaker should copy this architecture rather than pushing product behavior
+into Tauri-specific code. The Tauri side should own native shell concerns;
+the React app should own document commands and editor state.
+
 ## Phase Status
 
 ### Phase 1: Roadmap And Web Shell
 
-Status: complete for the initial browser shell.
+Status: complete for the initial shared frontend shell.
 
-Goal: create the project structure for a browser-first GUI that can build in
-CI and leaves room for Tauri.
+Goal: create the project structure for a shared GUI that can build in CI and
+run in browser mode.
 
 Work items:
 
@@ -146,24 +174,64 @@ Done when:
 - A simple optimized tree can generate a visible crease pattern in the Crease
   Pattern pane.
 
-### Phase 6: Files, Examples, And Persistence
+### Phase 6: Tauri Shell And Platform Bridge
 
 Status: not started.
 
-Goal: make the app usable across sessions.
+Goal: create a working desktop shell before file workflows become browser-only.
+
+Work items:
+
+- Add `apps/tauri/src-tauri` using Tauri v2.
+- Add root scripts for `dev:desktop`, `build:desktop`, and desktop validation.
+- Configure Tauri `beforeDevCommand`, `beforeBuildCommand`, `devUrl`, and
+  `frontendDist` to reuse `apps/web`.
+- Add basic app window metadata, icons/placeholders, bundle identifiers, and
+  capabilities.
+- Add a Rust native menu with stable IDs for File, Edit, View, Help, Optimize,
+  and Crease Pattern commands.
+- Emit Tauri `menu-action` events for native menu selections.
+- Add frontend runtime detection for `web` and `desktop`.
+- Add frontend feature visibility helpers for browser-only and desktop-only UI.
+- Add `useTauriMenuListener` or equivalent to subscribe to native menu events.
+- Add a command dispatcher that handles menu IDs from both web UI and native
+  menus.
+- Add a file-service interface with browser and Tauri implementations; start
+  with no-op or mockable methods where persistence is not implemented yet.
+- Wire initial dirty-state and window-title hooks so later file work has a
+  place to attach.
+- Add unit tests for runtime detection, feature flags, menu dispatch, and file
+  service selection.
+
+Done when:
+
+- `npm run dev:desktop` launches the existing editor in a Tauri window.
+- Browser development and builds still use the same `apps/web` app.
+- Native menu actions reach the frontend command dispatcher.
+- The next save/open/export phase can implement behavior against shared
+  platform interfaces.
+
+### Phase 7: Web And Desktop Files, Examples, And Persistence
+
+Status: not started.
+
+Goal: make the app usable across sessions in both browser and Tauri.
 
 Work items:
 
 - Add browser open/import, save/download, autosave, and unsaved-change guards.
+- Add Tauri open/save/save-as dialogs behind the same file-service interface.
+- Add Tauri close guards and window modified-state handling.
 - Add examples based on existing generated tree families.
 - Preserve imported crease-pattern payloads until the first edit.
 - Add SVG and PNG export for crease renderings.
 
 Done when:
 
-- A browser-only user can load, edit, optimize, build, save, reload, and export.
+- A user can load, edit, optimize, build, save, reload, and export in browser
+  and Tauri mode.
 
-### Phase 7: Conditions And Advanced Controls
+### Phase 8: Conditions And Advanced Controls
 
 Status: not started.
 
@@ -182,25 +250,27 @@ Done when:
 - The common symmetry and constraint workflows from TreeMaker tutorials are
   expressible in the web UI.
 
-### Phase 8: Tauri Desktop App
+### Phase 9: Native Desktop Integration
 
 Status: not started.
 
-Goal: wrap the same app in a desktop shell without forking the UI.
+Goal: harden native desktop behavior after the shell and file bridge exist.
 
 Work items:
 
-- Add Tauri v2 app structure.
-- Add native file dialogs, menus, recent files, close guards, and window title
-  integration.
-- Keep browser mode and desktop mode behind a small platform bridge.
+- Add native recent files.
+- Polish menu item enablement, labels, and keyboard shortcut parity.
+- Add file association and open-on-launch behavior if practical.
+- Add preferences storage.
+- Add native print/export affordances where the browser path is weak.
+- Add desktop bundle metadata, signing/notarization notes, and release scripts.
 
 Done when:
 
 - Desktop builds can open/save local `.tmd5` files and run the same core UI
   workflow as the web app.
 
-### Phase 9: Release And Maintenance
+### Phase 10: Release And Maintenance
 
 Status: not started.
 

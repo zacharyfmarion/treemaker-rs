@@ -3,8 +3,8 @@ use wasm_bindgen::JsValue;
 use wasm_bindgen_test::*;
 
 use treemaker_wasm::{
-    build_crease_pattern, cp_status_report, free_tree, load_tmd, optimize_scale, save_tmd5,
-    tree_summary,
+    apply_edit, build_crease_pattern, cp_status_report, free_tree, load_tmd, new_design,
+    optimize_scale, save_tmd5, tree_design, tree_snapshot, tree_summary,
 };
 
 const FIXTURE_1: &str = include_str!("../testdata/tmModelTester_1.tmd5");
@@ -45,6 +45,63 @@ fn parse_errors_are_structured() {
     assert_js_error(&err, "parse", "expected tag");
 }
 
+#[wasm_bindgen_test]
+fn editable_design_api_returns_snapshots() {
+    let handle = new_design(JsValue::NULL).expect("new design");
+    let first = json(
+        apply_edit(
+            handle,
+            edit(
+                "add_node",
+                serde_json::json!({
+                    "loc": { "x": 0.5, "y": 0.5 },
+                    "label": "root"
+                }),
+            ),
+        )
+        .expect("add root"),
+    );
+    assert_eq!(first["created_node"], 1);
+
+    for (x, y) in [(0.2, 0.2), (0.8, 0.2), (0.5, 0.85)] {
+        apply_edit(
+            handle,
+            edit(
+                "add_node",
+                serde_json::json!({
+                    "loc": { "x": x, "y": y },
+                    "connect_to": 1,
+                    "edge_length": 1.0
+                }),
+            ),
+        )
+        .expect("add connected node");
+    }
+
+    let snapshot = json(tree_snapshot(handle).expect("snapshot"));
+    assert_eq!(snapshot["summary"]["nodes"], 4);
+    assert_eq!(snapshot["summary"]["edges"], 3);
+    assert_eq!(snapshot["summary"]["paths"], 6);
+    assert_eq!(snapshot["nodes"].as_array().expect("nodes").len(), 4);
+
+    let design = json(tree_design(handle).expect("design"));
+    assert_eq!(design["nodes"].as_array().expect("design nodes").len(), 4);
+
+    let err = apply_edit(
+        handle,
+        edit(
+            "add_edge",
+            serde_json::json!({
+                "node1": 2,
+                "node2": 3
+            }),
+        ),
+    )
+    .expect_err("cycle should be rejected");
+    assert_js_error(&err, "invalid_operation", "tree topology");
+    free_tree(handle).expect("free handle");
+}
+
 fn json(value: JsValue) -> Value {
     serde_wasm_bindgen::from_value(value).expect("json value")
 }
@@ -59,4 +116,9 @@ fn assert_js_error(value: &JsValue, code: &str, message_fragment: &str) {
             .contains(message_fragment),
         "{error:?}"
     );
+}
+
+fn edit(kind: &str, mut value: serde_json::Value) -> JsValue {
+    value["type"] = serde_json::Value::String(kind.to_string());
+    serde_wasm_bindgen::to_value(&value).expect("edit value")
 }

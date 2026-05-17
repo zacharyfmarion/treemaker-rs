@@ -65,7 +65,7 @@ Done when:
 
 ### Phase 2: Editable Engine Contract
 
-Status: not started.
+Status: complete for the initial core and wasm editing contract.
 
 Goal: expose a safe, UI-friendly editing API instead of making the browser
 construct TreeMaker internals by hand.

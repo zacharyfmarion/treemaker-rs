@@ -491,7 +491,11 @@
 }
 
 .conditions-panel__body {
+  display: grid;
+  align-content: start;
   gap: var(--space-4);
+  padding: var(--space-3);
+  box-sizing: border-box;
 }
 
 .condition-section {

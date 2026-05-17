@@ -1,6 +1,6 @@
 import { useCallback, useEffect } from 'react';
-import { DockviewReact } from 'dockview';
-import type { DockviewReadyEvent } from 'dockview';
+import { DockviewDefaultTab, DockviewReact } from 'dockview';
+import type { DockviewReadyEvent, IDockviewPanelHeaderProps } from 'dockview';
 import 'dockview/dist/styles/dockview.css';
 import {
   FilePlus,
@@ -85,25 +85,7 @@ function Toolbar() {
           onClick={() => void handleMenuAction('optimize.scale')}
         >
           <Sparkles size={14} />
-          Scale
-        </Button>
-        <Button
-          size="sm"
-          variant="secondary"
-          disabled={!canOptimize}
-          onClick={() => void handleMenuAction('optimize.edges')}
-        >
-          <Sparkles size={14} />
-          Edges
-        </Button>
-        <Button
-          size="sm"
-          variant="secondary"
-          disabled={!canOptimize}
-          onClick={() => void handleMenuAction('optimize.strain')}
-        >
-          <Sparkles size={14} />
-          Strain
+          Optimize
         </Button>
         <Button
           size="sm"
@@ -121,6 +103,10 @@ function Toolbar() {
       </div>
     </header>
   );
+}
+
+function FixedDockTab(props: IDockviewPanelHeaderProps) {
+  return <DockviewDefaultTab {...props} hideClose />;
 }
 
 export default function App() {
@@ -259,6 +245,7 @@ export default function App() {
         <Toolbar />
         <DockviewReact
           components={panelComponents}
+          defaultTabComponent={FixedDockTab}
           onReady={onReady}
           className="dockview-theme-treemaker"
           disableFloatingGroups

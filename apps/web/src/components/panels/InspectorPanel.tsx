@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Activity, Circle, GitBranch, Square } from 'lucide-react';
+import { Activity, Circle, GitBranch, MousePointer2, Square, Waypoints } from 'lucide-react';
 import { formatNumber } from '../../lib/geometry';
+import { selectedNodeIds, selectionSummary } from '../../lib/selection';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 
 export function InspectorPanel() {
@@ -9,6 +10,9 @@ export function InspectorPanel() {
   const moveNode = useWorkspaceStore((state) => state.moveNode);
   const updateNodeLabel = useWorkspaceStore((state) => state.updateNodeLabel);
   const updateEdge = useWorkspaceStore((state) => state.updateEdge);
+  const selectPathBetweenSelectedNodes = useWorkspaceStore(
+    (state) => state.selectPathBetweenSelectedNodes
+  );
 
   const selectedNode =
     selection.kind === 'node' ? project.nodes.find((node) => node.id === selection.id) : null;
@@ -16,6 +20,11 @@ export function InspectorPanel() {
     selection.kind === 'edge' ? project.edges.find((edge) => edge.id === selection.id) : null;
   const selectedCrease =
     selection.kind === 'crease' ? project.creases.find((crease) => crease.id === selection.id) : null;
+  const selectedFacet =
+    selection.kind === 'facet' ? project.facets.find((facet) => facet.id === selection.id) : null;
+  const selectedPath =
+    selection.kind === 'path' ? project.paths.find((path) => path.id === selection.id) : null;
+  const selectedNodes = selectedNodeIds(selection);
 
   return (
     <section className="panel-shell inspector-panel">
@@ -82,6 +91,38 @@ export function InspectorPanel() {
             <div className="inspector-heading"><Activity size={15} /> Crease {selectedCrease.id}</div>
             <Row label="Fold" value={selectedCrease.fold} />
             <Row label="Kind" value={selectedCrease.kind} />
+          </>
+        )}
+        {selectedPath && (
+          <>
+            <div className="inspector-heading"><Waypoints size={15} /> Path {selectedPath.id}</div>
+            <Row label="Nodes" value={selectedPath.nodes.join(' -> ')} />
+            <Row label="Active" value={selectedPath.isActive ? 'Yes' : 'No'} />
+            <Row label="Feasible" value={selectedPath.isFeasible ? 'Yes' : 'No'} />
+            <Row label="Border" value={selectedPath.isBorder ? 'Yes' : 'No'} />
+          </>
+        )}
+        {selectedFacet && (
+          <>
+            <div className="inspector-heading"><Activity size={15} /> Facet {selectedFacet.id}</div>
+            <Row label="Vertices" value={String(selectedFacet.vertices.length)} />
+            <Row label="Color" value={selectedFacet.color} />
+          </>
+        )}
+        {selection.kind === 'multi' && (
+          <>
+            <div className="inspector-heading"><MousePointer2 size={15} /> Selection</div>
+            <Row label="Parts" value={selectionSummary(selection)} />
+            {selectedNodes.length === 2 && (
+              <button
+                className="control-row control-row--button"
+                type="button"
+                onClick={selectPathBetweenSelectedNodes}
+              >
+                <span className="control-row__label">Path</span>
+                <span className="control-row__value">Select between nodes</span>
+              </button>
+            )}
           </>
         )}
         {selection.kind === 'tree' && (

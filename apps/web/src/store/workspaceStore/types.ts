@@ -57,6 +57,28 @@ export interface ProjectSliceActions {
 
 export type ProjectSlice = ProjectSliceState & ProjectSliceActions;
 
+export interface HistoryEntry {
+  text: string;
+  label: string;
+  timestamp: string;
+}
+
+export interface HistorySliceState {
+  historyPast: HistoryEntry[];
+  historyFuture: HistoryEntry[];
+  historyBusy: boolean;
+}
+
+export interface HistorySliceActions {
+  beginHistoryCheckpoint: () => Promise<string | null>;
+  commitHistoryCheckpoint: (beforeText: string | null, label?: string) => void;
+  clearHistory: () => void;
+  undo: () => Promise<void>;
+  redo: () => Promise<void>;
+}
+
+export type HistorySlice = HistorySliceState & HistorySliceActions;
+
 export interface EditingSliceState {
   selection: Selection;
   toolMode: ToolMode;
@@ -73,10 +95,46 @@ export interface EditingSliceActions {
   ) => Promise<void>;
   deleteSelection: () => Promise<void>;
   select: (selection: Selection) => void;
+  selectAll: () => void;
+  selectNone: () => void;
+  selectPathBetweenSelectedNodes: () => void;
   setToolMode: (toolMode: ToolMode) => void;
 }
 
 export type EditingSlice = EditingSliceState & EditingSliceActions;
+
+export interface ClipboardNode {
+  sourceId: number;
+  label: string;
+  loc: Point;
+}
+
+export interface ClipboardEdge {
+  sourceId: number;
+  sourceNodes: [number, number];
+  label: string;
+  length: number;
+  strain: number;
+  stiffness: number;
+}
+
+export interface TreeClipboardPayload {
+  nodes: ClipboardNode[];
+  edges: ClipboardEdge[];
+}
+
+export interface ClipboardSliceState {
+  clipboard: TreeClipboardPayload | null;
+  clipboardPasteCount: number;
+}
+
+export interface ClipboardSliceActions {
+  copySelection: () => void;
+  cutSelection: () => Promise<void>;
+  pasteClipboard: () => Promise<void>;
+}
+
+export type ClipboardSlice = ClipboardSliceState & ClipboardSliceActions;
 
 export interface CreasePatternSliceState {
   creaseColorMode: CreaseColorMode;
@@ -90,7 +148,7 @@ export interface CreasePatternSliceActions {
 
 export type CreasePatternSlice = CreasePatternSliceState & CreasePatternSliceActions;
 
-export type WorkspaceState = ProjectSlice & EditingSlice & CreasePatternSlice;
+export type WorkspaceState = ProjectSlice & HistorySlice & EditingSlice & ClipboardSlice & CreasePatternSlice;
 
 export type WorkspaceSliceCreator<T> = StateCreator<
   WorkspaceState,

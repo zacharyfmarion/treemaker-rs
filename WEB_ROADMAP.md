@@ -233,7 +233,31 @@ Done when:
 - A user can load, edit, optimize, build, save, reload, and export in browser
   and Tauri mode.
 
-### Phase 8: Conditions And Advanced Controls
+### Phase 8: History, Clipboard, And Selection
+
+Status: started.
+
+Goal: make editing recoverable and selection-safe in both browser and Tauri.
+
+Work items:
+
+- Add snapshot-based undo/redo across design edits, optimization, and CP builds.
+- Add shared edit command IDs for undo, redo, cut, copy, paste, select all,
+  deselect all, and delete.
+- Route browser keyboard shortcuts and native Tauri menu actions through the
+  same command dispatcher.
+- Add internal clipboard support for connected tree selections.
+- Add multi-selection for design nodes/edges and CP creases/facets.
+- Add select-path-between-two-nodes workflow.
+- Finish select-by-index, movable-part selection, corridor-facet selection, and
+  condition selection after those surfaces exist.
+
+Done when:
+
+- Users can experiment, undo mistakes, select the relevant parts, and use
+  standard edit commands in both web and desktop builds.
+
+### Phase 9: Conditions And Advanced Controls
 
 Status: not started.
 
@@ -252,7 +276,7 @@ Done when:
 - The common symmetry and constraint workflows from TreeMaker tutorials are
   expressible in the web UI.
 
-### Phase 9: Native Desktop Integration
+### Phase 10: Native Desktop Integration
 
 Status: not started.
 
@@ -272,7 +296,7 @@ Done when:
 - Desktop builds can open/save local `.tmd5` files and run the same core UI
   workflow as the web app.
 
-### Phase 10: Release And Maintenance
+### Phase 11: Release And Maintenance
 
 Status: not started.
 

@@ -20,6 +20,7 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
 
     optimizeScale: async () => {
       set({ status: 'optimizing', error: null });
+      const checkpoint = await get().beginHistoryCheckpoint();
       try {
         const { api, treeHandle } = await requireActiveTree();
         const report = await api.optimizeScale(treeHandle);
@@ -31,6 +32,7 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
           lastOptimization: report,
           dirty: true,
         });
+        get().commitHistoryCheckpoint(checkpoint, 'Optimize scale');
         void get().autosaveProject();
       } catch (error) {
         set({ status: 'error', error: engineError(error) });
@@ -39,6 +41,7 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
 
     buildCreasePattern: async () => {
       set({ status: 'building_crease_pattern', error: null });
+      const checkpoint = await get().beginHistoryCheckpoint();
       try {
         const { api, treeHandle } = await requireActiveTree();
         const snapshot = await api.buildCreasePattern(treeHandle);
@@ -48,6 +51,7 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
           error: null,
           dirty: true,
         });
+        get().commitHistoryCheckpoint(checkpoint, 'Build crease pattern');
         void get().autosaveProject();
         useLayoutStore.getState().activatePanel('crease-pattern');
       } catch (error) {

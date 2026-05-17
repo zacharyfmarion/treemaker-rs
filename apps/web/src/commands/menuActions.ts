@@ -11,7 +11,13 @@ export const MENU_ACTION_IDS = [
   'file.exportV4',
   'file.exportSvg',
   'file.exportPng',
+  'edit.undo',
+  'edit.redo',
+  'edit.cut',
+  'edit.copy',
+  'edit.paste',
   'edit.delete',
+  'edit.selectAll',
   'edit.deselectAll',
   'view.design',
   'view.creasePattern',
@@ -31,10 +37,17 @@ export interface WorkspaceCommands {
   exportV4(fileService?: FileService): Promise<boolean>;
   exportSvg(fileService?: FileService): Promise<boolean>;
   exportPng(fileService?: FileService): Promise<boolean>;
+  undo(): Promise<void>;
+  redo(): Promise<void>;
+  cutSelection(): Promise<void>;
+  copySelection(): void;
+  pasteClipboard(): Promise<void>;
   deleteSelection(): Promise<void>;
   optimizeScale(): Promise<void>;
   buildCreasePattern(): Promise<void>;
   select(selection: { kind: 'tree' }): void;
+  selectAll(): void;
+  selectNone(): void;
 }
 
 export interface LayoutCommands {
@@ -95,11 +108,29 @@ export function createMenuActionHandler(deps: MenuActionDependencies) {
       case 'file.new':
         await deps.workspace.createNewProject();
         return true;
+      case 'edit.undo':
+        await deps.workspace.undo();
+        return true;
+      case 'edit.redo':
+        await deps.workspace.redo();
+        return true;
+      case 'edit.cut':
+        await deps.workspace.cutSelection();
+        return true;
+      case 'edit.copy':
+        deps.workspace.copySelection();
+        return true;
+      case 'edit.paste':
+        await deps.workspace.pasteClipboard();
+        return true;
       case 'edit.delete':
         await deps.workspace.deleteSelection();
         return true;
+      case 'edit.selectAll':
+        deps.workspace.selectAll();
+        return true;
       case 'edit.deselectAll':
-        deps.workspace.select({ kind: 'tree' });
+        deps.workspace.selectNone();
         return true;
       case 'view.design':
         deps.layout.activatePanel('design');

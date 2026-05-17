@@ -4,7 +4,17 @@ export type Selection =
   | { kind: 'tree' }
   | { kind: 'node'; id: number }
   | { kind: 'edge'; id: number }
-  | { kind: 'crease'; id: number };
+  | { kind: 'path'; id: number }
+  | { kind: 'crease'; id: number }
+  | { kind: 'facet'; id: number }
+  | {
+      kind: 'multi';
+      nodes: number[];
+      edges: number[];
+      paths: number[];
+      creases: number[];
+      facets: number[];
+    };
 
 export type AppStatus =
   | 'loading_engine'

@@ -167,7 +167,36 @@ export default function App() {
         target instanceof HTMLInputElement ||
         target instanceof HTMLTextAreaElement ||
         target instanceof HTMLSelectElement;
-      if (isEditing || (event.key !== 'Delete' && event.key !== 'Backspace')) return;
+      if (isEditing) return;
+
+      const modifier = event.metaKey || event.ctrlKey;
+      const key = event.key.toLowerCase();
+      if (modifier && key === 'z') {
+        event.preventDefault();
+        void handleMenuAction(event.shiftKey ? 'edit.redo' : 'edit.undo');
+        return;
+      }
+      if (modifier && key === 'x') {
+        event.preventDefault();
+        void handleMenuAction('edit.cut');
+        return;
+      }
+      if (modifier && key === 'c') {
+        event.preventDefault();
+        void handleMenuAction('edit.copy');
+        return;
+      }
+      if (modifier && key === 'v') {
+        event.preventDefault();
+        void handleMenuAction('edit.paste');
+        return;
+      }
+      if (modifier && key === 'a') {
+        event.preventDefault();
+        void handleMenuAction('edit.selectAll');
+        return;
+      }
+      if (event.key !== 'Delete' && event.key !== 'Backspace') return;
       event.preventDefault();
       void deleteSelection();
     };

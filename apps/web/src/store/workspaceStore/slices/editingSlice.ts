@@ -1,5 +1,10 @@
-import type { TreeEdit } from '../../../engine/types';
+import type { TreeEdit, TreeSnapshot } from '../../../engine/types';
 import { projectFromSnapshot } from '../../../engine/snapshotMapper';
+import {
+  selectEverything,
+  selectedEdgeIds,
+  selectedNodeIds,
+} from '../../../lib/selection';
 import {
   engineError,
   ensureTreeHandle,
@@ -24,6 +29,7 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
 
     addNodeAt: async (loc, connectTo) => {
       set({ error: null });
+      const checkpoint = await get().beginHistoryCheckpoint();
       try {
         const { api, treeHandle } = await requireActiveTree();
         const report = await api.applyEdit(treeHandle, {
@@ -45,6 +51,7 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
           error: null,
           lastOptimization: null,
         });
+        get().commitHistoryCheckpoint(checkpoint, 'Add node');
         void get().autosaveProject();
       } catch (error) {
         set({ status: 'error', error: engineError(error) });
@@ -53,6 +60,7 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
 
     moveNode: async (id, loc) => {
       set({ error: null });
+      const checkpoint = await get().beginHistoryCheckpoint();
       try {
         const { api, treeHandle } = await requireActiveTree();
         const edit: TreeEdit = { type: 'move_node', id, loc };
@@ -65,6 +73,7 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
           error: null,
           lastOptimization: null,
         });
+        get().commitHistoryCheckpoint(checkpoint, 'Move node');
         void get().autosaveProject();
       } catch (error) {
         set({ status: 'error', error: engineError(error) });
@@ -74,6 +83,7 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
     addEdge: async (node1, node2) => {
       if (node1 === node2) return;
       set({ error: null });
+      const checkpoint = await get().beginHistoryCheckpoint();
       try {
         const { api, treeHandle } = await requireActiveTree();
         const report = await api.applyEdit(treeHandle, {
@@ -92,6 +102,7 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
           error: null,
           lastOptimization: null,
         });
+        get().commitHistoryCheckpoint(checkpoint, 'Add edge');
         void get().autosaveProject();
       } catch (error) {
         set({ status: 'error', error: engineError(error) });
@@ -100,6 +111,7 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
 
     updateNodeLabel: async (id, label) => {
       set({ error: null });
+      const checkpoint = await get().beginHistoryCheckpoint();
       try {
         const { api, treeHandle } = await requireActiveTree();
         const edit: TreeEdit = { type: 'update_node_label', id, label };
@@ -110,6 +122,7 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
           dirty: true,
           error: null,
         });
+        get().commitHistoryCheckpoint(checkpoint, 'Rename node');
         void get().autosaveProject();
       } catch (error) {
         set({ status: 'error', error: engineError(error) });
@@ -118,6 +131,7 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
 
     updateEdge: async (id, update) => {
       set({ error: null });
+      const checkpoint = await get().beginHistoryCheckpoint();
       try {
         const { api, treeHandle } = await requireActiveTree();
         const edit: TreeEdit = { type: 'update_edge', id, ...update };
@@ -130,6 +144,7 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
           error: null,
           lastOptimization: null,
         });
+        get().commitHistoryCheckpoint(checkpoint, 'Edit edge');
         void get().autosaveProject();
       } catch (error) {
         set({ status: 'error', error: engineError(error) });
@@ -138,23 +153,32 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
 
     deleteSelection: async () => {
       const selection = get().selection;
-      if (selection.kind !== 'node' && selection.kind !== 'edge') return;
+      const nodeIds = selectedNodeIds(selection).sort((a, b) => b - a);
+      const edgeIds = selectedEdgeIds(selection).sort((a, b) => b - a);
+      if (nodeIds.length === 0 && edgeIds.length === 0) return;
       set({ error: null });
+      const checkpoint = await get().beginHistoryCheckpoint();
       try {
         const { api, treeHandle } = await requireActiveTree();
-        const edit: TreeEdit =
-          selection.kind === 'node'
-            ? { type: 'delete_node', id: selection.id }
-            : { type: 'delete_edge', id: selection.id };
-        const report = await api.applyEdit(treeHandle, edit);
+        let snapshot: TreeSnapshot | null = null;
+        for (const id of edgeIds) {
+          const report = await api.applyEdit(treeHandle, { type: 'delete_edge', id });
+          snapshot = report.snapshot;
+        }
+        for (const id of nodeIds) {
+          const report = await api.applyEdit(treeHandle, { type: 'delete_node', id });
+          snapshot = report.snapshot;
+        }
+        if (!snapshot) return;
         set({
-          project: projectFromSnapshot(report.snapshot, get().project.title),
+          project: projectFromSnapshot(snapshot, get().project.title),
           selection: { kind: 'tree' },
-          status: statusAfterEdit(report.snapshot),
+          status: statusAfterEdit(snapshot),
           dirty: true,
           error: null,
           lastOptimization: null,
         });
+        get().commitHistoryCheckpoint(checkpoint, 'Delete selection');
         void get().autosaveProject();
       } catch (error) {
         set({ status: 'error', error: engineError(error) });
@@ -162,6 +186,18 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
     },
 
     select: (selection) => set({ selection }),
+    selectAll: () => set({ selection: selectEverything(get().project) }),
+    selectNone: () => set({ selection: { kind: 'tree' } }),
+    selectPathBetweenSelectedNodes: () => {
+      const [a, b] = selectedNodeIds(get().selection);
+      if (a === undefined || b === undefined) return;
+      const path = get().project.paths.find(
+        (candidate) =>
+          (candidate.nodes[0] === a && candidate.nodes[1] === b) ||
+          (candidate.nodes[0] === b && candidate.nodes[1] === a)
+      );
+      if (path) set({ selection: { kind: 'path', id: path.id } });
+    },
     setToolMode: (toolMode) => set({ toolMode }),
   };
 };

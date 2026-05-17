@@ -41,12 +41,24 @@ pub fn setup_menu(app: &App) -> Result<(), Box<dyn std::error::Error>> {
         .item(&file_export_png)
         .build()?;
 
-    let edit_undo = PredefinedMenuItem::undo(app, None)?;
-    let edit_redo = PredefinedMenuItem::redo(app, None)?;
-    let edit_cut = PredefinedMenuItem::cut(app, None)?;
-    let edit_copy = PredefinedMenuItem::copy(app, None)?;
-    let edit_paste = PredefinedMenuItem::paste(app, None)?;
-    let edit_select_all = PredefinedMenuItem::select_all(app, None)?;
+    let edit_undo = MenuItemBuilder::with_id("edit.undo", "Undo")
+        .accelerator("CmdOrCtrl+Z")
+        .build(app)?;
+    let edit_redo = MenuItemBuilder::with_id("edit.redo", "Redo")
+        .accelerator("CmdOrCtrl+Shift+Z")
+        .build(app)?;
+    let edit_cut = MenuItemBuilder::with_id("edit.cut", "Cut")
+        .accelerator("CmdOrCtrl+X")
+        .build(app)?;
+    let edit_copy = MenuItemBuilder::with_id("edit.copy", "Copy")
+        .accelerator("CmdOrCtrl+C")
+        .build(app)?;
+    let edit_paste = MenuItemBuilder::with_id("edit.paste", "Paste")
+        .accelerator("CmdOrCtrl+V")
+        .build(app)?;
+    let edit_select_all = MenuItemBuilder::with_id("edit.selectAll", "Select All")
+        .accelerator("CmdOrCtrl+A")
+        .build(app)?;
     let edit_deselect = MenuItemBuilder::with_id("edit.deselectAll", "Deselect All").build(app)?;
     let edit_delete = MenuItemBuilder::with_id("edit.delete", "Delete Selected")
         .accelerator("Backspace")

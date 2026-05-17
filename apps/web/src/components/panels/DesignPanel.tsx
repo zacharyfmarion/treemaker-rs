@@ -10,6 +10,13 @@ import {
   type PlotRect,
   type Point,
 } from '../../lib/geometry';
+import {
+  isEdgeSelected,
+  isNodeSelected,
+  isPathSelected,
+  toggleEdgeSelection,
+  toggleNodeSelection,
+} from '../../lib/selection';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import type { ToolMode } from '../../lib/sampleProject';
 
@@ -62,6 +69,10 @@ export function DesignPanel() {
   const onNodePointerDown = (event: PointerEvent<SVGGElement>, nodeId: number) => {
     if (event.button !== 0) return;
     event.stopPropagation();
+    if (event.shiftKey || event.metaKey || event.ctrlKey) {
+      select(toggleNodeSelection(selection, nodeId));
+      return;
+    }
     if (toolMode === 'edge') {
       if (selection.kind === 'node' && selection.id !== nodeId) {
         void addEdge(selection.id, nodeId);
@@ -174,14 +185,19 @@ export function DesignPanel() {
               : path.isFeasible
                 ? 'tree-path tree-path--feasible'
                 : 'tree-path tree-path--bad';
+            const active = isPathSelected(selection, path.id);
             return (
               <line
                 key={path.id}
-                className={className}
+                className={`${className} ${active ? 'tree-path--selected' : ''}`}
                 x1={p1.x}
                 y1={p1.y}
                 x2={p2.x}
                 y2={p2.y}
+                onPointerDown={(event) => {
+                  event.stopPropagation();
+                  select({ kind: 'path', id: path.id });
+                }}
               />
             );
           })}
@@ -191,11 +207,15 @@ export function DesignPanel() {
             if (!a || !b) return null;
             const p1 = paperToSvg(displayLoc(a.id, a.loc), PAPER_RECT);
             const p2 = paperToSvg(displayLoc(b.id, b.loc), PAPER_RECT);
-            const active = selection.kind === 'edge' && selection.id === edge.id;
+            const active = isEdgeSelected(selection, edge.id);
             return (
               <g key={edge.id} onPointerDown={(event) => {
                 event.stopPropagation();
-                select({ kind: 'edge', id: edge.id });
+                select(
+                  event.shiftKey || event.metaKey || event.ctrlKey
+                    ? toggleEdgeSelection(selection, edge.id)
+                    : { kind: 'edge', id: edge.id }
+                );
               }}>
                 <line
                   className={active ? 'tree-edge tree-edge--selected' : 'tree-edge'}
@@ -212,7 +232,7 @@ export function DesignPanel() {
           })}
           {project.nodes.map((node) => {
             const point = paperToSvg(displayLoc(node.id, node.loc), PAPER_RECT);
-            const active = selection.kind === 'node' && selection.id === node.id;
+            const active = isNodeSelected(selection, node.id);
             const pendingEdge = toolMode === 'edge' && active;
             const incidentEdge = project.edges.find((edge) => edge.nodes.includes(node.id));
             const radius = node.isLeaf

@@ -1,5 +1,11 @@
 import { GitBranch, ScanLine } from 'lucide-react';
 import { paperToSvg, type PlotRect } from '../../lib/geometry';
+import {
+  isCreaseSelected,
+  isFacetSelected,
+  toggleCreaseSelection,
+  toggleFacetSelection,
+} from '../../lib/selection';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { SegmentedControl } from '../ui/SegmentedControl';
 
@@ -14,6 +20,7 @@ function creaseClass(fold: string, kind: string, mode: 'mvf' | 'agrh'): string {
 export function CreasePatternPanel() {
   const project = useWorkspaceStore((state) => state.project);
   const mode = useWorkspaceStore((state) => state.creaseColorMode);
+  const selection = useWorkspaceStore((state) => state.selection);
   const setMode = useWorkspaceStore((state) => state.setCreaseColorMode);
   const select = useWorkspaceStore((state) => state.select);
 
@@ -48,7 +55,23 @@ export function CreasePatternPanel() {
               .map((point) => paperToSvg(point, PAPER_RECT))
               .map((point) => `${point.x},${point.y}`)
               .join(' ');
-            return <polygon key={facet.id} className={`facet facet--${facet.color}`} points={points} />;
+            return (
+              <polygon
+                key={facet.id}
+                className={[
+                  `facet facet--${facet.color}`,
+                  isFacetSelected(selection, facet.id) ? 'facet--selected' : '',
+                ].join(' ')}
+                points={points}
+                onClick={(event) => {
+                  select(
+                    event.shiftKey || event.metaKey || event.ctrlKey
+                      ? toggleFacetSelection(selection, facet.id)
+                      : { kind: 'facet', id: facet.id }
+                  );
+                }}
+              />
+            );
           })}
           {project.creases.map((crease) => {
             const a = paperToSvg(crease.vertices[0], PAPER_RECT);
@@ -56,12 +79,21 @@ export function CreasePatternPanel() {
             return (
               <line
                 key={crease.id}
-                className={creaseClass(crease.fold, crease.kind, mode)}
+                className={[
+                  creaseClass(crease.fold, crease.kind, mode),
+                  isCreaseSelected(selection, crease.id) ? 'crease--selected' : '',
+                ].join(' ')}
                 x1={a.x}
                 y1={a.y}
                 x2={b.x}
                 y2={b.y}
-                onClick={() => select({ kind: 'crease', id: crease.id })}
+                onClick={(event) => {
+                  select(
+                    event.shiftKey || event.metaKey || event.ctrlKey
+                      ? toggleCreaseSelection(selection, crease.id)
+                      : { kind: 'crease', id: crease.id }
+                  );
+                }}
               />
             );
           })}

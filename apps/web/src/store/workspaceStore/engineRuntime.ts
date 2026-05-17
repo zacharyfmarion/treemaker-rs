@@ -130,6 +130,12 @@ export function statusAfterEdit(snapshot: TreeSnapshot): AppStatus {
   return snapshot.edges.length > 0 ? 'needs_optimization' : 'ready';
 }
 
+export function statusFromSnapshot(snapshot: TreeSnapshot): AppStatus {
+  if (snapshot.creases.length > 0) return 'crease_pattern_ready';
+  if (snapshot.edges.length === 0) return 'ready';
+  return snapshot.summary.is_feasible ? 'optimized' : 'needs_optimization';
+}
+
 export function nextSelectionForEdit(
   edit: TreeEdit,
   snapshot: TreeSnapshot,

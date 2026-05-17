@@ -12,6 +12,7 @@ import {
   initializeBlankTree,
   loadTreeFromText,
   projectStateFromSnapshot,
+  statusFromSnapshot,
 } from '../engineRuntime';
 import type { ProjectSlice, RecentProject, WorkspaceSliceCreator } from '../types';
 
@@ -71,12 +72,6 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
     set({ recentProjects: next });
   };
 
-  const statusFromSnapshot = (snapshot: Parameters<typeof projectStateFromSnapshot>[0]) => {
-    if (snapshot.creases.length > 0) return 'crease_pattern_ready' as const;
-    if (snapshot.edges.length === 0) return 'ready' as const;
-    return snapshot.summary.is_feasible ? 'optimized' : 'needs_optimization';
-  };
-
   const loadText = async (
     text: string,
     source: { title?: string; filename?: string; path?: string | null; dirty?: boolean } = {}
@@ -97,6 +92,9 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
       status: statusFromSnapshot(snapshot),
       dirty: source.dirty ?? false,
       lastOptimization: null,
+      historyPast: [],
+      historyFuture: [],
+      clipboardPasteCount: 0,
     });
     rememberRecent({
       id: source.path ?? filename,
@@ -161,6 +159,8 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
           selection: { kind: 'tree' },
           dirty: false,
           lastOptimization: null,
+          historyPast: [],
+          historyFuture: [],
         });
       } catch (error) {
         set({ status: 'error', error: engineError(error), engineReady: false });
@@ -183,6 +183,9 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
           creaseColorMode: 'mvf',
           dirty: false,
           lastOptimization: null,
+          historyPast: [],
+          historyFuture: [],
+          clipboardPasteCount: 0,
         });
         useLayoutStore.getState().activatePanel('design');
       } catch (error) {
@@ -206,6 +209,9 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
           creaseColorMode: 'mvf',
           dirty: false,
           lastOptimization: null,
+          historyPast: [],
+          historyFuture: [],
+          clipboardPasteCount: 0,
         });
         useLayoutStore.getState().activatePanel('design');
       } catch (error) {

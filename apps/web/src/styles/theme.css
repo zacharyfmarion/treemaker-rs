@@ -397,7 +397,8 @@
   stroke-linecap: round;
   stroke-dasharray: 8 8;
   opacity: 0.9;
-  pointer-events: none;
+  pointer-events: stroke;
+  cursor: pointer;
 }
 
 .tree-path--active {
@@ -410,6 +411,12 @@
 
 .tree-path--bad {
   stroke: var(--status-danger);
+}
+
+.tree-path--selected {
+  stroke: var(--accent-primary);
+  stroke-width: 4;
+  opacity: 1;
 }
 
 .tree-edge {
@@ -445,6 +452,21 @@
 .tree-node--pending-edge {
   stroke: var(--status-warning);
   stroke-width: 4;
+}
+
+.control-row--button {
+  width: 100%;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.control-row--button:hover {
+  background: var(--bg-surface);
 }
 
 .leaf-radius {
@@ -495,6 +517,7 @@
 
 .facet {
   stroke: none;
+  cursor: pointer;
 }
 
 .facet--white {
@@ -507,6 +530,11 @@
 
 .facet--unset {
   fill: rgba(95, 179, 165, 0.12);
+}
+
+.facet--selected {
+  stroke: var(--accent-primary);
+  stroke-width: 3;
 }
 
 .crease {
@@ -562,6 +590,12 @@
 .crease--kind-pseudohinge {
   stroke: #3fbec4;
   stroke-width: 2;
+}
+
+.crease.crease--selected {
+  stroke: var(--accent-primary);
+  stroke-width: 5;
+  filter: drop-shadow(0 0 6px rgba(95, 179, 165, 0.45));
 }
 
 .inspector-heading {

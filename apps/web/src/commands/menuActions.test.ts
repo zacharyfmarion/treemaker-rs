@@ -12,10 +12,17 @@ function createDeps() {
       exportV4: vi.fn().mockResolvedValue(true),
       exportSvg: vi.fn().mockResolvedValue(true),
       exportPng: vi.fn().mockResolvedValue(true),
+      undo: vi.fn().mockResolvedValue(undefined),
+      redo: vi.fn().mockResolvedValue(undefined),
+      cutSelection: vi.fn().mockResolvedValue(undefined),
+      copySelection: vi.fn(),
+      pasteClipboard: vi.fn().mockResolvedValue(undefined),
       deleteSelection: vi.fn().mockResolvedValue(undefined),
       optimizeScale: vi.fn().mockResolvedValue(undefined),
       buildCreasePattern: vi.fn().mockResolvedValue(undefined),
       select: vi.fn(),
+      selectAll: vi.fn(),
+      selectNone: vi.fn(),
     },
     layout: {
       activatePanel: vi.fn(),
@@ -45,6 +52,21 @@ describe('menu actions', () => {
     expect(deps.workspace.createNewProject).toHaveBeenCalledOnce();
     expect(deps.layout.activatePanel).toHaveBeenCalledWith('crease-pattern');
     expect(deps.workspace.buildCreasePattern).toHaveBeenCalledOnce();
+  });
+
+  it('dispatches edit commands through workspace actions', async () => {
+    const deps = createDeps();
+    const handle = createMenuActionHandler(deps);
+
+    await expect(handle('edit.undo')).resolves.toBe(true);
+    await expect(handle('edit.copy')).resolves.toBe(true);
+    await expect(handle('edit.selectAll')).resolves.toBe(true);
+    await expect(handle('edit.deselectAll')).resolves.toBe(true);
+
+    expect(deps.workspace.undo).toHaveBeenCalledOnce();
+    expect(deps.workspace.copySelection).toHaveBeenCalledOnce();
+    expect(deps.workspace.selectAll).toHaveBeenCalledOnce();
+    expect(deps.workspace.selectNone).toHaveBeenCalledOnce();
   });
 
   it('routes file commands through the selected file service', async () => {

@@ -103,6 +103,8 @@ Done when:
 
 ## Phase 3: History, Clipboard, And Selection
 
+Status: started.
+
 Priority: highest after files.
 
 Goal: make editing safe enough for real design work.
@@ -111,12 +113,26 @@ Features:
 
 - Undo and redo for all document edits and optimization/build commands.
 - Cut, copy, paste, clear/delete.
-- Multi-selection for nodes, edges, paths, creases, facets, and conditions.
+- Multi-selection for nodes, edges, paths, creases, and facets.
 - Select all, select none, select by index.
 - Select path from two selected nodes.
 - Select movable parts.
 - Select corridor facets after CP generation.
 - Better keyboard shortcuts and command routing.
+
+Implemented or started:
+
+- Snapshot-based undo/redo for tree edits, optimization, and CP builds.
+- Internal cut/copy/paste for connected tree selections.
+- Multi-select for design nodes/edges and CP creases/facets.
+- Select all, select none, delete selection, and select path between two nodes.
+- Shared web keyboard shortcuts and native Tauri menu IDs for edit commands.
+
+Remaining:
+
+- Select by index UI.
+- Select movable parts and corridor facets.
+- Condition selection once condition editing lands.
 
 Done when:
 

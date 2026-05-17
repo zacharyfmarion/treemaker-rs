@@ -16,6 +16,7 @@ import {
   type ToolMode,
   type TreeProject,
 } from '../lib/sampleProject';
+import { useLayoutStore } from './layoutStore';
 import type { TreemakerWorkerApi } from '../workers/treemakerWorker';
 
 type EngineClient = Remote<TreemakerWorkerApi>;
@@ -220,6 +221,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         error: null,
         lastOptimization: null,
       });
+      useLayoutStore.getState().activatePanel('design');
     } catch (error) {
       set({ status: 'error', error: engineError(error) });
     }
@@ -241,6 +243,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         error: null,
         lastOptimization: null,
       });
+      useLayoutStore.getState().activatePanel('design');
     } catch (error) {
       set({ status: 'error', error: engineError(error) });
     }
@@ -408,6 +411,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         error: null,
         dirty: true,
       });
+      useLayoutStore.getState().activatePanel('crease-pattern');
     } catch (error) {
       set({ status: 'error', error: engineError(error) });
     }

@@ -3,23 +3,23 @@ import type { DockviewApi, SerializedDockview } from 'dockview';
 
 const LAYOUT_STORAGE_KEY = 'treemaker-web-layout';
 const LAYOUT_VERSION_KEY = 'treemaker-web-layout-version';
-const LAYOUT_VERSION = 1;
+const LAYOUT_VERSION = 2;
 
 export function applyDefaultLayout(api: DockviewApi): void {
-  api.addPanel({ id: 'design', component: 'design', title: 'Design' });
+  const design = api.addPanel({ id: 'design', component: 'design', title: 'Design' });
+  api.addPanel({
+    id: 'crease-pattern',
+    component: 'crease-pattern',
+    title: 'Crease Pattern',
+    position: { referenceGroup: design.group.id },
+    inactive: true,
+  });
   api.addPanel({
     id: 'inspector',
     component: 'inspector',
     title: 'Inspector',
     position: { referencePanel: 'design', direction: 'right' },
     initialWidth: 320,
-  });
-  api.addPanel({
-    id: 'crease-pattern',
-    component: 'crease-pattern',
-    title: 'Crease Pattern',
-    position: { referencePanel: 'design', direction: 'below' },
-    initialHeight: 300,
   });
   const inspector = api.getPanel('inspector');
   if (inspector) {
@@ -43,6 +43,7 @@ export function applyDefaultLayout(api: DockviewApi): void {
 interface LayoutState {
   dockviewApi: DockviewApi | null;
   setDockviewApi: (api: DockviewApi | null) => void;
+  activatePanel: (id: string) => void;
   saveLayout: () => void;
   loadLayout: () => SerializedDockview | null;
   resetLayout: () => void;
@@ -51,6 +52,10 @@ interface LayoutState {
 export const useLayoutStore = create<LayoutState>((set, get) => ({
   dockviewApi: null,
   setDockviewApi: (api) => set({ dockviewApi: api }),
+  activatePanel: (id) => {
+    const panel = get().dockviewApi?.getPanel(id);
+    panel?.api.setActive();
+  },
   saveLayout: () => {
     const { dockviewApi } = get();
     if (!dockviewApi) return;

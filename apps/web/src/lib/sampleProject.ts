@@ -6,7 +6,15 @@ export type Selection =
   | { kind: 'edge'; id: number }
   | { kind: 'crease'; id: number };
 
-export type AppStatus = 'ready' | 'needs_optimization' | 'optimized' | 'crease_pattern_ready';
+export type AppStatus =
+  | 'loading_engine'
+  | 'ready'
+  | 'needs_optimization'
+  | 'optimizing'
+  | 'optimized'
+  | 'building_crease_pattern'
+  | 'crease_pattern_ready'
+  | 'error';
 export type ToolMode = 'select' | 'node' | 'edge';
 export type CreaseColorMode = 'mvf' | 'agrh';
 

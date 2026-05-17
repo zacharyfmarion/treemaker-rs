@@ -4,6 +4,10 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "build:wasm": "wasm-pack build ../../crates/treemaker-wasm --target web --out-dir ../../apps/web/src/generated/treemaker-wasm",
+    "predev": "npm run build:wasm",
+    "prebuild": "npm run build:wasm",
+    "pretypecheck": "npm run build:wasm",
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
@@ -13,6 +17,7 @@
   "dependencies": {
     "@radix-ui/react-tooltip": "^1.2.8",
     "class-variance-authority": "^0.7.1",
+    "comlink": "^4.4.2",
     "dockview": "^4.13.1",
     "lucide-react": "^0.563.0",
     "react": "^19.2.0",

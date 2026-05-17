@@ -5,5 +5,6 @@ node_modules/
 **/node_modules/
 **/dist/
 coverage/
+apps/web/src/generated/
 tools/oracle/build/
 .DS_Store

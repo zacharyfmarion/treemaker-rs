@@ -12,7 +12,7 @@ export function FilesPanel() {
       </div>
       <div className="panel-body files-panel__body">
         <div className="file-actions">
-          <Button size="sm" variant="secondary" onClick={createNewProject}>
+          <Button size="sm" variant="secondary" onClick={() => void createNewProject()}>
             <FileText size={14} />
             New
           </Button>
@@ -26,7 +26,11 @@ export function FilesPanel() {
           </Button>
         </div>
         <div className="example-list">
-          <button type="button" className="example-item" onClick={createNewProject}>
+          <button
+            type="button"
+            className="example-item"
+            onClick={() => void createNewProject()}
+          >
             <span className="example-item__title">Three terminal flaps</span>
             <span className="example-item__meta">Scale 0.100 | Nodes 4</span>
           </button>

@@ -36,7 +36,8 @@
 }
 
 .toolbar__status,
-.toolbar__dirty {
+.toolbar__dirty,
+.toolbar__error {
   display: inline-flex;
   align-items: center;
   height: 20px;
@@ -50,9 +51,38 @@
   text-transform: capitalize;
 }
 
+.toolbar__error {
+  max-width: min(34vw, 360px);
+  overflow: hidden;
+  color: var(--status-danger);
+  text-overflow: ellipsis;
+  text-transform: none;
+  white-space: nowrap;
+  border-color: color-mix(in srgb, var(--status-danger) 48%, var(--border-default));
+}
+
 .toolbar__status[data-status='ready'] {
   color: var(--status-success);
   border-color: color-mix(in srgb, var(--status-success) 45%, var(--border-default));
+}
+
+.toolbar__status[data-status='optimized'],
+.toolbar__status[data-status='crease_pattern_ready'] {
+  color: var(--status-success);
+  border-color: color-mix(in srgb, var(--status-success) 45%, var(--border-default));
+}
+
+.toolbar__status[data-status='loading_engine'],
+.toolbar__status[data-status='optimizing'],
+.toolbar__status[data-status='building_crease_pattern'],
+.toolbar__status[data-status='needs_optimization'] {
+  color: var(--status-warning);
+  border-color: color-mix(in srgb, var(--status-warning) 50%, var(--border-default));
+}
+
+.toolbar__status[data-status='error'] {
+  color: var(--status-danger);
+  border-color: color-mix(in srgb, var(--status-danger) 48%, var(--border-default));
 }
 
 .toolbar__dirty {

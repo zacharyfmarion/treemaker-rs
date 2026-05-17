@@ -107,7 +107,8 @@ Done when:
 
 ### Phase 4: Optimization Workflow
 
-Status: not started.
+Status: started; the browser app now runs the engine in a Web Worker and can
+optimize the starter tree from the toolbar.
 
 Goal: run optimization from the browser without freezing the UI.
 
@@ -126,7 +127,8 @@ Done when:
 
 ### Phase 5: Crease Pattern Generation
 
-Status: not started.
+Status: started; the browser app can request crease-pattern generation from
+the worker after optimization and map the resulting snapshot into the CP pane.
 
 Goal: render generated crease patterns clearly and exportably.
 

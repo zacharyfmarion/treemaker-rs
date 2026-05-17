@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { DockviewReact } from 'dockview';
 import type { DockviewReadyEvent } from 'dockview';
 import 'dockview/dist/styles/dockview.css';
@@ -19,8 +19,19 @@ import { useWorkspaceStore } from './store/workspaceStore';
 
 function Toolbar() {
   const createNewProject = useWorkspaceStore((state) => state.createNewProject);
+  const optimizeScale = useWorkspaceStore((state) => state.optimizeScale);
+  const buildCreasePattern = useWorkspaceStore((state) => state.buildCreasePattern);
   const status = useWorkspaceStore((state) => state.status);
+  const engineReady = useWorkspaceStore((state) => state.engineReady);
+  const error = useWorkspaceStore((state) => state.error);
   const dirty = useWorkspaceStore((state) => state.dirty);
+  const busy =
+    status === 'loading_engine' ||
+    status === 'optimizing' ||
+    status === 'building_crease_pattern';
+  const canOptimize = engineReady && !busy && status !== 'error';
+  const canBuild =
+    engineReady && !busy && (status === 'optimized' || status === 'crease_pattern_ready');
 
   return (
     <header className="toolbar">
@@ -30,9 +41,20 @@ function Toolbar() {
           {status.replaceAll('_', ' ')}
         </span>
         {dirty && <span className="toolbar__dirty">Unsaved</span>}
+        {error && (
+          <span className="toolbar__error" title={error.message}>
+            {error.message}
+          </span>
+        )}
       </div>
       <div className="toolbar__actions">
-        <IconButton size="sm" title="New" tooltipSide="bottom" onClick={createNewProject}>
+        <IconButton
+          size="sm"
+          title="New"
+          tooltipSide="bottom"
+          disabled={busy}
+          onClick={() => void createNewProject()}
+        >
           <FilePlus size={15} />
         </IconButton>
         <IconButton size="sm" title="Open" tooltipSide="bottom" disabled>
@@ -42,11 +64,21 @@ function Toolbar() {
           <Save size={15} />
         </IconButton>
         <span className="toolbar__separator" />
-        <Button size="sm" variant="secondary" disabled>
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={!canOptimize}
+          onClick={() => void optimizeScale()}
+        >
           <Sparkles size={14} />
           Optimize
         </Button>
-        <Button size="sm" variant="primary" disabled>
+        <Button
+          size="sm"
+          variant="primary"
+          disabled={!canBuild}
+          onClick={() => void buildCreasePattern()}
+        >
           <Play size={14} />
           Build CP
         </Button>
@@ -60,9 +92,14 @@ function Toolbar() {
 }
 
 export default function App() {
+  const initEngine = useWorkspaceStore((state) => state.initEngine);
   const setDockviewApi = useLayoutStore((state) => state.setDockviewApi);
   const loadLayout = useLayoutStore((state) => state.loadLayout);
   const saveLayout = useLayoutStore((state) => state.saveLayout);
+
+  useEffect(() => {
+    void initEngine();
+  }, [initEngine]);
 
   const onReady = useCallback(
     (event: DockviewReadyEvent) => {

@@ -55,6 +55,7 @@ export interface SimulatorOptions {
   axialStiffness?: number;
   creaseStiffness?: number;
   panelStiffness?: number;
+  faceStiffness?: number;
   damping?: number;
   timeStep?: number;
   stepsPerFrame?: number;

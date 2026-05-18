@@ -222,17 +222,26 @@ function buildCreaseParams(fold: FoldDocument, edgesFaces: number[][]): CreasePa
 
     const faces = edgesFaces[edgeIndex] ?? [];
     if (faces.length !== 2) return;
-    const face1 = fold.faces_vertices[faces[0] ?? 0] ?? [];
-    const face2 = fold.faces_vertices[faces[1] ?? 0] ?? [];
+    let face1Index = faces[0] ?? 0;
+    let face2Index = faces[1] ?? 0;
+    const face1 = fold.faces_vertices[face1Index] ?? [];
+    const face2 = fold.faces_vertices[face2Index] ?? [];
     if (face1.length !== 3 || face2.length !== 3) return;
-    const vertex1 = face1.find((vertex) => vertex !== edge[0] && vertex !== edge[1]);
-    const vertex2 = face2.find((vertex) => vertex !== edge[0] && vertex !== edge[1]);
+    let vertex1 = face1.find((vertex) => vertex !== edge[0] && vertex !== edge[1]);
+    let vertex2 = face2.find((vertex) => vertex !== edge[0] && vertex !== edge[1]);
     if (vertex1 === undefined || vertex2 === undefined) return;
 
+    const v1Index = face2.indexOf(edge[0]);
+    const v2Index = face2.indexOf(edge[1]);
+    if (v2Index - v1Index === 1 || v2Index - v1Index === -2) {
+      [face1Index, face2Index] = [face2Index, face1Index];
+      [vertex1, vertex2] = [vertex2, vertex1];
+    }
+
     params.push({
-      face1: faces[0] ?? 0,
+      face1: face1Index,
       vertex1,
-      face2: faces[1] ?? 0,
+      face2: face2Index,
       vertex2,
       edge: edgeIndex,
       targetAngle: angle,

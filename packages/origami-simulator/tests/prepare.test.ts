@@ -15,7 +15,14 @@ describe('prepareFoldModel', () => {
     expect(prepared.edgesAssignment[4]).toBe('M');
     expect(prepared.edgesFoldAngle[4]).toBe(-180);
     expect(prepared.creaseParams).toHaveLength(1);
-    expect(prepared.creaseParams[0]).toMatchObject({ edge: 4, targetAngle: -180 });
+    expect(prepared.creaseParams[0]).toMatchObject({
+      face1: 1,
+      vertex1: 3,
+      face2: 0,
+      vertex2: 1,
+      edge: 4,
+      targetAngle: -180,
+    });
   });
 
   it('triangulates quads and adds flat facet edges', () => {
@@ -56,6 +63,34 @@ describe('createOrigamiSimulator', () => {
 
     simulator.dispose();
     expect(() => simulator.step()).toThrow(/disposed/);
+  });
+
+  it('settles a simple fold without frame-to-frame shape jumps', () => {
+    const prepared = prepareFoldModel(makeBookFoldFixture());
+    const simulator = createOrigamiSimulator({ model: prepared, options: { foldPercent: 100 } });
+    let previous = simulator.readFrame().positions;
+
+    for (let i = 0; i < 8; i += 1) {
+      previous = simulator.step(100).positions;
+    }
+    const after = simulator.step(100);
+
+    expect(maxPositionDelta(previous, after.positions)).toBeLessThan(1e-4);
+    expect(after.diagnostics.maxEdgeStrain).toBeLessThan(1e-4);
+    expect(Array.from(after.positions).every(Number.isFinite)).toBe(true);
+    simulator.dispose();
+  });
+
+  it('uses an adaptive timestep for very small crease-pattern edges', () => {
+    const tiny = makeBookFoldFixture();
+    tiny.vertices_coords = tiny.vertices_coords.map(([x, y]) => [x * 0.001, y * 0.001]);
+    const prepared = prepareFoldModel(tiny);
+    const simulator = createOrigamiSimulator({ model: prepared, options: { foldPercent: 100 } });
+    const frame = simulator.step(800);
+
+    expect(Array.from(frame.positions).every(Number.isFinite)).toBe(true);
+    expect(frame.diagnostics.maxEdgeStrain).toBeLessThan(1e-4);
+    simulator.dispose();
   });
 
   it('leaves a flat model still when the target fold percent is zero', () => {

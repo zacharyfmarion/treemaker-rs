@@ -373,19 +373,34 @@ fn build_crease_params(fold: &FoldDocument) -> Result<Vec<CreaseParameter>> {
             return Err(FoldError::BadCreaseTopology { edge: edge_index });
         }
         let [a, b] = fold.edges_vertices[edge_index];
-        let face1 = &fold.faces_vertices[faces[0]];
-        let face2 = &fold.faces_vertices[faces[1]];
+        let mut face1_index = faces[0];
+        let mut face2_index = faces[1];
+        let face1 = &fold.faces_vertices[face1_index];
+        let face2 = &fold.faces_vertices[face2_index];
         if face1.len() != 3 || face2.len() != 3 {
             return Err(FoldError::BadCreaseTopology { edge: edge_index });
         }
-        let vertex1 = opposite_triangle_vertex(face1, a, b)
+        let mut vertex1 = opposite_triangle_vertex(face1, a, b)
             .ok_or(FoldError::BadCreaseTopology { edge: edge_index })?;
-        let vertex2 = opposite_triangle_vertex(face2, a, b)
+        let mut vertex2 = opposite_triangle_vertex(face2, a, b)
             .ok_or(FoldError::BadCreaseTopology { edge: edge_index })?;
+        let v1_index = face2
+            .iter()
+            .position(|vertex| *vertex == a)
+            .ok_or(FoldError::BadCreaseTopology { edge: edge_index })?;
+        let v2_index = face2
+            .iter()
+            .position(|vertex| *vertex == b)
+            .ok_or(FoldError::BadCreaseTopology { edge: edge_index })?;
+        if v2_index as isize - v1_index as isize == 1 || v2_index as isize - v1_index as isize == -2
+        {
+            std::mem::swap(&mut face1_index, &mut face2_index);
+            std::mem::swap(&mut vertex1, &mut vertex2);
+        }
         params.push(CreaseParameter {
-            face1: faces[0],
+            face1: face1_index,
             vertex1,
-            face2: faces[1],
+            face2: face2_index,
             vertex2,
             edge: edge_index,
             target_angle,
@@ -563,6 +578,10 @@ mod tests {
         let prepared = prepare_simulation_model(&doc).unwrap();
         assert_eq!(prepared.crease_params.len(), 1);
         assert_eq!(prepared.crease_params[0].edge, 4);
+        assert_eq!(prepared.crease_params[0].face1, 1);
+        assert_eq!(prepared.crease_params[0].vertex1, 3);
+        assert_eq!(prepared.crease_params[0].face2, 0);
+        assert_eq!(prepared.crease_params[0].vertex2, 1);
         assert_eq!(prepared.crease_params[0].target_angle, -180.0);
     }
 }

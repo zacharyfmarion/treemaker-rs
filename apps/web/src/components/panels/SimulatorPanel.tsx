@@ -21,6 +21,9 @@ import { IconButton } from '../ui/IconButton';
 
 type LoadState = 'idle' | 'loading' | 'ready' | 'empty' | 'error';
 
+const INITIAL_SETTLE_STEPS = 300;
+const FOLD_CHANGE_SETTLE_STEPS = 120;
+
 export function SimulatorPanel() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const controllerRef = useRef<OrigamiSimulatorController | null>(null);
@@ -58,7 +61,7 @@ export function SimulatorPanel() {
   }, []);
 
   const stepSimulation = useCallback(
-    (steps = 1) => {
+    (steps?: number) => {
       const controller = controllerRef.current;
       if (!controller) return;
       frameRef.current = controller.step(steps);
@@ -109,12 +112,12 @@ export function SimulatorPanel() {
       );
       const controller = createOrigamiSimulator({
         model,
-        options: { foldPercent: foldPercentRef.current, damping: 0.34, stepsPerFrame: 6 },
+        options: { foldPercent: foldPercentRef.current },
       });
       modelRef.current = model;
       controllerRef.current = controller;
       setModelStats({ vertices: model.vertexCount, triangles: model.faceCount });
-      frameRef.current = controller.step(20);
+      frameRef.current = controller.step(INITIAL_SETTLE_STEPS);
       setLoadState('ready');
       drawCurrentFrame();
     } catch (error) {
@@ -137,7 +140,7 @@ export function SimulatorPanel() {
 
   useEffect(() => {
     controllerRef.current?.setFoldPercent(foldPercent);
-    stepSimulation(12);
+    stepSimulation(FOLD_CHANGE_SETTLE_STEPS);
   }, [foldPercent, stepSimulation]);
 
   useEffect(() => {
@@ -165,7 +168,7 @@ export function SimulatorPanel() {
   const reset = () => {
     controllerRef.current?.reset();
     controllerRef.current?.setFoldPercent(foldPercent);
-    frameRef.current = controllerRef.current?.step(20) ?? null;
+    frameRef.current = controllerRef.current?.step(INITIAL_SETTLE_STEPS) ?? null;
     drawCurrentFrame();
   };
 
@@ -214,7 +217,7 @@ export function SimulatorPanel() {
             size="sm"
             title="Step"
             tooltipSide="bottom"
-            onClick={() => stepSimulation(8)}
+            onClick={() => stepSimulation()}
             disabled={loadState !== 'ready'}
           >
             <StepForward size={14} />

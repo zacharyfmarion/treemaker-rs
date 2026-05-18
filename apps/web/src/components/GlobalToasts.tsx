@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { toast } from 'sonner';
-import { formatUnknownError, toastFromProjectMessage } from '../lib/toastMessages';
+import { formatUnknownError } from '../lib/toastMessages';
 import { useWorkspaceStore } from '../store/workspaceStore';
 
 function errorKey(error: unknown): string {
@@ -36,12 +36,6 @@ export function GlobalToasts() {
 
   useEffect(() => {
     if (!projectMessage) return;
-
-    const next = toastFromProjectMessage(projectMessage);
-    toast[next.kind](next.title, {
-      description: next.message,
-      duration: next.kind === 'error' ? 8000 : 4000,
-    });
     clearProjectMessage();
   }, [clearProjectMessage, projectMessage]);
 

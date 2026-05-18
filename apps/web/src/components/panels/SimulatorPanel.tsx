@@ -22,7 +22,11 @@ import { IconButton } from '../ui/IconButton';
 type LoadState = 'idle' | 'loading' | 'ready' | 'empty' | 'error';
 
 const INITIAL_SETTLE_STEPS = 300;
-const FOLD_CHANGE_SETTLE_STEPS = 120;
+const FOLD_CHANGE_IMMEDIATE_STEPS = 200;
+const FOLD_CHANGE_SETTLE_BATCH = 200;
+const FOLD_CHANGE_SETTLE_FRAMES = 40;
+const SETTLE_DELTA_EPSILON = 0.0002;
+const INITIAL_FOLD_PERCENT = 0;
 
 export function SimulatorPanel() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -30,7 +34,8 @@ export function SimulatorPanel() {
   const modelRef = useRef<PreparedOrigamiModel | null>(null);
   const frameRef = useRef<SimulationFrame | null>(null);
   const rafRef = useRef<number | null>(null);
-  const foldPercentRef = useRef(60);
+  const settleRafRef = useRef<number | null>(null);
+  const foldPercentRef = useRef(INITIAL_FOLD_PERCENT);
 
   const creaseCount = useWorkspaceStore((state) => state.project.creases.length);
   const foldArtifacts = useWorkspaceStore((state) => state.foldArtifacts);
@@ -38,7 +43,7 @@ export function SimulatorPanel() {
   const refreshFoldArtifacts = useWorkspaceStore((state) => state.refreshFoldArtifacts);
   const buildCreasePattern = useWorkspaceStore((state) => state.buildCreasePattern);
 
-  const [foldPercent, setFoldPercent] = useState(60);
+  const [foldPercent, setFoldPercent] = useState(INITIAL_FOLD_PERCENT);
   const [playing, setPlaying] = useState(false);
   const [loadState, setLoadState] = useState<LoadState>('idle');
   const [modelError, setModelError] = useState<string | null>(null);
@@ -61,17 +66,57 @@ export function SimulatorPanel() {
   }, []);
 
   const stepSimulation = useCallback(
-    (steps?: number) => {
+    (steps?: number): SimulationFrame | null => {
       const controller = controllerRef.current;
-      if (!controller) return;
+      if (!controller) return null;
       frameRef.current = controller.step(steps);
       drawCurrentFrame();
+      return frameRef.current;
     },
     [drawCurrentFrame]
   );
 
+  const clearSettling = useCallback(() => {
+    if (settleRafRef.current !== null && typeof window !== 'undefined') {
+      window.cancelAnimationFrame(settleRafRef.current);
+    }
+    settleRafRef.current = null;
+  }, []);
+
+  const startSettling = useCallback(
+    (frames = FOLD_CHANGE_SETTLE_FRAMES) => {
+      if (typeof window === 'undefined') return;
+      clearSettling();
+      let remaining = frames;
+      let quietFrames = 0;
+
+      const tick = () => {
+        const previous = frameRef.current?.positions;
+        const next = stepSimulation(FOLD_CHANGE_SETTLE_BATCH);
+        if (!next) {
+          settleRafRef.current = null;
+          return;
+        }
+
+        const delta = previous ? maxPositionDelta(previous, next.positions) : Infinity;
+        quietFrames = delta < SETTLE_DELTA_EPSILON ? quietFrames + 1 : 0;
+        remaining -= 1;
+
+        if (remaining > 0 && quietFrames < 3) {
+          settleRafRef.current = window.requestAnimationFrame(tick);
+        } else {
+          settleRafRef.current = null;
+        }
+      };
+
+      settleRafRef.current = window.requestAnimationFrame(tick);
+    },
+    [clearSettling, stepSimulation]
+  );
+
   useEffect(() => {
     if (creaseCount === 0) {
+      clearSettling();
       setPlaying(false);
       setModelError(null);
       setLoadState('empty');
@@ -93,9 +138,10 @@ export function SimulatorPanel() {
     return () => {
       cancelled = true;
     };
-  }, [creaseCount, foldArtifacts, refreshFoldArtifacts]);
+  }, [clearSettling, creaseCount, foldArtifacts, refreshFoldArtifacts]);
 
   useEffect(() => {
+    clearSettling();
     controllerRef.current?.dispose();
     controllerRef.current = null;
     modelRef.current = null;
@@ -120,6 +166,7 @@ export function SimulatorPanel() {
       frameRef.current = controller.step(INITIAL_SETTLE_STEPS);
       setLoadState('ready');
       drawCurrentFrame();
+      if (foldPercentRef.current !== 0) startSettling();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.warn('Failed to prepare simulator model', error);
@@ -130,21 +177,25 @@ export function SimulatorPanel() {
     }
 
     return () => {
+      clearSettling();
       controllerRef.current?.dispose();
       controllerRef.current = null;
       modelRef.current = null;
       frameRef.current = null;
       setModelStats({ vertices: 0, triangles: 0 });
     };
-  }, [drawCurrentFrame, foldArtifacts]);
+  }, [clearSettling, drawCurrentFrame, foldArtifacts, startSettling]);
 
   useEffect(() => {
     controllerRef.current?.setFoldPercent(foldPercent);
-    stepSimulation(FOLD_CHANGE_SETTLE_STEPS);
-  }, [foldPercent, stepSimulation]);
+    if (stepSimulation(FOLD_CHANGE_IMMEDIATE_STEPS)) {
+      startSettling();
+    }
+  }, [foldPercent, startSettling, stepSimulation]);
 
   useEffect(() => {
     if (!playing || typeof window === 'undefined') return;
+    clearSettling();
     const tick = () => {
       stepSimulation();
       rafRef.current = window.requestAnimationFrame(tick);
@@ -154,7 +205,7 @@ export function SimulatorPanel() {
       if (rafRef.current !== null) window.cancelAnimationFrame(rafRef.current);
       rafRef.current = null;
     };
-  }, [playing, stepSimulation]);
+  }, [clearSettling, playing, stepSimulation]);
 
   useEffect(() => {
     if (typeof ResizeObserver === 'undefined') return;
@@ -166,10 +217,12 @@ export function SimulatorPanel() {
   }, [drawCurrentFrame]);
 
   const reset = () => {
+    clearSettling();
     controllerRef.current?.reset();
     controllerRef.current?.setFoldPercent(foldPercent);
     frameRef.current = controllerRef.current?.step(INITIAL_SETTLE_STEPS) ?? null;
     drawCurrentFrame();
+    if (foldPercent !== 0) startSettling();
   };
 
   const errorDetail = modelError ?? foldArtifactError ?? 'Simulator unavailable';
@@ -257,7 +310,7 @@ export function SimulatorPanel() {
           <input
             aria-label="Fold percent"
             type="range"
-            min="-100"
+            min="0"
             max="100"
             step="1"
             value={foldPercent}
@@ -274,6 +327,14 @@ export function SimulatorPanel() {
       </div>
     </section>
   );
+}
+
+function maxPositionDelta(previous: Float32Array, next: Float32Array): number {
+  let max = 0;
+  for (let index = 0; index < Math.min(previous.length, next.length); index += 1) {
+    max = Math.max(max, Math.abs((next[index] ?? 0) - (previous[index] ?? 0)));
+  }
+  return max;
 }
 
 function shortStatus(message: string): string {

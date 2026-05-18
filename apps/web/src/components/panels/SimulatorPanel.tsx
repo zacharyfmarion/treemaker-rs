@@ -361,7 +361,7 @@ export function SimulatorPanel() {
     viewRef.current = {
       ...viewRef.current,
       yaw: drag.yaw + (event.clientX - drag.x) * 0.01,
-      pitch: clamp(drag.pitch + (event.clientY - drag.y) * 0.01, -1.35, 1.35),
+      pitch: clamp(drag.pitch - (event.clientY - drag.y) * 0.01, -1.35, 1.35),
     };
     drawCurrentFrame();
   };

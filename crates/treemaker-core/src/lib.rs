@@ -29,7 +29,7 @@
 //! TreeMaker 5.0.1 with the distributable ALM backend.
 
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, VecDeque};
 
 mod nlco;
 
@@ -266,7 +266,7 @@ pub struct Facet {
 }
 
 /// TreeMaker condition wrapper.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Condition {
     pub index: usize,
     pub is_feasible: bool,
@@ -274,7 +274,7 @@ pub struct Condition {
 }
 
 /// Supported TreeMaker condition variants.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ConditionKind {
     NodeCombo {
@@ -435,6 +435,232 @@ pub struct TreeSummary {
     pub conditions_by_tag: BTreeMap<String, usize>,
 }
 
+/// User-editable document settings for a TreeMaker design.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PaperSettings {
+    pub width: TmFloat,
+    pub height: TmFloat,
+    pub scale: TmFloat,
+    pub has_symmetry: bool,
+    pub sym_loc: Point,
+    pub sym_angle: TmFloat,
+}
+
+/// User-editable tree node input.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct DesignNode {
+    pub id: usize,
+    pub label: String,
+    pub loc: Point,
+}
+
+/// User-editable tree edge input.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct DesignEdge {
+    pub id: usize,
+    pub label: String,
+    pub nodes: [usize; 2],
+    pub length: TmFloat,
+    pub strain: TmFloat,
+    pub stiffness: TmFloat,
+}
+
+/// Minimal design-level input used by GUI and wasm consumers.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct TreeDesign {
+    pub paper: PaperSettings,
+    pub nodes: Vec<DesignNode>,
+    pub edges: Vec<DesignEdge>,
+    pub conditions: Vec<ConditionKind>,
+}
+
+/// Render/inspection snapshot of the complete current tree state.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct TreeSnapshot {
+    pub summary: TreeSummary,
+    pub cp_status_report: CPStatusReport,
+    pub paper: PaperSettings,
+    pub nodes: Vec<NodeSnapshot>,
+    pub edges: Vec<EdgeSnapshot>,
+    pub paths: Vec<PathSnapshot>,
+    pub polys: Vec<PolySnapshot>,
+    pub vertices: Vec<VertexSnapshot>,
+    pub creases: Vec<CreaseSnapshot>,
+    pub facets: Vec<FacetSnapshot>,
+    pub conditions: Vec<Condition>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct NodeSnapshot {
+    pub id: usize,
+    pub label: String,
+    pub loc: Point,
+    pub depth: TmFloat,
+    pub elevation: TmFloat,
+    pub is_leaf: bool,
+    pub is_sub: bool,
+    pub is_border: bool,
+    pub is_pinned: bool,
+    pub is_polygon: bool,
+    pub is_junction: bool,
+    pub is_conditioned: bool,
+    pub edges: Vec<usize>,
+    pub leaf_paths: Vec<usize>,
+    pub owner: OwnerRef,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct EdgeSnapshot {
+    pub id: usize,
+    pub label: String,
+    pub nodes: Vec<usize>,
+    pub length: TmFloat,
+    pub strain: TmFloat,
+    pub stiffness: TmFloat,
+    pub strained_length: TmFloat,
+    pub is_pinned: bool,
+    pub is_conditioned: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PathSnapshot {
+    pub id: usize,
+    pub nodes: Vec<usize>,
+    pub edges: Vec<usize>,
+    pub min_tree_length: TmFloat,
+    pub min_paper_length: TmFloat,
+    pub act_tree_length: TmFloat,
+    pub act_paper_length: TmFloat,
+    pub is_leaf: bool,
+    pub is_sub: bool,
+    pub is_feasible: bool,
+    pub is_active: bool,
+    pub is_border: bool,
+    pub is_polygon: bool,
+    pub is_conditioned: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PolySnapshot {
+    pub id: usize,
+    pub centroid: Point,
+    pub is_sub_poly: bool,
+    pub ring_nodes: Vec<usize>,
+    pub ring_paths: Vec<usize>,
+    pub owned_nodes: Vec<usize>,
+    pub owned_paths: Vec<usize>,
+    pub owned_polys: Vec<usize>,
+    pub owned_creases: Vec<usize>,
+    pub owned_facets: Vec<usize>,
+    pub owner: OwnerRef,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct VertexSnapshot {
+    pub id: usize,
+    pub loc: Point,
+    pub elevation: TmFloat,
+    pub is_border: bool,
+    pub tree_node: Option<usize>,
+    pub creases: Vec<usize>,
+    pub depth: TmFloat,
+    pub discrete_depth: usize,
+    pub owner: OwnerRef,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CreaseSnapshot {
+    pub id: usize,
+    pub kind: i32,
+    pub vertices: Vec<usize>,
+    pub fwd_facet: Option<usize>,
+    pub bkd_facet: Option<usize>,
+    pub fold: i32,
+    pub owner: OwnerRef,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct FacetSnapshot {
+    pub id: usize,
+    pub centroid: Point,
+    pub is_well_formed: bool,
+    pub vertices: Vec<usize>,
+    pub creases: Vec<usize>,
+    pub corridor_edge: Option<usize>,
+    pub head_facets: Vec<usize>,
+    pub tail_facets: Vec<usize>,
+    pub order: usize,
+    pub color: i32,
+    pub owner: OwnerRef,
+}
+
+/// User-intent edit operation for GUI and wasm consumers.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum TreeEdit {
+    MoveNode {
+        id: usize,
+        loc: Point,
+    },
+    AddNode {
+        loc: Point,
+        label: Option<String>,
+        connect_to: Option<usize>,
+        edge_length: Option<TmFloat>,
+    },
+    DeleteNode {
+        id: usize,
+    },
+    UpdateNodeLabel {
+        id: usize,
+        label: String,
+    },
+    AddEdge {
+        node1: usize,
+        node2: usize,
+        label: Option<String>,
+        length: Option<TmFloat>,
+    },
+    DeleteEdge {
+        id: usize,
+    },
+    UpdateEdge {
+        id: usize,
+        label: Option<String>,
+        length: Option<TmFloat>,
+        strain: Option<TmFloat>,
+        stiffness: Option<TmFloat>,
+    },
+    UpdatePaper {
+        width: TmFloat,
+        height: TmFloat,
+        scale: Option<TmFloat>,
+    },
+    SetSymmetry {
+        has_symmetry: bool,
+        sym_loc: Option<Point>,
+        sym_angle: Option<TmFloat>,
+    },
+    AddCondition {
+        kind: ConditionKind,
+    },
+    UpdateCondition {
+        id: usize,
+        kind: ConditionKind,
+    },
+    DeleteCondition {
+        id: usize,
+    },
+}
+
+/// Result of applying a user-intent edit.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct EditReport {
+    pub snapshot: TreeSnapshot,
+    pub created_node: Option<usize>,
+    pub created_edge: Option<usize>,
+}
+
 /// Report returned by optimization operations.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct OptimizationReport {
@@ -553,6 +779,504 @@ impl Tree {
             _ => return Err(TreeError::UnsupportedVersion(version)),
         };
         Ok(tree)
+    }
+
+    /// Create a new empty editable design with TreeMaker defaults.
+    pub fn new_design(paper_width: TmFloat, paper_height: TmFloat) -> Result<Self> {
+        Self::from_design(TreeDesign {
+            paper: PaperSettings {
+                width: paper_width,
+                height: paper_height,
+                scale: 0.1,
+                has_symmetry: false,
+                sym_loc: Point { x: 0.5, y: 0.0 },
+                sym_angle: 90.0,
+            },
+            nodes: Vec::new(),
+            edges: Vec::new(),
+            conditions: Vec::new(),
+        })
+    }
+
+    /// Build a complete TreeMaker model from user-editable design input.
+    pub fn from_design(design: TreeDesign) -> Result<Self> {
+        validate_paper_settings(&design.paper)?;
+        validate_contiguous_ids("node", design.nodes.iter().map(|node| node.id))?;
+        validate_contiguous_ids("edge", design.edges.iter().map(|edge| edge.id))?;
+
+        let nodes = design
+            .nodes
+            .into_iter()
+            .map(|node| Node {
+                index: node.id,
+                label: node.label,
+                loc: node.loc,
+                depth: DEPTH_NOT_SET,
+                elevation: 0.0,
+                is_leaf: false,
+                is_sub: false,
+                is_border: false,
+                is_pinned: false,
+                is_polygon: false,
+                is_junction: false,
+                is_conditioned: false,
+                owned_vertices: Vec::new(),
+                edges: Vec::new(),
+                leaf_paths: Vec::new(),
+                owner: OwnerRef::Tree,
+            })
+            .collect::<Vec<_>>();
+        let edges = design
+            .edges
+            .into_iter()
+            .map(|edge| Edge {
+                index: edge.id,
+                label: edge.label,
+                length: edge.length,
+                strain: edge.strain,
+                stiffness: edge.stiffness,
+                is_pinned: false,
+                is_conditioned: false,
+                nodes: edge.nodes.to_vec(),
+            })
+            .collect::<Vec<_>>();
+        let conditions = design
+            .conditions
+            .into_iter()
+            .enumerate()
+            .map(|(index, kind)| Condition {
+                index: index + 1,
+                is_feasible: true,
+                kind,
+            })
+            .collect::<Vec<_>>();
+
+        let mut tree = Self {
+            source_version: "5.0".to_string(),
+            paper_width: design.paper.width,
+            paper_height: design.paper.height,
+            scale: design.paper.scale,
+            has_symmetry: design.paper.has_symmetry,
+            sym_loc: design.paper.sym_loc,
+            sym_angle: design.paper.sym_angle,
+            is_feasible: false,
+            is_polygon_valid: false,
+            is_polygon_filled: false,
+            is_vertex_depth_valid: false,
+            is_facet_data_valid: false,
+            is_local_root_connectable: false,
+            needs_cleanup: true,
+            nodes,
+            edges,
+            paths: Vec::new(),
+            polys: Vec::new(),
+            vertices: Vec::new(),
+            creases: Vec::new(),
+            facets: Vec::new(),
+            conditions,
+            owned_nodes: Vec::new(),
+            owned_edges: Vec::new(),
+            owned_paths: Vec::new(),
+            owned_polys: Vec::new(),
+        };
+        tree.rebuild_tree_paths()?;
+        tree.validate()?;
+        tree.cleanup_after_edit();
+        Ok(tree)
+    }
+
+    /// Return only the user-editable design inputs for this tree.
+    pub fn to_design(&self) -> TreeDesign {
+        TreeDesign {
+            paper: self.paper_settings(),
+            nodes: self
+                .owned_nodes
+                .iter()
+                .copied()
+                .filter_map(|id| self.nodes.get(id.saturating_sub(1)))
+                .map(|node| DesignNode {
+                    id: node.index,
+                    label: node.label.clone(),
+                    loc: node.loc,
+                })
+                .collect(),
+            edges: self
+                .owned_edges
+                .iter()
+                .copied()
+                .filter_map(|id| self.edges.get(id.saturating_sub(1)))
+                .filter_map(|edge| {
+                    let nodes: [usize; 2] = edge.nodes.as_slice().try_into().ok()?;
+                    Some(DesignEdge {
+                        id: edge.index,
+                        label: edge.label.clone(),
+                        nodes,
+                        length: edge.length,
+                        strain: edge.strain,
+                        stiffness: edge.stiffness,
+                    })
+                })
+                .collect(),
+            conditions: self
+                .conditions
+                .iter()
+                .map(|condition| condition.kind.clone())
+                .collect(),
+        }
+    }
+
+    /// Return a render-friendly snapshot of user input and generated state.
+    pub fn snapshot(&self) -> TreeSnapshot {
+        TreeSnapshot {
+            summary: self.summary(),
+            cp_status_report: self.cp_status_report(),
+            paper: self.paper_settings(),
+            nodes: self
+                .nodes
+                .iter()
+                .map(|node| NodeSnapshot {
+                    id: node.index,
+                    label: node.label.clone(),
+                    loc: node.loc,
+                    depth: node.depth,
+                    elevation: node.elevation,
+                    is_leaf: node.is_leaf,
+                    is_sub: node.is_sub,
+                    is_border: node.is_border,
+                    is_pinned: node.is_pinned,
+                    is_polygon: node.is_polygon,
+                    is_junction: node.is_junction,
+                    is_conditioned: node.is_conditioned,
+                    edges: node.edges.clone(),
+                    leaf_paths: node.leaf_paths.clone(),
+                    owner: node.owner.clone(),
+                })
+                .collect(),
+            edges: self
+                .edges
+                .iter()
+                .map(|edge| EdgeSnapshot {
+                    id: edge.index,
+                    label: edge.label.clone(),
+                    nodes: edge.nodes.clone(),
+                    length: edge.length,
+                    strain: edge.strain,
+                    stiffness: edge.stiffness,
+                    strained_length: edge.strained_length(),
+                    is_pinned: edge.is_pinned,
+                    is_conditioned: edge.is_conditioned,
+                })
+                .collect(),
+            paths: self
+                .paths
+                .iter()
+                .map(|path| PathSnapshot {
+                    id: path.index,
+                    nodes: path.nodes.clone(),
+                    edges: path.edges.clone(),
+                    min_tree_length: path.min_tree_length,
+                    min_paper_length: path.min_paper_length,
+                    act_tree_length: path.act_tree_length,
+                    act_paper_length: path.act_paper_length,
+                    is_leaf: path.is_leaf,
+                    is_sub: path.is_sub,
+                    is_feasible: path.is_feasible,
+                    is_active: path.is_active,
+                    is_border: path.is_border,
+                    is_polygon: path.is_polygon,
+                    is_conditioned: path.is_conditioned,
+                })
+                .collect(),
+            polys: self
+                .polys
+                .iter()
+                .map(|poly| PolySnapshot {
+                    id: poly.index,
+                    centroid: poly.centroid,
+                    is_sub_poly: poly.is_sub_poly,
+                    ring_nodes: poly.ring_nodes.clone(),
+                    ring_paths: poly.ring_paths.clone(),
+                    owned_nodes: poly.owned_nodes.clone(),
+                    owned_paths: poly.owned_paths.clone(),
+                    owned_polys: poly.owned_polys.clone(),
+                    owned_creases: poly.owned_creases.clone(),
+                    owned_facets: poly.owned_facets.clone(),
+                    owner: poly.owner.clone(),
+                })
+                .collect(),
+            vertices: self
+                .vertices
+                .iter()
+                .map(|vertex| VertexSnapshot {
+                    id: vertex.index,
+                    loc: vertex.loc,
+                    elevation: vertex.elevation,
+                    is_border: vertex.is_border,
+                    tree_node: vertex.tree_node,
+                    creases: vertex.creases.clone(),
+                    depth: vertex.depth,
+                    discrete_depth: vertex.discrete_depth,
+                    owner: vertex.owner.clone(),
+                })
+                .collect(),
+            creases: self
+                .creases
+                .iter()
+                .map(|crease| CreaseSnapshot {
+                    id: crease.index,
+                    kind: crease.kind,
+                    vertices: crease.vertices.clone(),
+                    fwd_facet: crease.fwd_facet,
+                    bkd_facet: crease.bkd_facet,
+                    fold: crease.fold,
+                    owner: crease.owner.clone(),
+                })
+                .collect(),
+            facets: self
+                .facets
+                .iter()
+                .map(|facet| FacetSnapshot {
+                    id: facet.index,
+                    centroid: facet.centroid,
+                    is_well_formed: facet.is_well_formed,
+                    vertices: facet.vertices.clone(),
+                    creases: facet.creases.clone(),
+                    corridor_edge: facet.corridor_edge,
+                    head_facets: facet.head_facets.clone(),
+                    tail_facets: facet.tail_facets.clone(),
+                    order: facet.order,
+                    color: facet.color,
+                    owner: facet.owner.clone(),
+                })
+                .collect(),
+            conditions: self.conditions.clone(),
+        }
+    }
+
+    /// Apply a user-intent edit while preserving TreeMaker invariants.
+    pub fn apply_edit(&mut self, edit: TreeEdit) -> Result<EditReport> {
+        let before = self.clone();
+        let mut created_node = None;
+        let mut created_edge = None;
+        let mut topology_changed = false;
+        let mut generated_geometry_stale = false;
+        let requires_design_only = matches!(
+            edit,
+            TreeEdit::AddNode { .. }
+                | TreeEdit::DeleteNode { .. }
+                | TreeEdit::AddEdge { .. }
+                | TreeEdit::DeleteEdge { .. }
+        );
+
+        let result = (|| -> Result<()> {
+            if requires_design_only && self.has_generated_parts() {
+                self.reset_to_design_state()?;
+            }
+
+            match edit {
+                TreeEdit::MoveNode { id, loc } => {
+                    let node = self.node_mut(id)?;
+                    node.loc = loc;
+                    generated_geometry_stale = true;
+                }
+                TreeEdit::AddNode {
+                    loc,
+                    label,
+                    connect_to,
+                    edge_length,
+                } => {
+                    if self.nodes.is_empty() && connect_to.is_some() {
+                        return Err(TreeError::InvalidOperation(
+                            "cannot connect the first node to another node",
+                        ));
+                    }
+                    if !self.nodes.is_empty() && connect_to.is_none() {
+                        return Err(TreeError::InvalidOperation(
+                            "new nodes after the first must connect to an existing node",
+                        ));
+                    }
+                    let node_id = self.nodes.len() + 1;
+                    self.nodes.push(Node {
+                        index: node_id,
+                        label: label.unwrap_or_else(|| format!("n{node_id}")),
+                        loc,
+                        depth: DEPTH_NOT_SET,
+                        elevation: 0.0,
+                        is_leaf: false,
+                        is_sub: false,
+                        is_border: false,
+                        is_pinned: false,
+                        is_polygon: false,
+                        is_junction: false,
+                        is_conditioned: false,
+                        owned_vertices: Vec::new(),
+                        edges: Vec::new(),
+                        leaf_paths: Vec::new(),
+                        owner: OwnerRef::Tree,
+                    });
+                    self.owned_nodes.push(node_id);
+                    created_node = Some(node_id);
+                    if let Some(connect_to) = connect_to {
+                        self.check_ref("node", connect_to, self.nodes.len())?;
+                        let edge_id = self.edges.len() + 1;
+                        self.edges.push(Edge {
+                            index: edge_id,
+                            label: format!("e{edge_id}"),
+                            length: edge_length.unwrap_or(1.0),
+                            strain: 0.0,
+                            stiffness: 1.0,
+                            is_pinned: false,
+                            is_conditioned: false,
+                            nodes: vec![connect_to, node_id],
+                        });
+                        self.owned_edges.push(edge_id);
+                        created_edge = Some(edge_id);
+                    }
+                    topology_changed = true;
+                }
+                TreeEdit::DeleteNode { id } => {
+                    self.check_ref("node", id, self.nodes.len())?;
+                    self.delete_design_node(id);
+                    topology_changed = true;
+                }
+                TreeEdit::UpdateNodeLabel { id, label } => {
+                    self.node_mut(id)?.label = label;
+                }
+                TreeEdit::AddEdge {
+                    node1,
+                    node2,
+                    label,
+                    length,
+                } => {
+                    self.check_ref("node", node1, self.nodes.len())?;
+                    self.check_ref("node", node2, self.nodes.len())?;
+                    if node1 == node2 {
+                        return Err(TreeError::InvalidOperation(
+                            "edge endpoints must be different nodes",
+                        ));
+                    }
+                    let edge_id = self.edges.len() + 1;
+                    self.edges.push(Edge {
+                        index: edge_id,
+                        label: label.unwrap_or_else(|| format!("e{edge_id}")),
+                        length: length.unwrap_or(1.0),
+                        strain: 0.0,
+                        stiffness: 1.0,
+                        is_pinned: false,
+                        is_conditioned: false,
+                        nodes: vec![node1, node2],
+                    });
+                    self.owned_edges.push(edge_id);
+                    created_edge = Some(edge_id);
+                    topology_changed = true;
+                }
+                TreeEdit::DeleteEdge { id } => {
+                    self.check_ref("edge", id, self.edges.len())?;
+                    self.delete_design_edge(id);
+                    topology_changed = true;
+                }
+                TreeEdit::UpdateEdge {
+                    id,
+                    label,
+                    length,
+                    strain,
+                    stiffness,
+                } => {
+                    let edge = self.edge_mut(id)?;
+                    if let Some(label) = label {
+                        edge.label = label;
+                    }
+                    if let Some(length) = length {
+                        validate_positive("edge length", length)?;
+                        edge.length = length;
+                        generated_geometry_stale = true;
+                    }
+                    if let Some(strain) = strain {
+                        edge.strain = strain;
+                        generated_geometry_stale = true;
+                    }
+                    if let Some(stiffness) = stiffness {
+                        edge.stiffness = stiffness;
+                        generated_geometry_stale = true;
+                    }
+                }
+                TreeEdit::UpdatePaper {
+                    width,
+                    height,
+                    scale,
+                } => {
+                    validate_positive("paper width", width)?;
+                    validate_positive("paper height", height)?;
+                    if let Some(scale) = scale {
+                        validate_positive("scale", scale)?;
+                        self.scale = scale;
+                    }
+                    self.paper_width = width;
+                    self.paper_height = height;
+                    generated_geometry_stale = true;
+                }
+                TreeEdit::SetSymmetry {
+                    has_symmetry,
+                    sym_loc,
+                    sym_angle,
+                } => {
+                    self.has_symmetry = has_symmetry;
+                    if let Some(sym_loc) = sym_loc {
+                        self.sym_loc = sym_loc;
+                    }
+                    if let Some(sym_angle) = sym_angle {
+                        self.sym_angle = sym_angle;
+                    }
+                    generated_geometry_stale = true;
+                }
+                TreeEdit::AddCondition { kind } => {
+                    push_condition(&mut self.conditions, kind);
+                    generated_geometry_stale = true;
+                }
+                TreeEdit::UpdateCondition { id, kind } => {
+                    let max = self.conditions.len();
+                    let condition = self.conditions.get_mut(id.saturating_sub(1)).ok_or(
+                        TreeError::BadReference {
+                            kind: "condition",
+                            index: id,
+                            max,
+                        },
+                    )?;
+                    condition.kind = kind;
+                    generated_geometry_stale = true;
+                }
+                TreeEdit::DeleteCondition { id } => {
+                    if id == 0 || id > self.conditions.len() {
+                        return Err(TreeError::BadReference {
+                            kind: "condition",
+                            index: id,
+                            max: self.conditions.len(),
+                        });
+                    }
+                    self.conditions.remove(id - 1);
+                    generated_geometry_stale = true;
+                }
+            }
+
+            if topology_changed || generated_geometry_stale {
+                self.reset_to_design_state()?;
+            } else {
+                self.validate()?;
+                self.cleanup_after_edit();
+            }
+            Ok(())
+        })();
+
+        if let Err(error) = result {
+            *self = before;
+            return Err(error);
+        }
+
+        Ok(EditReport {
+            snapshot: self.snapshot(),
+            created_node,
+            created_edge,
+        })
     }
 
     /// Serialize this tree to canonical TreeMaker v5 text.
@@ -1540,6 +2264,302 @@ impl Tree {
             OwnerRef::Path(id) => self.check_ref("path", id, self.paths.len()),
             OwnerRef::Poly(id) => self.check_ref("poly", id, self.polys.len()),
         }
+    }
+
+    fn paper_settings(&self) -> PaperSettings {
+        PaperSettings {
+            width: self.paper_width,
+            height: self.paper_height,
+            scale: self.scale,
+            has_symmetry: self.has_symmetry,
+            sym_loc: self.sym_loc,
+            sym_angle: self.sym_angle,
+        }
+    }
+
+    fn node_mut(&mut self, id: usize) -> Result<&mut Node> {
+        let max = self.nodes.len();
+        self.nodes
+            .get_mut(id.saturating_sub(1))
+            .ok_or(TreeError::BadReference {
+                kind: "node",
+                index: id,
+                max,
+            })
+    }
+
+    fn edge_mut(&mut self, id: usize) -> Result<&mut Edge> {
+        let max = self.edges.len();
+        self.edges
+            .get_mut(id.saturating_sub(1))
+            .ok_or(TreeError::BadReference {
+                kind: "edge",
+                index: id,
+                max,
+            })
+    }
+
+    fn clear_generated_state(&mut self) {
+        for node in &mut self.nodes {
+            node.owned_vertices.clear();
+        }
+        for path in &mut self.paths {
+            path.fwd_poly = None;
+            path.bkd_poly = None;
+            path.outset_path = None;
+            path.front_reduction = 0.0;
+            path.back_reduction = 0.0;
+            path.min_depth = DEPTH_NOT_SET;
+            path.min_depth_dist = DEPTH_NOT_SET;
+            path.owned_vertices.clear();
+            path.owned_creases.clear();
+        }
+        self.polys.clear();
+        self.vertices.clear();
+        self.creases.clear();
+        self.facets.clear();
+        self.owned_polys.clear();
+        self.is_polygon_valid = false;
+        self.is_polygon_filled = false;
+        self.is_vertex_depth_valid = false;
+        self.is_facet_data_valid = false;
+        self.is_local_root_connectable = false;
+        self.needs_cleanup = true;
+    }
+
+    fn has_generated_parts(&self) -> bool {
+        self.nodes.len() != self.owned_nodes.len()
+            || self.edges.len() != self.owned_edges.len()
+            || self.paths.len() != self.owned_paths.len()
+            || !self.polys.is_empty()
+            || !self.vertices.is_empty()
+            || !self.creases.is_empty()
+            || !self.facets.is_empty()
+    }
+
+    fn reset_to_design_state(&mut self) -> Result<()> {
+        let design = self.to_design();
+        *self = Self::from_design(design)?;
+        Ok(())
+    }
+
+    fn rebuild_tree_paths(&mut self) -> Result<()> {
+        self.clear_generated_state();
+        self.renumber_part_indices();
+        self.owned_nodes = (1..=self.nodes.len()).collect();
+        self.owned_edges = (1..=self.edges.len()).collect();
+        self.paths.clear();
+        self.owned_paths.clear();
+
+        for node in &mut self.nodes {
+            node.edges.clear();
+            node.leaf_paths.clear();
+            node.is_leaf = false;
+            node.is_sub = false;
+            node.owner = OwnerRef::Tree;
+        }
+
+        for edge_id in 1..=self.edges.len() {
+            let edge = &self.edges[edge_id - 1];
+            validate_positive("edge length", edge.length)?;
+            if edge.nodes.len() != 2 {
+                return Err(TreeError::InvalidOperation(
+                    "tree edges must have exactly two endpoints",
+                ));
+            }
+            let a = edge.nodes[0];
+            let b = edge.nodes[1];
+            if a == b {
+                return Err(TreeError::InvalidOperation(
+                    "edge endpoints must be different nodes",
+                ));
+            }
+            self.check_ref("node", a, self.nodes.len())?;
+            self.check_ref("node", b, self.nodes.len())?;
+            self.nodes[a - 1].edges.push(edge_id);
+            self.nodes[b - 1].edges.push(edge_id);
+        }
+
+        if self.nodes.is_empty() {
+            return Ok(());
+        }
+        if self.edges.len() != self.nodes.len().saturating_sub(1) {
+            return Err(TreeError::InvalidOperation(
+                "tree topology must be connected and acyclic",
+            ));
+        }
+        self.validate_connected_tree()?;
+
+        for node_id in 1..=self.nodes.len() {
+            let degree = self.nodes[node_id - 1].edges.len();
+            self.nodes[node_id - 1].is_leaf = if self.nodes.len() == 1 {
+                true
+            } else {
+                degree == 1
+            };
+        }
+
+        for node1 in 1..=self.nodes.len() {
+            for node2 in node1 + 1..=self.nodes.len() {
+                let (path_nodes, path_edges) = self.tree_path_between(node1, node2)?;
+                let path_id = self.paths.len() + 1;
+                let is_leaf = self.nodes[node1 - 1].is_leaf && self.nodes[node2 - 1].is_leaf;
+                if is_leaf {
+                    self.nodes[node1 - 1].leaf_paths.push(path_id);
+                    self.nodes[node2 - 1].leaf_paths.push(path_id);
+                }
+                self.paths.push(Path {
+                    index: path_id,
+                    min_tree_length: 0.0,
+                    min_paper_length: 0.0,
+                    act_tree_length: 0.0,
+                    act_paper_length: 0.0,
+                    is_leaf,
+                    is_sub: false,
+                    is_feasible: false,
+                    is_active: false,
+                    is_border: false,
+                    is_polygon: false,
+                    is_conditioned: false,
+                    fwd_poly: None,
+                    bkd_poly: None,
+                    nodes: path_nodes,
+                    edges: path_edges,
+                    outset_path: None,
+                    front_reduction: 0.0,
+                    back_reduction: 0.0,
+                    min_depth: DEPTH_NOT_SET,
+                    min_depth_dist: DEPTH_NOT_SET,
+                    owned_vertices: Vec::new(),
+                    owned_creases: Vec::new(),
+                    owner: OwnerRef::Tree,
+                });
+            }
+        }
+        self.owned_paths = (1..=self.paths.len()).collect();
+        Ok(())
+    }
+
+    fn validate_connected_tree(&self) -> Result<()> {
+        let mut visited = vec![false; self.nodes.len() + 1];
+        let mut queue = VecDeque::from([1usize]);
+        visited[1] = true;
+        while let Some(node_id) = queue.pop_front() {
+            for edge_id in self.nodes[node_id - 1].edges.iter().copied() {
+                let edge = &self.edges[edge_id - 1];
+                let next = if edge.nodes[0] == node_id {
+                    edge.nodes[1]
+                } else {
+                    edge.nodes[0]
+                };
+                if !visited[next] {
+                    visited[next] = true;
+                    queue.push_back(next);
+                }
+            }
+        }
+        if visited.iter().skip(1).any(|visited| !visited) {
+            return Err(TreeError::InvalidOperation(
+                "tree topology must be connected and acyclic",
+            ));
+        }
+        Ok(())
+    }
+
+    fn tree_path_between(&self, start: usize, end: usize) -> Result<(Vec<usize>, Vec<usize>)> {
+        let mut parent = vec![None::<(usize, usize)>; self.nodes.len() + 1];
+        let mut queue = VecDeque::from([start]);
+        parent[start] = Some((0, 0));
+        while let Some(node_id) = queue.pop_front() {
+            if node_id == end {
+                break;
+            }
+            for edge_id in self.nodes[node_id - 1].edges.iter().copied() {
+                let edge = &self.edges[edge_id - 1];
+                let next = if edge.nodes[0] == node_id {
+                    edge.nodes[1]
+                } else {
+                    edge.nodes[0]
+                };
+                if parent[next].is_none() {
+                    parent[next] = Some((node_id, edge_id));
+                    queue.push_back(next);
+                }
+            }
+        }
+        if parent[end].is_none() {
+            return Err(TreeError::InvalidOperation(
+                "tree topology must be connected and acyclic",
+            ));
+        }
+
+        let mut nodes = vec![end];
+        let mut edges = Vec::new();
+        let mut cur = end;
+        while cur != start {
+            let (prev, edge_id) = parent[cur].expect("parent checked");
+            nodes.push(prev);
+            edges.push(edge_id);
+            cur = prev;
+        }
+        nodes.reverse();
+        edges.reverse();
+        Ok((nodes, edges))
+    }
+
+    fn delete_design_node(&mut self, id: usize) {
+        let old_node_len = self.nodes.len();
+        self.nodes.remove(id - 1);
+        let mut node_map = vec![None; old_node_len + 1];
+        let mut next_node = 1usize;
+        for (old_id, slot) in node_map.iter_mut().enumerate().skip(1) {
+            if old_id == id {
+                continue;
+            }
+            *slot = Some(next_node);
+            next_node += 1;
+        }
+        for condition in &mut self.conditions {
+            condition.kind.remap_nodes(&node_map);
+        }
+
+        let old_edges = std::mem::take(&mut self.edges);
+        let mut edge_map = vec![None; old_edges.len() + 1];
+        for edge in old_edges {
+            if edge.nodes.contains(&id) {
+                continue;
+            }
+            let old_id = edge.index;
+            let mut remapped = edge;
+            remap_vec(&mut remapped.nodes, &node_map);
+            remapped.index = self.edges.len() + 1;
+            edge_map[old_id] = Some(remapped.index);
+            self.edges.push(remapped);
+        }
+        for condition in &mut self.conditions {
+            condition.kind.remap_edges(&edge_map);
+        }
+        self.owned_nodes = (1..=self.nodes.len()).collect();
+        self.owned_edges = (1..=self.edges.len()).collect();
+    }
+
+    fn delete_design_edge(&mut self, id: usize) {
+        let old_edges = std::mem::take(&mut self.edges);
+        let mut edge_map = vec![None; old_edges.len() + 1];
+        for edge in old_edges {
+            if edge.index == id {
+                continue;
+            }
+            let old_id = edge.index;
+            let mut remapped = edge;
+            remapped.index = self.edges.len() + 1;
+            edge_map[old_id] = Some(remapped.index);
+            self.edges.push(remapped);
+        }
+        for condition in &mut self.conditions {
+            condition.kind.remap_edges(&edge_map);
+        }
+        self.owned_edges = (1..=self.edges.len()).collect();
     }
 
     fn find_leaf_path_between(&self, node1: usize, node2: usize) -> Option<&Path> {
@@ -7753,6 +8773,17 @@ impl ConditionKind {
             Self::EdgeLengthFixed { .. } | Self::EdgesSameStrain { .. } => {}
         }
     }
+
+    fn remap_edges(&mut self, map: &[Option<usize>]) {
+        match self {
+            Self::EdgeLengthFixed { edge } => remap_value(edge, map),
+            Self::EdgesSameStrain { edge1, edge2 } => {
+                remap_value(edge1, map);
+                remap_value(edge2, map);
+            }
+            _ => {}
+        }
+    }
 }
 
 fn push_condition(conditions: &mut Vec<Condition>, kind: ConditionKind) {
@@ -7761,6 +8792,33 @@ fn push_condition(conditions: &mut Vec<Condition>, kind: ConditionKind) {
         is_feasible: true,
         kind,
     });
+}
+
+fn validate_paper_settings(paper: &PaperSettings) -> Result<()> {
+    validate_positive("paper width", paper.width)?;
+    validate_positive("paper height", paper.height)?;
+    validate_positive("scale", paper.scale)
+}
+
+fn validate_positive(name: &'static str, value: TmFloat) -> Result<()> {
+    if value.is_finite() && value > 0.0 {
+        Ok(())
+    } else {
+        Err(TreeError::InvalidOperation(name))
+    }
+}
+
+fn validate_contiguous_ids(kind: &'static str, ids: impl Iterator<Item = usize>) -> Result<()> {
+    for (offset, id) in ids.enumerate() {
+        if id != offset + 1 {
+            return Err(TreeError::InvalidOperation(match kind {
+                "node" => "design node IDs must be contiguous and 1-based",
+                "edge" => "design edge IDs must be contiguous and 1-based",
+                _ => "design IDs must be contiguous and 1-based",
+            }));
+        }
+    }
+    Ok(())
 }
 
 fn kill_v4_crease_pattern_refs(nodes: &mut [Node], paths: &mut [Path]) {
@@ -8345,5 +9403,122 @@ mod tests {
         assert!(report.bad_vertices.is_empty());
         assert!(report.bad_creases.is_empty());
         assert!(report.bad_facets.is_empty());
+    }
+
+    #[test]
+    fn editable_design_builds_paths_optimizes_and_invalidates_cp() {
+        let mut tree = Tree::new_design(1.0, 1.0).unwrap();
+        let root = tree
+            .apply_edit(TreeEdit::AddNode {
+                loc: Point { x: 0.5, y: 0.5 },
+                label: Some("root".to_string()),
+                connect_to: None,
+                edge_length: None,
+            })
+            .unwrap();
+        assert_eq!(root.created_node, Some(1));
+
+        for (x, y) in [(0.18, 0.18), (0.82, 0.2), (0.5, 0.86)] {
+            tree.apply_edit(TreeEdit::AddNode {
+                loc: Point { x, y },
+                label: None,
+                connect_to: Some(1),
+                edge_length: Some(1.0),
+            })
+            .unwrap();
+        }
+
+        let snapshot = tree.snapshot();
+        assert_eq!(snapshot.summary.nodes, 4);
+        assert_eq!(snapshot.summary.edges, 3);
+        assert_eq!(snapshot.summary.paths, 6);
+        assert_eq!(snapshot.summary.leaf_nodes, 3);
+        assert_eq!(tree.to_design().edges.len(), 3);
+
+        tree.apply_edit(TreeEdit::UpdateEdge {
+            id: 1,
+            label: Some("head".to_string()),
+            length: Some(0.85),
+            strain: None,
+            stiffness: None,
+        })
+        .unwrap();
+        assert_eq!(tree.to_design().edges[0].label, "head");
+        assert_eq!(tree.to_design().edges[0].length, 0.85);
+
+        tree.optimize_scale().unwrap();
+        assert!(tree.is_feasible());
+        tree.build_polys_and_crease_pattern().unwrap();
+        assert!(!tree.snapshot().creases.is_empty());
+
+        tree.apply_edit(TreeEdit::MoveNode {
+            id: 2,
+            loc: Point { x: 0.2, y: 0.25 },
+        })
+        .unwrap();
+        assert_eq!(tree.snapshot().summary.creases, 0);
+        assert_eq!(tree.snapshot().summary.polys, 0);
+    }
+
+    #[test]
+    fn invalid_topology_edit_rolls_back() {
+        let mut tree = Tree::from_design(TreeDesign {
+            paper: PaperSettings {
+                width: 1.0,
+                height: 1.0,
+                scale: 0.1,
+                has_symmetry: false,
+                sym_loc: Point { x: 0.5, y: 0.0 },
+                sym_angle: 90.0,
+            },
+            nodes: vec![
+                DesignNode {
+                    id: 1,
+                    label: "root".to_string(),
+                    loc: Point { x: 0.5, y: 0.5 },
+                },
+                DesignNode {
+                    id: 2,
+                    label: "a".to_string(),
+                    loc: Point { x: 0.2, y: 0.2 },
+                },
+                DesignNode {
+                    id: 3,
+                    label: "b".to_string(),
+                    loc: Point { x: 0.8, y: 0.2 },
+                },
+            ],
+            edges: vec![
+                DesignEdge {
+                    id: 1,
+                    label: "e1".to_string(),
+                    nodes: [1, 2],
+                    length: 1.0,
+                    strain: 0.0,
+                    stiffness: 1.0,
+                },
+                DesignEdge {
+                    id: 2,
+                    label: "e2".to_string(),
+                    nodes: [1, 3],
+                    length: 1.0,
+                    strain: 0.0,
+                    stiffness: 1.0,
+                },
+            ],
+            conditions: Vec::new(),
+        })
+        .unwrap();
+        let before = tree.snapshot();
+        let err = tree
+            .apply_edit(TreeEdit::AddEdge {
+                node1: 2,
+                node2: 3,
+                label: None,
+                length: Some(1.0),
+            })
+            .expect_err("cycle should be rejected");
+        assert_eq!(err.code(), "invalid_operation");
+        assert_eq!(tree.snapshot(), before);
     }
 }

@@ -4,6 +4,7 @@ members = [
     "crates/treemaker-cli",
     "crates/treemaker-wasm",
     "crates/oracle-tests",
+    "apps/tauri/src-tauri",
 ]
 resolver = "3"
 

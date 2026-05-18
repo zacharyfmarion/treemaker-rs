@@ -1,0 +1,124 @@
+.app-layout {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: 100vw;
+  height: 100vh;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--bg-primary);
+}
+
+.toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  min-height: 36px;
+  padding: 3px var(--space-3);
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border-subtle);
+  box-sizing: border-box;
+}
+
+.toolbar__brand,
+.toolbar__actions {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.toolbar__brand {
+  gap: var(--space-2);
+  overflow: visible;
+}
+
+.toolbar__title {
+  flex: 0 0 auto;
+  color: var(--text-primary);
+  font-size: 0.78rem;
+  font-weight: 750;
+  letter-spacing: 0;
+}
+
+.toolbar__actions {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.toolbar__separator {
+  width: 1px;
+  height: 18px;
+  margin: 0 var(--space-1);
+  background: var(--border-default);
+}
+
+@media (max-width: 680px) {
+  .toolbar {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-1);
+    padding: 5px var(--space-2);
+  }
+
+  .toolbar__brand,
+  .toolbar__actions {
+    width: 100%;
+  }
+
+  .toolbar__brand {
+    gap: var(--space-1);
+  }
+
+  .toolbar__actions {
+    justify-content: flex-start;
+  }
+
+  .toolbar__separator {
+    display: none;
+  }
+}
+
+@media (max-width: 460px) {
+  .toolbar__actions .ui-control--sm {
+    padding: 0 8px;
+  }
+}
+
+.dockview-theme-treemaker {
+  --dv-paneview-header-border-color: var(--border-default);
+  --dv-tabs-and-actions-container-background-color: var(--bg-primary);
+  --dv-tabs-and-actions-container-height: 28px;
+  --dv-tabs-and-actions-container-font-size: 11px;
+  --dv-activegroup-visiblepanel-tab-background-color: var(--bg-secondary);
+  --dv-activegroup-hiddenpanel-tab-background-color: var(--bg-primary);
+  --dv-inactivegroup-visiblepanel-tab-background-color: var(--bg-elevated);
+  --dv-inactivegroup-hiddenpanel-tab-background-color: var(--bg-primary);
+  --dv-tab-divider-color: var(--border-default);
+  --dv-activegroup-visiblepanel-tab-color: var(--text-primary);
+  --dv-activegroup-hiddenpanel-tab-color: var(--text-secondary);
+  --dv-inactivegroup-visiblepanel-tab-color: var(--text-secondary);
+  --dv-inactivegroup-hiddenpanel-tab-color: var(--text-tertiary);
+  --dv-background-color: var(--bg-primary);
+  --dv-group-view-background-color: var(--bg-secondary);
+  --dv-separator-border: var(--border-default);
+  --dv-drag-over-background-color: color-mix(in srgb, var(--accent-primary) 18%, transparent);
+  --dv-drag-over-border-color: var(--accent-primary);
+}
+
+.dockview-theme-treemaker .dv-tabs-and-actions-container {
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.dockview-theme-treemaker .dv-split-view-container .dv-sash-container .dv-sash {
+  --dv-sash-size: 6px;
+}
+
+.dockview-theme-treemaker .dv-split-view-container .dv-sash-container .dv-sash:not(.disabled):hover,
+.dockview-theme-treemaker .dv-split-view-container .dv-sash-container .dv-sash:not(.disabled):active {
+  background-color: var(--accent-primary);
+  transition: background-color 0.15s ease;
+  transition-delay: 0.18s;
+}

@@ -1,0 +1,260 @@
+import { useRef, useState, type PointerEvent } from 'react';
+import { CircleDot, Plus, Waypoints } from 'lucide-react';
+import {
+  clampPaperPoint,
+  formatNumber,
+  paperToSvg,
+  svgToPaper,
+  type PlotRect,
+  type Point,
+} from '../../lib/geometry';
+import {
+  isEdgeSelected,
+  isNodeSelected,
+  isPathSelected,
+  toggleEdgeSelection,
+  toggleNodeSelection,
+} from '../../lib/selection';
+import { useWorkspaceStore } from '../../store/workspaceStore';
+
+const VIEWBOX = 720;
+const PAPER_RECT: PlotRect = { x: 66, y: 54, width: 588, height: 588 };
+
+export function DesignPanel() {
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const [dragging, setDragging] = useState<{
+    id: number;
+    start: Point;
+    loc: Point;
+    moved: boolean;
+  } | null>(null);
+  const project = useWorkspaceStore((state) => state.project);
+  const selection = useWorkspaceStore((state) => state.selection);
+  const select = useWorkspaceStore((state) => state.select);
+  const addNodeAt = useWorkspaceStore((state) => state.addNodeAt);
+  const moveNode = useWorkspaceStore((state) => state.moveNode);
+
+  const findNode = (id: number) => project.nodes.find((node) => node.id === id);
+  const displayLoc = (id: number, loc: Point) => (dragging?.id === id ? dragging.loc : loc);
+  const symmetryCenter = paperToSvg(project.paper.symLoc, PAPER_RECT);
+  const symmetryAngle = (project.paper.symAngle * Math.PI) / 180;
+  const symmetryLine = {
+    x1: symmetryCenter.x - Math.cos(symmetryAngle) * VIEWBOX,
+    y1: symmetryCenter.y + Math.sin(symmetryAngle) * VIEWBOX,
+    x2: symmetryCenter.x + Math.cos(symmetryAngle) * VIEWBOX,
+    y2: symmetryCenter.y - Math.sin(symmetryAngle) * VIEWBOX,
+  };
+
+  const eventToPaper = (event: PointerEvent): Point => {
+    const svg = svgRef.current;
+    if (!svg) return { x: 0, y: 0 };
+    const bounds = svg.getBoundingClientRect();
+    const point = {
+      x: ((event.clientX - bounds.left) / bounds.width) * VIEWBOX,
+      y: ((event.clientY - bounds.top) / bounds.height) * VIEWBOX,
+    };
+    return clampPaperPoint(svgToPaper(point, PAPER_RECT));
+  };
+
+  const onPaperPointerDown = (event: PointerEvent<SVGRectElement>) => {
+    if (event.button !== 0) return;
+    const connectTo = selection.kind === 'node' ? selection.id : undefined;
+    void addNodeAt(eventToPaper(event), connectTo);
+  };
+
+  const onNodePointerDown = (event: PointerEvent<SVGCircleElement>, nodeId: number) => {
+    if (event.button !== 0) return;
+    event.stopPropagation();
+    if (event.shiftKey || event.metaKey || event.ctrlKey) {
+      select(toggleNodeSelection(selection, nodeId));
+      return;
+    }
+    select({ kind: 'node', id: nodeId });
+    const node = findNode(nodeId);
+    if (!node) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setDragging({ id: nodeId, start: node.loc, loc: node.loc, moved: false });
+  };
+
+  const onNodePointerMove = (event: PointerEvent<SVGCircleElement>, nodeId: number) => {
+    if (dragging?.id !== nodeId) return;
+    event.stopPropagation();
+    const loc = eventToPaper(event);
+    const dx = loc.x - dragging.start.x;
+    const dy = loc.y - dragging.start.y;
+    setDragging({
+      id: nodeId,
+      start: dragging.start,
+      loc,
+      moved: dragging.moved || Math.hypot(dx, dy) > 0.003,
+    });
+  };
+
+  const finishDrag = (event: PointerEvent<SVGCircleElement>, nodeId: number) => {
+    if (dragging?.id !== nodeId) return;
+    event.stopPropagation();
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    const loc = dragging.loc;
+    const moved = dragging.moved;
+    setDragging(null);
+    if (moved) void moveNode(nodeId, loc);
+  };
+
+  return (
+    <section className="panel-shell design-panel">
+      <div className="panel-body design-panel__body">
+        <svg
+          ref={svgRef}
+          className="design-canvas"
+          viewBox={`0 0 ${VIEWBOX} ${VIEWBOX}`}
+          role="img"
+          aria-label="Tree design canvas"
+        >
+          <defs>
+            <pattern id="paper-grid" width="58.8" height="58.8" patternUnits="userSpaceOnUse">
+              <path d="M 58.8 0 L 0 0 0 58.8" fill="none" stroke="rgba(16,20,23,0.14)" strokeWidth="1" />
+            </pattern>
+          </defs>
+          <rect className="paper-shadow" x="56" y="44" width="608" height="608" rx="6" />
+          <rect
+            className="paper"
+            x={PAPER_RECT.x}
+            y={PAPER_RECT.y}
+            width={PAPER_RECT.width}
+            height={PAPER_RECT.height}
+          />
+          <rect
+            x={PAPER_RECT.x}
+            y={PAPER_RECT.y}
+            width={PAPER_RECT.width}
+            height={PAPER_RECT.height}
+            fill="url(#paper-grid)"
+          />
+          <rect
+            className="paper-hit-area"
+            x={PAPER_RECT.x}
+            y={PAPER_RECT.y}
+            width={PAPER_RECT.width}
+            height={PAPER_RECT.height}
+            onPointerDown={onPaperPointerDown}
+          />
+          {project.hasSymmetry && (
+            <line
+              className="symmetry-line"
+              x1={symmetryLine.x1}
+              y1={symmetryLine.y1}
+              x2={symmetryLine.x2}
+              y2={symmetryLine.y2}
+            />
+          )}
+          {project.paths.map((path) => {
+            const a = findNode(path.nodes[0]);
+            const b = findNode(path.nodes[1]);
+            if (!a || !b) return null;
+            const p1 = paperToSvg(displayLoc(a.id, a.loc), PAPER_RECT);
+            const p2 = paperToSvg(displayLoc(b.id, b.loc), PAPER_RECT);
+            const className = path.isActive
+              ? 'tree-path tree-path--active'
+              : path.isFeasible
+                ? 'tree-path tree-path--feasible'
+                : 'tree-path tree-path--bad';
+            const conditioned = path.isConditioned ? 'tree-path--conditioned' : '';
+            const active = isPathSelected(selection, path.id);
+            return (
+              <line
+                key={path.id}
+                className={`${className} ${conditioned} ${active ? 'tree-path--selected' : ''}`}
+                x1={p1.x}
+                y1={p1.y}
+                x2={p2.x}
+                y2={p2.y}
+                onPointerDown={(event) => {
+                  event.stopPropagation();
+                  select({ kind: 'path', id: path.id });
+                }}
+              />
+            );
+          })}
+          {project.edges.map((edge) => {
+            const a = findNode(edge.nodes[0]);
+            const b = findNode(edge.nodes[1]);
+            if (!a || !b) return null;
+            const p1 = paperToSvg(displayLoc(a.id, a.loc), PAPER_RECT);
+            const p2 = paperToSvg(displayLoc(b.id, b.loc), PAPER_RECT);
+            const active = isEdgeSelected(selection, edge.id);
+            return (
+              <g key={edge.id} onPointerDown={(event) => {
+                event.stopPropagation();
+                select(
+                  event.shiftKey || event.metaKey || event.ctrlKey
+                    ? toggleEdgeSelection(selection, edge.id)
+                    : { kind: 'edge', id: edge.id }
+                );
+              }}>
+                <line
+                  className={[
+                    'tree-edge',
+                    edge.isConditioned ? 'tree-edge--conditioned' : '',
+                    active ? 'tree-edge--selected' : '',
+                  ].join(' ')}
+                  x1={p1.x}
+                  y1={p1.y}
+                  x2={p2.x}
+                  y2={p2.y}
+                />
+                <text className="edge-label" x={(p1.x + p2.x) / 2 + 8} y={(p1.y + p2.y) / 2 - 8}>
+                  {formatNumber(edge.length, 2)}
+                </text>
+              </g>
+            );
+          })}
+          {project.nodes.map((node) => {
+            const point = paperToSvg(displayLoc(node.id, node.loc), PAPER_RECT);
+            const active = isNodeSelected(selection, node.id);
+            const incidentEdge = project.edges.find((edge) => edge.nodes.includes(node.id));
+            const radius = node.isLeaf
+              ? Math.max(22, (incidentEdge?.length ?? 1) * project.scale * PAPER_RECT.width)
+              : 0;
+            return (
+              <g key={node.id}>
+                {node.isLeaf && (
+                  <circle
+                    className="leaf-radius"
+                    cx={point.x}
+                    cy={point.y}
+                    r={Math.max(22, radius)}
+                  />
+                )}
+                <circle
+                  className={[
+                    'tree-node',
+                    node.isConditioned ? 'tree-node--conditioned' : '',
+                    active ? 'tree-node--selected' : '',
+                  ].join(' ')}
+                  data-leaf={node.isLeaf || undefined}
+                  cx={point.x}
+                  cy={point.y}
+                  r={node.isLeaf ? 7 : 8}
+                  onPointerDown={(event) => onNodePointerDown(event, node.id)}
+                  onPointerMove={(event) => onNodePointerMove(event, node.id)}
+                  onPointerUp={(event) => finishDrag(event, node.id)}
+                  onPointerCancel={(event) => finishDrag(event, node.id)}
+                />
+                <text className="node-label" x={point.x + 11} y={point.y + 4}>
+                  {node.label}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+        <div className="design-legend">
+          <span><CircleDot size={13} /> Terminal</span>
+          <span><Waypoints size={13} /> Active path</span>
+          <span><Plus size={13} /> Scale {formatNumber(project.scale, 3)}</span>
+        </div>
+      </div>
+    </section>
+  );
+}

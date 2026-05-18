@@ -1,0 +1,32 @@
+[data-sonner-toaster] {
+  --normal-bg: var(--bg-elevated);
+  --normal-border: var(--border-default);
+  --normal-text: var(--text-primary);
+  --success-bg: var(--bg-elevated);
+  --success-border: var(--border-default);
+  --success-text: var(--text-primary);
+  --error-bg: var(--bg-elevated);
+  --error-border: var(--border-default);
+  --error-text: var(--text-primary);
+  --warning-bg: var(--bg-elevated);
+  --warning-border: var(--border-default);
+  --warning-text: var(--text-primary);
+  --info-bg: var(--bg-elevated);
+  --info-border: var(--border-default);
+  --info-text: var(--text-primary);
+}
+
+[data-sonner-toaster] [data-sonner-toast] {
+  border-radius: var(--radius-md);
+  box-shadow: 0 14px 38px var(--shadow-overlay);
+}
+
+[data-sonner-toaster] [data-description] {
+  color: var(--text-secondary);
+}
+
+[data-sonner-toaster] [data-close-button] {
+  color: var(--text-secondary);
+  background: var(--bg-surface);
+  border-color: var(--border-default);
+}

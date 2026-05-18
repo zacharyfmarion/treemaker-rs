@@ -65,6 +65,35 @@ describe('createOrigamiSimulator', () => {
     expect(() => simulator.step()).toThrow(/disposed/);
   });
 
+  it('starts from OrigamiSimulator-style centered and scaled model coordinates', () => {
+    const prepared = prepareFoldModel(makeBookFoldFixture());
+    const simulator = createOrigamiSimulator({ model: prepared });
+    const positions = simulator.readFrame().positions;
+    const xs = [positions[0], positions[3], positions[6], positions[9]];
+    const zs = [positions[2], positions[5], positions[8], positions[11]];
+
+    expect(Math.max(...xs)).toBeCloseTo(Math.SQRT1_2);
+    expect(Math.min(...xs)).toBeCloseTo(-Math.SQRT1_2);
+    expect(Math.max(...zs)).toBeCloseTo(Math.SQRT1_2);
+    expect(Math.min(...zs)).toBeCloseTo(-Math.SQRT1_2);
+
+    simulator.dispose();
+  });
+
+  it('clamps fold playback to the flat-to-target range', () => {
+    const prepared = prepareFoldModel(makeBookFoldFixture());
+    const simulator = createOrigamiSimulator({ model: prepared, options: { foldPercent: -100 } });
+    const before = simulator.readFrame().positions;
+    const after = simulator.step(64);
+
+    expect(after.foldPercent).toBe(0);
+    expect(maxPositionDelta(before, after.positions)).toBeLessThan(1e-6);
+    simulator.setFoldPercent(250);
+    expect(simulator.readFrame().foldPercent).toBe(100);
+
+    simulator.dispose();
+  });
+
   it('settles a simple fold without frame-to-frame shape jumps', () => {
     const prepared = prepareFoldModel(makeBookFoldFixture());
     const simulator = createOrigamiSimulator({ model: prepared, options: { foldPercent: 100 } });

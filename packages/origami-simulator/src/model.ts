@@ -14,8 +14,9 @@ export class OrigamiModel {
 
   constructor(prepared: PreparedOrigamiModel) {
     this.prepared = prepared;
-    this.originalPositions = prepared.originalPositions.slice();
+    this.originalPositions = normalizeSimulationPositions(prepared.originalPositions);
     this.positions = prepared.originalPositions.slice();
+    this.positions.set(this.originalPositions);
     this.velocities = new Float32Array(this.positions.length);
     this.colors = prepared.colors.slice();
     this.originalEdgeLengths = new Float32Array(
@@ -135,6 +136,55 @@ export class OrigamiModel {
     });
     return arms;
   }
+}
+
+function normalizeSimulationPositions(source: Float32Array): Float32Array {
+  const normalized = source.slice();
+  if (normalized.length < 3) return normalized;
+
+  let minX = Infinity;
+  let minY = Infinity;
+  let minZ = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  let maxZ = -Infinity;
+  for (let index = 0; index < normalized.length; index += 3) {
+    const x = normalized[index] ?? 0;
+    const y = normalized[index + 1] ?? 0;
+    const z = normalized[index + 2] ?? 0;
+    minX = Math.min(minX, x);
+    minY = Math.min(minY, y);
+    minZ = Math.min(minZ, z);
+    maxX = Math.max(maxX, x);
+    maxY = Math.max(maxY, y);
+    maxZ = Math.max(maxZ, z);
+  }
+
+  if (!Number.isFinite(minX)) return normalized;
+  const center: [number, number, number] = [
+    (minX + maxX) / 2,
+    (minY + maxY) / 2,
+    (minZ + maxZ) / 2,
+  ];
+  let radius = 0;
+  for (let index = 0; index < normalized.length; index += 3) {
+    radius = Math.max(
+      radius,
+      Math.hypot(
+        (normalized[index] ?? 0) - center[0],
+        (normalized[index + 1] ?? 0) - center[1],
+        (normalized[index + 2] ?? 0) - center[2]
+      )
+    );
+  }
+  if (radius <= EPSILON) return normalized;
+
+  for (let index = 0; index < normalized.length; index += 3) {
+    normalized[index] = ((normalized[index] ?? 0) - center[0]) / radius;
+    normalized[index + 1] = ((normalized[index + 1] ?? 0) - center[1]) / radius;
+    normalized[index + 2] = ((normalized[index + 2] ?? 0) - center[2]) / radius;
+  }
+  return normalized;
 }
 
 function pointAt(source: Float32Array, vertex: number): [number, number, number] {

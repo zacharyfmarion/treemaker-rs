@@ -60,6 +60,7 @@ export interface SimulatorOptions {
   timeStep?: number;
   stepsPerFrame?: number;
   autoRender?: boolean;
+  integrationType?: 'euler' | 'verlet';
 }
 
 export interface SimulatorDiagnostics {

@@ -3,6 +3,7 @@ export { createOrigamiSimulator } from './simulator.js';
 export { DynamicSolver } from './dynamicSolver.js';
 export { GpuMath, detectWebGlSupport } from './gpuMath.js';
 export { OrigamiModel } from './model.js';
+export { ORIGAMI_SIMULATOR_UPSTREAM } from './provenance.js';
 export type {
   CreateSimulatorConfig,
   CreaseParameter,

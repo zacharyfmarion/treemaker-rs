@@ -1,0 +1,26 @@
+@treemaker/origami-simulator includes a modern TypeScript port of the dynamic
+solver from Origami Simulator.
+
+Origami Simulator:
+  Copyright (c) 2018 Amanda Ghassaei
+  Repository: https://github.com/amandaghassaei/OrigamiSimulator
+  Source commit used for this port: 7855983a613c879c171b2b1557f8cd102d2640cf
+  Upstream license: MIT
+
+Primary upstream source files:
+  js/dynamic/dynamicSolver.js
+  js/model.js
+  js/beam.js
+  js/crease.js
+  js/node.js
+  index.html shader blocks:
+    normalCalc
+    thetaCalcShader
+    updateCreaseGeo
+    velocityCalcShader
+    positionCalcShader
+    positionCalcVerletShader
+    velocityCalcVerletShader
+
+The TreeMaker package removes the original UI/global DOM layer and keeps the
+solver as a FOLD-in, frame-out library API.

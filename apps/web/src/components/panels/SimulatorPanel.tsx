@@ -51,6 +51,9 @@ const INITIAL_SETTLE_STEPS = 300;
 const FOLD_CHANGE_IMMEDIATE_STEPS = 200;
 const FOLD_CHANGE_SETTLE_BATCH = 200;
 const FOLD_CHANGE_SETTLE_FRAMES = 40;
+const FOLD_PLAY_STEP_BATCH = 160;
+const FOLD_PLAY_PERCENT_PER_SECOND = 28;
+const FOLD_STEP_PERCENT = 5;
 const SETTLE_DELTA_EPSILON = 0.0002;
 const INITIAL_FOLD_PERCENT = 0;
 const DEFAULT_VIEW: SimulatorView = { yaw: 0, pitch: 0.38, zoom: 1 };
@@ -80,10 +83,6 @@ export function SimulatorPanel() {
   const [strain, setStrain] = useState(0);
   const [modelStats, setModelStats] = useState({ vertices: 0, triangles: 0 });
 
-  useEffect(() => {
-    foldPercentRef.current = foldPercent;
-  }, [foldPercent]);
-
   const drawCurrentFrame = useCallback(() => {
     const canvas = canvasRef.current;
     const model = modelRef.current;
@@ -104,6 +103,20 @@ export function SimulatorPanel() {
     },
     [drawCurrentFrame]
   );
+
+  const applyFoldPercent = useCallback((percent: number) => {
+    const next = clamp(percent, 0, 100);
+    foldPercentRef.current = next;
+    setFoldPercent(next);
+    controllerRef.current?.setFoldPercent(next);
+  }, []);
+
+  const clearPlayback = useCallback(() => {
+    if (rafRef.current !== null && typeof window !== 'undefined') {
+      window.cancelAnimationFrame(rafRef.current);
+    }
+    rafRef.current = null;
+  }, []);
 
   const clearSettling = useCallback(() => {
     if (settleRafRef.current !== null && typeof window !== 'undefined') {
@@ -145,6 +158,7 @@ export function SimulatorPanel() {
 
   useEffect(() => {
     if (creaseCount === 0) {
+      clearPlayback();
       clearSettling();
       setPlaying(false);
       setModelError(null);
@@ -167,9 +181,10 @@ export function SimulatorPanel() {
     return () => {
       cancelled = true;
     };
-  }, [clearSettling, creaseCount, foldArtifacts, refreshFoldArtifacts]);
+  }, [clearPlayback, clearSettling, creaseCount, foldArtifacts, refreshFoldArtifacts]);
 
   useEffect(() => {
+    clearPlayback();
     clearSettling();
     controllerRef.current?.dispose();
     controllerRef.current = null;
@@ -206,6 +221,7 @@ export function SimulatorPanel() {
     }
 
     return () => {
+      clearPlayback();
       clearSettling();
       controllerRef.current?.dispose();
       controllerRef.current = null;
@@ -213,28 +229,80 @@ export function SimulatorPanel() {
       frameRef.current = null;
       setModelStats({ vertices: 0, triangles: 0 });
     };
-  }, [clearSettling, drawCurrentFrame, foldArtifacts, startSettling]);
+  }, [clearPlayback, clearSettling, drawCurrentFrame, foldArtifacts, startSettling]);
 
-  useEffect(() => {
-    controllerRef.current?.setFoldPercent(foldPercent);
-    if (stepSimulation(FOLD_CHANGE_IMMEDIATE_STEPS)) {
-      startSettling();
-    }
-  }, [foldPercent, startSettling, stepSimulation]);
+  const setFoldTarget = useCallback(
+    (percent: number) => {
+      clearPlayback();
+      setPlaying(false);
+      applyFoldPercent(percent);
+      if (stepSimulation(FOLD_CHANGE_IMMEDIATE_STEPS)) {
+        startSettling();
+      }
+    },
+    [applyFoldPercent, clearPlayback, startSettling, stepSimulation]
+  );
+
+  const stepFoldTarget = useCallback(() => {
+    setFoldTarget(
+      Math.min(100, Math.floor(foldPercentRef.current / FOLD_STEP_PERCENT + 1) * FOLD_STEP_PERCENT)
+    );
+  }, [setFoldTarget]);
+
+  const replayFromFlat = useCallback(() => {
+    clearPlayback();
+    clearSettling();
+    setPlaying(false);
+    controllerRef.current?.reset();
+    applyFoldPercent(0);
+    frameRef.current = controllerRef.current?.step(INITIAL_SETTLE_STEPS) ?? null;
+    drawCurrentFrame();
+  }, [applyFoldPercent, clearPlayback, clearSettling, drawCurrentFrame]);
 
   useEffect(() => {
     if (!playing || typeof window === 'undefined') return;
     clearSettling();
-    const tick = () => {
-      stepSimulation();
+
+    if (foldPercentRef.current >= 100) {
+      controllerRef.current?.reset();
+      applyFoldPercent(0);
+      frameRef.current = controllerRef.current?.step(INITIAL_SETTLE_STEPS) ?? null;
+      drawCurrentFrame();
+    }
+
+    let previousTime: number | null = null;
+    const tick = (time: number) => {
+      if (previousTime === null) previousTime = time;
+      const elapsedSeconds = Math.min(0.08, (time - previousTime) / 1000);
+      previousTime = time;
+      const nextPercent = Math.min(
+        100,
+        foldPercentRef.current + elapsedSeconds * FOLD_PLAY_PERCENT_PER_SECOND
+      );
+
+      applyFoldPercent(nextPercent);
+      stepSimulation(FOLD_PLAY_STEP_BATCH);
+
+      if (nextPercent >= 100) {
+        rafRef.current = null;
+        setPlaying(false);
+        startSettling();
+        return;
+      }
+
       rafRef.current = window.requestAnimationFrame(tick);
     };
     rafRef.current = window.requestAnimationFrame(tick);
-    return () => {
-      if (rafRef.current !== null) window.cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
-    };
-  }, [clearSettling, playing, stepSimulation]);
+    return clearPlayback;
+  }, [
+    applyFoldPercent,
+    clearPlayback,
+    clearSettling,
+    drawCurrentFrame,
+    playing,
+    startSettling,
+    stepSimulation,
+  ]);
 
   useEffect(() => {
     if (typeof ResizeObserver === 'undefined') return;
@@ -244,15 +312,6 @@ export function SimulatorPanel() {
     observer.observe(canvas);
     return () => observer.disconnect();
   }, [drawCurrentFrame]);
-
-  const reset = () => {
-    clearSettling();
-    controllerRef.current?.reset();
-    controllerRef.current?.setFoldPercent(foldPercent);
-    frameRef.current = controllerRef.current?.step(INITIAL_SETTLE_STEPS) ?? null;
-    drawCurrentFrame();
-    if (foldPercent !== 0) startSettling();
-  };
 
   const resetView = useCallback(() => {
     viewRef.current = { ...DEFAULT_VIEW };
@@ -319,47 +378,6 @@ export function SimulatorPanel() {
           <Waves size={14} />
           <span className="panel-title">Simulator</span>
         </div>
-        <div className="panel-toolbar__group">
-          <IconButton
-            size="sm"
-            title="Refresh"
-            tooltipSide="bottom"
-            onClick={() => {
-              setModelError(null);
-              void refreshFoldArtifacts();
-            }}
-            disabled={creaseCount === 0}
-          >
-            <RefreshCw size={14} />
-          </IconButton>
-          <IconButton
-            size="sm"
-            title={playing ? 'Pause' : 'Play'}
-            tooltipSide="bottom"
-            onClick={() => setPlaying((value) => !value)}
-            disabled={loadState !== 'ready'}
-          >
-            {playing ? <Pause size={14} /> : <Play size={14} />}
-          </IconButton>
-          <IconButton
-            size="sm"
-            title="Step"
-            tooltipSide="bottom"
-            onClick={() => stepSimulation()}
-            disabled={loadState !== 'ready'}
-          >
-            <StepForward size={14} />
-          </IconButton>
-          <IconButton
-            size="sm"
-            title="Reset"
-            tooltipSide="bottom"
-            onClick={reset}
-            disabled={loadState !== 'ready'}
-          >
-            <RotateCcw size={14} />
-          </IconButton>
-        </div>
       </div>
       <div className="panel-body simulator-panel__body">
         <canvas
@@ -387,6 +405,50 @@ export function SimulatorPanel() {
         )}
       </div>
       <div className="simulator-controls">
+        <div className="simulator-transport" aria-label="Simulation controls">
+          <IconButton
+            size="sm"
+            title="Refresh"
+            tooltipSide="top"
+            onClick={() => {
+              clearPlayback();
+              clearSettling();
+              setPlaying(false);
+              setModelError(null);
+              void refreshFoldArtifacts();
+            }}
+            disabled={creaseCount === 0}
+          >
+            <RefreshCw size={14} />
+          </IconButton>
+          <IconButton
+            size="sm"
+            title={playing ? 'Pause' : 'Play'}
+            tooltipSide="top"
+            onClick={() => setPlaying((value) => !value)}
+            disabled={loadState !== 'ready'}
+          >
+            {playing ? <Pause size={14} /> : <Play size={14} />}
+          </IconButton>
+          <IconButton
+            size="sm"
+            title="Step"
+            tooltipSide="top"
+            onClick={stepFoldTarget}
+            disabled={loadState !== 'ready'}
+          >
+            <StepForward size={14} />
+          </IconButton>
+          <IconButton
+            size="sm"
+            title="Reset"
+            tooltipSide="top"
+            onClick={replayFromFlat}
+            disabled={loadState !== 'ready'}
+          >
+            <RotateCcw size={14} />
+          </IconButton>
+        </div>
         <label className="simulator-slider">
           <span>Fold</span>
           <input
@@ -395,11 +457,11 @@ export function SimulatorPanel() {
             min="0"
             max="100"
             step="1"
-            value={foldPercent}
-            onChange={(event) => setFoldPercent(Number(event.currentTarget.value))}
+            value={Math.round(foldPercent)}
+            onChange={(event) => setFoldTarget(Number(event.currentTarget.value))}
             disabled={loadState !== 'ready'}
           />
-          <output>{foldPercent}%</output>
+          <output>{Math.round(foldPercent)}%</output>
         </label>
         <div className="simulator-readout">
           <span>{statusLabel}</span>

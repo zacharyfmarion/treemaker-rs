@@ -515,24 +515,12 @@ function drawFrame(
   ctx.fillRect(0, 0, width, height);
 
   const projected = projectPositions(frame.positions, view);
-  const bounds = projected.reduce(
-    (acc, point) => ({
-      minX: Math.min(acc.minX, point.x),
-      maxX: Math.max(acc.maxX, point.x),
-      minY: Math.min(acc.minY, point.y),
-      maxY: Math.max(acc.maxY, point.y),
-    }),
-    { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity }
-  );
-  const spanX = Math.max(0.001, bounds.maxX - bounds.minX);
-  const spanY = Math.max(0.001, bounds.maxY - bounds.minY);
   const padding = Math.max(28, Math.min(width, height) * 0.08);
-  const scale = Math.min((width - padding * 2) / spanX, (height - padding * 2) / spanY) * view.zoom;
-  const centerX = (bounds.minX + bounds.maxX) / 2;
-  const centerY = (bounds.minY + bounds.maxY) / 2;
+  const availableSize = Math.max(1, Math.min(width, height) - padding * 2);
+  const scale = (availableSize / (2 * boundsRadius(frame.positions))) * view.zoom;
   const map = (point: ProjectedPoint) => ({
-    x: width / 2 + (point.x - centerX) * scale,
-    y: height / 2 - (point.y - centerY) * scale,
+    x: width / 2 + point.x * scale,
+    y: height / 2 - point.y * scale,
   });
 
   const triangles = triangleOrder(model.indices, projected);
@@ -611,6 +599,22 @@ function boundsCenter(positions: Float32Array): { x: number; y: number; z: numbe
     y: (minY + maxY) / 2,
     z: (minZ + maxZ) / 2,
   };
+}
+
+function boundsRadius(positions: Float32Array): number {
+  const center = boundsCenter(positions);
+  let radius = 0;
+  for (let index = 0; index < positions.length; index += 3) {
+    radius = Math.max(
+      radius,
+      Math.hypot(
+        (positions[index] ?? 0) - center.x,
+        (positions[index + 1] ?? 0) - center.y,
+        (positions[index + 2] ?? 0) - center.z
+      )
+    );
+  }
+  return Math.max(0.001, radius);
 }
 
 function triangleOrder(indices: Uint32Array, projected: ProjectedPoint[]): number[][] {

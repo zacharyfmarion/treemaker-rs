@@ -37,10 +37,16 @@ export function createThreeOrigamiRenderer(model: PreparedOrigamiModel): ThreeOr
     mesh,
     edgeLines,
     update(frame: SimulationFrame) {
-      geometry.setAttribute('position', new THREE.BufferAttribute(frame.positions.slice(), 3));
-      geometry.setAttribute('color', new THREE.BufferAttribute(frame.colors.slice(), 3));
+      const position = geometry.getAttribute('position') as THREE.BufferAttribute;
+      const color = geometry.getAttribute('color') as THREE.BufferAttribute;
+      position.array.set(frame.positions);
+      color.array.set(frame.colors);
+      position.needsUpdate = true;
+      color.needsUpdate = true;
       geometry.computeVertexNormals();
-      lineGeometry.setAttribute('position', new THREE.BufferAttribute(edgePositions(model, frame.positions), 3));
+      const linePosition = lineGeometry.getAttribute('position') as THREE.BufferAttribute;
+      linePosition.array.set(edgePositions(model, frame.positions));
+      linePosition.needsUpdate = true;
     },
     dispose() {
       geometry.dispose();
@@ -54,8 +60,15 @@ export function createThreeOrigamiRenderer(model: PreparedOrigamiModel): ThreeOr
 function edgePositions(model: PreparedOrigamiModel, positions = model.positions): Float32Array {
   const out = new Float32Array(model.edgesVertices.length * 2 * 3);
   model.edgesVertices.forEach((edge, edgeIndex) => {
-    out.set(positions.slice(edge[0] * 3, edge[0] * 3 + 3), edgeIndex * 6);
-    out.set(positions.slice(edge[1] * 3, edge[1] * 3 + 3), edgeIndex * 6 + 3);
+    const sourceA = edge[0] * 3;
+    const sourceB = edge[1] * 3;
+    const target = edgeIndex * 6;
+    out[target] = positions[sourceA] ?? 0;
+    out[target + 1] = positions[sourceA + 1] ?? 0;
+    out[target + 2] = positions[sourceA + 2] ?? 0;
+    out[target + 3] = positions[sourceB] ?? 0;
+    out[target + 4] = positions[sourceB + 1] ?? 0;
+    out[target + 5] = positions[sourceB + 2] ?? 0;
   });
   return out;
 }

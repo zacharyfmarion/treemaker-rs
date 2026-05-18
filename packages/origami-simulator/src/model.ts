@@ -1,6 +1,8 @@
 import { distanceToLine2D, edgeLength, normalizePoint } from './geometry.js';
 import type { PreparedOrigamiModel, SimulatorDiagnostics } from './types.js';
 
+const EPSILON = 1e-6;
+
 export class OrigamiModel {
   readonly prepared: PreparedOrigamiModel;
   readonly originalPositions: Float32Array;
@@ -8,6 +10,7 @@ export class OrigamiModel {
   readonly velocities: Float32Array;
   readonly colors: Float32Array;
   private readonly originalEdgeLengths: Float32Array;
+  private readonly creaseMomentArms: Float32Array;
 
   constructor(prepared: PreparedOrigamiModel) {
     this.prepared = prepared;
@@ -18,6 +21,7 @@ export class OrigamiModel {
     this.originalEdgeLengths = new Float32Array(
       prepared.edgesVertices.map((edge) => edgeLength(this.originalPositions, edge))
     );
+    this.creaseMomentArms = this.computeCreaseMomentArms();
   }
 
   reset(): void {
@@ -67,6 +71,26 @@ export class OrigamiModel {
     }
   }
 
+  edgeRestLength(edgeIndex: number): number {
+    return this.originalEdgeLengths[edgeIndex] || EPSILON;
+  }
+
+  creaseMomentArm(creaseIndex: number, side: 0 | 1): number {
+    return this.creaseMomentArms[creaseIndex * 2 + side] || EPSILON;
+  }
+
+  computeFaceNormals(source = this.positions): Float32Array {
+    const normals = new Float32Array(this.prepared.faceCount * 3);
+    for (let faceIndex = 0; faceIndex < this.prepared.faceCount; faceIndex += 1) {
+      const a = this.prepared.indices[faceIndex * 3] ?? 0;
+      const b = this.prepared.indices[faceIndex * 3 + 1] ?? 0;
+      const c = this.prepared.indices[faceIndex * 3 + 2] ?? 0;
+      const normal = triangleNormal(source, a, b, c);
+      normals.set(normal, faceIndex * 3);
+    }
+    return normals;
+  }
+
   diagnostics(): SimulatorDiagnostics {
     let total = 0;
     let max = 0;
@@ -92,4 +116,75 @@ export class OrigamiModel {
     }
     return points;
   }
+
+  private computeCreaseMomentArms(): Float32Array {
+    const arms = new Float32Array(this.prepared.creaseParams.length * 2);
+    this.prepared.creaseParams.forEach((crease, index) => {
+      const edge = this.prepared.edgesVertices[crease.edge];
+      if (!edge) {
+        arms[index * 2] = EPSILON;
+        arms[index * 2 + 1] = EPSILON;
+        return;
+      }
+      const a = pointAt(this.originalPositions, edge[0]);
+      const b = pointAt(this.originalPositions, edge[1]);
+      const v1 = pointAt(this.originalPositions, crease.vertex1);
+      const v2 = pointAt(this.originalPositions, crease.vertex2);
+      arms[index * 2] = Math.max(EPSILON, distanceToLine3D(v1, a, b));
+      arms[index * 2 + 1] = Math.max(EPSILON, distanceToLine3D(v2, a, b));
+    });
+    return arms;
+  }
+}
+
+function pointAt(source: Float32Array, vertex: number): [number, number, number] {
+  const index = vertex * 3;
+  return [source[index] ?? 0, source[index + 1] ?? 0, source[index + 2] ?? 0];
+}
+
+function triangleNormal(
+  source: Float32Array,
+  aIndex: number,
+  bIndex: number,
+  cIndex: number
+): [number, number, number] {
+  const a = pointAt(source, aIndex);
+  const b = pointAt(source, bIndex);
+  const c = pointAt(source, cIndex);
+  const cb: [number, number, number] = [c[0] - b[0], c[1] - b[1], c[2] - b[2]];
+  const ab: [number, number, number] = [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+  return normalize(cross(cb, ab));
+}
+
+function distanceToLine3D(
+  point: [number, number, number],
+  a: [number, number, number],
+  b: [number, number, number]
+): number {
+  const ab: [number, number, number] = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+  const ap: [number, number, number] = [point[0] - a[0], point[1] - a[1], point[2] - a[2]];
+  const length = magnitude(ab);
+  if (length <= EPSILON) return magnitude(ap);
+  return magnitude(cross(ap, ab)) / length;
+}
+
+function cross(
+  a: [number, number, number],
+  b: [number, number, number]
+): [number, number, number] {
+  return [
+    a[1] * b[2] - a[2] * b[1],
+    a[2] * b[0] - a[0] * b[2],
+    a[0] * b[1] - a[1] * b[0],
+  ];
+}
+
+function magnitude(vector: [number, number, number]): number {
+  return Math.hypot(vector[0], vector[1], vector[2]);
+}
+
+function normalize(vector: [number, number, number]): [number, number, number] {
+  const length = magnitude(vector);
+  if (length <= EPSILON) return [0, 1, 0];
+  return [vector[0] / length, vector[1] / length, vector[2] / length];
 }

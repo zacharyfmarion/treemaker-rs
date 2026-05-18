@@ -1,0 +1,183 @@
+import type { TreeNode, TreeProject } from './sampleProject';
+import {
+  clampPaperPoint,
+  formatNumber,
+  paperToSvg,
+  svgToPaper,
+  type PlotRect,
+  type Point,
+} from './geometry';
+
+export const DESIGN_VIEWBOX_SIZE = 720;
+export const DESIGN_PAPER_RECT: PlotRect = { x: 66, y: 54, width: 588, height: 588 };
+export const DESIGN_BASE_WORLD_RECT: PlotRect = {
+  x: 0,
+  y: 0,
+  width: DESIGN_VIEWBOX_SIZE,
+  height: DESIGN_VIEWBOX_SIZE,
+};
+export const DESIGN_PAPER_SHADOW_RECT: PlotRect = { x: 56, y: 44, width: 608, height: 608 };
+
+const WORLD_PADDING = 32;
+const NODE_RADIUS = 14;
+const LEAF_NODE_RADIUS = 14;
+const LABEL_HEIGHT = 22;
+
+export interface DesignViewLayers {
+  grid: boolean;
+  paths: boolean;
+  leafCircles: boolean;
+  labels: boolean;
+  symmetry: boolean;
+}
+
+export type DesignViewLayerKey = keyof DesignViewLayers;
+
+export const DEFAULT_DESIGN_VIEW_LAYERS: DesignViewLayers = {
+  grid: true,
+  paths: true,
+  leafCircles: true,
+  labels: true,
+  symmetry: true,
+};
+
+export function setDesignLayerVisibility(
+  layers: DesignViewLayers,
+  layer: DesignViewLayerKey,
+  visible: boolean
+): DesignViewLayers {
+  return { ...layers, [layer]: visible };
+}
+
+interface Bounds {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
+
+export interface DesignWorldOptions {
+  nodeLocations?: ReadonlyMap<number, Point>;
+  padding?: number;
+}
+
+function includePoint(bounds: Bounds, point: Point): void {
+  bounds.minX = Math.min(bounds.minX, point.x);
+  bounds.minY = Math.min(bounds.minY, point.y);
+  bounds.maxX = Math.max(bounds.maxX, point.x);
+  bounds.maxY = Math.max(bounds.maxY, point.y);
+}
+
+function includeRect(bounds: Bounds, rect: PlotRect): void {
+  includePoint(bounds, { x: rect.x, y: rect.y });
+  includePoint(bounds, { x: rect.x + rect.width, y: rect.y + rect.height });
+}
+
+function includeCircle(bounds: Bounds, center: Point, radius: number): void {
+  includeRect(bounds, {
+    x: center.x - radius,
+    y: center.y - radius,
+    width: radius * 2,
+    height: radius * 2,
+  });
+}
+
+function labelWidth(text: string, characterWidth: number): number {
+  return Math.max(18, text.length * characterWidth) + 12;
+}
+
+function nodeLoc(node: TreeNode, options?: DesignWorldOptions): Point {
+  return options?.nodeLocations?.get(node.id) ?? node.loc;
+}
+
+export function designNodePoint(node: TreeNode, options?: DesignWorldOptions): Point {
+  return paperToSvg(nodeLoc(node, options), DESIGN_PAPER_RECT);
+}
+
+export function leafCircleRadius(project: TreeProject, nodeId: number): number {
+  const incidentEdge = project.edges.find((edge) => edge.nodes.includes(nodeId));
+  return Math.max(22, (incidentEdge?.length ?? 1) * project.scale * DESIGN_PAPER_RECT.width);
+}
+
+export function getDesignWorldRect(
+  project: TreeProject,
+  layers: DesignViewLayers = DEFAULT_DESIGN_VIEW_LAYERS,
+  options: DesignWorldOptions = {}
+): PlotRect {
+  const bounds: Bounds = {
+    minX: DESIGN_BASE_WORLD_RECT.x,
+    minY: DESIGN_BASE_WORLD_RECT.y,
+    maxX: DESIGN_BASE_WORLD_RECT.x + DESIGN_BASE_WORLD_RECT.width,
+    maxY: DESIGN_BASE_WORLD_RECT.y + DESIGN_BASE_WORLD_RECT.height,
+  };
+
+  includeRect(bounds, DESIGN_PAPER_SHADOW_RECT);
+  includeRect(bounds, DESIGN_PAPER_RECT);
+
+  for (const node of project.nodes) {
+    const point = designNodePoint(node, options);
+    includeCircle(bounds, point, node.isLeaf ? LEAF_NODE_RADIUS : NODE_RADIUS);
+
+    if (node.isLeaf && layers.leafCircles) {
+      includeCircle(bounds, point, leafCircleRadius(project, node.id));
+    }
+
+    if (layers.labels) {
+      includeRect(bounds, {
+        x: point.x + 8,
+        y: point.y - LABEL_HEIGHT / 2,
+        width: labelWidth(node.label, 8.2),
+        height: LABEL_HEIGHT,
+      });
+    }
+  }
+
+  if (layers.labels) {
+    for (const edge of project.edges) {
+      const a = project.nodes.find((node) => node.id === edge.nodes[0]);
+      const b = project.nodes.find((node) => node.id === edge.nodes[1]);
+      if (!a || !b) continue;
+      const p1 = designNodePoint(a, options);
+      const p2 = designNodePoint(b, options);
+      const text = formatNumber(edge.length, 2);
+      includeRect(bounds, {
+        x: (p1.x + p2.x) / 2 + 6,
+        y: (p1.y + p2.y) / 2 - 22,
+        width: labelWidth(text, 7.2),
+        height: LABEL_HEIGHT,
+      });
+    }
+  }
+
+  const padding = options.padding ?? WORLD_PADDING;
+  return {
+    x: bounds.minX - padding,
+    y: bounds.minY - padding,
+    width: bounds.maxX - bounds.minX + padding * 2,
+    height: bounds.maxY - bounds.minY + padding * 2,
+  };
+}
+
+export function clientPointToDesignWorld(
+  client: Point,
+  bounds: Pick<DOMRect, 'left' | 'top' | 'width' | 'height'>,
+  worldRect: PlotRect
+): Point {
+  if (bounds.width <= 0 || bounds.height <= 0) {
+    return { x: worldRect.x, y: worldRect.y };
+  }
+
+  return {
+    x: worldRect.x + ((client.x - bounds.left) / bounds.width) * worldRect.width,
+    y: worldRect.y + ((client.y - bounds.top) / bounds.height) * worldRect.height,
+  };
+}
+
+export function clientPointToPaper(
+  client: Point,
+  bounds: Pick<DOMRect, 'left' | 'top' | 'width' | 'height'>,
+  worldRect: PlotRect,
+  paperRect: PlotRect = DESIGN_PAPER_RECT
+): Point {
+  return clampPaperPoint(svgToPaper(clientPointToDesignWorld(client, bounds, worldRect), paperRect));
+}

@@ -10,6 +10,7 @@
     "dev:desktop": "npm --workspace @treemaker/tauri run dev",
     "build:web": "npm --workspace @treemaker/web run build",
     "build:desktop": "npm --workspace @treemaker/tauri run build",
+    "lint:web": "npm --workspace @treemaker/web run lint",
     "test:web": "npm --workspace @treemaker/web run test",
     "typecheck:web": "npm --workspace @treemaker/web run typecheck",
     "check:desktop": "npm --workspace @treemaker/tauri run check"

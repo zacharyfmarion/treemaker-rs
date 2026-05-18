@@ -1,5 +1,4 @@
 import { AlertTriangle, CheckCircle2, CircleDashed } from 'lucide-react';
-import { formatNumber } from '../../lib/geometry';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 
 export function DiagnosticsPanel() {

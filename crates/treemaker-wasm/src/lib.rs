@@ -83,6 +83,14 @@ pub fn tree_snapshot(handle: u32) -> std::result::Result<JsValue, JsValue> {
 }
 
 #[wasm_bindgen]
+pub fn fold_artifacts(handle: u32) -> std::result::Result<JsValue, JsValue> {
+    with_tree(handle, |tree| {
+        serde_wasm_bindgen::to_value(&tree.fold_artifacts().map_err(to_js_error)?)
+            .map_err(to_js_value)
+    })
+}
+
+#[wasm_bindgen]
 pub fn tree_design(handle: u32) -> std::result::Result<JsValue, JsValue> {
     with_tree(handle, |tree| {
         serde_wasm_bindgen::to_value(&tree.to_design()).map_err(to_js_value)

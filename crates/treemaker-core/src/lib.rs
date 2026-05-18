@@ -81,6 +81,8 @@ pub enum TreeError {
     OptimizerConvergence(String),
     #[error("invalid operation: {0}")]
     InvalidOperation(&'static str),
+    #[error("fold artifact error: {0}")]
+    FoldArtifact(String),
 }
 
 impl TreeError {
@@ -93,6 +95,7 @@ impl TreeError {
             TreeError::UnsupportedOperation(_) => "unsupported_operation",
             TreeError::OptimizerConvergence(_) => "optimizer_convergence",
             TreeError::InvalidOperation(_) => "invalid_operation",
+            TreeError::FoldArtifact(_) => "fold_artifact",
         }
     }
 }
@@ -594,6 +597,54 @@ pub struct FacetSnapshot {
     pub owner: OwnerRef,
 }
 
+/// Folded-base vertex projected into TreeMaker's uniaxial base coordinates.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct FoldedBaseVertex {
+    pub id: usize,
+    pub source_vertex: usize,
+    pub loc: Point,
+    pub paper_loc: Point,
+    pub depth: TmFloat,
+    pub elevation: TmFloat,
+    pub is_border: bool,
+}
+
+/// Folded-base crease projected into TreeMaker's uniaxial base coordinates.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct FoldedBaseCrease {
+    pub id: usize,
+    pub source_crease: usize,
+    pub vertices: [usize; 2],
+    pub kind: i32,
+    pub fold: i32,
+}
+
+/// Folded-base facet projected into TreeMaker's uniaxial base coordinates.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct FoldedBaseFacet {
+    pub id: usize,
+    pub source_facet: usize,
+    pub vertices: Vec<usize>,
+    pub color: i32,
+    pub order: usize,
+}
+
+/// TreeMaker folded-form geometry, matching the original app's side-view base.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct FoldedBaseSnapshot {
+    pub vertices: Vec<FoldedBaseVertex>,
+    pub creases: Vec<FoldedBaseCrease>,
+    pub facets: Vec<FoldedBaseFacet>,
+}
+
+/// Complete folded-form/export artifacts for UI and simulator consumers.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct FoldArtifacts {
+    pub fold: treemaker_fold::FoldDocument,
+    pub folded_base: FoldedBaseSnapshot,
+    pub simulation_model: treemaker_fold::PreparedFoldModel,
+}
+
 /// User-intent edit operation for GUI and wasm consumers.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -1051,6 +1102,187 @@ impl Tree {
                 .collect(),
             conditions: self.conditions.clone(),
         }
+    }
+
+    /// Export the current crease pattern as a generic FOLD document.
+    pub fn to_fold_document(&self) -> Result<treemaker_fold::FoldDocument> {
+        if self.vertices.is_empty() || self.creases.is_empty() || self.facets.is_empty() {
+            return Err(TreeError::InvalidOperation(
+                "build a crease pattern before exporting FOLD artifacts",
+            ));
+        }
+
+        let vertices_coords = self
+            .vertices
+            .iter()
+            .map(|vertex| vec![vertex.loc.x, vertex.loc.y])
+            .collect::<Vec<_>>();
+        let edges_vertices = self
+            .creases
+            .iter()
+            .map(|crease| {
+                [
+                    crease.vertices[0].saturating_sub(1),
+                    crease.vertices[1].saturating_sub(1),
+                ]
+            })
+            .collect::<Vec<_>>();
+        let edges_assignment = self
+            .creases
+            .iter()
+            .map(|crease| match crease.fold {
+                FOLD_MOUNTAIN => treemaker_fold::Assignment::Mountain,
+                FOLD_VALLEY => treemaker_fold::Assignment::Valley,
+                FOLD_BORDER => treemaker_fold::Assignment::Boundary,
+                FOLD_FLAT => treemaker_fold::Assignment::Flat,
+                _ => treemaker_fold::Assignment::Unassigned,
+            })
+            .collect::<Vec<_>>();
+        let edges_fold_angle = edges_assignment
+            .iter()
+            .copied()
+            .map(treemaker_fold::FoldAngle::default_for_assignment)
+            .collect::<Vec<_>>();
+        let faces_vertices = self
+            .facets
+            .iter()
+            .map(|facet| {
+                facet
+                    .vertices
+                    .iter()
+                    .map(|vertex| vertex.saturating_sub(1))
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>();
+
+        let mut fold = treemaker_fold::FoldDocument::new(vertices_coords, edges_vertices);
+        fold.file_creator = Some("treemaker-rs".to_string());
+        fold.frame_title = Some("TreeMaker crease pattern".to_string());
+        fold.frame_classes = vec!["creasePattern".to_string()];
+        fold.edges_assignment = edges_assignment;
+        fold.edges_fold_angle = edges_fold_angle;
+        fold.faces_vertices = faces_vertices;
+        fold.face_orders = self
+            .facets
+            .iter()
+            .flat_map(|facet| {
+                facet
+                    .head_facets
+                    .iter()
+                    .map(move |head| [facet.index - 1, head - 1, 1])
+            })
+            .collect();
+        fold.extra.insert(
+            "tm:vertexSourceIds".to_string(),
+            serde_json::to_value(self.vertices.iter().map(|v| v.index).collect::<Vec<_>>())
+                .map_err(|error| TreeError::FoldArtifact(error.to_string()))?,
+        );
+        fold.extra.insert(
+            "tm:creaseSourceIds".to_string(),
+            serde_json::to_value(self.creases.iter().map(|c| c.index).collect::<Vec<_>>())
+                .map_err(|error| TreeError::FoldArtifact(error.to_string()))?,
+        );
+        fold.extra.insert(
+            "tm:facetSourceIds".to_string(),
+            serde_json::to_value(self.facets.iter().map(|f| f.index).collect::<Vec<_>>())
+                .map_err(|error| TreeError::FoldArtifact(error.to_string()))?,
+        );
+        fold.extra.insert(
+            "tm:creaseKinds".to_string(),
+            serde_json::to_value(self.creases.iter().map(|c| c.kind).collect::<Vec<_>>())
+                .map_err(|error| TreeError::FoldArtifact(error.to_string()))?,
+        );
+        fold.extra.insert(
+            "tm:facetColors".to_string(),
+            serde_json::to_value(self.facets.iter().map(|f| f.color).collect::<Vec<_>>())
+                .map_err(|error| TreeError::FoldArtifact(error.to_string()))?,
+        );
+        fold.extra.insert(
+            "tm:facetOrder".to_string(),
+            serde_json::to_value(self.facets.iter().map(|f| f.order).collect::<Vec<_>>())
+                .map_err(|error| TreeError::FoldArtifact(error.to_string()))?,
+        );
+
+        fold.faces_edges = treemaker_fold::build_faces_edges(&fold)
+            .map_err(|error| TreeError::FoldArtifact(error.to_string()))?;
+        fold.edges_faces = treemaker_fold::build_edges_faces(&fold)
+            .map_err(|error| TreeError::FoldArtifact(error.to_string()))?;
+        Ok(fold)
+    }
+
+    /// Return the folded base in TreeMaker's original side-view coordinates.
+    pub fn folded_base_snapshot(&self) -> Result<FoldedBaseSnapshot> {
+        if !self.is_vertex_depth_valid {
+            return Err(TreeError::InvalidOperation(
+                "build a crease pattern with valid vertex depths before viewing the folded base",
+            ));
+        }
+
+        Ok(FoldedBaseSnapshot {
+            vertices: self
+                .vertices
+                .iter()
+                .map(|vertex| FoldedBaseVertex {
+                    id: vertex.index,
+                    source_vertex: vertex.index,
+                    loc: Point {
+                        x: vertex.elevation,
+                        y: vertex.depth,
+                    },
+                    paper_loc: vertex.loc,
+                    depth: vertex.depth,
+                    elevation: vertex.elevation,
+                    is_border: vertex.is_border,
+                })
+                .collect(),
+            creases: self
+                .creases
+                .iter()
+                .filter_map(|crease| {
+                    if crease.vertices.len() != 2 {
+                        return None;
+                    }
+                    Some(FoldedBaseCrease {
+                        id: crease.index,
+                        source_crease: crease.index,
+                        vertices: [crease.vertices[0], crease.vertices[1]],
+                        kind: crease.kind,
+                        fold: crease.fold,
+                    })
+                })
+                .collect(),
+            facets: self
+                .facets
+                .iter()
+                .map(|facet| FoldedBaseFacet {
+                    id: facet.index,
+                    source_facet: facet.index,
+                    vertices: facet.vertices.clone(),
+                    color: facet.color,
+                    order: facet.order,
+                })
+                .collect(),
+        })
+    }
+
+    /// Return a generic triangulated simulation model for the current crease pattern.
+    pub fn simulation_model(&self) -> Result<treemaker_fold::PreparedFoldModel> {
+        let fold = self.to_fold_document()?;
+        treemaker_fold::prepare_simulation_model(&fold)
+            .map_err(|error| TreeError::FoldArtifact(error.to_string()))
+    }
+
+    /// Return all fold-related artifacts used by UI, export, and simulation surfaces.
+    pub fn fold_artifacts(&self) -> Result<FoldArtifacts> {
+        let fold = self.to_fold_document()?;
+        let folded_base = self.folded_base_snapshot()?;
+        let simulation_model = treemaker_fold::prepare_simulation_model(&fold)
+            .map_err(|error| TreeError::FoldArtifact(error.to_string()))?;
+        Ok(FoldArtifacts {
+            fold,
+            folded_base,
+            simulation_model,
+        })
     }
 
     /// Apply a user-intent edit while preserving TreeMaker invariants.
@@ -9390,6 +9622,92 @@ mod tests {
         assert!(!tree.vertices.is_empty());
         assert!(!tree.creases.is_empty());
         assert!(!tree.facets.is_empty());
+    }
+
+    #[test]
+    fn exports_fold_artifacts_for_generated_crease_pattern() {
+        let mut tree = triad_design();
+        tree.optimize_scale().unwrap();
+        tree.build_polys_and_crease_pattern().unwrap();
+
+        let fold = tree.to_fold_document().unwrap();
+        assert_eq!(fold.vertices_coords.len(), tree.vertices.len());
+        assert_eq!(fold.edges_vertices.len(), tree.creases.len());
+        assert_eq!(fold.faces_vertices.len(), tree.facets.len());
+        assert!(fold.frame_classes.contains(&"creasePattern".to_string()));
+        assert!(fold.extra.contains_key("tm:creaseKinds"));
+
+        let folded_base = tree.folded_base_snapshot().unwrap();
+        assert_eq!(folded_base.vertices.len(), tree.vertices.len());
+        assert_eq!(folded_base.vertices[0].loc.x, tree.vertices[0].elevation);
+        assert_eq!(folded_base.vertices[0].loc.y, tree.vertices[0].depth);
+
+        let artifacts = tree.fold_artifacts().unwrap();
+        assert_eq!(artifacts.fold.edges_vertices.len(), tree.creases.len());
+        assert!(!artifacts.simulation_model.fold.faces_vertices.is_empty());
+    }
+
+    fn triad_design() -> Tree {
+        Tree::from_design(TreeDesign {
+            paper: PaperSettings {
+                width: 1.0,
+                height: 1.0,
+                scale: 0.1,
+                has_symmetry: false,
+                sym_loc: Point { x: 0.5, y: 0.0 },
+                sym_angle: 90.0,
+            },
+            nodes: vec![
+                DesignNode {
+                    id: 1,
+                    label: "root".to_string(),
+                    loc: Point { x: 0.5, y: 0.5 },
+                },
+                DesignNode {
+                    id: 2,
+                    label: "t0".to_string(),
+                    loc: Point { x: 0.14, y: 0.16 },
+                },
+                DesignNode {
+                    id: 3,
+                    label: "t1".to_string(),
+                    loc: Point { x: 0.86, y: 0.17 },
+                },
+                DesignNode {
+                    id: 4,
+                    label: "t2".to_string(),
+                    loc: Point { x: 0.5, y: 0.88 },
+                },
+            ],
+            edges: vec![
+                DesignEdge {
+                    id: 1,
+                    label: "e1".to_string(),
+                    nodes: [1, 2],
+                    length: 1.0,
+                    strain: 0.0,
+                    stiffness: 1.0,
+                },
+                DesignEdge {
+                    id: 2,
+                    label: "e2".to_string(),
+                    nodes: [1, 3],
+                    length: 1.0,
+                    strain: 0.0,
+                    stiffness: 1.0,
+                },
+                DesignEdge {
+                    id: 3,
+                    label: "e3".to_string(),
+                    nodes: [1, 4],
+                    length: 1.0,
+                    strain: 0.0,
+                    stiffness: 1.0,
+                },
+            ],
+            conditions: Vec::new(),
+        })
+        .unwrap()
     }
 
     #[test]

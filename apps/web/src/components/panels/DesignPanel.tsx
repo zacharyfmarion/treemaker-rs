@@ -62,7 +62,7 @@ export function DesignPanel() {
     void addNodeAt(eventToPaper(event), connectTo);
   };
 
-  const onNodePointerDown = (event: PointerEvent<SVGGElement>, nodeId: number) => {
+  const onNodePointerDown = (event: PointerEvent<SVGCircleElement>, nodeId: number) => {
     if (event.button !== 0) return;
     event.stopPropagation();
     if (event.shiftKey || event.metaKey || event.ctrlKey) {
@@ -76,7 +76,7 @@ export function DesignPanel() {
     setDragging({ id: nodeId, start: node.loc, loc: node.loc, moved: false });
   };
 
-  const onNodePointerMove = (event: PointerEvent<SVGGElement>, nodeId: number) => {
+  const onNodePointerMove = (event: PointerEvent<SVGCircleElement>, nodeId: number) => {
     if (dragging?.id !== nodeId) return;
     event.stopPropagation();
     const loc = eventToPaper(event);
@@ -90,7 +90,7 @@ export function DesignPanel() {
     });
   };
 
-  const finishDrag = (event: PointerEvent<SVGGElement>, nodeId: number) => {
+  const finishDrag = (event: PointerEvent<SVGCircleElement>, nodeId: number) => {
     if (dragging?.id !== nodeId) return;
     event.stopPropagation();
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
@@ -218,13 +218,7 @@ export function DesignPanel() {
               ? Math.max(22, (incidentEdge?.length ?? 1) * project.scale * PAPER_RECT.width)
               : 0;
             return (
-              <g
-                key={node.id}
-                onPointerDown={(event) => onNodePointerDown(event, node.id)}
-                onPointerMove={(event) => onNodePointerMove(event, node.id)}
-                onPointerUp={(event) => finishDrag(event, node.id)}
-                onPointerCancel={(event) => finishDrag(event, node.id)}
-              >
+              <g key={node.id}>
                 {node.isLeaf && (
                   <circle
                     className="leaf-radius"
@@ -243,6 +237,10 @@ export function DesignPanel() {
                   cx={point.x}
                   cy={point.y}
                   r={node.isLeaf ? 7 : 8}
+                  onPointerDown={(event) => onNodePointerDown(event, node.id)}
+                  onPointerMove={(event) => onNodePointerMove(event, node.id)}
+                  onPointerUp={(event) => finishDrag(event, node.id)}
+                  onPointerCancel={(event) => finishDrag(event, node.id)}
                 />
                 <text className="node-label" x={point.x + 11} y={point.y + 4}>
                   {node.label}

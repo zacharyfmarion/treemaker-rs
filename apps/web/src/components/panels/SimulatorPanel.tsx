@@ -26,6 +26,10 @@ import {
   type PreparedOrigamiModel,
   type SimulationFrame,
 } from '@treemaker/origami-simulator';
+import {
+  nextSimulatorOrbitView,
+  type SimulatorOrbitView as SimulatorView,
+} from '../../lib/simulatorOrbit';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { Button } from '../ui/Button';
 import { IconButton } from '../ui/IconButton';
@@ -33,12 +37,6 @@ import { SegmentedControl } from '../ui/SegmentedControl';
 
 type LoadState = 'idle' | 'loading' | 'ready' | 'empty' | 'error';
 type SimulatorRenderMode = 'paper' | 'xray';
-
-interface SimulatorView {
-  yaw: number;
-  pitch: number;
-  zoom: number;
-}
 
 interface SimulatorViewSettings {
   renderMode: SimulatorRenderMode;
@@ -358,11 +356,10 @@ export function SimulatorPanel() {
   const handleCanvasPointerMove = (event: ReactPointerEvent<HTMLCanvasElement>) => {
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
-    viewRef.current = {
-      ...viewRef.current,
-      yaw: drag.yaw + (event.clientX - drag.x) * 0.01,
-      pitch: clamp(drag.pitch - (event.clientY - drag.y) * 0.01, -1.35, 1.35),
-    };
+    viewRef.current = nextSimulatorOrbitView(viewRef.current, drag, {
+      x: event.clientX,
+      y: event.clientY,
+    });
     drawCurrentFrame();
   };
 

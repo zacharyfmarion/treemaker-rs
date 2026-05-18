@@ -2,6 +2,7 @@
   "name": "treemaker-rs-workspace",
   "private": true,
   "workspaces": [
+    "packages/origami-simulator",
     "apps/web",
     "apps/tauri"
   ],
@@ -10,7 +11,9 @@
     "dev:desktop": "npm --workspace @treemaker/tauri run dev",
     "build:web": "npm --workspace @treemaker/web run build",
     "build:desktop": "npm --workspace @treemaker/tauri run build",
+    "build:simulator": "npm --workspace @treemaker/origami-simulator run build",
     "lint:web": "npm --workspace @treemaker/web run lint",
+    "test:simulator": "npm --workspace @treemaker/origami-simulator run test",
     "test:web": "npm --workspace @treemaker/web run test",
     "typecheck:web": "npm --workspace @treemaker/web run typecheck",
     "check:desktop": "npm --workspace @treemaker/tauri run check"

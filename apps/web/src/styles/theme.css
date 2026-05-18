@@ -406,6 +406,17 @@
   cursor: grabbing;
 }
 
+.simulator-view-settings {
+  flex: 1 1 auto;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.simulator-view-settings .segmented__option {
+  height: 24px;
+  padding: 0 7px;
+}
+
 .simulator-panel__empty {
   position: absolute;
   inset: 0;

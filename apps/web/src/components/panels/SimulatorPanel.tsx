@@ -7,10 +7,14 @@ import {
   type WheelEvent as ReactWheelEvent,
 } from 'react';
 import {
+  Eye,
+  EyeOff,
+  Layers3,
   Pause,
   Play,
   RefreshCw,
   RotateCcw,
+  Square,
   StepForward,
   Waves,
 } from 'lucide-react';
@@ -25,12 +29,22 @@ import {
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { Button } from '../ui/Button';
 import { IconButton } from '../ui/IconButton';
+import { SegmentedControl } from '../ui/SegmentedControl';
 
 type LoadState = 'idle' | 'loading' | 'ready' | 'empty' | 'error';
+type SimulatorRenderMode = 'paper' | 'xray';
+
 interface SimulatorView {
   yaw: number;
   pitch: number;
   zoom: number;
+}
+
+interface SimulatorViewSettings {
+  renderMode: SimulatorRenderMode;
+  showFaces: boolean;
+  showEdges: boolean;
+  showHiddenLines: boolean;
 }
 
 interface DragState {
@@ -57,6 +71,12 @@ const FOLD_STEP_PERCENT = 5;
 const SETTLE_DELTA_EPSILON = 0.0002;
 const INITIAL_FOLD_PERCENT = 0;
 const DEFAULT_VIEW: SimulatorView = { yaw: 0, pitch: 0.38, zoom: 1 };
+const DEFAULT_VIEW_SETTINGS: SimulatorViewSettings = {
+  renderMode: 'paper',
+  showFaces: true,
+  showEdges: true,
+  showHiddenLines: false,
+};
 
 export function SimulatorPanel() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -82,16 +102,17 @@ export function SimulatorPanel() {
   const [step, setStep] = useState(0);
   const [strain, setStrain] = useState(0);
   const [modelStats, setModelStats] = useState({ vertices: 0, triangles: 0 });
+  const [viewSettings, setViewSettings] = useState<SimulatorViewSettings>(DEFAULT_VIEW_SETTINGS);
 
   const drawCurrentFrame = useCallback(() => {
     const canvas = canvasRef.current;
     const model = modelRef.current;
     const frame = frameRef.current;
     if (!canvas || !model || !frame) return;
-    drawFrame(canvas, model, frame, viewRef.current);
+    drawFrame(canvas, model, frame, viewRef.current, viewSettings);
     setStep(frame.step);
     setStrain(frame.diagnostics.maxEdgeStrain ?? 0);
-  }, []);
+  }, [viewSettings]);
 
   const stepSimulation = useCallback(
     (steps?: number): SimulationFrame | null => {
@@ -313,6 +334,10 @@ export function SimulatorPanel() {
     return () => observer.disconnect();
   }, [drawCurrentFrame]);
 
+  useEffect(() => {
+    drawCurrentFrame();
+  }, [drawCurrentFrame]);
+
   const resetView = useCallback(() => {
     viewRef.current = { ...DEFAULT_VIEW };
     drawCurrentFrame();
@@ -377,6 +402,53 @@ export function SimulatorPanel() {
         <div className="panel-toolbar__group">
           <Waves size={14} />
           <span className="panel-title">Simulator</span>
+        </div>
+        <div className="panel-toolbar__group simulator-view-settings" aria-label="Simulator view settings">
+          <SegmentedControl
+            aria-label="Simulator render mode"
+            value={viewSettings.renderMode}
+            onChange={(renderMode) => setViewSettings((current) => ({ ...current, renderMode }))}
+            options={[
+              { value: 'paper', label: 'Paper', title: 'Paper rendering' },
+              { value: 'xray', label: 'X-ray', title: 'X-ray rendering' },
+            ]}
+          />
+          <IconButton
+            size="sm"
+            variant="toolbar"
+            title="Faces"
+            tooltipSide="bottom"
+            isActive={viewSettings.showFaces}
+            onClick={() => setViewSettings((current) => ({ ...current, showFaces: !current.showFaces }))}
+          >
+            <Square size={14} />
+          </IconButton>
+          <IconButton
+            size="sm"
+            variant="toolbar"
+            title="Crease Lines"
+            tooltipSide="bottom"
+            isActive={viewSettings.showEdges}
+            onClick={() => setViewSettings((current) => ({ ...current, showEdges: !current.showEdges }))}
+          >
+            {viewSettings.showEdges ? <Eye size={14} /> : <EyeOff size={14} />}
+          </IconButton>
+          <IconButton
+            size="sm"
+            variant="toolbar"
+            title="Hidden Lines"
+            tooltipSide="bottom"
+            isActive={viewSettings.showHiddenLines}
+            onClick={() =>
+              setViewSettings((current) => ({
+                ...current,
+                showHiddenLines: !current.showHiddenLines,
+              }))
+            }
+            disabled={!viewSettings.showEdges}
+          >
+            <Layers3 size={14} />
+          </IconButton>
         </div>
       </div>
       <div className="panel-body simulator-panel__body">
@@ -496,7 +568,8 @@ function drawFrame(
   canvas: HTMLCanvasElement,
   model: PreparedOrigamiModel,
   frame: SimulationFrame,
-  view: SimulatorView
+  view: SimulatorView,
+  settings: SimulatorViewSettings
 ): void {
   const rect = canvas.getBoundingClientRect();
   const dpr = Math.max(1, window.devicePixelRatio || 1);
@@ -524,32 +597,38 @@ function drawFrame(
   });
 
   const triangles = triangleOrder(model.indices, projected);
+  const faceAlpha = settings.renderMode === 'xray' ? 0.48 : 1;
+  const surfaceEdgeAlpha = settings.renderMode === 'xray' ? 0.5 : 0.92;
+
   for (const triangle of triangles) {
-    const a = map(projected[triangle[0]] ?? { x: 0, y: 0 });
-    const b = map(projected[triangle[1]] ?? { x: 0, y: 0 });
-    const c = map(projected[triangle[2]] ?? { x: 0, y: 0 });
-    ctx.beginPath();
-    ctx.moveTo(a.x, a.y);
-    ctx.lineTo(b.x, b.y);
-    ctx.lineTo(c.x, c.y);
-    ctx.closePath();
-    ctx.fillStyle = triangleColor(frame.colors, triangle);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(16, 20, 23, 0.42)';
-    ctx.lineWidth = Math.max(1, dpr);
-    ctx.stroke();
+    if (settings.showFaces) {
+      const a = map(projected[triangle.vertices[0]] ?? { x: 0, y: 0, depth: 0 });
+      const b = map(projected[triangle.vertices[1]] ?? { x: 0, y: 0, depth: 0 });
+      const c = map(projected[triangle.vertices[2]] ?? { x: 0, y: 0, depth: 0 });
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.lineTo(c.x, c.y);
+      ctx.closePath();
+      ctx.fillStyle = triangleColor(frame.colors, triangle.vertices, faceAlpha);
+      ctx.fill();
+    }
+    if (settings.showEdges && settings.showFaces) {
+      drawTriangleEdges(ctx, model, triangle, projected, map, dpr, surfaceEdgeAlpha);
+    }
   }
 
-  ctx.lineWidth = Math.max(1.5, dpr * 1.25);
-  model.edgesVertices.forEach((edge, index) => {
-    const a = map(projected[edge[0]] ?? { x: 0, y: 0 });
-    const b = map(projected[edge[1]] ?? { x: 0, y: 0 });
-    ctx.beginPath();
-    ctx.moveTo(a.x, a.y);
-    ctx.lineTo(b.x, b.y);
-    ctx.strokeStyle = edgeColor(model.edgesAssignment[index]);
-    ctx.stroke();
-  });
+  if (settings.showEdges && (!settings.showFaces || settings.showHiddenLines)) {
+    drawAllEdges(
+      ctx,
+      model,
+      projected,
+      map,
+      dpr,
+      settings.showFaces ? 0.34 : 0.95,
+      settings.showFaces && settings.renderMode === 'paper'
+    );
+  }
 }
 
 function projectPositions(positions: Float32Array, view: SimulatorView): ProjectedPoint[] {
@@ -617,31 +696,112 @@ function boundsRadius(positions: Float32Array): number {
   return Math.max(0.001, radius);
 }
 
-function triangleOrder(indices: Uint32Array, projected: ProjectedPoint[]): number[][] {
-  const triangles: number[][] = [];
+interface OrderedTriangle {
+  faceIndex: number;
+  vertices: [number, number, number];
+}
+
+function triangleOrder(indices: Uint32Array, projected: ProjectedPoint[]): OrderedTriangle[] {
+  const triangles: OrderedTriangle[] = [];
   for (let index = 0; index < indices.length; index += 3) {
-    triangles.push([indices[index] ?? 0, indices[index + 1] ?? 0, indices[index + 2] ?? 0]);
+    triangles.push({
+      faceIndex: Math.floor(index / 3),
+      vertices: [indices[index] ?? 0, indices[index + 1] ?? 0, indices[index + 2] ?? 0],
+    });
   }
   return triangles.sort((a, b) => averageDepth(a, projected) - averageDepth(b, projected));
 }
 
-function averageDepth(triangle: number[], projected: ProjectedPoint[]): number {
-  return triangle.reduce((total, vertex) => total + (projected[vertex]?.depth ?? 0), 0) / 3;
+function averageDepth(triangle: OrderedTriangle, projected: ProjectedPoint[]): number {
+  return triangle.vertices.reduce((total, vertex) => total + (projected[vertex]?.depth ?? 0), 0) / 3;
 }
 
-function triangleColor(colors: Float32Array, triangle: number[]): string {
+function triangleColor(colors: Float32Array, triangle: number[], alpha = 1): string {
   const channel = (offset: number) =>
     triangle.reduce((total, vertex) => total + (colors[vertex * 3 + offset] ?? 0.75), 0) / 3;
   const r = Math.round(channel(0) * 255);
   const g = Math.round(channel(1) * 255);
   const b = Math.round(channel(2) * 255);
-  return `rgb(${r} ${g} ${b})`;
+  return alpha >= 1 ? `rgb(${r} ${g} ${b})` : `rgb(${r} ${g} ${b} / ${alpha})`;
 }
 
-function edgeColor(assignment: string | undefined): string {
-  if (assignment === 'M') return '#e06c75';
-  if (assignment === 'V') return '#5fb3a5';
-  if (assignment === 'B') return '#111417';
-  if (assignment === 'F') return 'rgba(232, 237, 240, 0.55)';
-  return 'rgba(232, 237, 240, 0.32)';
+function drawTriangleEdges(
+  ctx: CanvasRenderingContext2D,
+  model: PreparedOrigamiModel,
+  triangle: OrderedTriangle,
+  projected: ProjectedPoint[],
+  map: (point: ProjectedPoint) => { x: number; y: number },
+  dpr: number,
+  alpha: number
+): void {
+  const faceEdges = model.facesEdges[triangle.faceIndex] ?? [];
+  const pairs: Array<[number, number]> = [
+    [triangle.vertices[0], triangle.vertices[1]],
+    [triangle.vertices[1], triangle.vertices[2]],
+    [triangle.vertices[2], triangle.vertices[0]],
+  ];
+  ctx.setLineDash([]);
+  ctx.lineWidth = Math.max(1.2, dpr * 1.05);
+  pairs.forEach(([from, to], side) => {
+    drawEdgeSegment(
+      ctx,
+      model,
+      projected,
+      map,
+      from,
+      to,
+      faceEdges[side] ?? findEdge(model.edgesVertices, from, to),
+      alpha
+    );
+  });
+}
+
+function drawAllEdges(
+  ctx: CanvasRenderingContext2D,
+  model: PreparedOrigamiModel,
+  projected: ProjectedPoint[],
+  map: (point: ProjectedPoint) => { x: number; y: number },
+  dpr: number,
+  alpha: number,
+  dashed: boolean
+): void {
+  ctx.setLineDash(dashed ? [Math.max(3, dpr * 3), Math.max(3, dpr * 3)] : []);
+  ctx.lineWidth = Math.max(1.5, dpr * 1.25);
+  model.edgesVertices.forEach((edge, index) => {
+    drawEdgeSegment(ctx, model, projected, map, edge[0], edge[1], index, alpha);
+  });
+  ctx.setLineDash([]);
+}
+
+function drawEdgeSegment(
+  ctx: CanvasRenderingContext2D,
+  model: PreparedOrigamiModel,
+  projected: ProjectedPoint[],
+  map: (point: ProjectedPoint) => { x: number; y: number },
+  from: number,
+  to: number,
+  edgeIndex: number,
+  alpha: number
+): void {
+  const a = map(projected[from] ?? { x: 0, y: 0, depth: 0 });
+  const b = map(projected[to] ?? { x: 0, y: 0, depth: 0 });
+  ctx.beginPath();
+  ctx.moveTo(a.x, a.y);
+  ctx.lineTo(b.x, b.y);
+  ctx.strokeStyle = edgeColor(model.edgesAssignment[edgeIndex], alpha);
+  ctx.stroke();
+}
+
+function findEdge(edges: [number, number][], from: number, to: number): number {
+  return edges.findIndex(
+    (edge) => (edge[0] === from && edge[1] === to) || (edge[0] === to && edge[1] === from)
+  );
+}
+
+function edgeColor(assignment: string | undefined, alpha = 1): string {
+  if (assignment === 'M') return `rgb(224 108 117 / ${alpha})`;
+  if (assignment === 'V') return `rgb(95 179 165 / ${alpha})`;
+  if (assignment === 'B') return `rgb(17 20 23 / ${alpha})`;
+  if (assignment === 'F') return `rgb(232 237 240 / ${alpha * 0.55})`;
+  return `rgb(232 237 240 / ${alpha * 0.32})`;
 }

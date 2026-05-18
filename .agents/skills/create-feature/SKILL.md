@@ -72,20 +72,23 @@ maintenance tasks.
 
 ## Execution Contract
 
-After planning, implement directly unless blocked by a real product ambiguity.
+After planning, implement directly. Escalate only when the repo and request do
+not provide enough signal to choose the correct path responsibly.
 
 Always:
 
-- Prefer the smallest change that fully solves the task.
 - Read existing patterns before introducing new ones.
+- Make the architecturally correct change for the job, even when that requires
+  a larger implementation than a narrow patch.
 - Preserve TreeMaker parity with the vendored C++ source.
 - Avoid inventing new repo workflow conventions when an existing one can be
   extended.
 - Keep product behavior in shared frontend or engine code rather than the Tauri
   shell unless the behavior is native shell behavior.
 - Keep a running summary of what changed and why for the PR body.
-- When you hit an architectural limitation, stop and surface it to the user
-  instead of working around it.
+- Surface the issue to the user only when the correct architectural path depends
+  on a product decision, scope tradeoff, migration risk, or ownership boundary
+  that cannot be inferred from the repo and request.
 
 ## Test Expectations
 

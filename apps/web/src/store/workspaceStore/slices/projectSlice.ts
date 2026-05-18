@@ -83,6 +83,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
     const title = source.title ?? basenameWithoutTreeMakerExtension(filename);
     set({
       ...projectStateFromSnapshot(snapshot, title),
+      projectLoadId: get().projectLoadId + 1,
       currentFileName: filename,
       currentFilePath: source.path ?? null,
       projectMessage: `Loaded ${filename}`,
@@ -141,6 +142,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
 
   return {
     project: createEmptyProject(),
+    projectLoadId: 0,
     currentFilePath: null,
     currentFileName: 'Untitled.tmd5',
     projectMessage: null,
@@ -158,6 +160,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
         const snapshot = await initializeBlankTree(api);
         set({
           ...projectStateFromSnapshot(snapshot, get().project.title),
+          projectLoadId: get().projectLoadId + 1,
           selection: { kind: 'tree' },
           dirty: false,
           lastOptimization: null,
@@ -179,6 +182,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
         const snapshot = await createBlankTree(api);
         set({
           ...projectStateFromSnapshot(snapshot, 'Untitled'),
+          projectLoadId: get().projectLoadId + 1,
           currentFileName: 'Untitled.tmd5',
           currentFilePath: null,
           projectMessage: null,
@@ -207,6 +211,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
         const snapshot = await createStarterTree(api);
         set({
           ...projectStateFromSnapshot(snapshot, 'Three terminal flaps'),
+          projectLoadId: get().projectLoadId + 1,
           currentFileName: 'three-terminal-flaps.tmd5',
           currentFilePath: null,
           projectMessage: 'Loaded starter project',

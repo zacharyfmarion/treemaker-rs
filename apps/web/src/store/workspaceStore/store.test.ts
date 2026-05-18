@@ -495,6 +495,7 @@ function configureEngine(api: TestEngineApi) {
 function loadSnapshotIntoStore(snapshot: TreeSnapshot, title = 'Seed project') {
   useWorkspaceStore.setState({
     project: projectFromSnapshot(snapshot, title),
+    projectLoadId: useWorkspaceStore.getState().projectLoadId + 1,
     currentFileName: 'seed.tmd5',
     currentFilePath: null,
     projectMessage: null,
@@ -575,6 +576,7 @@ describe('workspace store slices', () => {
     expect(state.foldArtifacts).toBeNull();
     expect(state.historyPast).toEqual([]);
     expect(state.clipboard).toBeNull();
+    expect(state.projectLoadId).toBe(0);
     expect(state.currentFileName).toBe('Untitled.tmd5');
     expect(state.createNewProject).toBeTypeOf('function');
     expect(state.openProject).toBeTypeOf('function');
@@ -600,12 +602,14 @@ describe('workspace store slices', () => {
     await useWorkspaceStore.getState().initEngine();
     expect(useWorkspaceStore.getState().engineReady).toBe(true);
     expect(useWorkspaceStore.getState().project.nodes).toHaveLength(2);
+    const initializedLoadId = useWorkspaceStore.getState().projectLoadId;
 
     await useWorkspaceStore.getState().loadProjectText('loaded text', {
       title: 'Loaded design',
       filename: 'loaded.tmd5',
       path: '/tmp/loaded.tmd5',
     });
+    expect(useWorkspaceStore.getState().projectLoadId).toBe(initializedLoadId + 1);
     expect(useWorkspaceStore.getState()).toMatchObject({
       currentFileName: 'loaded.tmd5',
       currentFilePath: '/tmp/loaded.tmd5',

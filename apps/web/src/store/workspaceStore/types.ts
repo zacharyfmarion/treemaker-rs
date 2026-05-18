@@ -26,6 +26,7 @@ export interface RecentProject {
 
 export interface ProjectSliceState {
   project: TreeProject;
+  projectLoadId: number;
   currentFilePath: string | null;
   currentFileName: string;
   projectMessage: string | null;

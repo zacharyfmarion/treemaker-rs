@@ -395,6 +395,12 @@
 
 .simulator-canvas {
   display: block;
+  cursor: grab;
+  touch-action: none;
+}
+
+.simulator-canvas:active {
+  cursor: grabbing;
 }
 
 .simulator-panel__empty {

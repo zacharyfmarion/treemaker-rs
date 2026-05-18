@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+  type WheelEvent as ReactWheelEvent,
+} from 'react';
 import {
   Pause,
   Play,
@@ -20,6 +27,25 @@ import { Button } from '../ui/Button';
 import { IconButton } from '../ui/IconButton';
 
 type LoadState = 'idle' | 'loading' | 'ready' | 'empty' | 'error';
+interface SimulatorView {
+  yaw: number;
+  pitch: number;
+  zoom: number;
+}
+
+interface DragState {
+  pointerId: number;
+  x: number;
+  y: number;
+  yaw: number;
+  pitch: number;
+}
+
+interface ProjectedPoint {
+  x: number;
+  y: number;
+  depth: number;
+}
 
 const INITIAL_SETTLE_STEPS = 300;
 const FOLD_CHANGE_IMMEDIATE_STEPS = 200;
@@ -27,6 +53,7 @@ const FOLD_CHANGE_SETTLE_BATCH = 200;
 const FOLD_CHANGE_SETTLE_FRAMES = 40;
 const SETTLE_DELTA_EPSILON = 0.0002;
 const INITIAL_FOLD_PERCENT = 0;
+const DEFAULT_VIEW: SimulatorView = { yaw: 0, pitch: 0.38, zoom: 1 };
 
 export function SimulatorPanel() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -35,6 +62,8 @@ export function SimulatorPanel() {
   const frameRef = useRef<SimulationFrame | null>(null);
   const rafRef = useRef<number | null>(null);
   const settleRafRef = useRef<number | null>(null);
+  const viewRef = useRef<SimulatorView>({ ...DEFAULT_VIEW });
+  const dragRef = useRef<DragState | null>(null);
   const foldPercentRef = useRef(INITIAL_FOLD_PERCENT);
 
   const creaseCount = useWorkspaceStore((state) => state.project.creases.length);
@@ -60,7 +89,7 @@ export function SimulatorPanel() {
     const model = modelRef.current;
     const frame = frameRef.current;
     if (!canvas || !model || !frame) return;
-    drawFrame(canvas, model, frame);
+    drawFrame(canvas, model, frame, viewRef.current);
     setStep(frame.step);
     setStrain(frame.diagnostics.maxEdgeStrain ?? 0);
   }, []);
@@ -225,6 +254,52 @@ export function SimulatorPanel() {
     if (foldPercent !== 0) startSettling();
   };
 
+  const resetView = useCallback(() => {
+    viewRef.current = { ...DEFAULT_VIEW };
+    drawCurrentFrame();
+  }, [drawCurrentFrame]);
+
+  const handleCanvasPointerDown = (event: ReactPointerEvent<HTMLCanvasElement>) => {
+    if (loadState !== 'ready') return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    dragRef.current = {
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      yaw: viewRef.current.yaw,
+      pitch: viewRef.current.pitch,
+    };
+  };
+
+  const handleCanvasPointerMove = (event: ReactPointerEvent<HTMLCanvasElement>) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    viewRef.current = {
+      ...viewRef.current,
+      yaw: drag.yaw + (event.clientX - drag.x) * 0.01,
+      pitch: clamp(drag.pitch + (event.clientY - drag.y) * 0.01, -1.35, 1.35),
+    };
+    drawCurrentFrame();
+  };
+
+  const handleCanvasPointerEnd = (event: ReactPointerEvent<HTMLCanvasElement>) => {
+    if (dragRef.current?.pointerId !== event.pointerId) return;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    dragRef.current = null;
+  };
+
+  const handleCanvasWheel = (event: ReactWheelEvent<HTMLCanvasElement>) => {
+    if (loadState !== 'ready') return;
+    event.preventDefault();
+    viewRef.current = {
+      ...viewRef.current,
+      zoom: clamp(viewRef.current.zoom * Math.exp(-event.deltaY * 0.001), 0.45, 4),
+    };
+    drawCurrentFrame();
+  };
+
   const errorDetail = modelError ?? foldArtifactError ?? 'Simulator unavailable';
   const statusLabel =
     loadState === 'ready'
@@ -290,7 +365,14 @@ export function SimulatorPanel() {
         <canvas
           ref={canvasRef}
           className="simulator-canvas"
-          aria-label="Origami folded-base simulator"
+          aria-label="Origami folded-base simulator. Drag to rotate, scroll to zoom, double-click to reset view."
+          title="Drag to rotate, scroll to zoom, double-click to reset view"
+          onPointerDown={handleCanvasPointerDown}
+          onPointerMove={handleCanvasPointerMove}
+          onPointerUp={handleCanvasPointerEnd}
+          onPointerCancel={handleCanvasPointerEnd}
+          onDoubleClick={resetView}
+          onWheel={handleCanvasWheel}
         />
         {loadState !== 'ready' && (
           <div className="simulator-panel__empty">
@@ -337,6 +419,10 @@ function maxPositionDelta(previous: Float32Array, next: Float32Array): number {
   return max;
 }
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
 function shortStatus(message: string): string {
   const trimmed = message.trim();
   if (!trimmed) return 'Simulator unavailable';
@@ -347,7 +433,8 @@ function shortStatus(message: string): string {
 function drawFrame(
   canvas: HTMLCanvasElement,
   model: PreparedOrigamiModel,
-  frame: SimulationFrame
+  frame: SimulationFrame,
+  view: SimulatorView
 ): void {
   const rect = canvas.getBoundingClientRect();
   const dpr = Math.max(1, window.devicePixelRatio || 1);
@@ -365,7 +452,7 @@ function drawFrame(
   ctx.fillStyle = '#0c0f12';
   ctx.fillRect(0, 0, width, height);
 
-  const projected = projectPositions(frame.positions);
+  const projected = projectPositions(frame.positions, view);
   const bounds = projected.reduce(
     (acc, point) => ({
       minX: Math.min(acc.minX, point.x),
@@ -378,13 +465,15 @@ function drawFrame(
   const spanX = Math.max(0.001, bounds.maxX - bounds.minX);
   const spanY = Math.max(0.001, bounds.maxY - bounds.minY);
   const padding = Math.max(28, Math.min(width, height) * 0.08);
-  const scale = Math.min((width - padding * 2) / spanX, (height - padding * 2) / spanY);
-  const map = (point: { x: number; y: number }) => ({
-    x: padding + (point.x - bounds.minX) * scale,
-    y: height - padding - (point.y - bounds.minY) * scale,
+  const scale = Math.min((width - padding * 2) / spanX, (height - padding * 2) / spanY) * view.zoom;
+  const centerX = (bounds.minX + bounds.maxX) / 2;
+  const centerY = (bounds.minY + bounds.maxY) / 2;
+  const map = (point: ProjectedPoint) => ({
+    x: width / 2 + (point.x - centerX) * scale,
+    y: height / 2 - (point.y - centerY) * scale,
   });
 
-  const triangles = triangleOrder(model.indices, frame.positions);
+  const triangles = triangleOrder(model.indices, projected);
   for (const triangle of triangles) {
     const a = map(projected[triangle[0]] ?? { x: 0, y: 0 });
     const b = map(projected[triangle[1]] ?? { x: 0, y: 0 });
@@ -413,27 +502,65 @@ function drawFrame(
   });
 }
 
-function projectPositions(positions: Float32Array): Array<{ x: number; y: number }> {
-  const points: Array<{ x: number; y: number }> = [];
+function projectPositions(positions: Float32Array, view: SimulatorView): ProjectedPoint[] {
+  const center = boundsCenter(positions);
+  const points: ProjectedPoint[] = [];
+  const cosYaw = Math.cos(view.yaw);
+  const sinYaw = Math.sin(view.yaw);
+  const cosPitch = Math.cos(view.pitch);
+  const sinPitch = Math.sin(view.pitch);
+
   for (let index = 0; index < positions.length; index += 3) {
+    const dx = (positions[index] ?? 0) - center.x;
+    const dy = (positions[index + 1] ?? 0) - center.y;
+    const dz = (positions[index + 2] ?? 0) - center.z;
+    const yawX = cosYaw * dx + sinYaw * dz;
+    const yawZ = -sinYaw * dx + cosYaw * dz;
     points.push({
-      x: positions[index] ?? 0,
-      y: (positions[index + 2] ?? 0) - (positions[index + 1] ?? 0) * 0.38,
+      x: yawX,
+      y: cosPitch * yawZ - sinPitch * dy,
+      depth: sinPitch * yawZ + cosPitch * dy,
     });
   }
   return points;
 }
 
-function triangleOrder(indices: Uint32Array, positions: Float32Array): number[][] {
+function boundsCenter(positions: Float32Array): { x: number; y: number; z: number } {
+  let minX = Infinity;
+  let minY = Infinity;
+  let minZ = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  let maxZ = -Infinity;
+  for (let index = 0; index < positions.length; index += 3) {
+    const x = positions[index] ?? 0;
+    const y = positions[index + 1] ?? 0;
+    const z = positions[index + 2] ?? 0;
+    minX = Math.min(minX, x);
+    minY = Math.min(minY, y);
+    minZ = Math.min(minZ, z);
+    maxX = Math.max(maxX, x);
+    maxY = Math.max(maxY, y);
+    maxZ = Math.max(maxZ, z);
+  }
+  if (!Number.isFinite(minX)) return { x: 0, y: 0, z: 0 };
+  return {
+    x: (minX + maxX) / 2,
+    y: (minY + maxY) / 2,
+    z: (minZ + maxZ) / 2,
+  };
+}
+
+function triangleOrder(indices: Uint32Array, projected: ProjectedPoint[]): number[][] {
   const triangles: number[][] = [];
   for (let index = 0; index < indices.length; index += 3) {
     triangles.push([indices[index] ?? 0, indices[index + 1] ?? 0, indices[index + 2] ?? 0]);
   }
-  return triangles.sort((a, b) => averageHeight(a, positions) - averageHeight(b, positions));
+  return triangles.sort((a, b) => averageDepth(a, projected) - averageDepth(b, projected));
 }
 
-function averageHeight(triangle: number[], positions: Float32Array): number {
-  return triangle.reduce((total, vertex) => total + (positions[vertex * 3 + 1] ?? 0), 0) / 3;
+function averageDepth(triangle: number[], projected: ProjectedPoint[]): number {
+  return triangle.reduce((total, vertex) => total + (projected[vertex]?.depth ?? 0), 0) / 3;
 }
 
 function triangleColor(colors: Float32Array, triangle: number[]): string {

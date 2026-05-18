@@ -10,6 +10,7 @@ function createDeps() {
       saveProject: vi.fn().mockResolvedValue(true),
       saveProjectAs: vi.fn().mockResolvedValue(true),
       exportV4: vi.fn().mockResolvedValue(true),
+      exportFold: vi.fn().mockResolvedValue(true),
       exportSvg: vi.fn().mockResolvedValue(true),
       exportPng: vi.fn().mockResolvedValue(true),
       undo: vi.fn().mockResolvedValue(undefined),
@@ -49,11 +50,13 @@ describe('menu actions', () => {
 
     await expect(handle('file.new')).resolves.toBe(true);
     await expect(handle('view.creasePattern')).resolves.toBe(true);
+    await expect(handle('view.simulator')).resolves.toBe(true);
     await expect(handle('cp.build')).resolves.toBe(true);
     await expect(handle('optimize.edges')).resolves.toBe(true);
 
     expect(deps.workspace.createNewProject).toHaveBeenCalledOnce();
     expect(deps.layout.activatePanel).toHaveBeenCalledWith('crease-pattern');
+    expect(deps.layout.activatePanel).toHaveBeenCalledWith('simulator');
     expect(deps.workspace.buildCreasePattern).toHaveBeenCalledOnce();
     expect(deps.workspace.optimizeEdges).toHaveBeenCalledOnce();
   });
@@ -78,6 +81,9 @@ describe('menu actions', () => {
 
     await expect(createMenuActionHandler(deps)('file.saveAs')).resolves.toBe(true);
     expect(deps.workspace.saveProjectAs).toHaveBeenCalledWith(deps.fileService);
+
+    await expect(createMenuActionHandler(deps)('file.exportFold')).resolves.toBe(true);
+    expect(deps.workspace.exportFold).toHaveBeenCalledWith(deps.fileService);
   });
 
   it('returns false for unknown ids', async () => {

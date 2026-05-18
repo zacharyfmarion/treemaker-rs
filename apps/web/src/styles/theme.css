@@ -343,15 +343,19 @@
 }
 
 .design-panel__body,
-.cp-panel__body {
+.cp-panel__body,
+.simulator-panel__body {
   position: relative;
   display: grid;
   place-items: center;
   overflow: hidden;
-  background: linear-gradient(135deg, var(--bg-canvas), #111821);
+  background:
+    radial-gradient(circle at 20% 20%, rgba(95, 179, 165, 0.08), transparent 22%),
+    linear-gradient(135deg, var(--bg-canvas), #111821);
 }
 
-.cp-canvas {
+.cp-canvas,
+.simulator-canvas {
   width: min(100%, 86vh);
   height: min(100%, 86vh);
   max-width: 980px;
@@ -371,6 +375,69 @@
   overflow: visible;
   touch-action: none;
   user-select: none;
+}
+
+.simulator-panel__body {
+  min-height: 0;
+}
+
+.simulator-canvas {
+  display: block;
+}
+
+.simulator-panel__empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  gap: var(--space-3);
+  justify-items: center;
+  background: rgba(12, 15, 18, 0.68);
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+.simulator-controls {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-2) var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-primary);
+}
+
+.simulator-slider {
+  display: grid;
+  grid-template-columns: auto minmax(120px, 1fr) 48px;
+  gap: var(--space-2);
+  align-items: center;
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: 0.74rem;
+  font-weight: 650;
+}
+
+.simulator-slider input {
+  min-width: 0;
+  accent-color: var(--accent-primary);
+}
+
+.simulator-slider output {
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.simulator-readout {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  color: var(--text-tertiary);
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .design-canvas[data-tool='node'] {

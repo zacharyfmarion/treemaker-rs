@@ -6,6 +6,7 @@ export type FileCommand =
   | 'saveProject'
   | 'saveProjectAs'
   | 'exportV4'
+  | 'exportFold'
   | 'exportSvg'
   | 'exportPng';
 

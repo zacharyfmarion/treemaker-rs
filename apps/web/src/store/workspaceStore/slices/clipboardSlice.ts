@@ -203,6 +203,7 @@ export const createClipboardSlice: WorkspaceSliceCreator<ClipboardSlice> = (set,
         dirty: true,
         error: null,
         lastOptimization: null,
+        foldArtifacts: null,
         clipboardPasteCount: get().clipboardPasteCount + 1,
         projectMessage: `Pasted ${pastedNodes.length} nodes`,
       });

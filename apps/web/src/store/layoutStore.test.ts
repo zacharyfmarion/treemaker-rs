@@ -50,15 +50,16 @@ describe('layout store', () => {
     vi.restoreAllMocks();
   });
 
-  it('builds the default design, crease pattern, and inspector-side panes', () => {
+  it('builds the default design, crease pattern, simulator, and inspector-side panes', () => {
     const api = createDockviewApi();
 
     applyDefaultLayout(api);
 
-    expect(api.addPanel).toHaveBeenCalledTimes(6);
+    expect(api.addPanel).toHaveBeenCalledTimes(7);
     expect(api.addPanel.mock.calls.map(([options]) => options.id)).toEqual([
       'design',
       'crease-pattern',
+      'simulator',
       'inspector',
       'diagnostics',
       'conditions',
@@ -70,11 +71,16 @@ describe('layout store', () => {
       position: { referenceGroup: 'design-group' },
     });
     expect(api.addPanel.mock.calls[2][0]).toMatchObject({
+      id: 'simulator',
+      inactive: true,
+      position: { referenceGroup: 'design-group' },
+    });
+    expect(api.addPanel.mock.calls[3][0]).toMatchObject({
       id: 'inspector',
       initialWidth: 320,
       position: { referencePanel: 'design', direction: 'right' },
     });
-    expect(api.addPanel.mock.calls[4][0]).toMatchObject({
+    expect(api.addPanel.mock.calls[5][0]).toMatchObject({
       id: 'conditions',
       inactive: true,
       position: { referenceGroup: 'inspector-group' },
@@ -109,7 +115,7 @@ describe('layout store', () => {
     expect(useLayoutStore.getState().loadLayout()).toBeNull();
     expect(localStorage.getItem('treemaker-web-layout')).toBeNull();
 
-    localStorage.setItem('treemaker-web-layout-version', '3');
+    localStorage.setItem('treemaker-web-layout-version', '4');
     localStorage.setItem('treemaker-web-layout', '{broken');
 
     expect(useLayoutStore.getState().loadLayout()).toBeNull();
@@ -119,13 +125,13 @@ describe('layout store', () => {
   it('resets to the default layout and persists the replacement', () => {
     const api = createDockviewApi(dockviewLayout('reset'));
     useLayoutStore.getState().setDockviewApi(api);
-    localStorage.setItem('treemaker-web-layout-version', '3');
+    localStorage.setItem('treemaker-web-layout-version', '4');
     localStorage.setItem('treemaker-web-layout', '{"old":true}');
 
     useLayoutStore.getState().resetLayout();
 
     expect(api.clear).toHaveBeenCalledOnce();
-    expect(api.addPanel).toHaveBeenCalledTimes(6);
+    expect(api.addPanel).toHaveBeenCalledTimes(7);
     expect(localStorage.getItem('treemaker-web-layout')).toContain('reset');
   });
 });

@@ -85,7 +85,10 @@ pub fn tree_snapshot(handle: u32) -> std::result::Result<JsValue, JsValue> {
 #[wasm_bindgen]
 pub fn fold_artifacts(handle: u32) -> std::result::Result<JsValue, JsValue> {
     with_tree(handle, |tree| {
-        serde_wasm_bindgen::to_value(&tree.fold_artifacts().map_err(to_js_error)?)
+        let serializer = serde_wasm_bindgen::Serializer::json_compatible();
+        tree.fold_artifacts()
+            .map_err(to_js_error)?
+            .serialize(&serializer)
             .map_err(to_js_value)
     })
 }
@@ -158,6 +161,14 @@ pub fn save_tmd5(handle: u32) -> std::result::Result<String, JsValue> {
 #[wasm_bindgen]
 pub fn export_v4(handle: u32) -> std::result::Result<String, JsValue> {
     with_tree(handle, |tree| Ok(tree.export_v4_string()))
+}
+
+#[wasm_bindgen]
+pub fn export_fold(handle: u32) -> std::result::Result<String, JsValue> {
+    with_tree(handle, |tree| {
+        let fold = tree.to_fold_document().map_err(to_js_error)?;
+        serde_json::to_string_pretty(&fold).map_err(to_js_value)
+    })
 }
 
 #[wasm_bindgen]

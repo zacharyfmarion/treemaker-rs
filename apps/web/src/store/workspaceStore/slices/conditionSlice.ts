@@ -36,6 +36,7 @@ export const createConditionSlice: WorkspaceSliceCreator<ConditionSlice> = (set,
         dirty: true,
         error: null,
         lastOptimization: null,
+        foldArtifacts: null,
         projectMessage: label,
       });
       get().commitHistoryCheckpoint(checkpoint, label);
@@ -95,6 +96,7 @@ export const createConditionSlice: WorkspaceSliceCreator<ConditionSlice> = (set,
           dirty: true,
           error: null,
           lastOptimization: null,
+          foldArtifacts: null,
           projectMessage: 'Cleared conditions',
         });
         get().commitHistoryCheckpoint(checkpoint, 'Clear conditions');

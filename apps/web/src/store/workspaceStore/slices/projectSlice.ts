@@ -89,6 +89,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
       selection: { kind: 'tree' },
       toolMode: 'select',
       creaseColorMode: 'mvf',
+      foldArtifacts: null,
       status: statusFromSnapshot(snapshot),
       dirty: source.dirty ?? false,
       lastOptimization: null,
@@ -159,6 +160,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
           selection: { kind: 'tree' },
           dirty: false,
           lastOptimization: null,
+          foldArtifacts: null,
           historyPast: [],
           historyFuture: [],
         });
@@ -181,6 +183,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
           selection: { kind: 'tree' },
           toolMode: 'select',
           creaseColorMode: 'mvf',
+          foldArtifacts: null,
           dirty: false,
           lastOptimization: null,
           historyPast: [],
@@ -207,6 +210,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
           selection: { kind: 'tree' },
           toolMode: 'select',
           creaseColorMode: 'mvf',
+          foldArtifacts: null,
           dirty: false,
           lastOptimization: null,
           historyPast: [],
@@ -271,6 +275,26 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
           suggestedName: defaultFilename(get().project.title, 'tmd4'),
           path: null,
           extensions: ['tmd4'],
+        });
+        if (!result) return false;
+        set({ projectMessage: `Exported ${result.name}` });
+        return true;
+      } catch (error) {
+        set({ status: 'error', error: engineError(error) });
+        return false;
+      }
+    },
+
+    exportFold: async (fileService = getFileService()) => {
+      try {
+        const { api, treeHandle } = await ensureTreeHandle();
+        const contents = await api.exportFold(treeHandle);
+        const result = await fileService.saveTextFile({
+          title: 'Export FOLD Document',
+          contents,
+          suggestedName: defaultFilename(get().project.title, 'fold'),
+          path: null,
+          extensions: ['fold'],
         });
         if (!result) return false;
         set({ projectMessage: `Exported ${result.name}` });

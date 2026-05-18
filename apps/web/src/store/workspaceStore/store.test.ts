@@ -4,6 +4,7 @@ import type {
   ConditionSnapshot,
   EditReport,
   EdgeSnapshot,
+  FoldArtifacts,
   NodeSnapshot,
   OptimizationReport,
   PaperSettings,
@@ -198,6 +199,59 @@ function seedSnapshot(): TreeSnapshot {
   });
 }
 
+function foldArtifactsFromSnapshot(snapshot: TreeSnapshot): FoldArtifacts {
+  if (snapshot.vertices.length === 0 || snapshot.creases.length === 0 || snapshot.facets.length === 0) {
+    throw { code: 'invalid_operation', message: 'build a crease pattern before exporting FOLD artifacts' };
+  }
+
+  const fold = {
+    file_spec: 1.2,
+    file_creator: 'store-test',
+    frame_title: 'Test crease pattern',
+    frame_classes: ['creasePattern'],
+    vertices_coords: snapshot.vertices.map((vertex) => [vertex.loc.x, vertex.loc.y]),
+    edges_vertices: snapshot.creases.map(
+      (crease) => [crease.vertices[0] - 1, crease.vertices[1] - 1] as [number, number]
+    ),
+    edges_assignment: snapshot.creases.map(() => 'M' as const),
+    edges_foldAngle: snapshot.creases.map(() => -180),
+    faces_vertices: snapshot.facets.map((facet) => facet.vertices.map((vertex) => vertex - 1)),
+  };
+
+  return {
+    fold,
+    folded_base: {
+      vertices: snapshot.vertices.map((vertex) => ({
+        id: vertex.id,
+        source_vertex: vertex.id,
+        loc: vertex.loc,
+        paper_loc: vertex.loc,
+        depth: 0,
+        elevation: 0,
+        is_border: false,
+      })),
+      creases: snapshot.creases.map((crease) => ({
+        id: crease.id,
+        source_crease: crease.id,
+        vertices: [crease.vertices[0], crease.vertices[1]] as [number, number],
+        kind: crease.kind,
+        fold: crease.fold,
+      })),
+      facets: snapshot.facets.map((facet) => ({
+        id: facet.id,
+        source_facet: facet.id,
+        vertices: facet.vertices,
+        color: facet.color,
+        order: 0,
+      })),
+    },
+    simulation_model: {
+      fold,
+      crease_params: [],
+    },
+  };
+}
+
 function nextId<T extends { id: number }>(items: T[]): number {
   return Math.max(0, ...items.map((item) => item.id)) + 1;
 }
@@ -227,6 +281,8 @@ function createMockEngineApi(initialSnapshot: TreeSnapshot) {
       return text;
     }),
     exportV4: vi.fn(async () => 'exported-v4'),
+    exportFold: vi.fn(async () => JSON.stringify(foldArtifactsFromSnapshot(snapshotState).fold)),
+    foldArtifacts: vi.fn(async () => foldArtifactsFromSnapshot(snapshotState)),
     optimizeScale: vi.fn(async (): Promise<OptimizationReport> => {
       const oldScale = snapshotState.paper.scale;
       snapshotState = makeSnapshot({
@@ -455,6 +511,7 @@ function loadSnapshotIntoStore(snapshot: TreeSnapshot, title = 'Seed project') {
     clipboard: null,
     clipboardPasteCount: 0,
     creaseColorMode: 'mvf',
+    foldArtifacts: null,
   });
 }
 
@@ -514,12 +571,14 @@ describe('workspace store slices', () => {
     expect(state.selection).toEqual({ kind: 'tree' });
     expect(state.toolMode).toBe('select');
     expect(state.creaseColorMode).toBe('mvf');
+    expect(state.foldArtifacts).toBeNull();
     expect(state.historyPast).toEqual([]);
     expect(state.clipboard).toBeNull();
     expect(state.currentFileName).toBe('Untitled.tmd5');
     expect(state.createNewProject).toBeTypeOf('function');
     expect(state.openProject).toBeTypeOf('function');
     expect(state.saveProject).toBeTypeOf('function');
+    expect(state.exportFold).toBeTypeOf('function');
     expect(state.undo).toBeTypeOf('function');
     expect(state.copySelection).toBeTypeOf('function');
     expect(state.updatePaper).toBeTypeOf('function');
@@ -585,6 +644,13 @@ describe('workspace store slices', () => {
 
     await expect(useWorkspaceStore.getState().exportV4(fileService)).resolves.toBe(true);
     expect(api.exportV4).toHaveBeenCalledWith(1);
+
+    await useWorkspaceStore.getState().buildCreasePattern();
+    await expect(useWorkspaceStore.getState().exportFold(fileService)).resolves.toBe(true);
+    expect(api.exportFold).toHaveBeenCalledWith(1);
+    expect(fileService.saveTextFile).toHaveBeenLastCalledWith(
+      expect.objectContaining({ title: 'Export FOLD Document', extensions: ['fold'] })
+    );
 
     await expect(useWorkspaceStore.getState().exportSvg(fileService)).resolves.toBe(true);
     expect(exportMocks.serializeCreasePatternSvg).toHaveBeenCalledWith(
@@ -746,7 +812,7 @@ describe('workspace store slices', () => {
   });
 
   it('optimizes, builds crease patterns, toggles color mode, and foregrounds the CP pane', async () => {
-    resetStores(seedSnapshot());
+    const api = resetStores(seedSnapshot());
     loadSnapshotIntoStore(seedSnapshot());
     const activatePanel = vi.fn();
     useLayoutStore.setState({ activatePanel });
@@ -764,6 +830,9 @@ describe('workspace store slices', () => {
     await useWorkspaceStore.getState().buildCreasePattern();
     expect(useWorkspaceStore.getState().status).toBe('crease_pattern_ready');
     expect(useWorkspaceStore.getState().project.creases).toHaveLength(1);
+    expect(useWorkspaceStore.getState().foldArtifacts?.fold.vertices_coords).toHaveLength(3);
+    expect(useWorkspaceStore.getState().refreshFoldArtifacts).toBeTypeOf('function');
+    expect(api.foldArtifacts).toHaveBeenCalledWith(1);
     expect(activatePanel).toHaveBeenCalledWith('crease-pattern');
 
     useWorkspaceStore.getState().setCreaseColorMode('agrh');

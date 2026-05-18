@@ -1,6 +1,7 @@
 import type { StateCreator } from 'zustand';
 import type {
   ConditionKind,
+  FoldArtifacts,
   OptimizationReport,
   TreeEdit,
   WasmErrorEnvelope,
@@ -48,6 +49,7 @@ export interface ProjectSliceActions {
   saveProject: (fileService?: FileService) => Promise<boolean>;
   saveProjectAs: (fileService?: FileService) => Promise<boolean>;
   exportV4: (fileService?: FileService) => Promise<boolean>;
+  exportFold: (fileService?: FileService) => Promise<boolean>;
   exportSvg: (fileService?: FileService) => Promise<boolean>;
   exportPng: (fileService?: FileService) => Promise<boolean>;
   loadExampleProject: (id: string) => Promise<void>;
@@ -153,6 +155,7 @@ export type ClipboardSlice = ClipboardSliceState & ClipboardSliceActions;
 
 export interface CreasePatternSliceState {
   creaseColorMode: CreaseColorMode;
+  foldArtifacts: FoldArtifacts | null;
 }
 
 export interface CreasePatternSliceActions {
@@ -160,6 +163,7 @@ export interface CreasePatternSliceActions {
   optimizeEdges: () => Promise<void>;
   optimizeStrain: () => Promise<void>;
   buildCreasePattern: () => Promise<void>;
+  refreshFoldArtifacts: () => Promise<FoldArtifacts | null>;
   setCreaseColorMode: (mode: CreaseColorMode) => void;
 }
 

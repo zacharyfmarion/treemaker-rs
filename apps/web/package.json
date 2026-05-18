@@ -5,9 +5,11 @@
   "type": "module",
   "scripts": {
     "build:wasm": "wasm-pack build ../../crates/treemaker-wasm --target web --out-dir ../../apps/web/src/generated/treemaker-wasm",
-    "predev": "npm run build:wasm",
-    "prebuild": "npm run build:wasm",
-    "pretypecheck": "npm run build:wasm",
+    "build:simulator": "npm --workspace @treemaker/origami-simulator run build",
+    "predev": "npm run build:simulator && npm run build:wasm",
+    "prebuild": "npm run build:simulator && npm run build:wasm",
+    "pretypecheck": "npm run build:simulator && npm run build:wasm",
+    "pretest": "npm run build:simulator && npm run build:wasm",
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "lint": "eslint .",
@@ -16,6 +18,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@treemaker/origami-simulator": "0.1.0",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@tauri-apps/api": "^2.0.0",
     "@tauri-apps/plugin-dialog": "^2.0.0",

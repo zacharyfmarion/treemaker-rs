@@ -55,13 +55,14 @@ describe('layout store', () => {
 
     applyDefaultLayout(api);
 
-    expect(api.addPanel).toHaveBeenCalledTimes(7);
+    expect(api.addPanel).toHaveBeenCalledTimes(8);
     expect(api.addPanel.mock.calls.map(([options]) => options.id)).toEqual([
       'design',
       'crease-pattern',
       'simulator',
       'inspector',
       'diagnostics',
+      'folded-base',
       'conditions',
       'files',
     ]);
@@ -81,6 +82,11 @@ describe('layout store', () => {
       position: { referencePanel: 'design', direction: 'right' },
     });
     expect(api.addPanel.mock.calls[5][0]).toMatchObject({
+      id: 'folded-base',
+      initialHeight: 320,
+      position: { referencePanel: 'inspector', direction: 'below' },
+    });
+    expect(api.addPanel.mock.calls[6][0]).toMatchObject({
       id: 'conditions',
       inactive: true,
       position: { referenceGroup: 'inspector-group' },
@@ -115,7 +121,7 @@ describe('layout store', () => {
     expect(useLayoutStore.getState().loadLayout()).toBeNull();
     expect(localStorage.getItem('treemaker-web-layout')).toBeNull();
 
-    localStorage.setItem('treemaker-web-layout-version', '4');
+    localStorage.setItem('treemaker-web-layout-version', '6');
     localStorage.setItem('treemaker-web-layout', '{broken');
 
     expect(useLayoutStore.getState().loadLayout()).toBeNull();
@@ -125,13 +131,13 @@ describe('layout store', () => {
   it('resets to the default layout and persists the replacement', () => {
     const api = createDockviewApi(dockviewLayout('reset'));
     useLayoutStore.getState().setDockviewApi(api);
-    localStorage.setItem('treemaker-web-layout-version', '4');
+    localStorage.setItem('treemaker-web-layout-version', '6');
     localStorage.setItem('treemaker-web-layout', '{"old":true}');
 
     useLayoutStore.getState().resetLayout();
 
     expect(api.clear).toHaveBeenCalledOnce();
-    expect(api.addPanel).toHaveBeenCalledTimes(7);
+    expect(api.addPanel).toHaveBeenCalledTimes(8);
     expect(localStorage.getItem('treemaker-web-layout')).toContain('reset');
   });
 });

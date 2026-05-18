@@ -156,6 +156,7 @@ export type ClipboardSlice = ClipboardSliceState & ClipboardSliceActions;
 export interface CreasePatternSliceState {
   creaseColorMode: CreaseColorMode;
   foldArtifacts: FoldArtifacts | null;
+  foldArtifactError: string | null;
 }
 
 export interface CreasePatternSliceActions {

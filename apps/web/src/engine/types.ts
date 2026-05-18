@@ -80,7 +80,8 @@ export interface RustPreparedFoldModel {
 
 export interface FoldArtifacts {
   fold: FoldDocument;
-  folded_base: FoldedBaseSnapshot;
+  folded_base?: FoldedBaseSnapshot | null;
+  folded_base_error?: string | null;
   simulation_model: RustPreparedFoldModel;
 }
 

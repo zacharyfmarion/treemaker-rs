@@ -641,7 +641,10 @@ pub struct FoldedBaseSnapshot {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct FoldArtifacts {
     pub fold: treemaker_fold::FoldDocument,
-    pub folded_base: FoldedBaseSnapshot,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub folded_base: Option<FoldedBaseSnapshot>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub folded_base_error: Option<String>,
     pub simulation_model: treemaker_fold::PreparedFoldModel,
 }
 
@@ -1275,12 +1278,16 @@ impl Tree {
     /// Return all fold-related artifacts used by UI, export, and simulation surfaces.
     pub fn fold_artifacts(&self) -> Result<FoldArtifacts> {
         let fold = self.to_fold_document()?;
-        let folded_base = self.folded_base_snapshot()?;
+        let (folded_base, folded_base_error) = match self.folded_base_snapshot() {
+            Ok(snapshot) => (Some(snapshot), None),
+            Err(error) => (None, Some(error.to_string())),
+        };
         let simulation_model = treemaker_fold::prepare_simulation_model(&fold)
             .map_err(|error| TreeError::FoldArtifact(error.to_string()))?;
         Ok(FoldArtifacts {
             fold,
             folded_base,
+            folded_base_error,
             simulation_model,
         })
     }
@@ -9644,6 +9651,8 @@ mod tests {
 
         let artifacts = tree.fold_artifacts().unwrap();
         assert_eq!(artifacts.fold.edges_vertices.len(), tree.creases.len());
+        assert!(artifacts.folded_base.is_some());
+        assert!(artifacts.folded_base_error.is_none());
         assert!(!artifacts.simulation_model.fold.faces_vertices.is_empty());
     }
 

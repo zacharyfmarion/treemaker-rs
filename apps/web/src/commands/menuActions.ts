@@ -23,6 +23,7 @@ export const MENU_ACTION_IDS = [
   'view.design',
   'view.creasePattern',
   'view.simulator',
+  'view.foldedBase',
   'view.conditions',
   'view.resetLayout',
   'optimize.scale',
@@ -151,6 +152,9 @@ export function createMenuActionHandler(deps: MenuActionDependencies) {
         return true;
       case 'view.simulator':
         deps.layout.activatePanel('simulator');
+        return true;
+      case 'view.foldedBase':
+        deps.layout.activatePanel('folded-base');
         return true;
       case 'view.conditions':
         deps.layout.activatePanel('conditions');

@@ -51,12 +51,14 @@ describe('menu actions', () => {
     await expect(handle('file.new')).resolves.toBe(true);
     await expect(handle('view.creasePattern')).resolves.toBe(true);
     await expect(handle('view.simulator')).resolves.toBe(true);
+    await expect(handle('view.foldedBase')).resolves.toBe(true);
     await expect(handle('cp.build')).resolves.toBe(true);
     await expect(handle('optimize.edges')).resolves.toBe(true);
 
     expect(deps.workspace.createNewProject).toHaveBeenCalledOnce();
     expect(deps.layout.activatePanel).toHaveBeenCalledWith('crease-pattern');
     expect(deps.layout.activatePanel).toHaveBeenCalledWith('simulator');
+    expect(deps.layout.activatePanel).toHaveBeenCalledWith('folded-base');
     expect(deps.workspace.buildCreasePattern).toHaveBeenCalledOnce();
     expect(deps.workspace.optimizeEdges).toHaveBeenCalledOnce();
   });

@@ -512,6 +512,7 @@ function loadSnapshotIntoStore(snapshot: TreeSnapshot, title = 'Seed project') {
     clipboardPasteCount: 0,
     creaseColorMode: 'mvf',
     foldArtifacts: null,
+    foldArtifactError: null,
   });
 }
 

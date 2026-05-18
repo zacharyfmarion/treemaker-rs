@@ -161,6 +161,7 @@ export function projectStateFromSnapshot(snapshot: TreeSnapshot, title?: string)
     status: 'ready' as const,
     error: null,
     foldArtifacts: null,
+    foldArtifactError: null,
   };
 }
 

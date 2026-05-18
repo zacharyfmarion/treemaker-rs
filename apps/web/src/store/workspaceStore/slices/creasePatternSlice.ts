@@ -25,10 +25,10 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
     try {
       const { api, treeHandle } = await requireActiveTree();
       const foldArtifacts = await api.foldArtifacts(treeHandle);
-      set({ foldArtifacts });
+      set({ foldArtifacts, foldArtifactError: null });
       return foldArtifacts;
-    } catch {
-      set({ foldArtifacts: null });
+    } catch (error) {
+      set({ foldArtifacts: null, foldArtifactError: engineError(error).message });
       return null;
     }
   }
@@ -49,6 +49,7 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
         error: null,
         lastOptimization: report,
         foldArtifacts: null,
+        foldArtifactError: null,
         dirty: true,
         projectMessage: label,
       });
@@ -62,6 +63,7 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
   return {
     creaseColorMode: 'mvf',
     foldArtifacts: null,
+    foldArtifactError: null,
 
     optimizeScale: async () => {
       await runOptimization('Optimize scale', (api, treeHandle) => api.optimizeScale(treeHandle));
@@ -81,12 +83,17 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
       try {
         const { api, treeHandle } = await requireActiveTree();
         const snapshot = await api.buildCreasePattern(treeHandle);
-        const foldArtifacts = await api.foldArtifacts(treeHandle).catch(() => null);
+        let foldArtifactError: string | null = null;
+        const foldArtifacts = await api.foldArtifacts(treeHandle).catch((error) => {
+          foldArtifactError = engineError(error).message;
+          return null;
+        });
         set({
           project: projectFromSnapshot(snapshot, get().project.title),
           status: 'crease_pattern_ready',
           error: null,
           foldArtifacts,
+          foldArtifactError,
           dirty: true,
           projectMessage: 'Built crease pattern',
         });

@@ -64,6 +64,7 @@ export function getMenuBarDef(): MenuDef[] {
         { type: 'action', id: 'view.design', label: 'Design' },
         { type: 'action', id: 'view.creasePattern', label: 'Crease Pattern' },
         { type: 'action', id: 'view.simulator', label: 'Simulator' },
+        { type: 'action', id: 'view.foldedBase', label: 'Folded Base' },
         { type: 'action', id: 'view.conditions', label: 'Conditions' },
         { type: 'separator' },
         { type: 'action', id: 'view.resetLayout', label: 'Reset Layout' },

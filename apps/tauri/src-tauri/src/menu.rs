@@ -83,6 +83,7 @@ pub fn setup_menu(app: &App) -> Result<(), Box<dyn std::error::Error>> {
     let view_design = MenuItemBuilder::with_id("view.design", "Design").build(app)?;
     let view_cp = MenuItemBuilder::with_id("view.creasePattern", "Crease Pattern").build(app)?;
     let view_simulator = MenuItemBuilder::with_id("view.simulator", "Simulator").build(app)?;
+    let view_folded_base = MenuItemBuilder::with_id("view.foldedBase", "Folded Base").build(app)?;
     let view_conditions = MenuItemBuilder::with_id("view.conditions", "Conditions").build(app)?;
     let view_reset = MenuItemBuilder::with_id("view.resetLayout", "Reset Layout").build(app)?;
 
@@ -90,6 +91,7 @@ pub fn setup_menu(app: &App) -> Result<(), Box<dyn std::error::Error>> {
         .item(&view_design)
         .item(&view_cp)
         .item(&view_simulator)
+        .item(&view_folded_base)
         .item(&view_conditions)
         .separator()
         .item(&view_reset)

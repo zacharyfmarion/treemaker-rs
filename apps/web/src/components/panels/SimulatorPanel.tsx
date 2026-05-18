@@ -31,12 +31,14 @@ export function SimulatorPanel() {
 
   const creaseCount = useWorkspaceStore((state) => state.project.creases.length);
   const foldArtifacts = useWorkspaceStore((state) => state.foldArtifacts);
+  const foldArtifactError = useWorkspaceStore((state) => state.foldArtifactError);
   const refreshFoldArtifacts = useWorkspaceStore((state) => state.refreshFoldArtifacts);
   const buildCreasePattern = useWorkspaceStore((state) => state.buildCreasePattern);
 
   const [foldPercent, setFoldPercent] = useState(60);
   const [playing, setPlaying] = useState(false);
   const [loadState, setLoadState] = useState<LoadState>('idle');
+  const [modelError, setModelError] = useState<string | null>(null);
   const [step, setStep] = useState(0);
   const [strain, setStrain] = useState(0);
   const [modelStats, setModelStats] = useState({ vertices: 0, triangles: 0 });
@@ -67,15 +69,19 @@ export function SimulatorPanel() {
 
   useEffect(() => {
     if (creaseCount === 0) {
+      setPlaying(false);
+      setModelError(null);
       setLoadState('empty');
       return;
     }
     if (foldArtifacts) {
+      setModelError(null);
       setLoadState('ready');
       return;
     }
 
     let cancelled = false;
+    setModelError(null);
     setLoadState('loading');
     void refreshFoldArtifacts().then((artifacts) => {
       if (cancelled) return;
@@ -91,12 +97,16 @@ export function SimulatorPanel() {
     controllerRef.current = null;
     modelRef.current = null;
     frameRef.current = null;
+    setModelError(null);
     setModelStats({ vertices: 0, triangles: 0 });
 
     if (!foldArtifacts) return;
 
     try {
-      const model = prepareFoldModel(foldArtifacts.fold as SimulatorFoldDocument);
+      const model = prepareFoldModel(
+        (foldArtifacts.simulation_model?.fold ?? foldArtifacts.fold) as SimulatorFoldDocument,
+        { triangulate: false }
+      );
       const controller = createOrigamiSimulator({
         model,
         options: { foldPercent: foldPercentRef.current, damping: 0.34, stepsPerFrame: 6 },
@@ -108,7 +118,10 @@ export function SimulatorPanel() {
       setLoadState('ready');
       drawCurrentFrame();
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       console.warn('Failed to prepare simulator model', error);
+      setPlaying(false);
+      setModelError(message);
       setModelStats({ vertices: 0, triangles: 0 });
       setLoadState('error');
     }
@@ -156,6 +169,7 @@ export function SimulatorPanel() {
     drawCurrentFrame();
   };
 
+  const errorDetail = modelError ?? foldArtifactError ?? 'Simulator unavailable';
   const statusLabel =
     loadState === 'ready'
       ? `${modelStats.vertices} vertices | ${modelStats.triangles} triangles`
@@ -164,7 +178,7 @@ export function SimulatorPanel() {
         : loadState === 'empty'
           ? 'No crease pattern'
           : loadState === 'error'
-            ? 'Unavailable'
+            ? shortStatus(errorDetail)
             : 'Idle';
 
   return (
@@ -179,7 +193,10 @@ export function SimulatorPanel() {
             size="sm"
             title="Refresh"
             tooltipSide="bottom"
-            onClick={() => void refreshFoldArtifacts()}
+            onClick={() => {
+              setModelError(null);
+              void refreshFoldArtifacts();
+            }}
             disabled={creaseCount === 0}
           >
             <RefreshCw size={14} />
@@ -221,7 +238,8 @@ export function SimulatorPanel() {
         />
         {loadState !== 'ready' && (
           <div className="simulator-panel__empty">
-            <span>{statusLabel}</span>
+            <span title={loadState === 'error' ? errorDetail : undefined}>{statusLabel}</span>
+            {loadState === 'error' && <small>{errorDetail}</small>}
             {loadState === 'empty' && (
               <Button size="sm" variant="primary" onClick={() => void buildCreasePattern()}>
                 Build
@@ -253,6 +271,13 @@ export function SimulatorPanel() {
       </div>
     </section>
   );
+}
+
+function shortStatus(message: string): string {
+  const trimmed = message.trim();
+  if (!trimmed) return 'Simulator unavailable';
+  const sentence = trimmed.split(/[.;]\s+/u)[0] ?? trimmed;
+  return sentence.length > 54 ? `${sentence.slice(0, 51)}...` : sentence;
 }
 
 function drawFrame(

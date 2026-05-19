@@ -127,4 +127,25 @@ describe('CreasePatternPanel', () => {
     expect(container.textContent).not.toContain('AGRH');
     expect(container.textContent).not.toContain('No crease pattern');
   });
+
+  it('maps the M/V assignment option to mountain and valley fold classes', () => {
+    const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready');
+    const buttons = Array.from(container.querySelectorAll('button'));
+    const rolesButton = buttons.find((button) => button.textContent?.includes('Crease roles'));
+    const mvButton = buttons.find((button) => button.textContent?.includes('M/V assignment'));
+
+    expect(rolesButton?.getAttribute('aria-pressed')).toBe('true');
+    expect(mvButton?.getAttribute('aria-pressed')).toBe('false');
+    expect(container.querySelector('.crease--kind-hinge')).not.toBeNull();
+    expect(container.querySelector('.crease--fold-valley')).toBeNull();
+
+    act(() => {
+      mvButton?.click();
+    });
+
+    expect(useWorkspaceStore.getState().creaseColorMode).toBe('mvf');
+    expect(container.querySelector('.crease--fold-mountain')).not.toBeNull();
+    expect(container.querySelector('.crease--fold-valley')).not.toBeNull();
+    expect(container.querySelector('.crease--kind-hinge')).toBeNull();
+  });
 });

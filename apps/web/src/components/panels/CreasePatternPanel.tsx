@@ -51,13 +51,13 @@ export function CreasePatternPanel() {
               onChange={setMode}
               options={[
                 {
-                  value: 'mvf',
+                  value: 'agrh',
                   label: 'Crease roles',
                   icon: <ScanLine size={13} />,
                   title: 'Color by axial, gusset, ridge, hinge, and pseudohinge roles',
                 },
                 {
-                  value: 'agrh',
+                  value: 'mvf',
                   label: 'M/V assignment',
                   icon: <GitBranch size={13} />,
                   title: 'Color by mountain, valley, flat, and border folds',

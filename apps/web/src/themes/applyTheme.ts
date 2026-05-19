@@ -28,6 +28,17 @@ const TOKEN_VARIABLE_MAP: Array<[keyof ThemeTokens, string]> = [
   ['shadow.contextMenu', '--shadow-context-menu'],
 ];
 
+const MOUNTAIN_VALLEY_COLORS = {
+  dark: {
+    mountain: '#ff4d5d',
+    valley: '#60a5fa',
+  },
+  light: {
+    mountain: '#d91f3a',
+    valley: '#2563eb',
+  },
+} as const;
+
 function colorMix(color: string, amount: number): string {
   return `color-mix(in srgb, ${color} ${amount}%, transparent)`;
 }
@@ -48,8 +59,8 @@ function applyTreeMakerDerivedTokens(theme: TreeMakerTheme, setVar: (name: strin
   setVar('--tree-label', colors['text.primary']);
   setVar('--tree-label-stroke', isLight ? colorMix(colors['bg.primary'], 86) : colorMix(colors['bg.secondary'], 82));
 
-  setVar('--fold-mountain', colors['status.danger']);
-  setVar('--fold-valley', colors['accent.primary']);
+  setVar('--fold-mountain', MOUNTAIN_VALLEY_COLORS[theme.type].mountain);
+  setVar('--fold-valley', MOUNTAIN_VALLEY_COLORS[theme.type].valley);
   setVar('--fold-flat', colorMix(colors['text.primary'], 55));
   setVar('--fold-border', colors['text.primary']);
   setVar('--fold-ridge', colors['status.danger']);

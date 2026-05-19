@@ -35,6 +35,21 @@ describe('themeStore', () => {
     expect(document.documentElement.getAttribute('data-theme-type')).toBe('light');
   });
 
+  it('keeps M/V assignment colors semantic instead of theme-accent driven', () => {
+    const lightTheme = PRESET_THEMES.find((preset) => preset.name === 'GitHub Light');
+    const darkTheme = PRESET_THEMES.find((preset) => preset.name === 'Solarized Dark');
+    expect(lightTheme).toBeDefined();
+    expect(darkTheme).toBeDefined();
+
+    useThemeStore.getState().setTheme(lightTheme ?? DEFAULT_THEME);
+    expect(document.documentElement.style.getPropertyValue('--fold-mountain')).toBe('#d91f3a');
+    expect(document.documentElement.style.getPropertyValue('--fold-valley')).toBe('#2563eb');
+
+    useThemeStore.getState().setTheme(darkTheme ?? DEFAULT_THEME);
+    expect(document.documentElement.style.getPropertyValue('--fold-mountain')).toBe('#ff4d5d');
+    expect(document.documentElement.style.getPropertyValue('--fold-valley')).toBe('#60a5fa');
+  });
+
   it('sets a theme by name and ignores unknown names', () => {
     useThemeStore.getState().setThemeByName('Dracula');
     expect(useThemeStore.getState().currentTheme.name).toBe('Dracula');

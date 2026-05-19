@@ -1,5 +1,6 @@
 import { getFileService, type FileCommand, type FileService } from '../platform/fileService';
 import { useLayoutStore } from '../store/layoutStore';
+import { useSettingsStore } from '../store/settingsStore';
 import { useWorkspaceStore } from '../store/workspaceStore';
 
 export const MENU_ACTION_IDS = [
@@ -8,6 +9,7 @@ export const MENU_ACTION_IDS = [
   'file.open',
   'file.save',
   'file.saveAs',
+  'file.settings',
   'file.exportV4',
   'file.exportFold',
   'file.exportSvg',
@@ -70,6 +72,7 @@ export interface MenuActionDependencies {
   fileService: FileService;
   quit?: () => void;
   about?: () => void;
+  settings?: () => void;
 }
 
 const FILE_ACTIONS: Partial<Record<MenuActionId, FileCommand>> = {
@@ -119,6 +122,9 @@ export function createMenuActionHandler(deps: MenuActionDependencies) {
         return true;
       case 'file.new':
         await deps.workspace.createNewProject();
+        return true;
+      case 'file.settings':
+        deps.settings?.();
         return true;
       case 'edit.undo':
         await deps.workspace.undo();
@@ -188,6 +194,9 @@ export function handleMenuAction(id: string): Promise<boolean> {
     workspace: useWorkspaceStore.getState(),
     layout: useLayoutStore.getState(),
     fileService: getFileService(),
+    settings: () => {
+      useSettingsStore.getState().openSettings();
+    },
     about: () => {
       console.info('TreeMaker web and desktop shell');
     },

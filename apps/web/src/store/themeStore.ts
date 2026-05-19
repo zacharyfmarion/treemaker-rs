@@ -1,8 +1,15 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-import { applyTheme, DEFAULT_THEME, PRESET_THEMES, type TreeMakerTheme } from '../themes';
+import {
+  applyTheme,
+  DEFAULT_DARK_THEME,
+  DEFAULT_LIGHT_THEME,
+  PRESET_THEMES,
+  type TreeMakerTheme,
+} from '../themes';
 
 export const THEME_STORAGE_KEY = 'treemaker-web-theme';
+const LIGHT_SCHEME_QUERY = '(prefers-color-scheme: light)';
 
 function loadSavedThemeName(): string | null {
   if (typeof localStorage === 'undefined') return null;
@@ -22,10 +29,17 @@ function saveThemeName(name: string): void {
   }
 }
 
-function resolveInitialTheme(): TreeMakerTheme {
+export function resolveSystemDefaultTheme(): TreeMakerTheme {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    return DEFAULT_DARK_THEME;
+  }
+  return window.matchMedia(LIGHT_SCHEME_QUERY).matches ? DEFAULT_LIGHT_THEME : DEFAULT_DARK_THEME;
+}
+
+export function resolveInitialTheme(): TreeMakerTheme {
   const savedName = loadSavedThemeName();
-  if (!savedName) return DEFAULT_THEME;
-  return PRESET_THEMES.find((theme) => theme.name === savedName) ?? DEFAULT_THEME;
+  if (!savedName) return resolveSystemDefaultTheme();
+  return PRESET_THEMES.find((theme) => theme.name === savedName) ?? resolveSystemDefaultTheme();
 }
 
 interface ThemeState {

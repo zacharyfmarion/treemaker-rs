@@ -24,12 +24,15 @@ import solarizedLight from './presets/solarized-light.json';
 import synthwave84 from './presets/synthwave-84.json';
 import tokyoNight from './presets/tokyo-night.json';
 
+const oneDarkTheme = oneDark as TreeMakerTheme;
+const atomOneLightTheme = atomOneLight as TreeMakerTheme;
+
 export const PRESET_THEMES: TreeMakerTheme[] = [
   solarizedDark as TreeMakerTheme,
   solarizedLight as TreeMakerTheme,
   monokai as TreeMakerTheme,
   dracula as TreeMakerTheme,
-  oneDark as TreeMakerTheme,
+  oneDarkTheme,
   nord as TreeMakerTheme,
   tokyoNight as TreeMakerTheme,
   catppuccinMocha as TreeMakerTheme,
@@ -47,10 +50,12 @@ export const PRESET_THEMES: TreeMakerTheme[] = [
   shadesOfPurple as TreeMakerTheme,
   githubDark as TreeMakerTheme,
   githubLight as TreeMakerTheme,
-  atomOneLight as TreeMakerTheme,
+  atomOneLightTheme,
 ];
 
-export const DEFAULT_THEME = solarizedDark as TreeMakerTheme;
+export const DEFAULT_DARK_THEME = oneDarkTheme;
+export const DEFAULT_LIGHT_THEME = atomOneLightTheme;
+export const DEFAULT_THEME = DEFAULT_DARK_THEME;
 
 export { applyTheme } from './applyTheme';
 export type { SyntaxColors, ThemeTokens, TreeMakerTheme } from './types';

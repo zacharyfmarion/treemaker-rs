@@ -1164,18 +1164,6 @@
   text-align: center;
 }
 
-.design-empty-state__mark {
-  display: grid;
-  width: 48px;
-  height: 48px;
-  place-items: center;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--bg-primary) 64%, transparent);
-  color: color-mix(in srgb, var(--accent-primary) 78%, var(--text-secondary));
-  box-shadow: 0 12px 36px color-mix(in srgb, var(--shadow-overlay) 28%, transparent);
-}
-
 .design-empty-state__copy {
   display: grid;
   gap: 5px;

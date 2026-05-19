@@ -865,9 +865,6 @@ export function DesignPanel() {
         </TransformWrapper>
         {showEmptyState && (
           <div className="design-empty-state" role="note">
-            <div className="design-empty-state__mark" aria-hidden="true">
-              <Waypoints size={22} />
-            </div>
             <div className="design-empty-state__copy">
               <strong>Sketch the tree behind your design</strong>
               <span>Use branches for the flaps, limbs, and features the folded base needs.</span>

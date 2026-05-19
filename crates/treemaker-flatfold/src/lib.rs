@@ -5,6 +5,11 @@
 //! original Flat-Folder implementation without substituting approximate
 //! algorithms while the port is in progress.
 
+mod avl;
+mod conversion;
+mod math;
+
+use conversion::normalize_document;
 use serde::{Deserialize, Serialize};
 use treemaker_fold::FoldDocument;
 
@@ -24,16 +29,11 @@ pub enum FlatFoldError {
     Unimplemented(&'static str),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PaperSide {
+    #[default]
     Front,
     Back,
-}
-
-impl Default for PaperSide {
-    fn default() -> Self {
-        Self::Front
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -48,15 +48,10 @@ impl Default for SolutionLimit {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub enum EpsilonPolicy {
+    #[default]
     FlatFolderDefault,
-}
-
-impl Default for EpsilonPolicy {
-    fn default() -> Self {
-        Self::FlatFolderDefault
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
@@ -81,21 +76,11 @@ impl Default for AnalyzeOptions {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct SolveOptions {
     pub analyze: AnalyzeOptions,
     pub starting_face: Option<usize>,
     pub solution_limit: SolutionLimit,
-}
-
-impl Default for SolveOptions {
-    fn default() -> Self {
-        Self {
-            analyze: AnalyzeOptions::default(),
-            starting_face: None,
-            solution_limit: SolutionLimit::default(),
-        }
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -138,10 +123,10 @@ pub struct FlatFoldDiagnostic {
 }
 
 pub fn normalize_fold(
-    _document: &FoldDocument,
-    _options: NormalizeOptions,
+    document: &FoldDocument,
+    options: NormalizeOptions,
 ) -> Result<NormalizedFold> {
-    Err(FlatFoldError::Unimplemented("normalize_fold"))
+    normalize_document(document, options)
 }
 
 pub fn analyze_flat_fold(_document: &FoldDocument, _options: AnalyzeOptions) -> Result<Analysis> {
@@ -155,18 +140,15 @@ pub fn solve_flat_fold(_document: &FoldDocument, _options: SolveOptions) -> Resu
 #[cfg(test)]
 mod tests {
     use super::*;
+    use treemaker_fold::Assignment;
 
     fn empty_doc() -> FoldDocument {
         FoldDocument::new(vec![vec![0.0, 0.0]], Vec::new())
     }
 
     #[test]
-    fn unported_stages_return_explicit_unimplemented_errors() {
+    fn unported_analysis_stages_return_explicit_unimplemented_errors() {
         let doc = empty_doc();
-        assert_eq!(
-            normalize_fold(&doc, NormalizeOptions::default()),
-            Err(FlatFoldError::Unimplemented("normalize_fold"))
-        );
         assert_eq!(
             analyze_flat_fold(&doc, AnalyzeOptions::default()),
             Err(FlatFoldError::Unimplemented("analyze_flat_fold"))
@@ -174,6 +156,70 @@ mod tests {
         assert_eq!(
             solve_flat_fold(&doc, SolveOptions::default()),
             Err(FlatFoldError::Unimplemented("solve_flat_fold"))
+        );
+    }
+
+    #[test]
+    fn normalize_defaults_missing_assignments_to_unassigned() {
+        let doc = FoldDocument::new(
+            vec![
+                vec![0.0, 0.0],
+                vec![1.0, 0.0],
+                vec![1.0, 1.0],
+                vec![0.0, 1.0],
+            ],
+            vec![[0, 1], [1, 2], [2, 3], [3, 0]],
+        );
+
+        let normalized = normalize_fold(&doc, NormalizeOptions::default()).unwrap();
+
+        assert_eq!(normalized.document.vertices_coords.len(), 4);
+        assert_eq!(normalized.document.edges_vertices.len(), 4);
+        assert_eq!(normalized.document.faces_vertices.len(), 1);
+        assert_eq!(
+            normalized.document.edges_assignment,
+            vec![Assignment::Boundary; 4]
+        );
+    }
+
+    #[test]
+    fn normalize_flips_faceless_front_side_mountain_valley_assignments() {
+        let mut doc = FoldDocument::new(
+            vec![
+                vec![0.0, 0.0],
+                vec![1.0, 0.0],
+                vec![1.0, 1.0],
+                vec![0.0, 1.0],
+                vec![0.0, 0.5],
+                vec![1.0, 0.5],
+            ],
+            vec![[0, 1], [1, 2], [2, 3], [3, 0], [4, 5]],
+        );
+        doc.edges_assignment = vec![
+            Assignment::Boundary,
+            Assignment::Boundary,
+            Assignment::Boundary,
+            Assignment::Boundary,
+            Assignment::Mountain,
+        ];
+
+        let normalized = normalize_fold(&doc, NormalizeOptions::default()).unwrap();
+
+        assert_eq!(normalized.document.faces_vertices.len(), 2);
+        assert_eq!(
+            normalized
+                .document
+                .edges_assignment
+                .iter()
+                .filter(|assignment| **assignment == Assignment::Valley)
+                .count(),
+            1
+        );
+        assert!(
+            !normalized
+                .document
+                .edges_assignment
+                .contains(&Assignment::Mountain)
         );
     }
 }

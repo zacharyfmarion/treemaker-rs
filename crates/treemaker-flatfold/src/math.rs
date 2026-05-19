@@ -128,3 +128,18 @@ pub(crate) fn encode_order_pair(a: usize, b: usize) -> Vec<u16> {
         encode(&[b, a])
     }
 }
+
+pub(crate) fn decode(key: &[u16]) -> Vec<usize> {
+    let mut out = Vec::new();
+    let mut i = 0usize;
+    while i < key.len() {
+        let mut value = key[i] as usize;
+        if value >= 0x8000 {
+            i += 1;
+            value = ((value - 0x8000) << 16) + key[i] as usize;
+        }
+        out.push(value);
+        i += 1;
+    }
+    out
+}

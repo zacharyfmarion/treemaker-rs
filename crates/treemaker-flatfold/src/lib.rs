@@ -6,6 +6,7 @@
 //! algorithms while the port is in progress.
 
 mod avl;
+mod constraints;
 mod conversion;
 mod math;
 
@@ -363,6 +364,28 @@ mod tests {
         assert_eq!(
             overlap.faces_cells.len(),
             analysis.normalized.document.faces_vertices.len()
+        );
+    }
+
+    #[test]
+    fn constraint_counts_match_flat_folder_kabuto_fixture() {
+        let document: FoldDocument = serde_json::from_str(include_str!(
+            "../../../tests/fixtures/flat-folder/kabuto.fold"
+        ))
+        .unwrap();
+        let analysis = analyze_flat_fold(&document, AnalyzeOptions::default()).unwrap();
+        let constraints = crate::constraints::build_constraint_state(&analysis).unwrap();
+
+        assert_eq!(constraints.variables.len(), 117);
+        assert_eq!(constraints.constraint_counts.taco_taco, 21);
+        assert_eq!(constraints.constraint_counts.taco_tortilla, 88);
+        assert_eq!(constraints.constraint_counts.tortilla_tortilla, 0);
+        assert_eq!(constraints.transitivity_counts.all / 3, 420);
+        assert_eq!(constraints.transitivity_counts.reduced / 3, 284);
+        assert_eq!(constraints.groups.len(), 3);
+        assert_eq!(
+            constraints.groups.iter().map(Vec::len).collect::<Vec<_>>(),
+            vec![81, 18, 18]
         );
     }
 }

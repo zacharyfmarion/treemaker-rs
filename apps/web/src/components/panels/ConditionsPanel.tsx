@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   ChevronRight,
+  FileQuestionMark,
   FileText,
   FlipHorizontal2,
   FolderOpen,
@@ -132,8 +133,12 @@ export function ConditionsPanel() {
           <span className="panel-title">Conditions</span>
         </div>
         <div className="panel-body document-mode-empty">
-          <ScanLine size={18} />
-          <span>Imported crease patterns do not have TreeMaker conditions.</span>
+          <div className="document-mode-empty__icon" aria-hidden="true">
+            <FileQuestionMark size={30} />
+          </div>
+          <span className="document-mode-empty__message">
+            Imported crease patterns do not have TreeMaker conditions.
+          </span>
           <div className="document-mode-empty__actions">
             <Button size="sm" variant="primary" onClick={() => void handleMenuAction('view.creasePattern')}>
               <ScanLine size={14} />

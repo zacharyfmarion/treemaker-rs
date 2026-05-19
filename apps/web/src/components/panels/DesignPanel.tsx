@@ -13,6 +13,7 @@ import {
   Axis3d,
   Circle,
   CircleDot,
+  FileQuestionMark,
   FileText,
   FolderOpen,
   Layers,
@@ -580,11 +581,22 @@ export function DesignPanel() {
     return (
       <section className="panel-shell design-panel">
         <div className="panel-body document-mode-empty">
-          <ScanLine size={18} />
-          <span>
+          <div className="document-mode-empty__icon" aria-hidden="true">
+            <FileQuestionMark size={30} />
+          </div>
+          <span className="document-mode-empty__message">
             {importedCreasePattern
-              ? `${importedCreasePattern.source.filename} is an imported crease pattern without a TreeMaker tree.`
-              : 'This document does not have a TreeMaker tree.'}
+              ? (
+                <>
+                  <span className="document-mode-empty__filename">
+                    {importedCreasePattern.source.filename}
+                  </span>{' '}
+                  is an imported crease pattern without a TreeMaker tree.
+                </>
+              )
+              : (
+                'This document does not have a TreeMaker tree.'
+              )}
           </span>
           <div className="document-mode-empty__actions">
             <Button size="sm" variant="primary" onClick={() => void handleMenuAction('view.creasePattern')}>

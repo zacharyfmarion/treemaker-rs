@@ -522,6 +522,7 @@
   fill: #111417;
 }
 
+.cp-panel__empty,
 .folded-base-panel__empty {
   position: absolute;
   inset: 0;

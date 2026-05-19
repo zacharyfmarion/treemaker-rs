@@ -1,23 +1,31 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Layers3, RefreshCw } from 'lucide-react';
 import type { FoldedBaseSnapshot, FoldedBaseVertex } from '../../engine/types';
+import { getCreasePatternWorkflowState } from '../../lib/workflowAvailability';
 import { useWorkspaceStore } from '../../store/workspaceStore';
-import { Button } from '../ui/Button';
 import { IconButton } from '../ui/IconButton';
+import { CreasePatternWorkflowButton } from './CreasePatternWorkflowButton';
 
 const VIEWBOX = 720;
 const PADDING = 62;
 
 export function FoldedBasePanel() {
   const creaseCount = useWorkspaceStore((state) => state.project.creases.length);
+  const edgeCount = useWorkspaceStore((state) => state.project.edges.length);
+  const status = useWorkspaceStore((state) => state.status);
+  const engineReady = useWorkspaceStore((state) => state.engineReady);
   const foldArtifacts = useWorkspaceStore((state) => state.foldArtifacts);
   const foldArtifactError = useWorkspaceStore((state) => state.foldArtifactError);
   const refreshFoldArtifacts = useWorkspaceStore((state) => state.refreshFoldArtifacts);
-  const buildCreasePattern = useWorkspaceStore((state) => state.buildCreasePattern);
   const [loading, setLoading] = useState(false);
 
   const foldedBase = foldArtifacts?.folded_base ?? null;
   const foldedBaseError = foldArtifacts?.folded_base_error ?? foldArtifactError;
+  const workflowState = getCreasePatternWorkflowState({
+    engineReady,
+    status,
+    edgeCount,
+  });
 
   useEffect(() => {
     if (creaseCount === 0 || foldArtifacts) return;
@@ -33,7 +41,9 @@ export function FoldedBasePanel() {
 
   const statusLabel =
     creaseCount === 0
-      ? 'No crease pattern'
+      ? status === 'building_crease_pattern'
+        ? 'Building crease pattern'
+        : 'No crease pattern'
       : loading
         ? 'Loading'
         : foldedBase
@@ -57,7 +67,7 @@ export function FoldedBasePanel() {
               setLoading(true);
               void refreshFoldArtifacts().finally(() => setLoading(false));
             }}
-            disabled={creaseCount === 0}
+            disabled={creaseCount === 0 || workflowState.isBusy}
           >
             <RefreshCw size={14} />
           </IconButton>
@@ -69,11 +79,7 @@ export function FoldedBasePanel() {
         ) : (
           <div className="folded-base-panel__empty">
             <span title={foldedBaseError ?? undefined}>{statusLabel}</span>
-            {creaseCount === 0 && (
-              <Button size="sm" variant="primary" onClick={() => void buildCreasePattern()}>
-                Build
-              </Button>
-            )}
+            {creaseCount === 0 && <CreasePatternWorkflowButton />}
           </div>
         )}
       </div>

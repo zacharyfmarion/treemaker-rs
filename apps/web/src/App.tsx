@@ -18,6 +18,7 @@ import { IconButton } from './components/ui/IconButton';
 import { Button } from './components/ui/Button';
 import { panelComponents } from './components/panels/PanelComponents';
 import { handleMenuAction } from './commands/menuActions';
+import { getCreasePatternWorkflowState } from './lib/workflowAvailability';
 import { useTauriMenuListener } from './menus/tauriMenuListener';
 import { isDesktopRuntime } from './platform/runtime';
 import { applyWindowTitle, formatWindowTitle } from './platform/windowTitle';
@@ -30,13 +31,11 @@ function Toolbar() {
   const project = useWorkspaceStore((state) => state.project);
   const engineReady = useWorkspaceStore((state) => state.engineReady);
   const isDesktop = isDesktopRuntime();
-  const busy =
-    status === 'loading_engine' ||
-    status === 'optimizing' ||
-    status === 'building_crease_pattern';
-  const canOptimize = engineReady && project.edges.length > 0 && !busy && status !== 'error';
-  const canBuild =
-    engineReady && !busy && (status === 'optimized' || status === 'crease_pattern_ready');
+  const workflowState = getCreasePatternWorkflowState({
+    engineReady,
+    status,
+    edgeCount: project.edges.length,
+  });
 
   return (
     <header className="toolbar">
@@ -48,7 +47,7 @@ function Toolbar() {
           size="sm"
           title="New"
           tooltipSide="bottom"
-          disabled={busy}
+          disabled={workflowState.isBusy}
           onClick={() => void handleMenuAction('file.new')}
         >
           <FilePlus size={15} />
@@ -72,17 +71,19 @@ function Toolbar() {
         <span className="toolbar__separator" />
         <Button
           size="sm"
-          variant="secondary"
-          disabled={!canOptimize}
+          variant={workflowState.canBuildCreasePattern ? 'secondary' : 'primary'}
+          disabled={!workflowState.canOptimizeScale}
+          title={workflowState.optimizeScaleReason}
           onClick={() => void handleMenuAction('optimize.scale')}
         >
           <Sparkles size={14} />
-          Optimize
+          Optimize Scale
         </Button>
         <Button
           size="sm"
-          variant="primary"
-          disabled={!canBuild}
+          variant={workflowState.canBuildCreasePattern ? 'primary' : 'secondary'}
+          disabled={!workflowState.canBuildCreasePattern}
+          title={workflowState.buildCreasePatternReason}
           onClick={() => void handleMenuAction('cp.build')}
         >
           <Play size={14} />

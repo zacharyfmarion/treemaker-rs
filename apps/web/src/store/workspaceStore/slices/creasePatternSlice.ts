@@ -1,6 +1,7 @@
 import { projectFromSnapshot } from '../../../engine/snapshotMapper';
 import type { FoldArtifacts, OptimizationReport } from '../../../engine/types';
 import { DEFAULT_CREASE_COLOR_MODE } from '../../../lib/sampleProject';
+import { getCreasePatternWorkflowState } from '../../../lib/workflowAvailability';
 import { useLayoutStore } from '../../layoutStore';
 import {
   engineError,
@@ -79,6 +80,21 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
     },
 
     buildCreasePattern: async () => {
+      const workflowState = getCreasePatternWorkflowState({
+        engineReady: get().engineReady,
+        status: get().status,
+        edgeCount: get().project.edges.length,
+      });
+      if (!workflowState.canBuildCreasePattern) {
+        set({
+          error: {
+            code: 'invalid_operation',
+            message: workflowState.buildCreasePatternReason,
+          },
+        });
+        return;
+      }
+
       set({ status: 'building_crease_pattern', error: null });
       const checkpoint = await get().beginHistoryCheckpoint();
       try {

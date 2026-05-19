@@ -846,6 +846,21 @@ describe('workspace store slices', () => {
     expect(useWorkspaceStore.getState().creaseColorMode).toBe('mvf');
   });
 
+  it('blocks building a crease pattern before optimization succeeds', async () => {
+    const api = resetStores(seedSnapshot());
+    loadSnapshotIntoStore(seedSnapshot());
+    useWorkspaceStore.setState({ status: 'needs_optimization', error: null });
+
+    await useWorkspaceStore.getState().buildCreasePattern();
+
+    expect(api.buildCreasePattern).not.toHaveBeenCalled();
+    expect(useWorkspaceStore.getState().status).toBe('needs_optimization');
+    expect(useWorkspaceStore.getState().error).toEqual({
+      code: 'invalid_operation',
+      message: 'Optimize Scale before building the crease pattern',
+    });
+  });
+
   it('surfaces engine errors on mutating actions', async () => {
     const api = resetStores(seedSnapshot());
     loadSnapshotIntoStore(seedSnapshot());

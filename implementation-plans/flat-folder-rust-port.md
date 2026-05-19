@@ -23,7 +23,7 @@ small parity-tested stages. Any not-yet-ported stage returns a typed
 
 - [x] Stage 0: Scaffold crate, vendor oracle, and add fixture smoke coverage.
 - [x] Stage 1: Port FOLD normalization and topology inference.
-- [ ] Stage 2: Port geometry and planar arrangement construction.
+- [x] Stage 2: Port geometry and planar arrangement construction.
 - [ ] Stage 3: Port flat folded projection.
 - [ ] Stage 4: Port overlap cell graph construction.
 - [ ] Stage 5: Port layer-order constraint generation.

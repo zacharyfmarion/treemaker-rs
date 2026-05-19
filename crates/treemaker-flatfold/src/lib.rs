@@ -222,4 +222,62 @@ mod tests {
                 .contains(&Assignment::Mountain)
         );
     }
+
+    #[test]
+    fn normalize_splits_crossing_and_vertex_on_segment_lines() {
+        let mut doc = FoldDocument::new(
+            vec![
+                vec![0.0, 0.0],
+                vec![1.0, 0.0],
+                vec![1.0, 1.0],
+                vec![0.0, 1.0],
+                vec![0.0, 0.5],
+                vec![1.0, 0.5],
+                vec![0.5, 0.0],
+                vec![0.5, 1.0],
+            ],
+            vec![[0, 1], [1, 2], [2, 3], [3, 0], [4, 5], [6, 7]],
+        );
+        doc.edges_assignment = vec![
+            Assignment::Boundary,
+            Assignment::Boundary,
+            Assignment::Boundary,
+            Assignment::Boundary,
+            Assignment::Mountain,
+            Assignment::Valley,
+        ];
+
+        let normalized = normalize_fold(&doc, NormalizeOptions::default()).unwrap();
+
+        assert_eq!(normalized.document.vertices_coords.len(), 9);
+        assert_eq!(normalized.document.edges_vertices.len(), 12);
+        assert_eq!(normalized.document.faces_vertices.len(), 4);
+        assert_eq!(
+            normalized
+                .document
+                .edges_assignment
+                .iter()
+                .filter(|assignment| **assignment == Assignment::Boundary)
+                .count(),
+            8
+        );
+        assert_eq!(
+            normalized
+                .document
+                .edges_assignment
+                .iter()
+                .filter(|assignment| **assignment == Assignment::Mountain)
+                .count(),
+            2
+        );
+        assert_eq!(
+            normalized
+                .document
+                .edges_assignment
+                .iter()
+                .filter(|assignment| **assignment == Assignment::Valley)
+                .count(),
+            2
+        );
+    }
 }

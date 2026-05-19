@@ -47,7 +47,7 @@ import {
 } from '../../lib/selection';
 import { paperCenter } from '../../lib/symmetryPresets';
 import {
-  findPairedNodeId,
+  findMirrorNodeId,
   reflectPointAcrossSymmetryAxis,
   snapPointToSymmetryAxis,
   symmetryAxisForProject,
@@ -236,6 +236,7 @@ export function DesignPanel() {
   const project = useWorkspaceStore((state) => state.project);
   const selection = useWorkspaceStore((state) => state.selection);
   const toolMode = useWorkspaceStore((state) => state.toolMode);
+  const symmetryAuthoringPairs = useWorkspaceStore((state) => state.symmetryAuthoringPairs);
   const select = useWorkspaceStore((state) => state.select);
   const addNodeAt = useWorkspaceStore((state) => state.addNodeAt);
   const addNodeWithSymmetry = useWorkspaceStore((state) => state.addNodeWithSymmetry);
@@ -257,13 +258,13 @@ export function DesignPanel() {
     if (!dragging) return undefined;
     const locations = new Map([[dragging.id, dragging.loc]]);
     if (mirrorMode && project.hasSymmetry) {
-      const pairedNode = findPairedNodeId(project, dragging.id);
+      const pairedNode = findMirrorNodeId(project, symmetryAuthoringPairs, dragging.id);
       if (pairedNode) {
         locations.set(pairedNode, reflectPointAcrossSymmetryAxis(dragging.loc, symmetryAxis));
       }
     }
     return locations;
-  }, [dragging, mirrorMode, project, symmetryAxis]);
+  }, [dragging, mirrorMode, project, symmetryAuthoringPairs, symmetryAxis]);
   const worldRect = useMemo(
     () => getDesignWorldRect(project, layers, { nodeLocations }),
     [layers, nodeLocations, project]
@@ -298,7 +299,7 @@ export function DesignPanel() {
     if (!parent) return null;
     const snapped = snapPointToSymmetryAxis(hoverPoint, symmetryAxis);
     const parentSide = symmetrySide(parent.loc, symmetryAxis);
-    const pairedParentId = findPairedNodeId(project, parent.id);
+    const pairedParentId = findMirrorNodeId(project, symmetryAuthoringPairs, parent.id);
     const pairedParent = pairedParentId
       ? project.nodes.find((node) => node.id === pairedParentId)
       : null;
@@ -315,7 +316,7 @@ export function DesignPanel() {
       snapped: snapped.snapped,
       unresolved: !snapped.snapped && parentSide !== 0 && !pairedParent,
     };
-  }, [hoverPoint, mirrorMode, project, selection, symmetryAxis]);
+  }, [hoverPoint, mirrorMode, project, selection, symmetryAuthoringPairs, symmetryAxis]);
 
   const eventToPaper = useCallback(
     (event: PointerEvent): Point => {

@@ -7,7 +7,10 @@ import {
   selectionCoversAllNodes,
 } from '../../../lib/selection';
 import {
-  findPairedNodeId,
+  addSymmetryAuthoringPair,
+  filterSymmetryAuthoringPairs,
+  findMirrorEdgeId,
+  findMirrorNodeId,
   reflectPointAcrossSymmetryAxis,
   snapPointToSymmetryAxis,
   symmetryAxisForProject,
@@ -35,6 +38,7 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
   return {
     selection: { kind: 'tree' },
     toolMode: 'select',
+    symmetryAuthoringPairs: [],
 
     addNodeAt: async (loc, connectTo) => {
       set({ error: null });
@@ -84,10 +88,16 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
         const snapped = snapPointToSymmetryAxis(loc, axis);
         const parent = connectTo === undefined ? null : project.nodes.find((node) => node.id === connectTo);
         const parentSide = parent ? symmetrySide(parent.loc, axis) : 0;
-        const parentPair = parent ? findPairedNodeId(project, parent.id) : null;
+        const parentPair = parent
+          ? findMirrorNodeId(project, get().symmetryAuthoringPairs, parent.id)
+          : null;
         const shouldMirror = Boolean(parent && !snapped.snapped && (parentSide === 0 || parentPair));
         let snapshot: TreeSnapshot | null = null;
         let selection = get().selection;
+        let authoringPairs = get().symmetryAuthoringPairs;
+        if (parent && parentPair) {
+          authoringPairs = addSymmetryAuthoringPair(authoringPairs, parent.id, parentPair);
+        }
 
         const firstReport = await api.applyEdit(treeHandle, {
           type: 'add_node',
@@ -115,6 +125,11 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
           snapshot = secondReport.snapshot;
 
           if (secondReport.created_node) {
+            authoringPairs = addSymmetryAuthoringPair(
+              authoringPairs,
+              firstReport.created_node,
+              secondReport.created_node
+            );
             const conditionReport = await api.applyEdit(treeHandle, {
               type: 'add_condition',
               kind: {
@@ -138,8 +153,10 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
 
         if (!snapshot) return;
         const addedPair = selection.kind === 'multi' && selection.nodes.length === 2;
+        const nextProject = projectFromSnapshot(snapshot, get().project.title);
         set({
-          project: projectFromSnapshot(snapshot, get().project.title),
+          project: nextProject,
+          symmetryAuthoringPairs: filterSymmetryAuthoringPairs(nextProject, authoringPairs),
           selection,
           status: statusAfterEdit(snapshot),
           dirty: true,
@@ -182,7 +199,9 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
 
     moveNodeWithSymmetry: async (id, loc) => {
       const project = get().project;
-      const pairedNode = project.hasSymmetry ? findPairedNodeId(project, id) : null;
+      const pairedNode = project.hasSymmetry
+        ? findMirrorNodeId(project, get().symmetryAuthoringPairs, id)
+        : null;
       if (!pairedNode) {
         await get().moveNode(id, loc);
         return;
@@ -277,17 +296,32 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
         const { api, treeHandle } = await requireActiveTree();
         const edit: TreeEdit = { type: 'update_edge', id, ...update };
         const report = await api.applyEdit(treeHandle, edit);
+        const mirrorEdge = findMirrorEdgeId(get().project, get().symmetryAuthoringPairs, id);
+        const mirrorUpdate = {
+          length: update.length,
+          stiffness: update.stiffness,
+        };
+        const shouldUpdateMirror =
+          mirrorEdge !== null &&
+          (mirrorUpdate.length !== undefined || mirrorUpdate.stiffness !== undefined);
+        const finalReport = shouldUpdateMirror
+          ? await api.applyEdit(treeHandle, {
+              type: 'update_edge',
+              id: mirrorEdge,
+              ...mirrorUpdate,
+            })
+          : report;
         set({
-          project: projectFromSnapshot(report.snapshot, get().project.title),
+          project: projectFromSnapshot(finalReport.snapshot, get().project.title),
           selection: nextSelectionForEdit(edit, report.snapshot),
-          status: statusAfterEdit(report.snapshot),
+          status: statusAfterEdit(finalReport.snapshot),
           dirty: true,
           error: null,
           lastOptimization: null,
           foldArtifacts: null,
           foldArtifactError: null,
         });
-        get().commitHistoryCheckpoint(checkpoint, 'Edit edge');
+        get().commitHistoryCheckpoint(checkpoint, shouldUpdateMirror ? 'Edit mirrored edges' : 'Edit edge');
         void get().autosaveProject();
       } catch (error) {
         set({ status: 'error', error: engineError(error) });

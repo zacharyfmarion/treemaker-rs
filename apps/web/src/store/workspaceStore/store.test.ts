@@ -283,6 +283,32 @@ function deleteNodeFromSnapshot(snapshot: TreeSnapshot, deletedId: number): Tree
   return makeSnapshot({ ...snapshot, nodes, edges, paths });
 }
 
+function refreshMockTopology(snapshot: TreeSnapshot): TreeSnapshot {
+  const degree = new Map(snapshot.nodes.map((node) => [node.id, 0]));
+  for (const edge of snapshot.edges) {
+    degree.set(edge.nodes[0], (degree.get(edge.nodes[0]) ?? 0) + 1);
+    degree.set(edge.nodes[1], (degree.get(edge.nodes[1]) ?? 0) + 1);
+  }
+  const nodes = snapshot.nodes.map((node) => ({
+    ...node,
+    is_leaf: snapshot.nodes.length > 1 && (degree.get(node.id) ?? 0) <= 1,
+  }));
+  const leafIds = new Set(nodes.filter((node) => node.is_leaf).map((node) => node.id));
+  const conditions = snapshot.conditions
+    .filter((condition) => {
+      switch (condition.kind.type) {
+        case 'node_symmetric':
+          return leafIds.has(condition.kind.node);
+        case 'nodes_paired':
+          return leafIds.has(condition.kind.node1) && leafIds.has(condition.kind.node2);
+        default:
+          return true;
+      }
+    })
+    .map((condition, index) => ({ ...condition, index: index + 1 }));
+  return makeSnapshot({ ...snapshot, nodes, conditions });
+}
+
 function createMockEngineApi(initialSnapshot: TreeSnapshot) {
   let snapshotState = cloneSnapshot(initialSnapshot);
   let saveCount = 0;
@@ -375,7 +401,7 @@ function createMockEngineApi(initialSnapshot: TreeSnapshot) {
               })
             );
           }
-          snapshotState = makeSnapshot({ ...snapshotState, nodes, edges });
+          snapshotState = refreshMockTopology(makeSnapshot({ ...snapshotState, nodes, edges }));
           break;
         }
         case 'move_node':
@@ -387,7 +413,7 @@ function createMockEngineApi(initialSnapshot: TreeSnapshot) {
           });
           break;
         case 'delete_node':
-          snapshotState = deleteNodeFromSnapshot(snapshotState, edit.id);
+          snapshotState = refreshMockTopology(deleteNodeFromSnapshot(snapshotState, edit.id));
           break;
         case 'update_node_label':
           snapshotState = makeSnapshot({
@@ -399,7 +425,7 @@ function createMockEngineApi(initialSnapshot: TreeSnapshot) {
           break;
         case 'add_edge':
           createdEdge = nextId(snapshotState.edges);
-          snapshotState = makeSnapshot({
+          snapshotState = refreshMockTopology(makeSnapshot({
             ...snapshotState,
             edges: [
               ...snapshotState.edges,
@@ -408,13 +434,13 @@ function createMockEngineApi(initialSnapshot: TreeSnapshot) {
                 length: edit.length ?? 1,
               }),
             ],
-          });
+          }));
           break;
         case 'delete_edge':
-          snapshotState = makeSnapshot({
+          snapshotState = refreshMockTopology(makeSnapshot({
             ...snapshotState,
             edges: snapshotState.edges.filter((edge) => edge.id !== edit.id),
-          });
+          }));
           break;
         case 'update_edge':
           snapshotState = makeSnapshot({
@@ -532,6 +558,7 @@ function loadSnapshotIntoStore(snapshot: TreeSnapshot, title = 'Seed project') {
     historyBusy: false,
     selection: { kind: 'tree' },
     toolMode: 'select',
+    symmetryAuthoringPairs: [],
     clipboard: null,
     clipboardPasteCount: 0,
     creaseColorMode: DEFAULT_CREASE_COLOR_MODE,
@@ -595,6 +622,7 @@ describe('workspace store slices', () => {
     expect(state.status).toBe('loading_engine');
     expect(state.selection).toEqual({ kind: 'tree' });
     expect(state.toolMode).toBe('select');
+    expect(state.symmetryAuthoringPairs).toEqual([]);
     expect(state.creaseColorMode).toBe(DEFAULT_CREASE_COLOR_MODE);
     expect(state.foldArtifacts).toBeNull();
     expect(state.designViewportFitRequestId).toBe(0);
@@ -811,6 +839,51 @@ describe('workspace store slices', () => {
     expect(useWorkspaceStore.getState().historyPast[0].label).toBe('Add mirrored branch');
   });
 
+  it('keeps internal mirror links after branching from a mirrored leaf', async () => {
+    const api = resetStores(
+      makeSnapshot({
+        paper: { has_symmetry: true },
+        nodes: [
+          nodeSnapshot(1, { x: 0.5, y: 0.5 }, { label: 'axis', is_leaf: false }),
+          nodeSnapshot(2, { x: 0.28, y: 0.5 }),
+          nodeSnapshot(3, { x: 0.72, y: 0.5 }),
+        ],
+        edges: [edgeSnapshot(1, [1, 2]), edgeSnapshot(2, [1, 3])],
+        conditions: [
+          conditionSnapshot(1, { type: 'nodes_paired', node1: 2, node2: 3 }),
+        ],
+      })
+    );
+    loadSnapshotIntoStore(api.snapshotState);
+
+    await useWorkspaceStore.getState().addNodeWithSymmetry({ x: 0.16, y: 0.7 }, 2);
+
+    expect(useWorkspaceStore.getState().project.conditions.map((condition) => condition.kind)).toEqual([
+      { type: 'nodes_paired', node1: 4, node2: 5 },
+    ]);
+    expect(useWorkspaceStore.getState().symmetryAuthoringPairs).toEqual([
+      { node1: 2, node2: 3 },
+      { node1: 4, node2: 5 },
+    ]);
+
+    await useWorkspaceStore.getState().addNodeWithSymmetry({ x: 0.14, y: 0.3 }, 2);
+
+    const nodeLocs = useWorkspaceStore.getState().project.nodes.map((node) => node.loc);
+    expect(nodeLocs).toHaveLength(7);
+    expect(nodeLocs[0]).toEqual({ x: 0.5, y: 0.5 });
+    expect(nodeLocs[1]).toEqual({ x: 0.28, y: 0.5 });
+    expect(nodeLocs[2]).toEqual({ x: 0.72, y: 0.5 });
+    expect(nodeLocs[3]).toEqual({ x: 0.16, y: 0.7 });
+    expect(nodeLocs[4]).toEqual({ x: 0.84, y: 0.7 });
+    expect(nodeLocs[5]).toEqual({ x: 0.14, y: 0.3 });
+    expect(nodeLocs[6]?.x).toBeCloseTo(0.86);
+    expect(nodeLocs[6]?.y).toBeCloseTo(0.3);
+    expect(useWorkspaceStore.getState().project.conditions.map((condition) => condition.kind)).toEqual([
+      { type: 'nodes_paired', node1: 4, node2: 5 },
+      { type: 'nodes_paired', node1: 6, node2: 7 },
+    ]);
+  });
+
   it('draws an axial segment once in symmetry mode', async () => {
     const api = resetStores(
       makeSnapshot({
@@ -891,6 +964,33 @@ describe('workspace store slices', () => {
     });
     expect(useWorkspaceStore.getState().historyPast).toHaveLength(1);
     expect(useWorkspaceStore.getState().historyPast[0].label).toBe('Move mirrored nodes');
+  });
+
+  it('updates mirrored flap edge lengths together', async () => {
+    const api = resetStores(
+      makeSnapshot({
+        paper: { has_symmetry: true },
+        nodes: [
+          nodeSnapshot(1, { x: 0.5, y: 0.5 }, { label: 'root', is_leaf: false }),
+          nodeSnapshot(2, { x: 0.2, y: 0.3 }),
+          nodeSnapshot(3, { x: 0.8, y: 0.3 }),
+        ],
+        edges: [edgeSnapshot(1, [1, 2]), edgeSnapshot(2, [1, 3])],
+        conditions: [
+          conditionSnapshot(1, { type: 'nodes_paired', node1: 2, node2: 3 }),
+        ],
+      })
+    );
+    loadSnapshotIntoStore(api.snapshotState);
+
+    await useWorkspaceStore.getState().updateEdge(1, { length: 2.5 });
+
+    expect(useWorkspaceStore.getState().project.edges.map((edge) => edge.length)).toEqual([
+      2.5,
+      2.5,
+    ]);
+    expect(useWorkspaceStore.getState().historyPast).toHaveLength(1);
+    expect(useWorkspaceStore.getState().historyPast[0].label).toBe('Edit mirrored edges');
   });
 
   it('deletes a selected design node from the canonical engine snapshot', async () => {

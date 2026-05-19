@@ -14,7 +14,10 @@ import type {
   ToolMode,
   TreeProject,
 } from '../../lib/sampleProject';
-import type { SymmetryLeafPreview } from '../../lib/symmetryAuthoring';
+import type {
+  SymmetryAuthoringPair,
+  SymmetryLeafPreview,
+} from '../../lib/symmetryAuthoring';
 import type { FileService } from '../../platform/fileService';
 
 export interface RecentProject {
@@ -88,6 +91,7 @@ export type HistorySlice = HistorySliceState & HistorySliceActions;
 export interface EditingSliceState {
   selection: Selection;
   toolMode: ToolMode;
+  symmetryAuthoringPairs: SymmetryAuthoringPair[];
 }
 
 export interface EditingSliceActions {

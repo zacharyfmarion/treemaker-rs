@@ -73,6 +73,18 @@ describe('HelpModal', () => {
     expect(useHelpStore.getState().activeModal).toBe('about');
     expect(rendered.textContent).toContain('Robert J. Lang and TreeMaker 5.0.1');
     expect(rendered.textContent).toContain('Jason S. Ku and Flat-Folder');
+    expect(rendered.textContent).not.toContain('http://127.0.0.1:5275/');
+
+    const links = Array.from(rendered.querySelectorAll('.about-modal__ack')).map((link) => ({
+      href: link.getAttribute('href'),
+      target: link.getAttribute('target'),
+    }));
+    expect(links).toEqual([
+      { href: 'https://langorigami.com/article/treemaker/', target: '_blank' },
+      { href: 'https://github.com/origamimagiro/flat-folder', target: '_blank' },
+      { href: 'https://github.com/edemaine/fold', target: '_blank' },
+      { href: 'https://github.com/zacharyfmarion/treemaker-rs', target: '_blank' },
+    ]);
 
     act(() => {
       findButton('Help').click();

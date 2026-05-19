@@ -2,6 +2,7 @@ import { useEffect, type ReactElement, type ReactNode } from 'react';
 import {
   BookOpen,
   CircleHelp,
+  ExternalLink,
   FileText,
   Info,
   LayoutDashboard,
@@ -154,23 +155,27 @@ const HELP_TOPICS: HelpTopic[] = [
 const ACKNOWLEDGEMENTS = [
   {
     title: 'Robert J. Lang and TreeMaker 5.0.1',
+    href: 'https://langorigami.com/article/treemaker/',
     detail:
       "TreeMaker's original model code and behavior are the canonical reference for this Rust, WebAssembly, and desktop port.",
   },
   {
     title: 'Jason S. Ku and Flat-Folder',
+    href: 'https://github.com/origamimagiro/flat-folder',
     detail:
       'The flat-folding analysis path is validated against the vendored Flat-Folder implementation by Jason S. Ku, also known as origamimagiro.',
   },
   {
     title: 'FOLD and origami software references',
+    href: 'https://github.com/edemaine/fold',
     detail:
       'The app reads and exports crease-pattern data using community file-format conventions and compares behavior against redistributable fixtures.',
   },
   {
-    title: 'Open-source app stack',
+    title: 'treemaker-rs',
+    href: 'https://github.com/zacharyfmarion/treemaker-rs',
     detail:
-      'Rust, WebAssembly, React, Vite, Tauri, Dockview, Zustand, and lucide-react make the shared browser and desktop surface possible.',
+      'This open-source Rust, WebAssembly, React, Vite, Tauri, Dockview, Zustand, and lucide-react app is developed in this repository.',
   },
 ];
 
@@ -336,29 +341,21 @@ function AboutModal() {
         <h3>Acknowledgements</h3>
         <div className="about-modal__ack-list">
           {ACKNOWLEDGEMENTS.map((item) => (
-            <article key={item.title} className="about-modal__ack">
-              <strong>{item.title}</strong>
+            <a
+              key={item.title}
+              className="about-modal__ack"
+              href={item.href}
+              target="_blank"
+              rel="noreferrer noopener"
+            >
+              <strong>
+                {item.title}
+                <ExternalLink size={13} aria-hidden="true" />
+              </strong>
               <p>{item.detail}</p>
-            </article>
+            </a>
           ))}
         </div>
-      </section>
-      <section className="about-modal__section">
-        <h3>Project Notes</h3>
-        <dl className="about-modal__facts">
-          <div>
-            <dt>Engine reference</dt>
-            <dd>TreeMaker 5.0.1 with ALM optimizer parity as the public baseline.</dd>
-          </div>
-          <div>
-            <dt>Runtime surfaces</dt>
-            <dd>Shared React web app plus a thin Tauri desktop shell.</dd>
-          </div>
-          <div>
-            <dt>Primary formats</dt>
-            <dd>TreeMaker .tmd, .tmd4, .tmd5 plus FOLD, SVG, and PNG exports.</dd>
-          </div>
-        </dl>
       </section>
     </ModalShell>
   );

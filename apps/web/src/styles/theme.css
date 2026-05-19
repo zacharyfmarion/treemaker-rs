@@ -841,19 +841,23 @@
   overflow: auto;
 }
 
+.help-modal__document--guide .help-modal__body {
+  overflow: hidden;
+}
+
 .help-guide {
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr);
-  min-height: 100%;
+  height: 100%;
+  min-height: 0;
 }
 
 .help-guide__toc {
-  position: sticky;
-  top: 0;
   display: grid;
   align-content: start;
   gap: 1px;
-  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
   padding: var(--space-3) 0;
   border-right: 1px solid var(--border-default);
   background: var(--bg-primary);
@@ -886,6 +890,8 @@
   display: grid;
   gap: var(--space-4);
   min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
   padding: var(--space-4);
 }
 
@@ -1010,14 +1016,34 @@
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   background: var(--bg-primary);
+  text-decoration: none;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.about-modal__ack:hover,
+.about-modal__ack:focus-visible {
+  border-color: var(--accent-primary);
+  background: var(--bg-elevated);
+  outline: none;
 }
 
 .about-modal__ack strong,
 .about-modal__facts dt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
   color: var(--text-primary);
   font-size: 0.78rem;
   font-weight: 750;
   letter-spacing: 0;
+}
+
+.about-modal__ack strong svg {
+  flex: 0 0 auto;
+  color: var(--text-tertiary);
 }
 
 .about-modal__facts {
@@ -1062,10 +1088,10 @@
 
   .help-guide {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
   }
 
   .help-guide__toc {
-    position: static;
     display: flex;
     gap: var(--space-1);
     height: auto;

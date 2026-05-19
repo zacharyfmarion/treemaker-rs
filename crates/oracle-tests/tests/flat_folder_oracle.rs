@@ -5,7 +5,7 @@ use std::process::Command;
 
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use treemaker_flatfold::{NormalizeOptions, normalize_fold};
+use treemaker_flatfold::{NormalizeOptions, SolveOptions, normalize_fold, solve_flat_fold};
 use treemaker_fold::{Assignment, FoldDocument};
 
 mod support;
@@ -56,6 +56,66 @@ fn flat_folder_normalization_matches_js_oracle_when_enabled() {
             .unwrap_or_else(|| panic!("{fixture}: missing overlap graph"));
         assert_overlap_record(overlap, &record, fixture);
     }
+}
+
+#[test]
+fn flat_folder_solver_matches_js_oracle_when_enabled() {
+    let Some(mut oracle) = env::var_os("FLATFOLDER_ORACLE").map(PathBuf::from) else {
+        eprintln!("skipping Flat-Folder solver oracle parity; set FLATFOLDER_ORACLE to enable");
+        return;
+    };
+    let root = repo_root();
+    if oracle.is_relative() {
+        oracle = root.join(oracle);
+    }
+    let path = root.join("tests/fixtures/flat-folder/kabuto.fold");
+    let record = run_flat_folder_oracle(&oracle, &root, "solve", &path);
+    assert_eq!(record["status"].as_str(), Some("ok"), "kabuto.fold");
+    let text =
+        std::fs::read_to_string(&path).unwrap_or_else(|err| panic!("{}: {err}", path.display()));
+    let document: FoldDocument =
+        serde_json::from_str(&text).unwrap_or_else(|err| panic!("{}: {err}", path.display()));
+    let solved = solve_flat_fold(&document, SolveOptions::default())
+        .unwrap_or_else(|err| panic!("{}: {err}", path.display()));
+
+    assert_constraint_record(&solved.constraints, &record, "kabuto.fold");
+    let solve = &record["solve"];
+    assert_eq!(
+        solved.component_sizes,
+        solve["component_sizes"]
+            .as_array()
+            .expect("component_sizes")
+            .iter()
+            .map(|value| value.as_u64().expect("component size") as usize)
+            .collect::<Vec<_>>(),
+        "kabuto.fold component_sizes"
+    );
+    assert_eq!(
+        solved.solution_counts,
+        solve["solution_counts"]
+            .as_array()
+            .expect("solution_counts")
+            .iter()
+            .map(|value| value.as_u64().expect("solution count") as usize)
+            .collect::<Vec<_>>(),
+        "kabuto.fold solution_counts"
+    );
+    assert_eq!(
+        solved.states,
+        solve["states"].as_str().expect("states"),
+        "kabuto.fold states"
+    );
+    assert_eq!(
+        solved.face_orders.len(),
+        solve["face_orders"].as_u64().expect("face_orders") as usize,
+        "kabuto.fold face_orders"
+    );
+    assert_hash(
+        &solved.face_orders,
+        solve,
+        "face_orders_hash",
+        "kabuto.fold",
+    );
 }
 
 fn assert_overlap_record(
@@ -140,6 +200,48 @@ fn assert_semantic_cells_match(
         expected.sort_unstable();
         assert_eq!(mapped_rust, expected, "{fixture}: segment {segment_index}");
     }
+}
+
+fn assert_constraint_record(
+    constraints: &treemaker_flatfold::ConstraintSummary,
+    record: &Value,
+    fixture: &str,
+) {
+    let expected = &record["constraints"];
+    assert_eq!(
+        constraints.variables,
+        expected["variables"].as_u64().expect("variables") as usize,
+        "{fixture} variables"
+    );
+    assert_eq!(
+        constraints.taco_taco,
+        expected["taco_taco"].as_u64().expect("taco_taco") as usize,
+        "{fixture} taco_taco"
+    );
+    assert_eq!(
+        constraints.taco_tortilla,
+        expected["taco_tortilla"].as_u64().expect("taco_tortilla") as usize,
+        "{fixture} taco_tortilla"
+    );
+    assert_eq!(
+        constraints.tortilla_tortilla,
+        expected["tortilla_tortilla"]
+            .as_u64()
+            .expect("tortilla_tortilla") as usize,
+        "{fixture} tortilla_tortilla"
+    );
+    assert_eq!(
+        constraints.transitivity,
+        expected["transitivity"].as_u64().expect("transitivity") as usize,
+        "{fixture} transitivity"
+    );
+    assert_eq!(
+        constraints.reduced_transitivity,
+        expected["reduced_transitivity"]
+            .as_u64()
+            .expect("reduced_transitivity") as usize,
+        "{fixture} reduced_transitivity"
+    );
 }
 
 fn assert_project_record(

@@ -114,10 +114,22 @@ pub struct OverlapGraph {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SolveResult {
     pub analysis: Analysis,
+    pub constraints: ConstraintSummary,
     pub component_sizes: Vec<usize>,
     pub solution_counts: Vec<usize>,
-    pub face_orders: Vec<[usize; 3]>,
+    pub states: String,
+    pub face_orders: Vec<[i64; 3]>,
     pub diagnostics: Vec<FlatFoldDiagnostic>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ConstraintSummary {
+    pub variables: usize,
+    pub taco_taco: usize,
+    pub taco_tortilla: usize,
+    pub tortilla_tortilla: usize,
+    pub transitivity: usize,
+    pub reduced_transitivity: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -150,8 +162,27 @@ pub fn analyze_flat_fold(document: &FoldDocument, options: AnalyzeOptions) -> Re
     })
 }
 
-pub fn solve_flat_fold(_document: &FoldDocument, _options: SolveOptions) -> Result<SolveResult> {
-    Err(FlatFoldError::Unimplemented("solve_flat_fold"))
+pub fn solve_flat_fold(document: &FoldDocument, options: SolveOptions) -> Result<SolveResult> {
+    if let Some(starting_face) = options.starting_face
+        && starting_face != 0
+    {
+        return Err(FlatFoldError::Unimplemented("custom starting_face"));
+    }
+    let mut analyze_options = options.analyze;
+    analyze_options.include_overlap_graph = true;
+    let analysis = analyze_flat_fold(document, analyze_options)?;
+    let constraints = constraints::build_constraint_state(&analysis)?;
+    let solution =
+        constraints::solve_constraint_state(&analysis, &constraints, &options.solution_limit)?;
+    Ok(SolveResult {
+        analysis,
+        constraints: constraints.summary(),
+        component_sizes: solution.component_sizes,
+        solution_counts: solution.solution_counts,
+        states: solution.states,
+        face_orders: solution.face_orders,
+        diagnostics: Vec::new(),
+    })
 }
 
 #[cfg(test)]
@@ -172,12 +203,15 @@ mod tests {
     }
 
     #[test]
-    fn unported_analysis_stages_return_explicit_unimplemented_errors() {
+    fn solve_boundary_square_has_empty_face_orders() {
         let doc = square_doc();
-        assert_eq!(
-            solve_flat_fold(&doc, SolveOptions::default()),
-            Err(FlatFoldError::Unimplemented("solve_flat_fold"))
-        );
+        let solved = solve_flat_fold(&doc, SolveOptions::default()).unwrap();
+
+        assert_eq!(solved.constraints.variables, 0);
+        assert_eq!(solved.component_sizes, vec![0]);
+        assert_eq!(solved.solution_counts, vec![1]);
+        assert_eq!(solved.states, "1");
+        assert!(solved.face_orders.is_empty());
     }
 
     #[test]
@@ -387,5 +421,20 @@ mod tests {
             constraints.groups.iter().map(Vec::len).collect::<Vec<_>>(),
             vec![81, 18, 18]
         );
+    }
+
+    #[test]
+    fn solve_matches_flat_folder_kabuto_fixture_counts() {
+        let document: FoldDocument = serde_json::from_str(include_str!(
+            "../../../tests/fixtures/flat-folder/kabuto.fold"
+        ))
+        .unwrap();
+        let solved = solve_flat_fold(&document, SolveOptions::default()).unwrap();
+
+        assert_eq!(solved.constraints.variables, 117);
+        assert_eq!(solved.component_sizes, vec![81, 18, 18]);
+        assert_eq!(solved.solution_counts, vec![1, 3, 3]);
+        assert_eq!(solved.states, "9");
+        assert_eq!(solved.face_orders.len(), 117);
     }
 }

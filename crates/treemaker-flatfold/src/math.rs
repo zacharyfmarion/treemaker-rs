@@ -143,3 +143,35 @@ pub(crate) fn decode(key: &[u16]) -> Vec<usize> {
     }
     out
 }
+
+pub(crate) fn bit_encode(assignments: &[u8]) -> Vec<u16> {
+    let packed = assignments
+        .chunks(8)
+        .map(|chunk| {
+            chunk
+                .iter()
+                .enumerate()
+                .fold(0usize, |byte, (offset, assignment)| {
+                    debug_assert!((*assignment == 1) || (*assignment == 2));
+                    byte | (((assignment - 1) as usize) << offset)
+                })
+        })
+        .collect::<Vec<_>>();
+    encode(&packed)
+}
+
+pub(crate) fn bit_decode(key: &[u16], len: usize) -> Vec<u8> {
+    if len == 0 {
+        return Vec::new();
+    }
+    let mut out = Vec::with_capacity(len);
+    for byte in decode(key) {
+        for offset in 0..8 {
+            out.push(((byte >> offset) as u8 & 1) + 1);
+            if out.len() == len {
+                return out;
+            }
+        }
+    }
+    out
+}

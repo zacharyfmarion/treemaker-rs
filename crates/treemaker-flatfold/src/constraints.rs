@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::math;
-use crate::{Analysis, FlatFoldError, Result};
+use crate::{Analysis, ConstraintSummary, FlatFoldError, Result, SolutionLimit};
 use treemaker_fold::Assignment;
 
 type Key = Vec<u16>;
@@ -36,6 +36,27 @@ pub(crate) struct ConstraintState {
     pub groups: Vec<Vec<usize>>,
     pub constraint_counts: ConstraintCounts,
     pub transitivity_counts: TransitivityCounts,
+}
+
+impl ConstraintState {
+    pub(crate) fn summary(&self) -> ConstraintSummary {
+        ConstraintSummary {
+            variables: self.variables.len(),
+            taco_taco: self.constraint_counts.taco_taco,
+            taco_tortilla: self.constraint_counts.taco_tortilla,
+            tortilla_tortilla: self.constraint_counts.tortilla_tortilla,
+            transitivity: self.transitivity_counts.all / 3,
+            reduced_transitivity: self.transitivity_counts.reduced / 3,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ConstraintSolution {
+    pub component_sizes: Vec<usize>,
+    pub solution_counts: Vec<usize>,
+    pub states: String,
+    pub face_orders: Vec<[i64; 3]>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -123,13 +144,68 @@ pub(crate) fn build_constraint_state(analysis: &Analysis) -> Result<ConstraintSt
     })
 }
 
+pub(crate) fn solve_constraint_state(
+    analysis: &Analysis,
+    state: &ConstraintState,
+    limit: &SolutionLimit,
+) -> Result<ConstraintSolution> {
+    let limit = match limit {
+        SolutionLimit::All => usize::MAX,
+        SolutionLimit::Count(0) => {
+            return Err(FlatFoldError::InvalidInput(
+                "solution limit must be positive".to_string(),
+            ));
+        }
+        SolutionLimit::Count(limit) => *limit,
+    };
+    let overlap = analysis
+        .overlap
+        .as_ref()
+        .ok_or(FlatFoldError::Unimplemented("overlap graph"))?;
+    let implications = ImplicationMaps::build();
+    let mut group_solutions = Vec::with_capacity(state.groups.len());
+    let assigned_orders = state.groups.first().map_or_else(Vec::new, |group| {
+        group
+            .iter()
+            .map(|variable| state.assignments[*variable])
+            .collect::<Vec<_>>()
+    });
+    group_solutions.push(vec![math::bit_encode(&assigned_orders)]);
+    for (component, group) in state.groups.iter().enumerate().skip(1) {
+        let mut assignments = state.assignments.clone();
+        let solutions = guess_vars(
+            group,
+            state,
+            &overlap.faces_cells,
+            &overlap.cells_faces,
+            &implications,
+            &mut assignments,
+            limit,
+        )?;
+        if solutions.is_empty() {
+            return Err(FlatFoldError::UnsatisfiedComponent(format!(
+                "component {component} has no valid assignments"
+            )));
+        }
+        group_solutions.push(solutions);
+    }
+    let solution_counts = group_solutions.iter().map(Vec::len).collect::<Vec<_>>();
+    let face_orders = first_solution_face_orders(state, &group_solutions, &analysis.faces_flip)?;
+    Ok(ConstraintSolution {
+        component_sizes: state.groups.iter().map(Vec::len).collect(),
+        states: product_decimal(&solution_counts),
+        solution_counts,
+        face_orders,
+    })
+}
+
 fn build_variables(
     edges_faces: &[Vec<usize>],
     segments_points: &[[usize; 2]],
     segments_edges: &[Vec<usize>],
     cells_points: &[Vec<usize>],
     cells_faces: &[Vec<usize>],
-    segments_cells: &[Vec<usize>],
+    _segments_cells: &[Vec<usize>],
 ) -> Vec<Key> {
     let mut segment_faces = BTreeMap::new();
     for (segment_index, segment) in segments_points.iter().copied().enumerate() {
@@ -181,22 +257,21 @@ fn build_variables(
             if let Some(neighbor) = cell_from_directed_segment
                 .get(&math::encode(&[v1, *v2]))
                 .copied()
+                && !seen.contains(&neighbor)
             {
-                if !seen.contains(&neighbor) {
-                    queue.push(neighbor);
-                    seen.insert(neighbor);
-                    let source = &cells_face_sets[cell_index];
-                    let target = &cells_face_sets[neighbor];
-                    let key = math::encode_order_pair(v1, *v2);
-                    if let Some(boundary_faces) = segment_faces.get(&key) {
-                        for face in boundary_faces {
-                            if source.contains(face) || !target.contains(face) {
-                                continue;
-                            }
-                            for other in target {
-                                if face != other {
-                                    variables.insert(math::encode_order_pair(*face, *other));
-                                }
+                queue.push(neighbor);
+                seen.insert(neighbor);
+                let source = &cells_face_sets[cell_index];
+                let target = &cells_face_sets[neighbor];
+                let key = math::encode_order_pair(v1, *v2);
+                if let Some(boundary_faces) = segment_faces.get(&key) {
+                    for face in boundary_faces {
+                        if source.contains(face) || !target.contains(face) {
+                            continue;
+                        }
+                        for other in target {
+                            if face != other {
+                                variables.insert(math::encode_order_pair(*face, *other));
                             }
                         }
                     }
@@ -575,11 +650,12 @@ fn variable_groups(
                     }
                     for pair in pairs_for_type(constraint_type, &constraint_faces) {
                         let key = math::encode_order_pair(pair[0], pair[1]);
-                        if let Some(next_variable) = variable_index.get(&key).copied() {
-                            if !seen.contains(&next_variable) && assignments[next_variable] == 0 {
-                                stack.push(next_variable);
-                                seen.insert(next_variable);
-                            }
+                        if let Some(next_variable) = variable_index.get(&key).copied()
+                            && !seen.contains(&next_variable)
+                            && assignments[next_variable] == 0
+                        {
+                            stack.push(next_variable);
+                            seen.insert(next_variable);
                         }
                     }
                 }
@@ -594,6 +670,7 @@ fn variable_groups(
     with_assigned
 }
 
+#[allow(clippy::too_many_arguments)]
 fn unpack_constraints(
     constraint_type: usize,
     buckets: &ConstraintBuckets,
@@ -808,6 +885,225 @@ impl ImplicationMaps {
             other => other,
         })
     }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn propagate_assignment(
+    variable: usize,
+    assignment: u8,
+    state: &ConstraintState,
+    faces_cells: &[Vec<usize>],
+    cells_faces: &[Vec<usize>],
+    implications: &ImplicationMaps,
+    assignments: &mut [u8],
+) -> Result<Vec<usize>> {
+    let mut assigned = vec![variable];
+    assignments[variable] = assignment;
+    let mut next = 0usize;
+    while next < assigned.len() {
+        let current = assigned[next];
+        next += 1;
+        let faces = math::decode(&state.variables[current]);
+        let buckets = &state.constraints[current];
+        for constraint_type in TYPES {
+            let mut transitivity_counts = TransitivityCounts::default();
+            let constraints_for_type = unpack_constraints(
+                constraint_type,
+                buckets,
+                faces[0],
+                faces[1],
+                faces_cells,
+                cells_faces,
+                &state.connected_components,
+                &mut transitivity_counts,
+            );
+            for constraint_faces in constraints_for_type {
+                match implications.infer(
+                    constraint_type,
+                    &constraint_faces,
+                    &state.variable_index,
+                    assignments,
+                )? {
+                    Inference::Conflict => {
+                        for variable in assigned {
+                            assignments[variable] = 0;
+                        }
+                        return Ok(Vec::new());
+                    }
+                    Inference::Alive | Inference::Dead => {}
+                    Inference::Implied(implied) => {
+                        for (implied_variable, implied_assignment) in implied {
+                            match assignments[implied_variable] {
+                                0 => {
+                                    assigned.push(implied_variable);
+                                    assignments[implied_variable] = implied_assignment;
+                                }
+                                existing if existing == implied_assignment => {}
+                                _ => {
+                                    for variable in assigned {
+                                        assignments[variable] = 0;
+                                    }
+                                    return Ok(Vec::new());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Ok(assigned)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn guess_vars(
+    group: &[usize],
+    state: &ConstraintState,
+    faces_cells: &[Vec<usize>],
+    cells_faces: &[Vec<usize>],
+    implications: &ImplicationMaps,
+    assignments: &mut [u8],
+    limit: usize,
+) -> Result<Vec<Key>> {
+    let mut guesses: Vec<Vec<usize>> = Vec::new();
+    let mut solutions = Vec::new();
+    let mut solution = vec![0u8; group.len()];
+    let mut index = 0usize;
+    let mut backtracking = false;
+    loop {
+        if backtracking {
+            let Some(guess) = guesses.pop() else {
+                break;
+            };
+            let previous_assignment = assignments[guess[0]];
+            while index >= group.len() || group[index] != guess[0] {
+                if index == 0 {
+                    return Err(FlatFoldError::PrecisionFailure(
+                        "solver backtracking index escaped component".to_string(),
+                    ));
+                }
+                index -= 1;
+            }
+            for variable in &guess {
+                assignments[*variable] = 0;
+            }
+            if previous_assignment == 1 {
+                let assigned = propagate_assignment(
+                    group[index],
+                    2,
+                    state,
+                    faces_cells,
+                    cells_faces,
+                    implications,
+                    assignments,
+                )?;
+                if assigned.is_empty() {
+                    guesses.push(vec![group[index]]);
+                    assignments[group[index]] = 2;
+                } else {
+                    guesses.push(assigned);
+                    backtracking = false;
+                    index += 1;
+                }
+            }
+        } else if index == group.len() {
+            for (solution_index, variable) in group.iter().enumerate() {
+                solution[solution_index] = assignments[*variable];
+            }
+            solutions.push(math::bit_encode(&solution));
+            if solutions.len() >= limit {
+                return Ok(solutions);
+            }
+            backtracking = true;
+        } else {
+            if assignments[group[index]] == 0 {
+                let assigned = propagate_assignment(
+                    group[index],
+                    1,
+                    state,
+                    faces_cells,
+                    cells_faces,
+                    implications,
+                    assignments,
+                )?;
+                if assigned.is_empty() {
+                    guesses.push(vec![group[index]]);
+                    assignments[group[index]] = 1;
+                    backtracking = true;
+                } else {
+                    guesses.push(assigned);
+                }
+            }
+            index += 1;
+        }
+    }
+    Ok(solutions)
+}
+
+fn first_solution_face_orders(
+    state: &ConstraintState,
+    group_solutions: &[Vec<Key>],
+    faces_flip: &[bool],
+) -> Result<Vec<[i64; 3]>> {
+    let mut edges = Vec::new();
+    for (group_index, group) in state.groups.iter().enumerate() {
+        let Some(first_solution) = group_solutions
+            .get(group_index)
+            .and_then(|solutions| solutions.first())
+        else {
+            return Err(FlatFoldError::UnsatisfiedComponent(format!(
+                "component {group_index} has no first solution"
+            )));
+        };
+        let orders = math::bit_decode(first_solution, group.len());
+        for (offset, variable) in group.iter().enumerate() {
+            let faces = math::decode(&state.variables[*variable]);
+            if faces.len() != 2 {
+                return Err(FlatFoldError::InvalidInput(
+                    "face-order variable does not contain exactly two faces".to_string(),
+                ));
+            }
+            let edge = if orders[offset] == 1 {
+                math::encode(&[faces[0], faces[1]])
+            } else {
+                math::encode(&[faces[1], faces[0]])
+            };
+            edges.push(edge);
+        }
+    }
+    let mut face_orders = Vec::with_capacity(edges.len());
+    for edge in edges {
+        let faces = math::decode(&edge);
+        let orientation = if faces_flip[faces[1]] { 1 } else { -1 };
+        face_orders.push([faces[0] as i64, faces[1] as i64, orientation]);
+    }
+    Ok(face_orders)
+}
+
+fn product_decimal(counts: &[usize]) -> String {
+    counts.iter().fold("1".to_string(), |product, count| {
+        multiply_decimal(&product, *count)
+    })
+}
+
+fn multiply_decimal(value: &str, factor: usize) -> String {
+    if factor == 0 {
+        return "0".to_string();
+    }
+    let mut carry = 0u128;
+    let factor = factor as u128;
+    let mut digits = Vec::new();
+    for byte in value.bytes().rev() {
+        let digit = u128::from(byte - b'0');
+        let product = digit * factor + carry;
+        digits.push(char::from(b'0' + (product % 10) as u8));
+        carry = product / 10;
+    }
+    while carry > 0 {
+        digits.push(char::from(b'0' + (carry % 10) as u8));
+        carry /= 10;
+    }
+    digits.iter().rev().collect()
 }
 
 fn tuple_key(values: &[u8]) -> String {

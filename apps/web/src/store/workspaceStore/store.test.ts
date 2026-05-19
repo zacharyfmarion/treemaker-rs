@@ -611,6 +611,8 @@ describe('workspace store slices', () => {
     expect(state.updatePaper).toBeTypeOf('function');
     expect(state.addCondition).toBeTypeOf('function');
     expect(state.addNodeAt).toBeTypeOf('function');
+    expect(state.addNodeWithSymmetry).toBeTypeOf('function');
+    expect(state.previewSymmetryLeafPairs).toBeTypeOf('function');
     expect(state.optimizeEdges).toBeTypeOf('function');
     expect(state.buildCreasePattern).toBeTypeOf('function');
   });
@@ -779,6 +781,116 @@ describe('workspace store slices', () => {
     await useWorkspaceStore.getState().deleteSelection();
     expect(useWorkspaceStore.getState().project.nodes).toEqual([]);
     expect(useWorkspaceStore.getState().projectMessage).toBe('Cleared design');
+  });
+
+  it('creates mirrored branches from an axial parent in one history entry', async () => {
+    const api = resetStores(
+      makeSnapshot({
+        paper: { has_symmetry: true },
+        nodes: [nodeSnapshot(1, { x: 0.5, y: 0.5 }, { label: 'axis', is_leaf: false })],
+      })
+    );
+    loadSnapshotIntoStore(api.snapshotState);
+
+    await useWorkspaceStore.getState().addNodeWithSymmetry({ x: 0.25, y: 0.72 }, 1);
+
+    expect(useWorkspaceStore.getState().project.nodes.map((node) => node.loc)).toEqual([
+      { x: 0.5, y: 0.5 },
+      { x: 0.25, y: 0.72 },
+      { x: 0.75, y: 0.72 },
+    ]);
+    expect(useWorkspaceStore.getState().project.edges.map((edge) => edge.nodes)).toEqual([
+      [1, 2],
+      [1, 3],
+    ]);
+    expect(useWorkspaceStore.getState().project.conditions.map((condition) => condition.kind)).toEqual([
+      { type: 'nodes_paired', node1: 2, node2: 3 },
+    ]);
+    expect(useWorkspaceStore.getState().selection).toMatchObject({ kind: 'multi', nodes: [2, 3] });
+    expect(useWorkspaceStore.getState().historyPast).toHaveLength(1);
+    expect(useWorkspaceStore.getState().historyPast[0].label).toBe('Add mirrored branch');
+  });
+
+  it('draws an axial segment once in symmetry mode', async () => {
+    const api = resetStores(
+      makeSnapshot({
+        paper: { has_symmetry: true },
+        nodes: [nodeSnapshot(1, { x: 0.5, y: 0.5 }, { label: 'axis', is_leaf: false })],
+      })
+    );
+    loadSnapshotIntoStore(api.snapshotState);
+
+    await useWorkspaceStore.getState().addNodeWithSymmetry({ x: 0.506, y: 0.72 }, 1);
+
+    expect(useWorkspaceStore.getState().project.nodes).toHaveLength(2);
+    expect(useWorkspaceStore.getState().project.nodes[1].loc.x).toBeCloseTo(0.5);
+    expect(useWorkspaceStore.getState().project.nodes[1].loc.y).toBeCloseTo(0.72);
+    expect(useWorkspaceStore.getState().project.edges.map((edge) => edge.nodes)).toEqual([[1, 2]]);
+    expect(useWorkspaceStore.getState().project.conditions).toEqual([]);
+    expect(useWorkspaceStore.getState().projectMessage).toBe('Added axial node');
+  });
+
+  it('applies symmetry leaf pairs and skips duplicate conditions', async () => {
+    const api = resetStores(
+      makeSnapshot({
+        paper: { has_symmetry: true },
+        nodes: [
+          nodeSnapshot(1, { x: 0.5, y: 0.5 }, { label: 'root', is_leaf: false }),
+          nodeSnapshot(2, { x: 0.2, y: 0.25 }),
+          nodeSnapshot(3, { x: 0.8, y: 0.25 }),
+          nodeSnapshot(4, { x: 0.25, y: 0.75 }),
+          nodeSnapshot(5, { x: 0.75, y: 0.75 }),
+          nodeSnapshot(6, { x: 0.504, y: 0.9 }),
+        ],
+        conditions: [
+          conditionSnapshot(1, { type: 'nodes_paired', node1: 2, node2: 3 }),
+        ],
+      })
+    );
+    loadSnapshotIntoStore(api.snapshotState);
+
+    const preview = useWorkspaceStore.getState().previewSymmetryLeafPairs();
+    expect(preview.pairs).toEqual([{ node1: 4, node2: 5, distance: 0 }]);
+    expect(preview.onAxis.map((item) => item.node)).toEqual([6]);
+
+    await useWorkspaceStore.getState().applySymmetryLeafPairs();
+
+    expect(useWorkspaceStore.getState().project.conditions.map((condition) => condition.kind)).toEqual([
+      { type: 'nodes_paired', node1: 2, node2: 3 },
+      { type: 'nodes_paired', node1: 4, node2: 5 },
+      { type: 'node_symmetric', node: 6 },
+    ]);
+    expect(useWorkspaceStore.getState().historyPast.at(-1)?.label).toBe('Apply symmetry pairs');
+  });
+
+  it('moves paired leaf nodes together in one history entry', async () => {
+    const api = resetStores(
+      makeSnapshot({
+        paper: { has_symmetry: true },
+        nodes: [
+          nodeSnapshot(1, { x: 0.5, y: 0.5 }, { label: 'root', is_leaf: false }),
+          nodeSnapshot(2, { x: 0.2, y: 0.25 }),
+          nodeSnapshot(3, { x: 0.8, y: 0.25 }),
+        ],
+        conditions: [
+          conditionSnapshot(1, { type: 'nodes_paired', node1: 2, node2: 3 }),
+        ],
+      })
+    );
+    loadSnapshotIntoStore(api.snapshotState);
+
+    await useWorkspaceStore.getState().moveNodeWithSymmetry(2, { x: 0.3, y: 0.4 });
+
+    expect(useWorkspaceStore.getState().project.nodes.find((node) => node.id === 2)?.loc).toEqual({
+      x: 0.3,
+      y: 0.4,
+    });
+    expect(useWorkspaceStore.getState().project.nodes.find((node) => node.id === 3)?.loc).toEqual({
+      x: 0.7,
+      y: 0.4,
+    });
+    expect(useWorkspaceStore.getState().historyPast).toHaveLength(1);
+    expect(useWorkspaceStore.getState().historyPast[0].label).toBe('Move mirrored nodes');
   });
 
   it('deletes a selected design node from the canonical engine snapshot', async () => {

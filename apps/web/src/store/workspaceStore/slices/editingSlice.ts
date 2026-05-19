@@ -7,6 +7,13 @@ import {
   selectionCoversAllNodes,
 } from '../../../lib/selection';
 import {
+  findPairedNodeId,
+  reflectPointAcrossSymmetryAxis,
+  snapPointToSymmetryAxis,
+  symmetryAxisForProject,
+  symmetrySide,
+} from '../../../lib/symmetryAuthoring';
+import {
   createBlankTree,
   engineError,
   ensureTreeHandle,
@@ -62,6 +69,93 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
       }
     },
 
+    addNodeWithSymmetry: async (loc, connectTo) => {
+      const project = get().project;
+      if (!project.hasSymmetry) {
+        await get().addNodeAt(loc, connectTo);
+        return;
+      }
+
+      set({ error: null });
+      const checkpoint = await get().beginHistoryCheckpoint();
+      try {
+        const { api, treeHandle } = await requireActiveTree();
+        const axis = symmetryAxisForProject(project);
+        const snapped = snapPointToSymmetryAxis(loc, axis);
+        const parent = connectTo === undefined ? null : project.nodes.find((node) => node.id === connectTo);
+        const parentSide = parent ? symmetrySide(parent.loc, axis) : 0;
+        const parentPair = parent ? findPairedNodeId(project, parent.id) : null;
+        const shouldMirror = Boolean(parent && !snapped.snapped && (parentSide === 0 || parentPair));
+        let snapshot: TreeSnapshot | null = null;
+        let selection = get().selection;
+
+        const firstReport = await api.applyEdit(treeHandle, {
+          type: 'add_node',
+          loc: snapped.point,
+          connect_to: connectTo,
+          edge_length: connectTo === undefined ? undefined : 1,
+        });
+        snapshot = firstReport.snapshot;
+        selection = nextSelectionForEdit(
+          { type: 'add_node', loc: snapped.point, connect_to: connectTo },
+          snapshot,
+          firstReport.created_node,
+          firstReport.created_edge
+        );
+
+        if (shouldMirror && firstReport.created_node) {
+          const mirroredLoc = reflectPointAcrossSymmetryAxis(snapped.point, axis);
+          const mirroredParent = parentSide === 0 ? connectTo : parentPair ?? undefined;
+          const secondReport = await api.applyEdit(treeHandle, {
+            type: 'add_node',
+            loc: mirroredLoc,
+            connect_to: mirroredParent,
+            edge_length: mirroredParent === undefined ? undefined : 1,
+          });
+          snapshot = secondReport.snapshot;
+
+          if (secondReport.created_node) {
+            const conditionReport = await api.applyEdit(treeHandle, {
+              type: 'add_condition',
+              kind: {
+                type: 'nodes_paired',
+                node1: firstReport.created_node,
+                node2: secondReport.created_node,
+              },
+            });
+            snapshot = conditionReport.snapshot;
+            selection = {
+              kind: 'multi',
+              nodes: [firstReport.created_node, secondReport.created_node].sort((a, b) => a - b),
+              edges: [],
+              paths: [],
+              creases: [],
+              facets: [],
+              conditions: [],
+            };
+          }
+        }
+
+        if (!snapshot) return;
+        const addedPair = selection.kind === 'multi' && selection.nodes.length === 2;
+        set({
+          project: projectFromSnapshot(snapshot, get().project.title),
+          selection,
+          status: statusAfterEdit(snapshot),
+          dirty: true,
+          error: null,
+          lastOptimization: null,
+          foldArtifacts: null,
+          foldArtifactError: null,
+          projectMessage: addedPair ? 'Added mirrored branch' : snapped.snapped ? 'Added axial node' : null,
+        });
+        get().commitHistoryCheckpoint(checkpoint, addedPair ? 'Add mirrored branch' : 'Add node');
+        void get().autosaveProject();
+      } catch (error) {
+        set({ status: 'error', error: engineError(error) });
+      }
+    },
+
     moveNode: async (id, loc) => {
       set({ error: null });
       const checkpoint = await get().beginHistoryCheckpoint();
@@ -80,6 +174,43 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
           foldArtifactError: null,
         });
         get().commitHistoryCheckpoint(checkpoint, 'Move node');
+        void get().autosaveProject();
+      } catch (error) {
+        set({ status: 'error', error: engineError(error) });
+      }
+    },
+
+    moveNodeWithSymmetry: async (id, loc) => {
+      const project = get().project;
+      const pairedNode = project.hasSymmetry ? findPairedNodeId(project, id) : null;
+      if (!pairedNode) {
+        await get().moveNode(id, loc);
+        return;
+      }
+
+      set({ error: null });
+      const checkpoint = await get().beginHistoryCheckpoint();
+      try {
+        const { api, treeHandle } = await requireActiveTree();
+        const axis = symmetryAxisForProject(project);
+        const edit: TreeEdit = { type: 'move_node', id, loc };
+        const primaryReport = await api.applyEdit(treeHandle, edit);
+        const pairedReport = await api.applyEdit(treeHandle, {
+          type: 'move_node',
+          id: pairedNode,
+          loc: reflectPointAcrossSymmetryAxis(loc, axis),
+        });
+        set({
+          project: projectFromSnapshot(pairedReport.snapshot, get().project.title),
+          selection: nextSelectionForEdit(edit, primaryReport.snapshot),
+          status: statusAfterEdit(pairedReport.snapshot),
+          dirty: true,
+          error: null,
+          lastOptimization: null,
+          foldArtifacts: null,
+          foldArtifactError: null,
+        });
+        get().commitHistoryCheckpoint(checkpoint, 'Move mirrored nodes');
         void get().autosaveProject();
       } catch (error) {
         set({ status: 'error', error: engineError(error) });

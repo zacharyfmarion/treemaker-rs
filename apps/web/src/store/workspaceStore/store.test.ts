@@ -110,6 +110,7 @@ function pathSnapshot(id: number, nodes: [number, number]): PathSnapshot {
     is_active: true,
     is_feasible: true,
     is_border: false,
+    is_polygon: false,
     is_conditioned: false,
   };
 }

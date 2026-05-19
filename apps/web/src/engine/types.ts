@@ -147,6 +147,7 @@ export interface PathSnapshot {
   is_active: boolean;
   is_feasible: boolean;
   is_border: boolean;
+  is_polygon: boolean;
   is_conditioned: boolean;
 }
 

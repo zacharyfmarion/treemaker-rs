@@ -104,9 +104,11 @@ export function InspectorPanel() {
           <>
             <div className="inspector-heading"><Waypoints size={15} /> Path {selectedPath.id}</div>
             <Row label="Nodes" value={selectedPath.nodes.join(' -> ')} />
+            <Row label="Leaf" value={selectedPath.isLeaf ? 'Yes' : 'No'} />
             <Row label="Active" value={selectedPath.isActive ? 'Yes' : 'No'} />
             <Row label="Feasible" value={selectedPath.isFeasible ? 'Yes' : 'No'} />
             <Row label="Border" value={selectedPath.isBorder ? 'Yes' : 'No'} />
+            <Row label="Polygon" value={selectedPath.isPolygon ? 'Yes' : 'No'} />
             <Row label="Conditioned" value={selectedPath.isConditioned ? 'Yes' : 'No'} />
           </>
         )}

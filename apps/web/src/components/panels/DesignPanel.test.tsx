@@ -1,7 +1,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createSampleProject, type TreeProject } from '../../lib/sampleProject';
+import { createEmptyProject, createSampleProject, type TreeProject } from '../../lib/sampleProject';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { TooltipProvider } from '../ui/Tooltip';
 import { DesignPanel } from './DesignPanel';
@@ -106,6 +106,19 @@ afterEach(() => {
 });
 
 describe('DesignPanel', () => {
+  it('shows a subtle nudge when the design tree is empty', () => {
+    renderPanel(createEmptyProject());
+
+    expect(container?.textContent).toContain('Sketch the tree behind your design');
+    expect(container?.textContent).toContain('Use branches for the flaps, limbs, and features');
+  });
+
+  it('hides the empty nudge once the design has nodes', () => {
+    renderPanel();
+
+    expect(container?.textContent).not.toContain('Sketch the tree behind your design');
+  });
+
   it('fits the paper viewport after scale optimization requests a design fit', () => {
     renderPanel();
     const project = useWorkspaceStore.getState().project;

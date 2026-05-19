@@ -1152,6 +1152,50 @@
   user-select: none;
 }
 
+.design-empty-state {
+  position: absolute;
+  inset: var(--space-6);
+  z-index: 6;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--space-3);
+  pointer-events: none;
+  text-align: center;
+}
+
+.design-empty-state__mark {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--bg-primary) 64%, transparent);
+  color: color-mix(in srgb, var(--accent-primary) 78%, var(--text-secondary));
+  box-shadow: 0 12px 36px color-mix(in srgb, var(--shadow-overlay) 28%, transparent);
+}
+
+.design-empty-state__copy {
+  display: grid;
+  gap: 5px;
+  max-width: min(340px, 78vw);
+}
+
+.design-empty-state__copy strong {
+  color: color-mix(in srgb, var(--text-primary) 86%, transparent);
+  font-size: 0.88rem;
+  font-weight: 750;
+  letter-spacing: 0;
+}
+
+.design-empty-state__copy span {
+  color: color-mix(in srgb, var(--text-secondary) 78%, transparent);
+  font-size: 0.76rem;
+  font-weight: 550;
+  line-height: 1.42;
+}
+
 .simulator-panel__body {
   min-height: 0;
 }

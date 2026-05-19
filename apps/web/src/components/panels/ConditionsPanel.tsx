@@ -1,5 +1,17 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { ChevronRight, FlipHorizontal2, Link2, LockKeyhole, Plus, Ruler, Trash2 } from 'lucide-react';
+import {
+  ChevronRight,
+  FileText,
+  FlipHorizontal2,
+  FolderOpen,
+  Link2,
+  LockKeyhole,
+  Plus,
+  Ruler,
+  ScanLine,
+  Trash2,
+} from 'lucide-react';
+import { handleMenuAction } from '../../commands/menuActions';
 import type { ConditionKind } from '../../engine/types';
 import { conditionDetail, conditionTitle } from '../../lib/conditionLabels';
 import {
@@ -17,11 +29,13 @@ import {
   selectedNodeIds,
 } from '../../lib/selection';
 import { useWorkspaceStore } from '../../store/workspaceStore';
+import { Button } from '../ui/Button';
 import { IconButton } from '../ui/IconButton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/Select';
 
 export function ConditionsPanel() {
   const project = useWorkspaceStore((state) => state.project);
+  const documentMode = useWorkspaceStore((state) => state.documentMode);
   const selection = useWorkspaceStore((state) => state.selection);
   const select = useWorkspaceStore((state) => state.select);
   const updatePaper = useWorkspaceStore((state) => state.updatePaper);
@@ -110,6 +124,34 @@ export function ConditionsPanel() {
     setSymmetryModeOverride('custom');
     void setSymmetry({ hasSymmetry: true, ...update });
   };
+
+  if (documentMode === 'crease-pattern') {
+    return (
+      <section className="panel-shell conditions-panel">
+        <div className="panel-toolbar">
+          <span className="panel-title">Conditions</span>
+        </div>
+        <div className="panel-body document-mode-empty">
+          <ScanLine size={18} />
+          <span>Imported crease patterns do not have TreeMaker conditions.</span>
+          <div className="document-mode-empty__actions">
+            <Button size="sm" variant="primary" onClick={() => void handleMenuAction('view.creasePattern')}>
+              <ScanLine size={14} />
+              View CP
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => void handleMenuAction('file.new')}>
+              <FileText size={14} />
+              New Tree
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => void handleMenuAction('file.open')}>
+              <FolderOpen size={14} />
+              Open
+            </Button>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="panel-shell conditions-panel">

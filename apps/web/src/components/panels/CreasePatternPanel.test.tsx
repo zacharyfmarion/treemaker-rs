@@ -15,7 +15,11 @@ import { CreasePatternPanel } from './CreasePatternPanel';
 let root: Root | null = null;
 let container: HTMLDivElement | null = null;
 
-function renderPanel(project: TreeProject, status: AppStatus) {
+function renderPanel(
+  project: TreeProject,
+  status: AppStatus,
+  state: Partial<ReturnType<typeof useWorkspaceStore.getState>> = {}
+) {
   const buildCreasePattern = vi.fn(async () => undefined);
   const optimizeScale = vi.fn(async () => undefined);
   useWorkspaceStore.setState(
@@ -26,6 +30,7 @@ function renderPanel(project: TreeProject, status: AppStatus) {
       engineReady: true,
       optimizeScale,
       buildCreasePattern,
+      ...state,
     },
     true
   );
@@ -147,5 +152,22 @@ describe('CreasePatternPanel', () => {
     expect(container.querySelector('.crease--fold-mountain')).not.toBeNull();
     expect(container.querySelector('.crease--fold-valley')).not.toBeNull();
     expect(container.querySelector('.crease--kind-hinge')).toBeNull();
+  });
+
+  it('does not show tree workflow actions for imported CP-only empty states', () => {
+    const project = {
+      ...createSampleProject(),
+      edges: [],
+      creases: [],
+      facets: [],
+    };
+    const { container } = renderPanel(project, 'crease_pattern_ready', {
+      documentMode: 'crease-pattern',
+      importedCreasePattern: null,
+    });
+
+    expect(container.textContent).toContain('No imported crease pattern');
+    expect(container.textContent).not.toContain('Optimize Scale');
+    expect(container.textContent).not.toContain('Build CP');
   });
 });

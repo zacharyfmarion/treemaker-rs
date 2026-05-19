@@ -30,11 +30,11 @@ import {
   nextSimulatorOrbitView,
   type SimulatorOrbitView as SimulatorView,
 } from '../../lib/simulatorOrbit';
-import { getCreasePatternWorkflowState } from '../../lib/workflowAvailability';
 import { useWorkspaceStore } from '../../store/workspaceStore';
+import { useWorkspaceCapabilities } from '../../store/workspaceStore/useWorkspaceCapabilities';
 import { IconButton } from '../ui/IconButton';
 import { SegmentedControl } from '../ui/SegmentedControl';
-import { CreasePatternWorkflowButton } from './CreasePatternWorkflowButton';
+import { NextDocumentAction } from './NextDocumentAction';
 
 type LoadState = 'idle' | 'loading' | 'ready' | 'empty' | 'error';
 type SimulatorRenderMode = 'paper' | 'xray';
@@ -90,12 +90,10 @@ export function SimulatorPanel() {
   const foldPercentRef = useRef(INITIAL_FOLD_PERCENT);
 
   const creaseCount = useWorkspaceStore((state) => state.project.creases.length);
-  const edgeCount = useWorkspaceStore((state) => state.project.edges.length);
-  const status = useWorkspaceStore((state) => state.status);
-  const engineReady = useWorkspaceStore((state) => state.engineReady);
   const foldArtifacts = useWorkspaceStore((state) => state.foldArtifacts);
   const foldArtifactError = useWorkspaceStore((state) => state.foldArtifactError);
   const refreshFoldArtifacts = useWorkspaceStore((state) => state.refreshFoldArtifacts);
+  const capabilities = useWorkspaceCapabilities();
 
   const [foldPercent, setFoldPercent] = useState(INITIAL_FOLD_PERCENT);
   const [playing, setPlaying] = useState(false);
@@ -105,11 +103,7 @@ export function SimulatorPanel() {
   const [strain, setStrain] = useState(0);
   const [modelStats, setModelStats] = useState({ vertices: 0, triangles: 0 });
   const [viewSettings, setViewSettings] = useState<SimulatorViewSettings>(DEFAULT_VIEW_SETTINGS);
-  const workflowState = getCreasePatternWorkflowState({
-    engineReady,
-    status,
-    edgeCount,
-  });
+  const refreshCapability = capabilities['simulator.refresh'];
 
   const drawCurrentFrame = useCallback(() => {
     const canvas = canvasRef.current;
@@ -482,7 +476,7 @@ export function SimulatorPanel() {
           <div className="simulator-panel__empty">
             <span title={loadState === 'error' ? errorDetail : undefined}>{statusLabel}</span>
             {loadState === 'error' && <small>{errorDetail}</small>}
-            {loadState === 'empty' && <CreasePatternWorkflowButton />}
+            {loadState === 'empty' && <NextDocumentAction />}
           </div>
         )}
       </div>
@@ -499,7 +493,7 @@ export function SimulatorPanel() {
               setModelError(null);
               void refreshFoldArtifacts();
             }}
-            disabled={creaseCount === 0 || workflowState.isBusy}
+            disabled={!refreshCapability.enabled}
           >
             <RefreshCw size={14} />
           </IconButton>

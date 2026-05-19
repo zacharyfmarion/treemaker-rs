@@ -28,7 +28,7 @@ function esc(value: string): string {
 
 export function serializeCreasePatternSvg(
   project: TreeProject,
-  mode: CreaseColorMode = 'mvf'
+  mode: CreaseColorMode = 'agrh'
 ): string {
   const paperWidth = project.paper.width || 1;
   const paperHeight = project.paper.height || 1;
@@ -64,7 +64,7 @@ export function serializeCreasePatternSvg(
     .map((crease) => {
       const a = point(crease.vertices[0]);
       const b = point(crease.vertices[1]);
-      const style = mode === 'agrh' ? KIND_STYLES[crease.kind] : FOLD_STYLES[crease.fold];
+      const style = mode === 'mvf' ? KIND_STYLES[crease.kind] : FOLD_STYLES[crease.fold];
       return `  <line x1="${a.x.toFixed(3)}" y1="${a.y.toFixed(3)}" x2="${b.x.toFixed(3)}" y2="${b.y.toFixed(3)}" style="${style};fill:none;stroke-linecap:round"/>`;
     })
     .join('\n');
@@ -85,7 +85,7 @@ export function serializeCreasePatternSvg(
 
 export async function renderCreasePatternPng(
   project: TreeProject,
-  mode: CreaseColorMode = 'mvf'
+  mode: CreaseColorMode = 'agrh'
 ): Promise<Uint8Array> {
   const svg = serializeCreasePatternSvg(project, mode);
   const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });

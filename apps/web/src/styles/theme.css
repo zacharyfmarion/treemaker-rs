@@ -910,6 +910,34 @@
   text-align: center;
 }
 
+.panel-subtitle {
+  flex: 0 0 auto;
+  padding: 4px var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-tertiary);
+  font-size: 0.68rem;
+  font-weight: 650;
+}
+
+.document-mode-empty {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 650;
+  text-align: center;
+}
+
+.document-mode-empty__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
 .simulator-controls {
   display: grid;
   grid-template-columns: auto minmax(220px, 1fr) auto;

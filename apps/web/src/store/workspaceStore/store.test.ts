@@ -543,6 +543,8 @@ function configureEngine(api: TestEngineApi) {
 function loadSnapshotIntoStore(snapshot: TreeSnapshot, title = 'Seed project') {
   useWorkspaceStore.setState({
     project: projectFromSnapshot(snapshot, title),
+    documentMode: 'tree',
+    importedCreasePattern: null,
     projectLoadId: useWorkspaceStore.getState().projectLoadId + 1,
     currentFileName: 'seed.tmd5',
     currentFilePath: null,
@@ -619,6 +621,8 @@ describe('workspace store slices', () => {
     const state = useWorkspaceStore.getState();
 
     expect(state.project.nodes).toEqual([]);
+    expect(state.documentMode).toBe('tree');
+    expect(state.importedCreasePattern).toBeNull();
     expect(state.status).toBe('loading_engine');
     expect(state.selection).toEqual({ kind: 'tree' });
     expect(state.toolMode).toBe('select');
@@ -632,6 +636,7 @@ describe('workspace store slices', () => {
     expect(state.currentFileName).toBe('Untitled.tmd5');
     expect(state.createNewProject).toBeTypeOf('function');
     expect(state.openProject).toBeTypeOf('function');
+    expect(state.loadCreasePatternText).toBeTypeOf('function');
     expect(state.saveProject).toBeTypeOf('function');
     expect(state.exportFold).toBeTypeOf('function');
     expect(state.undo).toBeTypeOf('function');
@@ -679,8 +684,8 @@ describe('workspace store slices', () => {
 
     await expect(useWorkspaceStore.getState().openProject(fileService)).resolves.toBe(true);
     expect(fileService.openTextFile).toHaveBeenCalledWith({
-      title: 'Open TreeMaker Project',
-      extensions: ['tmd', 'tmd4', 'tmd5'],
+      title: 'Open TreeMaker Project or Crease Pattern',
+      extensions: ['tmd', 'tmd4', 'tmd5', 'fold', 'cp'],
     });
 
     await expect(useWorkspaceStore.getState().saveProject(fileService)).resolves.toBe(true);
@@ -735,6 +740,48 @@ describe('workspace store slices', () => {
 
     useWorkspaceStore.getState().clearProjectMessage();
     expect(useWorkspaceStore.getState().projectMessage).toBeNull();
+  });
+
+  it('loads CP-only documents and gates tree-only persistence', async () => {
+    resetStores(seedSnapshot());
+    loadSnapshotIntoStore(seedSnapshot());
+    const activatePanel = vi.fn();
+    useLayoutStore.setState({ activatePanel });
+    const fileService = createFileService({
+      text: [
+        '1 0 0 1 0',
+        '1 1 0 1 1',
+        '1 1 1 0 1',
+        '1 0 1 0 0',
+        '2 0 0 1 1',
+      ].join('\n'),
+      name: 'square.cp',
+      path: '/tmp/square.cp',
+    });
+
+    await expect(useWorkspaceStore.getState().openProject(fileService)).resolves.toBe(true);
+
+    expect(useWorkspaceStore.getState()).toMatchObject({
+      documentMode: 'crease-pattern',
+      currentFileName: 'square.cp',
+      currentFilePath: '/tmp/square.cp',
+      dirty: false,
+      status: 'crease_pattern_ready',
+    });
+    expect(useWorkspaceStore.getState().importedCreasePattern?.source.format).toBe('cp');
+    expect(useWorkspaceStore.getState().project.creases.length).toBeGreaterThan(0);
+    expect(useWorkspaceStore.getState().project.facets.length).toBeGreaterThan(0);
+    expect(activatePanel).toHaveBeenCalledWith('crease-pattern');
+
+    await expect(useWorkspaceStore.getState().saveProject(fileService)).resolves.toBe(false);
+    expect(useWorkspaceStore.getState().error?.message).toBe(
+      'Imported crease patterns are exported, not saved as TreeMaker projects'
+    );
+
+    await expect(useWorkspaceStore.getState().exportFold(fileService)).resolves.toBe(true);
+    expect(fileService.saveTextFile).toHaveBeenLastCalledWith(
+      expect.objectContaining({ title: 'Export FOLD Document', extensions: ['fold'] })
+    );
   });
 
   it('applies editing and condition actions through the engine', async () => {

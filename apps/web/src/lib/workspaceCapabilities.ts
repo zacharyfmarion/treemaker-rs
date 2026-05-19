@@ -71,6 +71,8 @@ export function getWorkspaceCapabilities(input: WorkspaceCapabilityInput): Works
   const canExportImportedFold = creasePatternMode && input.hasImportedCreasePattern;
   const canExportCreasePattern = hasCreasePattern && !isBusy;
   const hasSelection = selectionHasEditableParts(input.selection);
+  const buildLabel = hasCreasePattern ? 'Rebuild CP' : 'Build CP';
+  const buildReason = hasCreasePattern ? 'Rebuild crease pattern' : 'Build crease pattern';
 
   return {
     'file.new': capability(!isBusy, 'New', isBusy ? busyReason(input.status) : 'Create a new TreeMaker project'),
@@ -176,12 +178,8 @@ export function getWorkspaceCapabilities(input: WorkspaceCapabilityInput): Works
     'cp.build': commandCapability(
       canBuild,
       treeMode,
-      input.status === 'crease_pattern_ready' ? 'Rebuild CP' : 'Build CP',
-      canBuild
-        ? input.status === 'crease_pattern_ready'
-          ? 'Rebuild crease pattern'
-          : 'Build crease pattern'
-        : disabledBuildReason(input, isBusy, hasTreeEdges)
+      buildLabel,
+      canBuild ? buildReason : disabledBuildReason(input, isBusy, hasTreeEdges)
     ),
     'simulator.refresh': capability(
       treeMode && hasCreasePattern && !isBusy,

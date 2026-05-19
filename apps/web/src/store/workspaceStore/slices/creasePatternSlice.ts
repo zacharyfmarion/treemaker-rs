@@ -115,13 +115,36 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
       try {
         const { api, treeHandle } = await requireActiveTree();
         const snapshot = await api.buildCreasePattern(treeHandle);
+        const project = projectFromSnapshot(snapshot, get().project.title);
+        const hasDrawableCreasePattern = project.creases.length > 0 || project.facets.length > 0;
+
+        if (!hasDrawableCreasePattern) {
+          set({
+            project,
+            status:
+              project.edges.length === 0
+                ? 'ready'
+                : snapshot.summary.is_feasible
+                  ? 'optimized'
+                  : 'needs_optimization',
+            error: {
+              code: 'invalid_operation',
+              message: 'Build CP completed but did not produce drawable crease-pattern geometry.',
+            },
+            foldArtifacts: null,
+            foldArtifactError: null,
+            projectMessage: null,
+          });
+          return;
+        }
+
         let foldArtifactError: string | null = null;
         const foldArtifacts = await api.foldArtifacts(treeHandle).catch((error) => {
           foldArtifactError = engineError(error).message;
           return null;
         });
         set({
-          project: projectFromSnapshot(snapshot, get().project.title),
+          project,
           status: 'crease_pattern_ready',
           error: null,
           foldArtifacts,

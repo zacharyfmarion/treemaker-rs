@@ -68,6 +68,14 @@ describe('workspace capabilities', () => {
     expect(state['file.exportFold'].enabled).toBe(true);
   });
 
+  it('does not call an empty CP-ready tree a rebuildable crease pattern', () => {
+    const state = capabilities({ status: 'crease_pattern_ready', edgeCount: 2 });
+
+    expect(state['cp.build'].enabled).toBe(true);
+    expect(state['cp.build'].label).toBe('Build CP');
+    expect(getNextDocumentAction(state)).toBe('cp.build');
+  });
+
   it('disables tree-only commands for imported crease-pattern documents', () => {
     const state = capabilities({
       documentMode: 'crease-pattern',

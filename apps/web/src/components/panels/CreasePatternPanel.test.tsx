@@ -76,6 +76,19 @@ describe('CreasePatternPanel', () => {
     expect(buildCreasePattern).toHaveBeenCalledOnce();
   });
 
+  it('keeps an empty CP-ready tree on Build CP instead of Rebuild CP', () => {
+    const project = {
+      ...createSampleProject(),
+      creases: [],
+      facets: [],
+    };
+    const { container } = renderPanel(project, 'crease_pattern_ready');
+
+    const button = container.querySelector('button');
+    expect(button?.textContent).toContain('Build CP');
+    expect(button?.textContent).not.toContain('Rebuild CP');
+  });
+
   it('shows an enabled Optimize Scale action before optimization', () => {
     const project = {
       ...createSampleProject(),

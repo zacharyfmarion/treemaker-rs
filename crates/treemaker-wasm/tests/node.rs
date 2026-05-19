@@ -86,6 +86,22 @@ fn editable_design_api_returns_snapshots() {
     assert_eq!(snapshot["summary"]["paths"], 6);
     assert_eq!(snapshot["nodes"].as_array().expect("nodes").len(), 4);
 
+    let report = json(optimize_scale(handle).expect("optimize editable design"));
+    assert_eq!(report["is_feasible"], true);
+    build_crease_pattern(handle).expect("build editable design cp");
+    let built = json(tree_snapshot(handle).expect("built editable snapshot"));
+    assert!(
+        !built["creases"]
+            .as_array()
+            .expect("built creases")
+            .is_empty(),
+        "{built:?}"
+    );
+    assert!(
+        !built["facets"].as_array().expect("built facets").is_empty(),
+        "{built:?}"
+    );
+
     let design = json(tree_design(handle).expect("design"));
     assert_eq!(design["nodes"].as_array().expect("design nodes").len(), 4);
 

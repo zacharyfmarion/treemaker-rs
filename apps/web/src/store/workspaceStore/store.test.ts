@@ -1221,6 +1221,23 @@ describe('workspace store slices', () => {
     expect(useWorkspaceStore.getState().creaseColorMode).toBe('mvf');
   });
 
+  it('does not mark CP ready when build returns no drawable crease pattern', async () => {
+    const api = resetStores(seedSnapshot());
+    loadSnapshotIntoStore(seedSnapshot());
+    api.buildCreasePattern.mockResolvedValueOnce(seedSnapshot());
+
+    await useWorkspaceStore.getState().buildCreasePattern();
+
+    expect(useWorkspaceStore.getState().status).toBe('optimized');
+    expect(useWorkspaceStore.getState().project.creases).toHaveLength(0);
+    expect(useWorkspaceStore.getState().project.facets).toHaveLength(0);
+    expect(useWorkspaceStore.getState().error).toEqual({
+      code: 'invalid_operation',
+      message: 'Build CP completed but did not produce drawable crease-pattern geometry.',
+    });
+    expect(api.foldArtifacts).not.toHaveBeenCalled();
+  });
+
   it('blocks building a crease pattern before optimization succeeds', async () => {
     const api = resetStores(seedSnapshot());
     loadSnapshotIntoStore(seedSnapshot());

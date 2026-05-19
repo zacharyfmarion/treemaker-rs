@@ -30,6 +30,9 @@ pub fn setup_menu(app: &App) -> Result<(), Box<dyn std::error::Error>> {
         MenuItemBuilder::with_id("file.exportFold", "Export FOLD...").build(app)?;
     let file_export_svg = MenuItemBuilder::with_id("file.exportSvg", "Export SVG...").build(app)?;
     let file_export_png = MenuItemBuilder::with_id("file.exportPng", "Export PNG...").build(app)?;
+    let file_settings = MenuItemBuilder::with_id("file.settings", "Settings")
+        .accelerator("CmdOrCtrl+,")
+        .build(app)?;
 
     let file_menu = SubmenuBuilder::new(app, "File")
         .item(&file_new)
@@ -42,6 +45,8 @@ pub fn setup_menu(app: &App) -> Result<(), Box<dyn std::error::Error>> {
         .item(&file_export_fold)
         .item(&file_export_svg)
         .item(&file_export_png)
+        .separator()
+        .item(&file_settings)
         .build()?;
 
     let edit_undo = MenuItemBuilder::with_id("edit.undo", "Undo")

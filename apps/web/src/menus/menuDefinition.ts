@@ -41,6 +41,8 @@ export function getMenuBarDef(): MenuDef[] {
         { type: 'action', id: 'file.exportFold', label: 'Export FOLD...' },
         { type: 'action', id: 'file.exportSvg', label: 'Export SVG...' },
         { type: 'action', id: 'file.exportPng', label: 'Export PNG...' },
+        { type: 'separator' },
+        { type: 'action', id: 'file.settings', label: 'Settings', shortcut: `${mod}+,` },
       ],
     },
     {

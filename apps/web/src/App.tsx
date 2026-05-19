@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { MenuBar } from './components/MenuBar';
 import { GlobalToasts } from './components/GlobalToasts';
+import { SettingsModal } from './components/SettingsModal';
 import { TooltipProvider } from './components/ui/Tooltip';
 import { IconButton } from './components/ui/IconButton';
 import { Button } from './components/ui/Button';
@@ -23,6 +24,8 @@ import { useTauriMenuListener } from './menus/tauriMenuListener';
 import { isDesktopRuntime } from './platform/runtime';
 import { applyWindowTitle, formatWindowTitle } from './platform/windowTitle';
 import { applyDefaultLayout, useLayoutStore } from './store/layoutStore';
+import { useSettingsStore } from './store/settingsStore';
+import { useThemeStore } from './store/themeStore';
 import { useWorkspaceStore } from './store/workspaceStore';
 import './styles/sonner.css';
 
@@ -30,6 +33,7 @@ function Toolbar() {
   const status = useWorkspaceStore((state) => state.status);
   const project = useWorkspaceStore((state) => state.project);
   const engineReady = useWorkspaceStore((state) => state.engineReady);
+  const openSettings = useSettingsStore((state) => state.openSettings);
   const isDesktop = isDesktopRuntime();
   const workflowState = getCreasePatternWorkflowState({
     engineReady,
@@ -90,7 +94,12 @@ function Toolbar() {
           Build CP
         </Button>
         <span className="toolbar__separator" />
-        <IconButton size="sm" title="Settings" tooltipSide="bottom" disabled>
+        <IconButton
+          size="sm"
+          title="Settings"
+          tooltipSide="bottom"
+          onClick={() => openSettings()}
+        >
           <Settings size={15} />
         </IconButton>
       </div>
@@ -107,6 +116,7 @@ export default function App() {
   const deleteSelection = useWorkspaceStore((state) => state.deleteSelection);
   const project = useWorkspaceStore((state) => state.project);
   const dirty = useWorkspaceStore((state) => state.dirty);
+  const toasterTheme = useThemeStore((state) => state.currentTheme.type);
   const setDockviewApi = useLayoutStore((state) => state.setDockviewApi);
   const loadLayout = useLayoutStore((state) => state.loadLayout);
   const saveLayout = useLayoutStore((state) => state.saveLayout);
@@ -193,6 +203,11 @@ export default function App() {
         void handleMenuAction('edit.selectAll');
         return;
       }
+      if (modifier && key === ',') {
+        event.preventDefault();
+        void handleMenuAction('file.settings');
+        return;
+      }
       if (event.key !== 'Delete' && event.key !== 'Backspace') return;
       event.preventDefault();
       void deleteSelection();
@@ -244,9 +259,10 @@ export default function App() {
           disableFloatingGroups
         />
       </div>
+      <SettingsModal />
       <GlobalToasts />
       <Toaster
-        theme="dark"
+        theme={toasterTheme}
         position="bottom-right"
         closeButton
         richColors

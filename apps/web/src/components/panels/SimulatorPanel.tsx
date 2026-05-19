@@ -592,9 +592,10 @@ function drawFrame(
 
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
+  const palette = readSimulatorPalette(canvas);
 
   ctx.clearRect(0, 0, width, height);
-  ctx.fillStyle = '#0c0f12';
+  ctx.fillStyle = palette.canvas;
   ctx.fillRect(0, 0, width, height);
 
   const projected = projectPositions(frame.positions, view);
@@ -624,7 +625,7 @@ function drawFrame(
       ctx.fill();
     }
     if (settings.showEdges && settings.showFaces) {
-      drawTriangleEdges(ctx, model, triangle, projected, map, dpr, surfaceEdgeAlpha);
+      drawTriangleEdges(ctx, model, triangle, projected, map, dpr, surfaceEdgeAlpha, palette);
     }
   }
 
@@ -636,7 +637,8 @@ function drawFrame(
       map,
       dpr,
       settings.showFaces ? 0.34 : 0.95,
-      settings.showFaces && settings.renderMode === 'paper'
+      settings.showFaces && settings.renderMode === 'paper',
+      palette
     );
   }
 }
@@ -711,6 +713,28 @@ interface OrderedTriangle {
   vertices: [number, number, number];
 }
 
+interface SimulatorPalette {
+  canvas: string;
+  mountain: string;
+  valley: string;
+  border: string;
+  flat: string;
+}
+
+function readSimulatorPalette(canvas: HTMLCanvasElement): SimulatorPalette {
+  const styles = getComputedStyle(canvas);
+  const cssVar = (name: string, fallback: string) =>
+    styles.getPropertyValue(name).trim() || fallback;
+
+  return {
+    canvas: cssVar('--bg-canvas', '#0c0f12'),
+    mountain: cssVar('--status-danger', '#e06c75'),
+    valley: cssVar('--accent-primary', '#5fb3a5'),
+    border: cssVar('--text-primary', '#e8edf0'),
+    flat: cssVar('--text-secondary', '#aeb9bf'),
+  };
+}
+
 function triangleOrder(indices: Uint32Array, projected: ProjectedPoint[]): OrderedTriangle[] {
   const triangles: OrderedTriangle[] = [];
   for (let index = 0; index < indices.length; index += 3) {
@@ -742,7 +766,8 @@ function drawTriangleEdges(
   projected: ProjectedPoint[],
   map: (point: ProjectedPoint) => { x: number; y: number },
   dpr: number,
-  alpha: number
+  alpha: number,
+  palette: SimulatorPalette
 ): void {
   const faceEdges = model.facesEdges[triangle.faceIndex] ?? [];
   const pairs: Array<[number, number]> = [
@@ -761,7 +786,8 @@ function drawTriangleEdges(
       from,
       to,
       faceEdges[side] ?? findEdge(model.edgesVertices, from, to),
-      alpha
+      alpha,
+      palette
     );
   });
 }
@@ -773,12 +799,13 @@ function drawAllEdges(
   map: (point: ProjectedPoint) => { x: number; y: number },
   dpr: number,
   alpha: number,
-  dashed: boolean
+  dashed: boolean,
+  palette: SimulatorPalette
 ): void {
   ctx.setLineDash(dashed ? [Math.max(3, dpr * 3), Math.max(3, dpr * 3)] : []);
   ctx.lineWidth = Math.max(1.5, dpr * 1.25);
   model.edgesVertices.forEach((edge, index) => {
-    drawEdgeSegment(ctx, model, projected, map, edge[0], edge[1], index, alpha);
+    drawEdgeSegment(ctx, model, projected, map, edge[0], edge[1], index, alpha, palette);
   });
   ctx.setLineDash([]);
 }
@@ -791,15 +818,19 @@ function drawEdgeSegment(
   from: number,
   to: number,
   edgeIndex: number,
-  alpha: number
+  alpha: number,
+  palette: SimulatorPalette
 ): void {
   const a = map(projected[from] ?? { x: 0, y: 0, depth: 0 });
   const b = map(projected[to] ?? { x: 0, y: 0, depth: 0 });
+  const assignment = model.edgesAssignment[edgeIndex];
   ctx.beginPath();
   ctx.moveTo(a.x, a.y);
   ctx.lineTo(b.x, b.y);
-  ctx.strokeStyle = edgeColor(model.edgesAssignment[edgeIndex], alpha);
+  ctx.strokeStyle = edgeColor(assignment, palette);
+  ctx.globalAlpha = edgeAlpha(assignment, alpha);
   ctx.stroke();
+  ctx.globalAlpha = 1;
 }
 
 function findEdge(edges: [number, number][], from: number, to: number): number {
@@ -808,10 +839,15 @@ function findEdge(edges: [number, number][], from: number, to: number): number {
   );
 }
 
-function edgeColor(assignment: string | undefined, alpha = 1): string {
-  if (assignment === 'M') return `rgb(224 108 117 / ${alpha})`;
-  if (assignment === 'V') return `rgb(95 179 165 / ${alpha})`;
-  if (assignment === 'B') return `rgb(17 20 23 / ${alpha})`;
-  if (assignment === 'F') return `rgb(232 237 240 / ${alpha * 0.55})`;
-  return `rgb(232 237 240 / ${alpha * 0.32})`;
+function edgeColor(assignment: string | undefined, palette: SimulatorPalette): string {
+  if (assignment === 'M') return palette.mountain;
+  if (assignment === 'V') return palette.valley;
+  if (assignment === 'B') return palette.border;
+  return palette.flat;
+}
+
+function edgeAlpha(assignment: string | undefined, alpha: number): number {
+  if (assignment === 'F') return alpha * 0.55;
+  if (!assignment) return alpha * 0.32;
+  return alpha;
 }

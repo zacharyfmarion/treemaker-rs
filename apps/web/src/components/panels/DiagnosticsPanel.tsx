@@ -3,6 +3,8 @@ import { useWorkspaceStore } from '../../store/workspaceStore';
 
 export function DiagnosticsPanel() {
   const project = useWorkspaceStore((state) => state.project);
+  const documentMode = useWorkspaceStore((state) => state.documentMode);
+  const importedCreasePattern = useWorkspaceStore((state) => state.importedCreasePattern);
   const status = useWorkspaceStore((state) => state.status);
   const engineReady = useWorkspaceStore((state) => state.engineReady);
   const error = useWorkspaceStore((state) => state.error);
@@ -21,6 +23,62 @@ export function DiagnosticsPanel() {
   ) : (
     <CircleDashed size={15} />
   );
+
+  if (documentMode === 'crease-pattern') {
+    const diagnostics = importedCreasePattern?.diagnostics;
+    const hasErrors = Boolean(diagnostics?.errors.length);
+    const hasWarnings = Boolean(diagnostics?.warnings.length);
+    return (
+      <section className="panel-shell">
+        <div className="panel-toolbar">
+          <span className="panel-title">Diagnostics</span>
+        </div>
+        <div className="panel-body">
+          <div className="metric-grid">
+            <Metric label="Vertices" value={importedCreasePattern?.stats.vertices ?? 0} />
+            <Metric label="Edges" value={importedCreasePattern?.stats.edges ?? 0} />
+            <Metric label="Faces" value={importedCreasePattern?.stats.faces ?? 0} />
+            <Metric label="Mode" value="CP-only" />
+          </div>
+          <div className="status-row" data-tone={hasErrors ? 'bad' : hasWarnings ? 'warn' : 'good'}>
+            {hasErrors ? <AlertTriangle size={15} /> : <CheckCircle2 size={15} />}
+            <span>
+              {hasErrors
+                ? diagnostics?.errors[0]
+                : hasWarnings
+                  ? diagnostics?.warnings[0]
+                  : 'Imported crease pattern ready'}
+            </span>
+          </div>
+          {importedCreasePattern?.selectedFrame && (
+            <div className="status-row" data-tone="good">
+              <CheckCircle2 size={15} />
+              <span>
+                FOLD frame {importedCreasePattern.selectedFrame.index}
+                {importedCreasePattern.selectedFrame.title
+                  ? `: ${importedCreasePattern.selectedFrame.title}`
+                  : ''}
+              </span>
+            </div>
+          )}
+          <div
+            className="status-row"
+            data-tone={importedCreasePattern?.simulationModelError ? 'warn' : 'good'}
+          >
+            {importedCreasePattern?.simulationModelError ? (
+              <CircleDashed size={15} />
+            ) : (
+              <CheckCircle2 size={15} />
+            )}
+            <span>
+              {importedCreasePattern?.simulationModelError ??
+                'Simulator-ready topology available'}
+            </span>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="panel-shell">

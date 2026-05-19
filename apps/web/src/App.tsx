@@ -19,7 +19,6 @@ import { IconButton } from './components/ui/IconButton';
 import { Button } from './components/ui/Button';
 import { panelComponents } from './components/panels/PanelComponents';
 import { handleMenuAction } from './commands/menuActions';
-import { getCreasePatternWorkflowState } from './lib/workflowAvailability';
 import { useTauriMenuListener } from './menus/tauriMenuListener';
 import { isDesktopRuntime } from './platform/runtime';
 import { applyWindowTitle, formatWindowTitle } from './platform/windowTitle';
@@ -27,19 +26,15 @@ import { applyDefaultLayout, useLayoutStore } from './store/layoutStore';
 import { useSettingsStore } from './store/settingsStore';
 import { useThemeStore } from './store/themeStore';
 import { useWorkspaceStore } from './store/workspaceStore';
+import { useWorkspaceCapabilities } from './store/workspaceStore/useWorkspaceCapabilities';
 import './styles/sonner.css';
 
 function Toolbar() {
-  const status = useWorkspaceStore((state) => state.status);
-  const project = useWorkspaceStore((state) => state.project);
-  const engineReady = useWorkspaceStore((state) => state.engineReady);
   const openSettings = useSettingsStore((state) => state.openSettings);
+  const capabilities = useWorkspaceCapabilities();
   const isDesktop = isDesktopRuntime();
-  const workflowState = getCreasePatternWorkflowState({
-    engineReady,
-    status,
-    edgeCount: project.edges.length,
-  });
+  const optimizeScale = capabilities['optimize.scale'];
+  const buildCp = capabilities['cp.build'];
 
   return (
     <header className="toolbar">
@@ -51,7 +46,7 @@ function Toolbar() {
           size="sm"
           title="New"
           tooltipSide="bottom"
-          disabled={workflowState.isBusy}
+          disabled={!capabilities['file.new'].enabled}
           onClick={() => void handleMenuAction('file.new')}
         >
           <FilePlus size={15} />
@@ -60,6 +55,7 @@ function Toolbar() {
           size="sm"
           title="Open"
           tooltipSide="bottom"
+          disabled={!capabilities['file.open'].enabled}
           onClick={() => void handleMenuAction('file.open')}
         >
           <FolderOpen size={15} />
@@ -68,38 +64,38 @@ function Toolbar() {
           size="sm"
           title="Save"
           tooltipSide="bottom"
+          disabled={!capabilities['file.save'].enabled}
           onClick={() => void handleMenuAction('file.save')}
         >
           <Save size={15} />
         </IconButton>
         <span className="toolbar__separator" />
-        <Button
-          size="sm"
-          variant={workflowState.canBuildCreasePattern ? 'secondary' : 'primary'}
-          disabled={!workflowState.canOptimizeScale}
-          title={workflowState.optimizeScaleReason}
-          onClick={() => void handleMenuAction('optimize.scale')}
-        >
-          <Sparkles size={14} />
-          Optimize Scale
-        </Button>
-        <Button
-          size="sm"
-          variant={workflowState.canBuildCreasePattern ? 'primary' : 'secondary'}
-          disabled={!workflowState.canBuildCreasePattern}
-          title={workflowState.buildCreasePatternReason}
-          onClick={() => void handleMenuAction('cp.build')}
-        >
-          <Play size={14} />
-          Build CP
-        </Button>
-        <span className="toolbar__separator" />
-        <IconButton
-          size="sm"
-          title="Settings"
-          tooltipSide="bottom"
-          onClick={() => openSettings()}
-        >
+        {optimizeScale.visible && (
+          <Button
+            size="sm"
+            variant={buildCp.enabled ? 'secondary' : 'primary'}
+            disabled={!optimizeScale.enabled}
+            title={optimizeScale.reason}
+            onClick={() => void handleMenuAction('optimize.scale')}
+          >
+            <Sparkles size={14} />
+            Optimize Scale
+          </Button>
+        )}
+        {buildCp.visible && (
+          <Button
+            size="sm"
+            variant={buildCp.enabled ? 'primary' : 'secondary'}
+            disabled={!buildCp.enabled}
+            title={buildCp.reason}
+            onClick={() => void handleMenuAction('cp.build')}
+          >
+            <Play size={14} />
+            {buildCp.label}
+          </Button>
+        )}
+        {(optimizeScale.visible || buildCp.visible) && <span className="toolbar__separator" />}
+        <IconButton size="sm" title="Settings" tooltipSide="bottom" onClick={() => openSettings()}>
           <Settings size={15} />
         </IconButton>
       </div>

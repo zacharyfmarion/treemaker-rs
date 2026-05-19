@@ -2,6 +2,8 @@ import { getFileService, type FileCommand, type FileService } from '../platform/
 import { useLayoutStore } from '../store/layoutStore';
 import { useSettingsStore } from '../store/settingsStore';
 import { useWorkspaceStore } from '../store/workspaceStore';
+import { selectWorkspaceCapabilities } from '../store/workspaceStore/capabilities';
+import type { WorkspaceCapabilities, WorkspaceCapabilityId } from '../lib/workspaceCapabilities';
 
 export const MENU_ACTION_IDS = [
   'app.quit',
@@ -70,6 +72,7 @@ export interface MenuActionDependencies {
   workspace: WorkspaceCommands;
   layout: LayoutCommands;
   fileService: FileService;
+  capabilities?: () => WorkspaceCapabilities;
   quit?: () => void;
   about?: () => void;
   settings?: () => void;
@@ -93,6 +96,12 @@ export function createMenuActionHandler(deps: MenuActionDependencies) {
   return async (id: string): Promise<boolean> => {
     if (!isMenuActionId(id)) {
       console.warn(`Unknown menu action: ${id}`);
+      return false;
+    }
+
+    const capability = deps.capabilities?.()[id as WorkspaceCapabilityId];
+    if (capability && !capability.enabled) {
+      console.info(`Menu action disabled: ${id}: ${capability.reason}`);
       return false;
     }
 
@@ -194,6 +203,7 @@ export function handleMenuAction(id: string): Promise<boolean> {
     workspace: useWorkspaceStore.getState(),
     layout: useLayoutStore.getState(),
     fileService: getFileService(),
+    capabilities: () => selectWorkspaceCapabilities(useWorkspaceStore.getState()),
     settings: () => {
       useSettingsStore.getState().openSettings();
     },

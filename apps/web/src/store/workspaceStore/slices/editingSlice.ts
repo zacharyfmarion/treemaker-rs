@@ -27,6 +27,17 @@ import {
 import type { EditingSlice, WorkspaceSliceCreator } from '../types';
 
 export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get) => {
+  function rejectReadOnly() {
+    if (get().documentMode === 'tree') return false;
+    set({
+      error: {
+        code: 'invalid_operation',
+        message: 'Imported crease patterns are read-only',
+      },
+    });
+    return true;
+  }
+
   async function requireActiveTree() {
     const result = await ensureTreeHandle();
     if (result.initializedSnapshot) {
@@ -41,6 +52,7 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
     symmetryAuthoringPairs: [],
 
     addNodeAt: async (loc, connectTo) => {
+      if (rejectReadOnly()) return;
       set({ error: null });
       const checkpoint = await get().beginHistoryCheckpoint();
       try {
@@ -174,6 +186,7 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
     },
 
     moveNode: async (id, loc) => {
+      if (rejectReadOnly()) return;
       set({ error: null });
       const checkpoint = await get().beginHistoryCheckpoint();
       try {
@@ -237,6 +250,7 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
     },
 
     addEdge: async (node1, node2) => {
+      if (rejectReadOnly()) return;
       if (node1 === node2) return;
       set({ error: null });
       const checkpoint = await get().beginHistoryCheckpoint();
@@ -268,6 +282,7 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
     },
 
     updateNodeLabel: async (id, label) => {
+      if (rejectReadOnly()) return;
       set({ error: null });
       const checkpoint = await get().beginHistoryCheckpoint();
       try {
@@ -290,6 +305,7 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
     },
 
     updateEdge: async (id, update) => {
+      if (rejectReadOnly()) return;
       set({ error: null });
       const checkpoint = await get().beginHistoryCheckpoint();
       try {
@@ -329,6 +345,7 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
     },
 
     deleteSelection: async () => {
+      if (rejectReadOnly()) return;
       const selection = get().selection;
       const nodeIds = selectedNodeIds(selection).sort((a, b) => b - a);
       const edgeIds = selectedEdgeIds(selection).sort((a, b) => b - a);
@@ -395,6 +412,6 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
       );
       if (path) set({ selection: { kind: 'path', id: path.id } });
     },
-    setToolMode: (toolMode) => set({ toolMode }),
+    setToolMode: (toolMode) => set({ toolMode: get().documentMode === 'tree' ? toolMode : 'select' }),
   };
 };

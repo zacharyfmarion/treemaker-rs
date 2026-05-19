@@ -65,6 +65,15 @@ export const createClipboardSlice: WorkspaceSliceCreator<ClipboardSlice> = (set,
   clipboardPasteCount: 0,
 
   copySelection: () => {
+    if (get().documentMode !== 'tree') {
+      set({
+        error: {
+          code: 'invalid_operation',
+          message: 'Imported crease patterns are read-only',
+        },
+      });
+      return;
+    }
     const clipboard = buildClipboardPayload(get().project, get().selection);
     if (!clipboard) return;
     set({
@@ -75,12 +84,30 @@ export const createClipboardSlice: WorkspaceSliceCreator<ClipboardSlice> = (set,
   },
 
   cutSelection: async () => {
+    if (get().documentMode !== 'tree') {
+      set({
+        error: {
+          code: 'invalid_operation',
+          message: 'Imported crease patterns are read-only',
+        },
+      });
+      return;
+    }
     get().copySelection();
     if (!get().clipboard) return;
     await get().deleteSelection();
   },
 
   pasteClipboard: async () => {
+    if (get().documentMode !== 'tree') {
+      set({
+        error: {
+          code: 'invalid_operation',
+          message: 'Imported crease patterns are read-only',
+        },
+      });
+      return;
+    }
     const clipboard = get().clipboard;
     if (!clipboard || clipboard.nodes.length === 0) return;
     set({ error: null });

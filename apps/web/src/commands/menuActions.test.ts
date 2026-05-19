@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { getWorkspaceCapabilities } from '../lib/workspaceCapabilities';
 import { createFileService } from '../platform/fileService';
 import { createMenuActionHandler, isMenuActionId } from './menuActions';
 
@@ -89,6 +90,31 @@ describe('menu actions', () => {
 
     await expect(createMenuActionHandler(deps)('file.exportFold')).resolves.toBe(true);
     expect(deps.workspace.exportFold).toHaveBeenCalledWith(deps.fileService);
+  });
+
+  it('does not dispatch disabled capabilities', async () => {
+    const deps = {
+      ...createDeps(),
+      capabilities: () =>
+        getWorkspaceCapabilities({
+        documentMode: 'crease-pattern',
+        engineReady: true,
+        status: 'crease_pattern_ready',
+        edgeCount: 0,
+        creaseCount: 4,
+        facetCount: 1,
+        hasImportedCreasePattern: true,
+        hasSimulationModel: true,
+        historyPastCount: 0,
+        historyFutureCount: 0,
+        clipboard: null,
+        selection: { kind: 'tree' },
+        }),
+    };
+
+    await expect(createMenuActionHandler(deps)('cp.build')).resolves.toBe(false);
+
+    expect(deps.workspace.buildCreasePattern).not.toHaveBeenCalled();
   });
 
   it('returns false for unknown ids', async () => {

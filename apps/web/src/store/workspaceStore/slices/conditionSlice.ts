@@ -10,6 +10,17 @@ import {
 import type { ConditionSlice, WorkspaceSliceCreator } from '../types';
 
 export const createConditionSlice: WorkspaceSliceCreator<ConditionSlice> = (set, get) => {
+  function rejectReadOnly() {
+    if (get().documentMode === 'tree') return false;
+    set({
+      error: {
+        code: 'invalid_operation',
+        message: 'Conditions require a TreeMaker tree document',
+      },
+    });
+    return true;
+  }
+
   async function applyConditionEdit(
     edit:
       | { type: 'update_paper'; width: number; height: number }
@@ -23,6 +34,7 @@ export const createConditionSlice: WorkspaceSliceCreator<ConditionSlice> = (set,
       | { type: 'delete_condition'; id: number },
     label: string
   ) {
+    if (rejectReadOnly()) return;
     set({ error: null });
     const checkpoint = await get().beginHistoryCheckpoint();
     try {
@@ -131,6 +143,7 @@ export const createConditionSlice: WorkspaceSliceCreator<ConditionSlice> = (set,
     },
 
     clearConditions: async () => {
+      if (rejectReadOnly()) return;
       const ids = get()
         .project.conditions.map((condition) => condition.id)
         .sort((a, b) => b - a);

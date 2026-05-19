@@ -3,13 +3,16 @@ import { EXAMPLE_PROJECTS } from '../../examples/catalog';
 import { handleMenuAction } from '../../commands/menuActions';
 import { Button } from '../ui/Button';
 import { useWorkspaceStore } from '../../store/workspaceStore';
+import { useWorkspaceCapabilities } from '../../store/workspaceStore/useWorkspaceCapabilities';
 
 export function FilesPanel() {
   const loadExampleProject = useWorkspaceStore((state) => state.loadExampleProject);
   const loadRecentProject = useWorkspaceStore((state) => state.loadRecentProject);
   const recentProjects = useWorkspaceStore((state) => state.recentProjects);
   const currentFileName = useWorkspaceStore((state) => state.currentFileName);
+  const documentMode = useWorkspaceStore((state) => state.documentMode);
   const dirty = useWorkspaceStore((state) => state.dirty);
+  const capabilities = useWorkspaceCapabilities();
 
   return (
     <section className="panel-shell files-panel">
@@ -18,19 +21,43 @@ export function FilesPanel() {
       </div>
       <div className="panel-body files-panel__body">
         <div className="file-actions">
-          <Button size="sm" variant="secondary" onClick={() => void handleMenuAction('file.new')}>
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={!capabilities['file.new'].enabled}
+            title={capabilities['file.new'].reason}
+            onClick={() => void handleMenuAction('file.new')}
+          >
             <FileText size={14} />
             New
           </Button>
-          <Button size="sm" variant="secondary" onClick={() => void handleMenuAction('file.open')}>
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={!capabilities['file.open'].enabled}
+            title={capabilities['file.open'].reason}
+            onClick={() => void handleMenuAction('file.open')}
+          >
             <FolderOpen size={14} />
             Open
           </Button>
-          <Button size="sm" variant="primary" onClick={() => void handleMenuAction('file.save')}>
+          <Button
+            size="sm"
+            variant="primary"
+            disabled={!capabilities['file.save'].enabled}
+            title={capabilities['file.save'].reason}
+            onClick={() => void handleMenuAction('file.save')}
+          >
             <Save size={14} />
             Save
           </Button>
-          <Button size="sm" variant="secondary" onClick={() => void handleMenuAction('file.saveAs')}>
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={!capabilities['file.saveAs'].enabled}
+            title={capabilities['file.saveAs'].reason}
+            onClick={() => void handleMenuAction('file.saveAs')}
+          >
             <Save size={14} />
             Save As
           </Button>
@@ -38,23 +65,47 @@ export function FilesPanel() {
 
         <div className="file-summary">
           <span>{currentFileName}</span>
-          <span>{dirty ? 'Unsaved changes' : 'Saved'}</span>
+          <span>{documentMode === 'crease-pattern' ? 'Imported CP' : dirty ? 'Unsaved changes' : 'Saved'}</span>
         </div>
 
         <div className="file-actions file-actions--exports">
-          <Button size="sm" variant="secondary" onClick={() => void handleMenuAction('file.exportV4')}>
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={!capabilities['file.exportV4'].enabled}
+            title={capabilities['file.exportV4'].reason}
+            onClick={() => void handleMenuAction('file.exportV4')}
+          >
             <Download size={14} />
             V4
           </Button>
-          <Button size="sm" variant="secondary" onClick={() => void handleMenuAction('file.exportFold')}>
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={!capabilities['file.exportFold'].enabled}
+            title={capabilities['file.exportFold'].reason}
+            onClick={() => void handleMenuAction('file.exportFold')}
+          >
             <Download size={14} />
             FOLD
           </Button>
-          <Button size="sm" variant="secondary" onClick={() => void handleMenuAction('file.exportSvg')}>
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={!capabilities['file.exportSvg'].enabled}
+            title={capabilities['file.exportSvg'].reason}
+            onClick={() => void handleMenuAction('file.exportSvg')}
+          >
             <Download size={14} />
             SVG
           </Button>
-          <Button size="sm" variant="secondary" onClick={() => void handleMenuAction('file.exportPng')}>
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={!capabilities['file.exportPng'].enabled}
+            title={capabilities['file.exportPng'].reason}
+            onClick={() => void handleMenuAction('file.exportPng')}
+          >
             <Download size={14} />
             PNG
           </Button>

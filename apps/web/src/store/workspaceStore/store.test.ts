@@ -5,6 +5,7 @@ import type {
   EditReport,
   EdgeSnapshot,
   FoldArtifacts,
+  FoldDocument,
   NodeSnapshot,
   OptimizationReport,
   PaperSettings,
@@ -254,6 +255,49 @@ function foldArtifactsFromSnapshot(snapshot: TreeSnapshot): FoldArtifacts {
   };
 }
 
+function foldArtifactsFromFold(fold: FoldDocument): FoldArtifacts {
+  return {
+    fold,
+    folded_base: {
+      vertices: fold.vertices_coords.map((coord, index) => ({
+        id: index,
+        source_vertex: index,
+        loc: { x: coord[0] ?? 0, y: coord[1] ?? 0 },
+        paper_loc: { x: coord[0] ?? 0, y: coord[1] ?? 0 },
+        depth: 0,
+        elevation: 0,
+        is_border: fold.edges_vertices.some(
+          (edge, edgeIndex) =>
+            fold.edges_assignment?.[edgeIndex] === 'B' &&
+            (edge[0] === index || edge[1] === index)
+        ),
+      })),
+      creases: fold.edges_vertices.map((vertices, index) => ({
+        id: index,
+        source_crease: index,
+        vertices,
+        kind: 0,
+        fold: fold.edges_assignment?.[index] === 'M' ? 1 : fold.edges_assignment?.[index] === 'V' ? 2 : 3,
+      })),
+      facets: fold.faces_vertices.map((vertices, index) => ({
+        id: index,
+        source_facet: index,
+        vertices,
+        color: index % 2 === 0 ? 1 : 2,
+        order: index,
+      })),
+    },
+    simulation_model:
+      fold.faces_vertices.length > 0
+        ? {
+            fold,
+            crease_params: [],
+          }
+        : null,
+    simulation_model_error: fold.faces_vertices.length > 0 ? null : 'Simulation requires faces',
+  };
+}
+
 function nextId<T extends { id: number }>(items: T[]): number {
   return Math.max(0, ...items.map((item) => item.id)) + 1;
 }
@@ -336,6 +380,9 @@ function createMockEngineApi(initialSnapshot: TreeSnapshot) {
     exportV4: vi.fn(async () => 'exported-v4'),
     exportFold: vi.fn(async () => JSON.stringify(foldArtifactsFromSnapshot(snapshotState).fold)),
     foldArtifacts: vi.fn(async () => foldArtifactsFromSnapshot(snapshotState)),
+    flatFoldArtifacts: vi.fn(async (foldJson: string) =>
+      foldArtifactsFromFold(JSON.parse(foldJson) as FoldDocument)
+    ),
     optimizeScale: vi.fn(async (): Promise<OptimizationReport> => {
       const oldScale = snapshotState.paper.scale;
       snapshotState = makeSnapshot({
@@ -543,6 +590,8 @@ function configureEngine(api: TestEngineApi) {
 function loadSnapshotIntoStore(snapshot: TreeSnapshot, title = 'Seed project') {
   useWorkspaceStore.setState({
     project: projectFromSnapshot(snapshot, title),
+    documentMode: 'tree',
+    importedCreasePattern: null,
     projectLoadId: useWorkspaceStore.getState().projectLoadId + 1,
     currentFileName: 'seed.tmd5',
     currentFilePath: null,
@@ -619,6 +668,8 @@ describe('workspace store slices', () => {
     const state = useWorkspaceStore.getState();
 
     expect(state.project.nodes).toEqual([]);
+    expect(state.documentMode).toBe('tree');
+    expect(state.importedCreasePattern).toBeNull();
     expect(state.status).toBe('loading_engine');
     expect(state.selection).toEqual({ kind: 'tree' });
     expect(state.toolMode).toBe('select');
@@ -632,6 +683,7 @@ describe('workspace store slices', () => {
     expect(state.currentFileName).toBe('Untitled.tmd5');
     expect(state.createNewProject).toBeTypeOf('function');
     expect(state.openProject).toBeTypeOf('function');
+    expect(state.loadCreasePatternText).toBeTypeOf('function');
     expect(state.saveProject).toBeTypeOf('function');
     expect(state.exportFold).toBeTypeOf('function');
     expect(state.undo).toBeTypeOf('function');
@@ -679,8 +731,8 @@ describe('workspace store slices', () => {
 
     await expect(useWorkspaceStore.getState().openProject(fileService)).resolves.toBe(true);
     expect(fileService.openTextFile).toHaveBeenCalledWith({
-      title: 'Open TreeMaker Project',
-      extensions: ['tmd', 'tmd4', 'tmd5'],
+      title: 'Open TreeMaker Project or Crease Pattern',
+      extensions: ['tmd', 'tmd4', 'tmd5', 'fold', 'cp'],
     });
 
     await expect(useWorkspaceStore.getState().saveProject(fileService)).resolves.toBe(true);
@@ -735,6 +787,52 @@ describe('workspace store slices', () => {
 
     useWorkspaceStore.getState().clearProjectMessage();
     expect(useWorkspaceStore.getState().projectMessage).toBeNull();
+  });
+
+  it('loads CP-only documents and gates tree-only persistence', async () => {
+    const api = resetStores(seedSnapshot());
+    loadSnapshotIntoStore(seedSnapshot());
+    const activatePanel = vi.fn();
+    useLayoutStore.setState({ activatePanel });
+    const fileService = createFileService({
+      text: [
+        '1 0 0 1 0',
+        '1 1 0 1 1',
+        '1 1 1 0 1',
+        '1 0 1 0 0',
+        '2 0 0 1 1',
+      ].join('\n'),
+      name: 'square.cp',
+      path: '/tmp/square.cp',
+    });
+
+    await expect(useWorkspaceStore.getState().openProject(fileService)).resolves.toBe(true);
+
+    expect(useWorkspaceStore.getState()).toMatchObject({
+      documentMode: 'crease-pattern',
+      currentFileName: 'square.cp',
+      currentFilePath: '/tmp/square.cp',
+      dirty: false,
+      status: 'crease_pattern_ready',
+    });
+    expect(useWorkspaceStore.getState().importedCreasePattern?.source.format).toBe('cp');
+    expect(useWorkspaceStore.getState().project.creases.length).toBeGreaterThan(0);
+    expect(useWorkspaceStore.getState().project.facets.length).toBeGreaterThan(0);
+    expect(useWorkspaceStore.getState().foldArtifacts?.folded_base?.facets.length).toBeGreaterThan(
+      0
+    );
+    expect(api.flatFoldArtifacts).toHaveBeenCalledOnce();
+    expect(activatePanel).toHaveBeenCalledWith('crease-pattern');
+
+    await expect(useWorkspaceStore.getState().saveProject(fileService)).resolves.toBe(false);
+    expect(useWorkspaceStore.getState().error?.message).toBe(
+      'Imported crease patterns are exported, not saved as TreeMaker projects'
+    );
+
+    await expect(useWorkspaceStore.getState().exportFold(fileService)).resolves.toBe(true);
+    expect(fileService.saveTextFile).toHaveBeenLastCalledWith(
+      expect.objectContaining({ title: 'Export FOLD Document', extensions: ['fold'] })
+    );
   });
 
   it('applies editing and condition actions through the engine', async () => {
@@ -1121,6 +1219,23 @@ describe('workspace store slices', () => {
 
     useWorkspaceStore.getState().setCreaseColorMode('mvf');
     expect(useWorkspaceStore.getState().creaseColorMode).toBe('mvf');
+  });
+
+  it('does not mark CP ready when build returns no drawable crease pattern', async () => {
+    const api = resetStores(seedSnapshot());
+    loadSnapshotIntoStore(seedSnapshot());
+    api.buildCreasePattern.mockResolvedValueOnce(seedSnapshot());
+
+    await useWorkspaceStore.getState().buildCreasePattern();
+
+    expect(useWorkspaceStore.getState().status).toBe('optimized');
+    expect(useWorkspaceStore.getState().project.creases).toHaveLength(0);
+    expect(useWorkspaceStore.getState().project.facets).toHaveLength(0);
+    expect(useWorkspaceStore.getState().error).toEqual({
+      code: 'invalid_operation',
+      message: 'Build CP completed but did not produce drawable crease-pattern geometry.',
+    });
+    expect(api.foldArtifacts).not.toHaveBeenCalled();
   });
 
   it('blocks building a crease pattern before optimization succeeds', async () => {

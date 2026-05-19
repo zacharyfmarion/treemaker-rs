@@ -1,34 +1,30 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Layers3, RefreshCw } from 'lucide-react';
 import type { FoldedBaseSnapshot, FoldedBaseVertex } from '../../engine/types';
-import { getCreasePatternWorkflowState } from '../../lib/workflowAvailability';
 import { useWorkspaceStore } from '../../store/workspaceStore';
+import { useWorkspaceCapabilities } from '../../store/workspaceStore/useWorkspaceCapabilities';
 import { IconButton } from '../ui/IconButton';
-import { CreasePatternWorkflowButton } from './CreasePatternWorkflowButton';
+import { NextDocumentAction } from './NextDocumentAction';
 
 const VIEWBOX = 720;
 const PADDING = 62;
 
 export function FoldedBasePanel() {
   const creaseCount = useWorkspaceStore((state) => state.project.creases.length);
-  const edgeCount = useWorkspaceStore((state) => state.project.edges.length);
   const status = useWorkspaceStore((state) => state.status);
-  const engineReady = useWorkspaceStore((state) => state.engineReady);
+  const documentMode = useWorkspaceStore((state) => state.documentMode);
   const foldArtifacts = useWorkspaceStore((state) => state.foldArtifacts);
   const foldArtifactError = useWorkspaceStore((state) => state.foldArtifactError);
   const refreshFoldArtifacts = useWorkspaceStore((state) => state.refreshFoldArtifacts);
+  const capabilities = useWorkspaceCapabilities();
   const [loading, setLoading] = useState(false);
 
   const foldedBase = foldArtifacts?.folded_base ?? null;
   const foldedBaseError = foldArtifacts?.folded_base_error ?? foldArtifactError;
-  const workflowState = getCreasePatternWorkflowState({
-    engineReady,
-    status,
-    edgeCount,
-  });
+  const refreshCapability = capabilities['foldedBase.refresh'];
 
   useEffect(() => {
-    if (creaseCount === 0 || foldArtifacts) return;
+    if (documentMode !== 'tree' || creaseCount === 0 || foldArtifacts) return;
     let cancelled = false;
     setLoading(true);
     void refreshFoldArtifacts().finally(() => {
@@ -37,7 +33,7 @@ export function FoldedBasePanel() {
     return () => {
       cancelled = true;
     };
-  }, [creaseCount, foldArtifacts, refreshFoldArtifacts]);
+  }, [creaseCount, documentMode, foldArtifacts, refreshFoldArtifacts]);
 
   const statusLabel =
     creaseCount === 0
@@ -67,7 +63,7 @@ export function FoldedBasePanel() {
               setLoading(true);
               void refreshFoldArtifacts().finally(() => setLoading(false));
             }}
-            disabled={creaseCount === 0 || workflowState.isBusy}
+            disabled={!refreshCapability.enabled}
           >
             <RefreshCw size={14} />
           </IconButton>
@@ -79,7 +75,7 @@ export function FoldedBasePanel() {
         ) : (
           <div className="folded-base-panel__empty">
             <span title={foldedBaseError ?? undefined}>{statusLabel}</span>
-            {creaseCount === 0 && <CreasePatternWorkflowButton />}
+            {documentMode === 'tree' && creaseCount === 0 && <NextDocumentAction />}
           </div>
         )}
       </div>

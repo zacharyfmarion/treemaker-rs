@@ -28,6 +28,7 @@ export type AppStatus =
   | 'building_crease_pattern'
   | 'crease_pattern_ready'
   | 'error';
+export type DocumentMode = 'tree' | 'crease-pattern';
 export type ToolMode = 'select' | 'node' | 'edge' | 'symmetry';
 export type CreaseColorMode = 'mvf' | 'agrh';
 export const DEFAULT_CREASE_COLOR_MODE: CreaseColorMode = 'agrh';

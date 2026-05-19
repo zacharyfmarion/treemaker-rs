@@ -1,16 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { handleMenuAction } from '../commands/menuActions';
 import { getMenuBarDef, type MenuItemDef } from '../menus/menuDefinition';
+import { useWorkspaceCapabilities } from '../store/workspaceStore/useWorkspaceCapabilities';
+import type { WorkspaceCapabilities, WorkspaceCapabilityId } from '../lib/workspaceCapabilities';
 import './MenuBar.css';
 
 function MenuDropdown({
   items,
   onAction,
   onClose,
+  capabilities,
 }: {
   items: MenuItemDef[];
   onAction: (id: string) => void;
   onClose: () => void;
+  capabilities: WorkspaceCapabilities;
 }) {
   return (
     <div className="menu-dropdown" role="menu">
@@ -19,18 +23,24 @@ function MenuDropdown({
           return <div key={`separator-${index}`} className="menu-dropdown__separator" />;
         }
 
+        const capability = capabilities[item.id as WorkspaceCapabilityId];
+        if (capability && !capability.visible) return null;
+
         return (
           <button
             key={item.id}
             type="button"
             className="menu-dropdown__item"
             role="menuitem"
+            disabled={capability ? !capability.enabled : false}
+            title={capability?.reason}
             onClick={() => {
+              if (capability && !capability.enabled) return;
               onAction(item.id);
               onClose();
             }}
           >
-            <span className="menu-dropdown__item-label">{item.label}</span>
+            <span className="menu-dropdown__item-label">{capability?.label ?? item.label}</span>
             {item.shortcut && (
               <span className="menu-dropdown__item-shortcut">{item.shortcut}</span>
             )}
@@ -45,6 +55,7 @@ export function MenuBar() {
   const [openMenu, setOpenMenu] = useState<number | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const menuDef = useMemo(() => getMenuBarDef(), []);
+  const capabilities = useWorkspaceCapabilities();
 
   const closeMenu = useCallback(() => {
     setOpenMenu(null);
@@ -94,7 +105,12 @@ export function MenuBar() {
               {menu.label}
             </button>
             {openMenu === index && (
-              <MenuDropdown items={menu.items} onAction={runAction} onClose={closeMenu} />
+              <MenuDropdown
+                items={menu.items}
+                onAction={runAction}
+                onClose={closeMenu}
+                capabilities={capabilities}
+              />
             )}
           </div>
         ))}

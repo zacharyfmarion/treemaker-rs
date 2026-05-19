@@ -4000,6 +4000,8 @@ dependencies = [
  "serde-wasm-bindgen",
  "serde_json",
  "treemaker-core",
+ "treemaker-flatfold",
+ "treemaker-fold",
  "wasm-bindgen",
  "wasm-bindgen-test",
 ]

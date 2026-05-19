@@ -1,6 +1,17 @@
 import { getExampleProject } from '../../../examples/catalog';
 import { serializeCreasePatternSvg, renderCreasePatternPng } from '../../../lib/creaseExport';
+import {
+  importedCreasePatternFormat,
+  isCreasePatternFilename,
+  parseImportedCreasePattern,
+  withFlatFoldArtifacts,
+  withFlatFoldError,
+} from '../../../lib/creasePatternImport';
 import { createEmptyProject, DEFAULT_CREASE_COLOR_MODE } from '../../../lib/sampleProject';
+import {
+  getWorkspaceCapabilities,
+  type WorkspaceCapabilityId,
+} from '../../../lib/workspaceCapabilities';
 import { ensureExtension, getFileService, type FileService } from '../../../platform/fileService';
 import { useLayoutStore } from '../../layoutStore';
 import {
@@ -72,6 +83,32 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
     set({ recentProjects: next });
   };
 
+  const capabilities = () =>
+    getWorkspaceCapabilities({
+      documentMode: get().documentMode,
+      engineReady: get().engineReady,
+      status: get().status,
+      edgeCount: get().project.edges.length,
+      creaseCount: get().project.creases.length,
+      facetCount: get().project.facets.length,
+      hasImportedCreasePattern: get().importedCreasePattern !== null,
+      hasSimulationModel: get().foldArtifacts?.simulation_model != null,
+      historyPastCount: get().historyPast.length,
+      historyFutureCount: get().historyFuture.length,
+      clipboard: get().clipboard,
+      selection: get().selection,
+    });
+
+  const rejectDisabled = (id: WorkspaceCapabilityId) => {
+    const capability = capabilities()[id];
+    if (capability.enabled) return false;
+    set({
+      error: { code: 'invalid_operation', message: capability.reason },
+      projectMessage: null,
+    });
+    return true;
+  };
+
   const loadText = async (
     text: string,
     source: { title?: string; filename?: string; path?: string | null; dirty?: boolean } = {}
@@ -83,6 +120,8 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
     const title = source.title ?? basenameWithoutTreeMakerExtension(filename);
     set({
       ...projectStateFromSnapshot(snapshot, title),
+      documentMode: 'tree',
+      importedCreasePattern: null,
       projectLoadId: get().projectLoadId + 1,
       currentFileName: filename,
       currentFilePath: source.path ?? null,
@@ -108,6 +147,60 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
       text,
     });
     useLayoutStore.getState().activatePanel('design');
+  };
+
+  const loadCreasePattern = async (
+    text: string,
+    source: { filename: string; path?: string | null }
+  ) => {
+    set({ status: 'loading_engine', error: null, projectMessage: null });
+    const filename = source.filename;
+    const parsed = parseImportedCreasePattern(text, {
+      format: importedCreasePatternFormat(filename),
+      filename,
+      path: source.path ?? null,
+    });
+    const result = await (async () => {
+      try {
+        const api = await getEngine();
+        const foldArtifacts = await api.flatFoldArtifacts(JSON.stringify(parsed.document.fold), {
+          solution_limit: 10,
+        });
+        return withFlatFoldArtifacts(parsed, foldArtifacts);
+      } catch (error) {
+        return withFlatFoldError(parsed, engineError(error).message);
+      }
+    })();
+    set({
+      project: result.project,
+      documentMode: 'crease-pattern',
+      importedCreasePattern: result.document,
+      projectLoadId: get().projectLoadId + 1,
+      currentFileName: filename,
+      currentFilePath: source.path ?? null,
+      projectMessage: `Loaded ${filename}`,
+      selection: { kind: 'tree' },
+      toolMode: 'select',
+      creaseColorMode: DEFAULT_CREASE_COLOR_MODE,
+      foldArtifacts: result.foldArtifacts,
+      foldArtifactError: null,
+      status: 'crease_pattern_ready',
+      dirty: false,
+      error: null,
+      engineReady: true,
+      lastOptimization: null,
+      historyPast: [],
+      historyFuture: [],
+      clipboardPasteCount: 0,
+    });
+    rememberRecent({
+      id: source.path ?? filename,
+      title: result.document.title,
+      filename,
+      savedAt: nowIso(),
+      text,
+    });
+    useLayoutStore.getState().activatePanel('crease-pattern');
   };
 
   const saveTmd5 = async (fileService: FileService, forceSaveAs: boolean) => {
@@ -143,6 +236,8 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
 
   return {
     project: createEmptyProject(),
+    documentMode: 'tree',
+    importedCreasePattern: null,
     projectLoadId: 0,
     currentFilePath: null,
     currentFileName: 'Untitled.tmd5',
@@ -160,8 +255,14 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
       try {
         const api = await getEngine();
         const snapshot = await initializeBlankTree(api);
+        if (get().documentMode !== 'tree') {
+          set({ engineReady: true });
+          return;
+        }
         set({
           ...projectStateFromSnapshot(snapshot, get().project.title),
+          documentMode: 'tree',
+          importedCreasePattern: null,
           projectLoadId: get().projectLoadId + 1,
           selection: { kind: 'tree' },
           symmetryAuthoringPairs: [],
@@ -178,6 +279,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
     },
 
     createNewProject: async () => {
+      if (rejectDisabled('file.new')) return;
       if (!confirmDiscardDirty(get().dirty)) return;
       set({ status: 'loading_engine', error: null, projectMessage: null });
       try {
@@ -185,6 +287,8 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
         const snapshot = await createBlankTree(api);
         set({
           ...projectStateFromSnapshot(snapshot, 'Untitled'),
+          documentMode: 'tree',
+          importedCreasePattern: null,
           projectLoadId: get().projectLoadId + 1,
           currentFileName: 'Untitled.tmd5',
           currentFilePath: null,
@@ -215,6 +319,8 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
         const snapshot = await createStarterTree(api);
         set({
           ...projectStateFromSnapshot(snapshot, 'Three terminal flaps'),
+          documentMode: 'tree',
+          importedCreasePattern: null,
           projectLoadId: get().projectLoadId + 1,
           currentFileName: 'three-terminal-flaps.tmd5',
           currentFilePath: null,
@@ -245,15 +351,28 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
       }
     },
 
+    loadCreasePatternText: async (text, source) => {
+      try {
+        await loadCreasePattern(text, source);
+      } catch (error) {
+        set({ status: 'error', error: engineError(error), projectMessage: null });
+      }
+    },
+
     openProject: async (fileService = getFileService()) => {
+      if (rejectDisabled('file.open')) return false;
       if (!confirmDiscardDirty(get().dirty)) return false;
       try {
         const file = await fileService.openTextFile({
-          title: 'Open TreeMaker Project',
-          extensions: ['tmd', 'tmd4', 'tmd5'],
+          title: 'Open TreeMaker Project or Crease Pattern',
+          extensions: ['tmd', 'tmd4', 'tmd5', 'fold', 'cp'],
         });
         if (!file) return false;
-        await loadText(file.text, { filename: file.name, path: file.path });
+        if (isCreasePatternFilename(file.name)) {
+          await loadCreasePattern(file.text, { filename: file.name, path: file.path });
+        } else {
+          await loadText(file.text, { filename: file.name, path: file.path });
+        }
         return true;
       } catch (error) {
         set({ status: 'error', error: engineError(error) });
@@ -263,6 +382,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
 
     saveProject: async (fileService = getFileService()) => {
       try {
+        if (rejectDisabled('file.save')) return false;
         return await saveTmd5(fileService, false);
       } catch (error) {
         set({ status: 'error', error: engineError(error) });
@@ -272,6 +392,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
 
     saveProjectAs: async (fileService = getFileService()) => {
       try {
+        if (rejectDisabled('file.saveAs')) return false;
         return await saveTmd5(fileService, true);
       } catch (error) {
         set({ status: 'error', error: engineError(error) });
@@ -281,6 +402,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
 
     exportV4: async (fileService = getFileService()) => {
       try {
+        if (rejectDisabled('file.exportV4')) return false;
         const { api, treeHandle } = await ensureTreeHandle();
         const contents = await api.exportV4(treeHandle);
         const result = await fileService.saveTextFile({
@@ -301,8 +423,14 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
 
     exportFold: async (fileService = getFileService()) => {
       try {
-        const { api, treeHandle } = await ensureTreeHandle();
-        const contents = await api.exportFold(treeHandle);
+        if (rejectDisabled('file.exportFold')) return false;
+        const contents =
+          get().documentMode === 'crease-pattern' && get().importedCreasePattern
+            ? JSON.stringify(get().importedCreasePattern?.fold, null, 2)
+            : await (async () => {
+                const { api, treeHandle } = await ensureTreeHandle();
+                return api.exportFold(treeHandle);
+              })();
         const result = await fileService.saveTextFile({
           title: 'Export FOLD Document',
           contents,
@@ -321,6 +449,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
 
     exportSvg: async (fileService = getFileService()) => {
       try {
+        if (rejectDisabled('file.exportSvg')) return false;
         const contents = serializeCreasePatternSvg(get().project, get().creaseColorMode);
         const result = await fileService.saveTextFile({
           title: 'Export Crease Pattern SVG',
@@ -340,6 +469,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
 
     exportPng: async (fileService = getFileService()) => {
       try {
+        if (rejectDisabled('file.exportPng')) return false;
         const bytes = await renderCreasePatternPng(get().project, get().creaseColorMode);
         const result = await fileService.saveBinaryFile({
           title: 'Export Crease Pattern PNG',
@@ -372,13 +502,21 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
       if (!confirmDiscardDirty(get().dirty)) return;
       const recent = get().recentProjects.find((item) => item.id === id);
       if (!recent) return;
-      await get().loadProjectText(recent.text, {
-        title: recent.title,
-        filename: recent.filename,
-      });
+      if (isCreasePatternFilename(recent.filename)) {
+        await get().loadCreasePatternText(recent.text, {
+          filename: recent.filename,
+          path: recent.id,
+        });
+      } else {
+        await get().loadProjectText(recent.text, {
+          title: recent.title,
+          filename: recent.filename,
+        });
+      }
     },
 
     autosaveProject: async () => {
+      if (get().documentMode !== 'tree') return;
       if (!get().dirty) return;
       try {
         const { api, treeHandle } = await ensureTreeHandle();

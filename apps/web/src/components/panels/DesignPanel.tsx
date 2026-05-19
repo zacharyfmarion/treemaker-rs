@@ -13,15 +13,20 @@ import {
   Axis3d,
   Circle,
   CircleDot,
+  FileQuestionMark,
+  FileText,
+  FolderOpen,
   Layers,
   Link2,
   Maximize2,
   Plus,
+  ScanLine,
   Tag,
   Waypoints,
   ZoomIn,
   ZoomOut,
 } from 'lucide-react';
+import { handleMenuAction } from '../../commands/menuActions';
 import { formatNumber, paperToSvg, type Point } from '../../lib/geometry';
 import {
   DEFAULT_DESIGN_VIEW_LAYERS,
@@ -55,6 +60,7 @@ import {
   type SymmetryLeafPreview,
 } from '../../lib/symmetryAuthoring';
 import { useWorkspaceStore } from '../../store/workspaceStore';
+import { Button } from '../ui/Button';
 import { IconButton } from '../ui/IconButton';
 
 const ZOOM_PRESETS = [25, 50, 100, 200, 400];
@@ -234,6 +240,8 @@ export function DesignPanel() {
   const [spacePressed, setSpacePressed] = useState(false);
   const [hoverPoint, setHoverPoint] = useState<Point | null>(null);
   const project = useWorkspaceStore((state) => state.project);
+  const documentMode = useWorkspaceStore((state) => state.documentMode);
+  const importedCreasePattern = useWorkspaceStore((state) => state.importedCreasePattern);
   const selection = useWorkspaceStore((state) => state.selection);
   const toolMode = useWorkspaceStore((state) => state.toolMode);
   const symmetryAuthoringPairs = useWorkspaceStore((state) => state.symmetryAuthoringPairs);
@@ -568,6 +576,46 @@ export function DesignPanel() {
   const onCanvasPointerMove = (event: PointerEvent<SVGSVGElement>) => {
     setHoverPoint(eventToPaper(event));
   };
+
+  if (documentMode === 'crease-pattern') {
+    return (
+      <section className="panel-shell design-panel">
+        <div className="panel-body document-mode-empty">
+          <div className="document-mode-empty__icon" aria-hidden="true">
+            <FileQuestionMark size={30} />
+          </div>
+          <span className="document-mode-empty__message">
+            {importedCreasePattern
+              ? (
+                <>
+                  <span className="document-mode-empty__filename">
+                    {importedCreasePattern.source.filename}
+                  </span>{' '}
+                  is an imported crease pattern without a TreeMaker tree.
+                </>
+              )
+              : (
+                'This document does not have a TreeMaker tree.'
+              )}
+          </span>
+          <div className="document-mode-empty__actions">
+            <Button size="sm" variant="primary" onClick={() => void handleMenuAction('view.creasePattern')}>
+              <ScanLine size={14} />
+              View CP
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => void handleMenuAction('file.new')}>
+              <FileText size={14} />
+              New Tree
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => void handleMenuAction('file.open')}>
+              <FolderOpen size={14} />
+              Open
+            </Button>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="panel-shell design-panel">

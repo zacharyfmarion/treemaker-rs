@@ -4,6 +4,7 @@ import init, {
   build_crease_pattern,
   export_fold,
   export_v4,
+  flat_fold_artifacts,
   fold_artifacts,
   free_tree,
   load_tmd,
@@ -85,6 +86,12 @@ const api = {
   },
   async foldArtifacts(handle: number): Promise<FoldArtifacts> {
     return call(() => fold_artifacts(handle) as FoldArtifacts);
+  },
+  async flatFoldArtifacts(
+    foldJson: string,
+    options?: { solution_limit?: number }
+  ): Promise<FoldArtifacts> {
+    return call(() => flat_fold_artifacts(foldJson, options ?? null) as FoldArtifacts);
   },
   async saveTmd5(handle: number): Promise<string> {
     return call(() => save_tmd5(handle));

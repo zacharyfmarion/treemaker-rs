@@ -8,7 +8,7 @@ import {
 } from '../../lib/selection';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { SegmentedControl } from '../ui/SegmentedControl';
-import { CreasePatternWorkflowButton } from './CreasePatternWorkflowButton';
+import { NextDocumentAction } from './NextDocumentAction';
 
 const VIEWBOX = 720;
 const PAPER_RECT: PlotRect = { x: 66, y: 54, width: 588, height: 588 };
@@ -22,6 +22,8 @@ export function CreasePatternPanel() {
   const project = useWorkspaceStore((state) => state.project);
   const status = useWorkspaceStore((state) => state.status);
   const error = useWorkspaceStore((state) => state.error);
+  const documentMode = useWorkspaceStore((state) => state.documentMode);
+  const importedCreasePattern = useWorkspaceStore((state) => state.importedCreasePattern);
   const mode = useWorkspaceStore((state) => state.creaseColorMode);
   const selection = useWorkspaceStore((state) => state.selection);
   const setMode = useWorkspaceStore((state) => state.setCreaseColorMode);
@@ -34,7 +36,13 @@ export function CreasePatternPanel() {
         ? 'Optimizing scale'
         : status === 'error' && error
           ? shortStatus(error.message)
-          : 'No crease pattern';
+          : documentMode === 'crease-pattern'
+            ? 'No imported crease pattern'
+            : 'No crease pattern';
+  const sourceLabel =
+    documentMode === 'crease-pattern' && importedCreasePattern
+      ? `${importedCreasePattern.source.filename} | ${importedCreasePattern.lineOnly ? 'View only' : 'Simulatable'}`
+      : null;
 
   return (
     <section className="panel-shell cp-panel">
@@ -69,6 +77,7 @@ export function CreasePatternPanel() {
           <span className="panel-toolbar__meta">{emptyStatusLabel}</span>
         )}
       </div>
+      {sourceLabel && <div className="panel-subtitle">{sourceLabel}</div>}
       <div className="panel-body cp-panel__body">
         {hasCreasePattern ? (
           <svg className="cp-canvas" viewBox={`0 0 ${VIEWBOX} ${VIEWBOX}`} role="img" aria-label="Crease pattern">
@@ -138,7 +147,7 @@ export function CreasePatternPanel() {
         ) : (
           <div className="cp-panel__empty">
             <span title={status === 'error' ? error?.message : undefined}>{emptyStatusLabel}</span>
-            <CreasePatternWorkflowButton />
+            <NextDocumentAction />
           </div>
         )}
       </div>

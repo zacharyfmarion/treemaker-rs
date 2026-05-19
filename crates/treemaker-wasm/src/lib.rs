@@ -7,7 +7,12 @@
 
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
-use treemaker_core::{Tree, TreeDesign, TreeEdit, TreeError};
+use treemaker_core::{
+    FoldedBaseCrease, FoldedBaseFacet, FoldedBaseSnapshot, FoldedBaseVertex, Point, Tree,
+    TreeDesign, TreeEdit, TreeError,
+};
+use treemaker_flatfold::{FlatFoldError, SolutionLimit, SolveOptions, solve_flat_fold};
+use treemaker_fold::{Assignment, FoldDocument};
 use wasm_bindgen::prelude::*;
 
 thread_local! {
@@ -91,6 +96,79 @@ pub fn fold_artifacts(handle: u32) -> std::result::Result<JsValue, JsValue> {
             .serialize(&serializer)
             .map_err(to_js_value)
     })
+}
+
+#[derive(Deserialize)]
+struct FlatFoldOptions {
+    solution_limit: Option<usize>,
+}
+
+#[derive(Serialize)]
+struct ImportedFoldArtifacts {
+    fold: serde_json::Value,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    folded_base: Option<FoldedBaseSnapshot>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    folded_base_error: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    simulation_model: Option<treemaker_fold::PreparedFoldModel>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    simulation_model_error: Option<String>,
+}
+
+#[wasm_bindgen]
+pub fn flat_fold_artifacts(
+    fold_json: &str,
+    options: JsValue,
+) -> std::result::Result<JsValue, JsValue> {
+    let options = if options.is_null() || options.is_undefined() {
+        FlatFoldOptions {
+            solution_limit: None,
+        }
+    } else {
+        serde_wasm_bindgen::from_value(options).map_err(to_js_value)?
+    };
+    let document: FoldDocument = serde_json::from_str(fold_json).map_err(|error| {
+        js_error(
+            "invalid_input",
+            format!("failed to parse FOLD document: {error}"),
+        )
+    })?;
+    let solved = solve_flat_fold(
+        &document,
+        SolveOptions {
+            solution_limit: SolutionLimit::Count(options.solution_limit.unwrap_or(10)),
+            ..SolveOptions::default()
+        },
+    )
+    .map_err(to_js_flatfold_error)?;
+    let normalized = solved.analysis.normalized.document.clone();
+    let mut fold_value = serde_json::to_value(&normalized).map_err(to_js_value)?;
+    if let serde_json::Value::Object(ref mut object) = fold_value {
+        object.insert(
+            "face_orders".to_string(),
+            serde_json::to_value(&solved.face_orders).map_err(to_js_value)?,
+        );
+    }
+    let folded_base = flatfold_base_snapshot(
+        &normalized,
+        &solved.analysis.folded_vertices,
+        &solved.face_orders,
+    );
+    let (simulation_model, simulation_model_error) =
+        match treemaker_fold::prepare_simulation_model(&normalized) {
+            Ok(model) => (Some(model), None),
+            Err(error) => (None, Some(error.to_string())),
+        };
+    let artifacts = ImportedFoldArtifacts {
+        fold: fold_value,
+        folded_base: Some(folded_base),
+        folded_base_error: None,
+        simulation_model,
+        simulation_model_error,
+    };
+    let serializer = serde_wasm_bindgen::Serializer::json_compatible();
+    artifacts.serialize(&serializer).map_err(to_js_value)
 }
 
 #[wasm_bindgen]
@@ -221,6 +299,18 @@ fn to_js_error(error: TreeError) -> JsValue {
     js_error(error.code(), error.to_string())
 }
 
+fn to_js_flatfold_error(error: FlatFoldError) -> JsValue {
+    let message = error.to_string();
+    let code = match &error {
+        FlatFoldError::InvalidInput(_) => "invalid_input",
+        FlatFoldError::PrecisionFailure(_) => "precision_failure",
+        FlatFoldError::AssignmentConflict(_) => "assignment_conflict",
+        FlatFoldError::UnsatisfiedComponent(_) => "unsatisfied_component",
+        FlatFoldError::Unimplemented(_) => "unimplemented",
+    };
+    js_error(code, message)
+}
+
 fn to_js_value(error: impl std::fmt::Display) -> JsValue {
     js_error("js_value", error.to_string())
 }
@@ -231,4 +321,126 @@ fn js_error(code: &'static str, message: impl Into<String>) -> JsValue {
         message: message.into(),
     })
     .unwrap_or_else(|_| JsValue::from_str(code))
+}
+
+fn flatfold_base_snapshot(
+    fold: &FoldDocument,
+    folded_vertices: &[[f64; 2]],
+    face_orders: &[[i64; 3]],
+) -> FoldedBaseSnapshot {
+    let border_vertices = border_vertex_flags(fold);
+    let layer_order = layer_order_from_face_orders(fold.faces_vertices.len(), face_orders);
+    let vertex_count = fold.vertices_coords.len().max(folded_vertices.len());
+    FoldedBaseSnapshot {
+        vertices: (0..vertex_count)
+            .map(|index| {
+                let [x, y] = folded_vertices.get(index).copied().unwrap_or_else(|| {
+                    let coords = fold.vertices_coords.get(index);
+                    [
+                        coords
+                            .and_then(|coord| coord.first())
+                            .copied()
+                            .unwrap_or(0.0),
+                        coords
+                            .and_then(|coord| coord.get(1))
+                            .copied()
+                            .unwrap_or(0.0),
+                    ]
+                });
+                let paper = fold
+                    .vertices_coords
+                    .get(index)
+                    .and_then(|coords| {
+                        (coords.len() >= 2).then(|| Point {
+                            x: coords[0],
+                            y: coords[1],
+                        })
+                    })
+                    .unwrap_or(Point { x, y });
+                FoldedBaseVertex {
+                    id: index,
+                    source_vertex: index,
+                    loc: Point { x, y },
+                    paper_loc: paper,
+                    depth: 0.0,
+                    elevation: 0.0,
+                    is_border: border_vertices.get(index).copied().unwrap_or(false),
+                }
+            })
+            .collect(),
+        creases: fold
+            .edges_vertices
+            .iter()
+            .enumerate()
+            .map(|(index, vertices)| FoldedBaseCrease {
+                id: index,
+                source_crease: index,
+                vertices: *vertices,
+                kind: 0,
+                fold: fold_number(fold.assignment_for_edge(index)),
+            })
+            .collect(),
+        facets: fold
+            .faces_vertices
+            .iter()
+            .enumerate()
+            .map(|(index, vertices)| FoldedBaseFacet {
+                id: index,
+                source_facet: index,
+                vertices: vertices.clone(),
+                color: if index % 2 == 0 { 1 } else { 2 },
+                order: layer_order.get(index).copied().unwrap_or(index),
+            })
+            .collect(),
+    }
+}
+
+fn border_vertex_flags(fold: &FoldDocument) -> Vec<bool> {
+    let mut flags = vec![false; fold.vertices_coords.len()];
+    for (edge_index, [a, b]) in fold.edges_vertices.iter().copied().enumerate() {
+        if fold.assignment_for_edge(edge_index) == Assignment::Boundary {
+            if let Some(flag) = flags.get_mut(a) {
+                *flag = true;
+            }
+            if let Some(flag) = flags.get_mut(b) {
+                *flag = true;
+            }
+        }
+    }
+    flags
+}
+
+fn layer_order_from_face_orders(face_count: usize, face_orders: &[[i64; 3]]) -> Vec<usize> {
+    let mut scores = vec![0isize; face_count];
+    for [above, below, _orientation] in face_orders {
+        if let Some(score) = usize::try_from(*above)
+            .ok()
+            .and_then(|face| scores.get_mut(face))
+        {
+            *score += 1;
+        }
+        if let Some(score) = usize::try_from(*below)
+            .ok()
+            .and_then(|face| scores.get_mut(face))
+        {
+            *score -= 1;
+        }
+    }
+    let mut faces = (0..face_count).collect::<Vec<_>>();
+    faces.sort_by_key(|face| (scores[*face], *face));
+    let mut order = vec![0usize; face_count];
+    for (rank, face) in faces.into_iter().enumerate() {
+        order[face] = rank;
+    }
+    order
+}
+
+fn fold_number(assignment: Assignment) -> i32 {
+    match assignment {
+        Assignment::Mountain => 1,
+        Assignment::Valley => 2,
+        Assignment::Boundary => 3,
+        Assignment::Flat => 0,
+        Assignment::Unassigned | Assignment::Cut | Assignment::Join => 0,
+    }
 }

@@ -1,8 +1,8 @@
 import { projectFromSnapshot } from '../../../engine/snapshotMapper';
 import type { FoldArtifacts, OptimizationReport } from '../../../engine/types';
 import { DEFAULT_CREASE_COLOR_MODE } from '../../../lib/sampleProject';
-import { getCreasePatternWorkflowState } from '../../../lib/workflowAvailability';
 import { useLayoutStore } from '../../layoutStore';
+import { selectWorkspaceCapabilities } from '../capabilities';
 import {
   engineError,
   ensureTreeHandle,
@@ -10,6 +10,7 @@ import {
   type EngineClient,
 } from '../engineRuntime';
 import type { CreasePatternSlice, WorkspaceSliceCreator } from '../types';
+import type { WorkspaceCapabilityId } from '../../../lib/workspaceCapabilities';
 
 export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice> = (
   set,
@@ -24,6 +25,7 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
   }
 
   async function loadFoldArtifacts(): Promise<FoldArtifacts | null> {
+    if (get().documentMode === 'crease-pattern') return get().foldArtifacts;
     try {
       const { api, treeHandle } = await requireActiveTree();
       const foldArtifacts = await api.foldArtifacts(treeHandle);
@@ -37,9 +39,15 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
 
   async function runOptimization(
     label: string,
+    capabilityId: WorkspaceCapabilityId,
     optimize: (api: EngineClient, treeHandle: number) => Promise<OptimizationReport>,
     options: { fitPaperView?: boolean } = {}
   ) {
+    const capability = selectWorkspaceCapabilities(get())[capabilityId];
+    if (!capability.enabled) {
+      set({ error: { code: 'invalid_operation', message: capability.reason } });
+      return;
+    }
     set({ status: 'optimizing', error: null });
     const checkpoint = await get().beginHistoryCheckpoint();
     try {
@@ -72,30 +80,31 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
     foldArtifactError: null,
 
     optimizeScale: async () => {
-      await runOptimization('Optimize scale', (api, treeHandle) => api.optimizeScale(treeHandle), {
-        fitPaperView: true,
-      });
+      await runOptimization('Optimize scale', 'optimize.scale', (api, treeHandle) =>
+        api.optimizeScale(treeHandle),
+        { fitPaperView: true }
+      );
     },
 
     optimizeEdges: async () => {
-      await runOptimization('Optimize edges', (api, treeHandle) => api.optimizeEdges(treeHandle));
+      await runOptimization('Optimize edges', 'optimize.edges', (api, treeHandle) =>
+        api.optimizeEdges(treeHandle)
+      );
     },
 
     optimizeStrain: async () => {
-      await runOptimization('Optimize strain', (api, treeHandle) => api.optimizeStrain(treeHandle));
+      await runOptimization('Optimize strain', 'optimize.strain', (api, treeHandle) =>
+        api.optimizeStrain(treeHandle)
+      );
     },
 
     buildCreasePattern: async () => {
-      const workflowState = getCreasePatternWorkflowState({
-        engineReady: get().engineReady,
-        status: get().status,
-        edgeCount: get().project.edges.length,
-      });
-      if (!workflowState.canBuildCreasePattern) {
+      const capability = selectWorkspaceCapabilities(get())['cp.build'];
+      if (!capability.enabled) {
         set({
           error: {
             code: 'invalid_operation',
-            message: workflowState.buildCreasePatternReason,
+            message: capability.reason,
           },
         });
         return;
@@ -106,13 +115,36 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
       try {
         const { api, treeHandle } = await requireActiveTree();
         const snapshot = await api.buildCreasePattern(treeHandle);
+        const project = projectFromSnapshot(snapshot, get().project.title);
+        const hasDrawableCreasePattern = project.creases.length > 0 || project.facets.length > 0;
+
+        if (!hasDrawableCreasePattern) {
+          set({
+            project,
+            status:
+              project.edges.length === 0
+                ? 'ready'
+                : snapshot.summary.is_feasible
+                  ? 'optimized'
+                  : 'needs_optimization',
+            error: {
+              code: 'invalid_operation',
+              message: 'Build CP completed but did not produce drawable crease-pattern geometry.',
+            },
+            foldArtifacts: null,
+            foldArtifactError: null,
+            projectMessage: null,
+          });
+          return;
+        }
+
         let foldArtifactError: string | null = null;
         const foldArtifacts = await api.foldArtifacts(treeHandle).catch((error) => {
           foldArtifactError = engineError(error).message;
           return null;
         });
         set({
-          project: projectFromSnapshot(snapshot, get().project.title),
+          project,
           status: 'crease_pattern_ready',
           error: null,
           foldArtifacts,

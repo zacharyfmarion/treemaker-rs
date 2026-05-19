@@ -7,6 +7,8 @@ import { useWorkspaceStore } from '../../store/workspaceStore';
 
 export function InspectorPanel() {
   const project = useWorkspaceStore((state) => state.project);
+  const documentMode = useWorkspaceStore((state) => state.documentMode);
+  const importedCreasePattern = useWorkspaceStore((state) => state.importedCreasePattern);
   const selection = useWorkspaceStore((state) => state.selection);
   const moveNode = useWorkspaceStore((state) => state.moveNode);
   const updateNodeLabel = useWorkspaceStore((state) => state.updateNodeLabel);
@@ -143,7 +145,22 @@ export function InspectorPanel() {
             )}
           </>
         )}
-        {selection.kind === 'tree' && (
+        {selection.kind === 'tree' && documentMode === 'crease-pattern' && (
+          <>
+            <div className="inspector-heading"><Square size={15} /> Imported CP</div>
+            <Row label="Title" value={project.title} />
+            <Row label="Source" value={importedCreasePattern?.source.filename ?? 'Unknown'} />
+            <Row label="Format" value={importedCreasePattern?.source.format.toUpperCase() ?? 'CP'} />
+            <Row label="Vertices" value={String(importedCreasePattern?.stats.vertices ?? 0)} />
+            <Row label="Edges" value={String(importedCreasePattern?.stats.edges ?? project.creases.length)} />
+            <Row label="Faces" value={String(importedCreasePattern?.stats.faces ?? project.facets.length)} />
+            <Row
+              label="Simulation"
+              value={importedCreasePattern?.simulationModelError ? 'Unavailable' : 'Ready'}
+            />
+          </>
+        )}
+        {selection.kind === 'tree' && documentMode === 'tree' && (
           <>
             <div className="inspector-heading"><Square size={15} /> Tree</div>
             <Row label="Title" value={project.title} />

@@ -10,6 +10,7 @@ import type { Point } from '../../lib/geometry';
 import type {
   AppStatus,
   CreaseColorMode,
+  DocumentMode,
   Selection,
   ToolMode,
   TreeProject,
@@ -19,6 +20,7 @@ import type {
   SymmetryLeafPreview,
 } from '../../lib/symmetryAuthoring';
 import type { FileService } from '../../platform/fileService';
+import type { ImportedCreasePatternDocument } from '../../lib/creasePatternImport';
 
 export interface RecentProject {
   id: string;
@@ -30,6 +32,8 @@ export interface RecentProject {
 
 export interface ProjectSliceState {
   project: TreeProject;
+  documentMode: DocumentMode;
+  importedCreasePattern: ImportedCreasePatternDocument | null;
   projectLoadId: number;
   currentFilePath: string | null;
   currentFileName: string;
@@ -50,6 +54,10 @@ export interface ProjectSliceActions {
   loadProjectText: (
     text: string,
     source?: { title?: string; filename?: string; path?: string | null; dirty?: boolean }
+  ) => Promise<void>;
+  loadCreasePatternText: (
+    text: string,
+    source: { filename: string; path?: string | null }
   ) => Promise<void>;
   openProject: (fileService?: FileService) => Promise<boolean>;
   saveProject: (fileService?: FileService) => Promise<boolean>;

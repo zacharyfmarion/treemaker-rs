@@ -24,6 +24,7 @@ export const createHistorySlice: WorkspaceSliceCreator<HistorySlice> = (set, get
   historyBusy: false,
 
   beginHistoryCheckpoint: async () => {
+    if (get().documentMode !== 'tree') return null;
     try {
       const { api, treeHandle } = await ensureTreeHandle();
       return api.saveTmd5(treeHandle);
@@ -48,6 +49,7 @@ export const createHistorySlice: WorkspaceSliceCreator<HistorySlice> = (set, get
   clearHistory: () => set({ historyPast: [], historyFuture: [] }),
 
   undo: async () => {
+    if (get().documentMode !== 'tree') return;
     const past = get().historyPast;
     const previous = past.at(-1);
     if (!previous || get().historyBusy) return;
@@ -79,6 +81,7 @@ export const createHistorySlice: WorkspaceSliceCreator<HistorySlice> = (set, get
   },
 
   redo: async () => {
+    if (get().documentMode !== 'tree') return;
     const future = get().historyFuture;
     const next = future[0];
     if (!next || get().historyBusy) return;

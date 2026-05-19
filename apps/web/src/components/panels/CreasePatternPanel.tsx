@@ -39,15 +39,15 @@ export function CreasePatternPanel() {
             options={[
               {
                 value: 'mvf',
-                label: 'Fold types',
+                label: 'Crease roles',
                 icon: <ScanLine size={13} />,
-                title: 'Color by mountain, valley, flat, and border folds',
+                title: 'Color by axial, gusset, ridge, hinge, and pseudohinge roles',
               },
               {
                 value: 'agrh',
-                label: 'Crease roles',
+                label: 'M/V assignment',
                 icon: <GitBranch size={13} />,
-                title: 'Color by axial, gusset, ridge, hinge, and pseudohinge roles',
+                title: 'Color by mountain, valley, flat, and border folds',
               },
             ]}
           />

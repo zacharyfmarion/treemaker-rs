@@ -11,14 +11,14 @@ describe('CreasePatternPanel', () => {
     useWorkspaceStore.setState(initialWorkspaceState, true);
   });
 
-  it('labels crease color controls without abbreviations and defaults to crease roles', () => {
+  it('labels crease color controls without abbreviations and defaults to the M/V assignment', () => {
     const markup = renderToStaticMarkup(<CreasePatternPanel />);
 
     expect(useWorkspaceStore.getState().creaseColorMode).toBe(DEFAULT_CREASE_COLOR_MODE);
     expect(markup).toContain('Color by');
-    expect(markup).toContain('Fold types');
     expect(markup).toContain('Crease roles');
-    expect(markup).toContain('Color by axial, gusset, ridge, hinge, and pseudohinge roles');
+    expect(markup).toContain('M/V assignment');
+    expect(markup).toContain('Color by mountain, valley, flat, and border folds');
     expect(markup).not.toContain('MVF');
     expect(markup).not.toContain('AGRH');
   });

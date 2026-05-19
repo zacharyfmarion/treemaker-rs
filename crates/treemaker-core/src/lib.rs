@@ -2809,6 +2809,13 @@ impl Tree {
             *slot = Some(next_node);
             next_node += 1;
         }
+        for node in &mut self.nodes {
+            if let Some(mapped) = node_map.get(node.index).copied().flatten() {
+                node.index = mapped;
+            }
+        }
+        self.conditions
+            .retain(|condition| condition.kind.node_refs_survive(&node_map));
         for condition in &mut self.conditions {
             condition.kind.remap_nodes(&node_map);
         }
@@ -2826,8 +2833,13 @@ impl Tree {
             edge_map[old_id] = Some(remapped.index);
             self.edges.push(remapped);
         }
+        self.conditions
+            .retain(|condition| condition.kind.edge_refs_survive(&edge_map));
         for condition in &mut self.conditions {
             condition.kind.remap_edges(&edge_map);
+        }
+        for (i, condition) in self.conditions.iter_mut().enumerate() {
+            condition.index = i + 1;
         }
         self.owned_nodes = (1..=self.nodes.len()).collect();
         self.owned_edges = (1..=self.edges.len()).collect();
@@ -2846,8 +2858,13 @@ impl Tree {
             edge_map[old_id] = Some(remapped.index);
             self.edges.push(remapped);
         }
+        self.conditions
+            .retain(|condition| condition.kind.edge_refs_survive(&edge_map));
         for condition in &mut self.conditions {
             condition.kind.remap_edges(&edge_map);
+        }
+        for (i, condition) in self.conditions.iter_mut().enumerate() {
+            condition.index = i + 1;
         }
         self.owned_edges = (1..=self.edges.len()).collect();
     }
@@ -9036,6 +9053,28 @@ impl ConditionKind {
         }
     }
 
+    fn node_refs_survive(&self, map: &[Option<usize>]) -> bool {
+        let survives = |id: usize| map.get(id).copied().flatten().is_some();
+        match *self {
+            Self::NodeCombo { node, .. }
+            | Self::NodeFixed { node, .. }
+            | Self::NodeOnCorner { node }
+            | Self::NodeOnEdge { node }
+            | Self::NodeSymmetric { node } => survives(node),
+            Self::NodesPaired { node1, node2 }
+            | Self::PathActive { node1, node2 }
+            | Self::PathAngleFixed { node1, node2, .. }
+            | Self::PathAngleQuant { node1, node2, .. }
+            | Self::PathCombo { node1, node2, .. } => survives(node1) && survives(node2),
+            Self::NodesCollinear {
+                node1,
+                node2,
+                node3,
+            } => survives(node1) && survives(node2) && survives(node3),
+            Self::EdgeLengthFixed { .. } | Self::EdgesSameStrain { .. } => true,
+        }
+    }
+
     fn remap_nodes(&mut self, map: &[Option<usize>]) {
         match self {
             Self::NodeCombo { node, .. }
@@ -9061,6 +9100,15 @@ impl ConditionKind {
                 remap_value(node3, map);
             }
             Self::EdgeLengthFixed { .. } | Self::EdgesSameStrain { .. } => {}
+        }
+    }
+
+    fn edge_refs_survive(&self, map: &[Option<usize>]) -> bool {
+        let survives = |id: usize| map.get(id).copied().flatten().is_some();
+        match *self {
+            Self::EdgeLengthFixed { edge } => survives(edge),
+            Self::EdgesSameStrain { edge1, edge2 } => survives(edge1) && survives(edge2),
+            _ => true,
         }
     }
 
@@ -9867,6 +9915,71 @@ mod tests {
         .unwrap();
         assert_eq!(tree.snapshot().summary.creases, 0);
         assert_eq!(tree.snapshot().summary.polys, 0);
+    }
+
+    #[test]
+    fn delete_design_node_renumbers_survivors_and_conditions() {
+        let mut tree = triad_design();
+        tree.apply_edit(TreeEdit::AddCondition {
+            kind: ConditionKind::NodeFixed {
+                node: 3,
+                x_fixed: true,
+                y_fixed: false,
+                x_fix_value: 0.86,
+                y_fix_value: 0.0,
+            },
+        })
+        .unwrap();
+        tree.apply_edit(TreeEdit::AddCondition {
+            kind: ConditionKind::NodeFixed {
+                node: 2,
+                x_fixed: true,
+                y_fixed: false,
+                x_fix_value: 0.14,
+                y_fix_value: 0.0,
+            },
+        })
+        .unwrap();
+
+        let report = tree.apply_edit(TreeEdit::DeleteNode { id: 2 }).unwrap();
+
+        assert_eq!(
+            report
+                .snapshot
+                .nodes
+                .iter()
+                .map(|node| (node.id, node.label.as_str()))
+                .collect::<Vec<_>>(),
+            vec![(1, "root"), (2, "t1"), (3, "t2")]
+        );
+        assert_eq!(
+            report
+                .snapshot
+                .edges
+                .iter()
+                .map(|edge| (edge.id, edge.nodes.clone()))
+                .collect::<Vec<_>>(),
+            vec![(1, vec![1, 2]), (2, vec![1, 3])]
+        );
+        assert_eq!(report.snapshot.conditions.len(), 1);
+        match &report.snapshot.conditions[0].kind {
+            ConditionKind::NodeFixed { node, .. } => assert_eq!(*node, 2),
+            other => panic!("unexpected condition kind {other:?}"),
+        }
+
+        let design = tree.to_design();
+        assert_eq!(
+            design.nodes.iter().map(|node| node.id).collect::<Vec<_>>(),
+            vec![1, 2, 3]
+        );
+        assert_eq!(
+            design
+                .edges
+                .iter()
+                .map(|edge| (edge.id, edge.nodes))
+                .collect::<Vec<_>>(),
+            vec![(1, [1, 2]), (2, [1, 3])]
+        );
     }
 
     #[test]

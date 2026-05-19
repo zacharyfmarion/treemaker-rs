@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { basename, extname } from "node:path";
+import { basename, extname, join } from "node:path";
 import { IO } from "../../third_party/flat-folder/src/io.js";
 import { M } from "../../third_party/flat-folder/src/math.js";
 import { X } from "../../third_party/flat-folder/src/conversion.js";
@@ -22,6 +22,12 @@ if (!command || !file) {
 }
 
 try {
+  if (command === "run-corpus") {
+    const limit = parseLimit(args);
+    const result = runCorpus(file, limit);
+    process.stdout.write(`${stableStringify(result)}\n`);
+    process.exit(0);
+  }
   const doc = readFileSync(file, "utf8");
   const limit = parseLimit(args);
   const result = run(command, file, doc, limit);
@@ -33,7 +39,7 @@ try {
 
 function usage() {
   process.stderr.write(
-    "usage: oracle.mjs <normalize|project|overlap|constraints|solve> <file> [--limit <n|all>]\n",
+    "usage: oracle.mjs <normalize|project|overlap|constraints|solve|run-corpus> <file-or-dir> [--limit <n|all>]\n",
   );
 }
 
@@ -50,6 +56,62 @@ function parseLimit(args) {
     throw new Error("limit must be a positive integer or all");
   }
   return limit;
+}
+
+function runCorpus(root, limit) {
+  const entries = [];
+  const seenDirs = new Set();
+  scanFoldFiles(root, entries, seenDirs);
+  const byHash = new Map();
+  let duplicates = 0;
+  for (const file of entries) {
+    const bytes = readFileSync(file);
+    const hash = createHash("sha256").update(bytes).digest("hex");
+    if (byHash.has(hash)) {
+      duplicates += 1;
+      continue;
+    }
+    byHash.set(hash, { file, doc: bytes.toString("utf8") });
+  }
+  const statuses = {};
+  const cases = [];
+  for (const { file, doc } of byHash.values()) {
+    const result = run("solve", file, doc, limit);
+    statuses[result.status] = (statuses[result.status] ?? 0) + 1;
+    cases.push({
+      file,
+      status: result.status,
+      solve: result.solve,
+      constraints: result.constraints,
+      error: result.error,
+    });
+  }
+  return {
+    command: "run-corpus",
+    file: root,
+    limit: limit === Infinity ? "all" : limit,
+    total: entries.length,
+    unique: byHash.size,
+    duplicates,
+    statuses,
+    cases,
+  };
+}
+
+function scanFoldFiles(root, entries, seenDirs) {
+  const stat = statSync(root);
+  if (stat.isDirectory()) {
+    const real = realpathSync(root);
+    if (seenDirs.has(real)) {
+      return;
+    }
+    seenDirs.add(real);
+    for (const entry of readdirSync(root, { withFileTypes: true })) {
+      scanFoldFiles(join(root, entry.name), entries, seenDirs);
+    }
+  } else if (stat.isFile() && extname(root).toLowerCase() === ".fold") {
+    entries.push(root);
+  }
 }
 
 function run(command, file, doc, limit) {
@@ -245,7 +307,7 @@ function constraintsRecord(p) {
 
 function solveRecord(p) {
   const solutionCounts = p.GA.map((A) => A.length);
-  return {
+  const record = {
     components: p.GB.length,
     component_sizes: p.GB.map((B) => B.length),
     solution_counts: solutionCounts,
@@ -253,6 +315,10 @@ function solveRecord(p) {
     face_orders: p.FO.length,
     face_orders_hash: hashJson(p.FO),
   };
+  if (process.env.FLATFOLDER_ORACLE_INCLUDE_DATA === "1") {
+    record.face_orders_data = p.FO;
+  }
+  return record;
 }
 
 function countValues(values) {

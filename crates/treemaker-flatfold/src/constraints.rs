@@ -319,12 +319,14 @@ fn fill_edge_edge_constraints(
     edges_faces: &[Vec<usize>],
     segments_edges: &[Vec<usize>],
 ) -> Result<()> {
-    let mut edge_overlaps = vec![BTreeSet::new(); edges_faces.len()];
+    let mut edge_overlaps = vec![Vec::<usize>::new(); edges_faces.len()];
     for edges in segments_edges {
         for (j, e1) in edges.iter().enumerate() {
             for e2 in edges.iter().skip(j + 1) {
                 let (a, b) = if e1 < e2 { (*e1, *e2) } else { (*e2, *e1) };
-                edge_overlaps[a].insert(b);
+                if !edge_overlaps[a].contains(&b) {
+                    edge_overlaps[a].push(b);
+                }
             }
         }
     }
@@ -368,7 +370,7 @@ fn fill_edge_face_constraints(
     cells_faces: &[Vec<usize>],
     segments_cells: &[Vec<usize>],
 ) -> Result<()> {
-    let mut edge_faces = vec![BTreeSet::new(); edges_faces.len()];
+    let mut edge_faces = vec![Vec::<usize>::new(); edges_faces.len()];
     for (segment_index, cells) in segments_cells.iter().enumerate() {
         if cells.len() != 2 {
             continue;
@@ -382,7 +384,9 @@ fn fill_edge_face_constraints(
             .collect::<Vec<_>>();
         for edge in &segments_edges[segment_index] {
             for face in &common {
-                edge_faces[*edge].insert(*face);
+                if !edge_faces[*edge].contains(face) {
+                    edge_faces[*edge].push(*face);
+                }
             }
         }
     }
@@ -710,15 +714,17 @@ fn transitivity_constraints(
     transitivity_counts: &mut TransitivityCounts,
 ) -> Vec<usize> {
     let f1_cells = faces_cells[f1].iter().copied().collect::<BTreeSet<_>>();
-    let mut candidates = BTreeSet::new();
+    let mut candidates = Vec::new();
     for cell in &faces_cells[f2] {
         if !f1_cells.contains(cell) {
             continue;
         }
-        candidates.extend(cells_faces[*cell].iter().copied());
+        for face in &cells_faces[*cell] {
+            if *face != f1 && *face != f2 && !candidates.contains(face) {
+                candidates.push(*face);
+            }
+        }
     }
-    candidates.remove(&f1);
-    candidates.remove(&f2);
     transitivity_counts.all += candidates.len();
     let cc1 = &connected_components[f1];
     let cc2 = &connected_components[f2];

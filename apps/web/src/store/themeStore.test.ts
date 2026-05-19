@@ -43,8 +43,12 @@ beforeEach(() => {
 describe('themeStore', () => {
   it('exposes the Cascade preset theme set', () => {
     const names = useThemeStore.getState().presetThemes.map((theme) => theme.name);
+    const firstDarkTheme = useThemeStore.getState().presetThemes.find((theme) => theme.type === 'dark');
+    const firstLightTheme = useThemeStore.getState().presetThemes.find((theme) => theme.type === 'light');
 
     expect(names).toHaveLength(23);
+    expect(firstDarkTheme?.name).toBe('One Dark');
+    expect(firstLightTheme?.name).toBe('Atom One Light');
     expect(names).toContain('Solarized Dark');
     expect(names).toContain('GitHub Light');
     expect(names).toContain('Shades of Purple');

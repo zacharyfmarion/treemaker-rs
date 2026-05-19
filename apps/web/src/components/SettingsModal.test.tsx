@@ -23,6 +23,16 @@ function findButton(label: string): HTMLButtonElement {
   return button as HTMLButtonElement;
 }
 
+function themeNamesForSection(rendered: HTMLElement, label: string): string[] {
+  const section = Array.from(rendered.querySelectorAll('.settings-section')).find((element) =>
+    element.querySelector('.settings-section__title')?.textContent?.includes(label)
+  );
+  expect(section).toBeDefined();
+  return Array.from(section?.querySelectorAll('.settings-theme-card__name') ?? []).map(
+    (element) => element.textContent ?? ''
+  );
+}
+
 function renderModal(tab?: SettingsTab) {
   useSettingsStore.getState().openSettings(tab);
   container = document.createElement('div');
@@ -65,6 +75,9 @@ describe('SettingsModal', () => {
     expect(rendered.textContent).toContain('Appearance');
     expect(rendered.textContent).toContain('Solarized Dark');
     expect(rendered.textContent).toContain('GitHub Light');
+
+    expect(themeNamesForSection(rendered, 'Dark')[0]).toBe('One Dark');
+    expect(themeNamesForSection(rendered, 'Light')[0]).toBe('Atom One Light');
 
     act(() => {
       findButton('GitHub Light').click();

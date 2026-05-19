@@ -28,11 +28,12 @@ const oneDarkTheme = oneDark as TreeMakerTheme;
 const atomOneLightTheme = atomOneLight as TreeMakerTheme;
 
 export const PRESET_THEMES: TreeMakerTheme[] = [
+  oneDarkTheme,
+  atomOneLightTheme,
   solarizedDark as TreeMakerTheme,
   solarizedLight as TreeMakerTheme,
   monokai as TreeMakerTheme,
   dracula as TreeMakerTheme,
-  oneDarkTheme,
   nord as TreeMakerTheme,
   tokyoNight as TreeMakerTheme,
   catppuccinMocha as TreeMakerTheme,
@@ -50,7 +51,6 @@ export const PRESET_THEMES: TreeMakerTheme[] = [
   shadesOfPurple as TreeMakerTheme,
   githubDark as TreeMakerTheme,
   githubLight as TreeMakerTheme,
-  atomOneLightTheme,
 ];
 
 export const DEFAULT_DARK_THEME = oneDarkTheme;

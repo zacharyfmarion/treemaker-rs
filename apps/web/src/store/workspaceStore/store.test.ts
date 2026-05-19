@@ -5,6 +5,7 @@ import type {
   EditReport,
   EdgeSnapshot,
   FoldArtifacts,
+  FoldDocument,
   NodeSnapshot,
   OptimizationReport,
   PaperSettings,
@@ -254,6 +255,49 @@ function foldArtifactsFromSnapshot(snapshot: TreeSnapshot): FoldArtifacts {
   };
 }
 
+function foldArtifactsFromFold(fold: FoldDocument): FoldArtifacts {
+  return {
+    fold,
+    folded_base: {
+      vertices: fold.vertices_coords.map((coord, index) => ({
+        id: index,
+        source_vertex: index,
+        loc: { x: coord[0] ?? 0, y: coord[1] ?? 0 },
+        paper_loc: { x: coord[0] ?? 0, y: coord[1] ?? 0 },
+        depth: 0,
+        elevation: 0,
+        is_border: fold.edges_vertices.some(
+          (edge, edgeIndex) =>
+            fold.edges_assignment?.[edgeIndex] === 'B' &&
+            (edge[0] === index || edge[1] === index)
+        ),
+      })),
+      creases: fold.edges_vertices.map((vertices, index) => ({
+        id: index,
+        source_crease: index,
+        vertices,
+        kind: 0,
+        fold: fold.edges_assignment?.[index] === 'M' ? 1 : fold.edges_assignment?.[index] === 'V' ? 2 : 3,
+      })),
+      facets: fold.faces_vertices.map((vertices, index) => ({
+        id: index,
+        source_facet: index,
+        vertices,
+        color: index % 2 === 0 ? 1 : 2,
+        order: index,
+      })),
+    },
+    simulation_model:
+      fold.faces_vertices.length > 0
+        ? {
+            fold,
+            crease_params: [],
+          }
+        : null,
+    simulation_model_error: fold.faces_vertices.length > 0 ? null : 'Simulation requires faces',
+  };
+}
+
 function nextId<T extends { id: number }>(items: T[]): number {
   return Math.max(0, ...items.map((item) => item.id)) + 1;
 }
@@ -336,6 +380,9 @@ function createMockEngineApi(initialSnapshot: TreeSnapshot) {
     exportV4: vi.fn(async () => 'exported-v4'),
     exportFold: vi.fn(async () => JSON.stringify(foldArtifactsFromSnapshot(snapshotState).fold)),
     foldArtifacts: vi.fn(async () => foldArtifactsFromSnapshot(snapshotState)),
+    flatFoldArtifacts: vi.fn(async (foldJson: string) =>
+      foldArtifactsFromFold(JSON.parse(foldJson) as FoldDocument)
+    ),
     optimizeScale: vi.fn(async (): Promise<OptimizationReport> => {
       const oldScale = snapshotState.paper.scale;
       snapshotState = makeSnapshot({
@@ -743,7 +790,7 @@ describe('workspace store slices', () => {
   });
 
   it('loads CP-only documents and gates tree-only persistence', async () => {
-    resetStores(seedSnapshot());
+    const api = resetStores(seedSnapshot());
     loadSnapshotIntoStore(seedSnapshot());
     const activatePanel = vi.fn();
     useLayoutStore.setState({ activatePanel });
@@ -771,6 +818,10 @@ describe('workspace store slices', () => {
     expect(useWorkspaceStore.getState().importedCreasePattern?.source.format).toBe('cp');
     expect(useWorkspaceStore.getState().project.creases.length).toBeGreaterThan(0);
     expect(useWorkspaceStore.getState().project.facets.length).toBeGreaterThan(0);
+    expect(useWorkspaceStore.getState().foldArtifacts?.folded_base?.facets.length).toBeGreaterThan(
+      0
+    );
+    expect(api.flatFoldArtifacts).toHaveBeenCalledOnce();
     expect(activatePanel).toHaveBeenCalledWith('crease-pattern');
 
     await expect(useWorkspaceStore.getState().saveProject(fileService)).resolves.toBe(false);

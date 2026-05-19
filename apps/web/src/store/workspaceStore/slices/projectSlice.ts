@@ -4,6 +4,8 @@ import {
   importedCreasePatternFormat,
   isCreasePatternFilename,
   parseImportedCreasePattern,
+  withFlatFoldArtifacts,
+  withFlatFoldError,
 } from '../../../lib/creasePatternImport';
 import { createEmptyProject, DEFAULT_CREASE_COLOR_MODE } from '../../../lib/sampleProject';
 import {
@@ -151,12 +153,24 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
     text: string,
     source: { filename: string; path?: string | null }
   ) => {
+    set({ status: 'loading_engine', error: null, projectMessage: null });
     const filename = source.filename;
-    const result = parseImportedCreasePattern(text, {
+    const parsed = parseImportedCreasePattern(text, {
       format: importedCreasePatternFormat(filename),
       filename,
       path: source.path ?? null,
     });
+    const result = await (async () => {
+      try {
+        const api = await getEngine();
+        const foldArtifacts = await api.flatFoldArtifacts(JSON.stringify(parsed.document.fold), {
+          solution_limit: 10,
+        });
+        return withFlatFoldArtifacts(parsed, foldArtifacts);
+      } catch (error) {
+        return withFlatFoldError(parsed, engineError(error).message);
+      }
+    })();
     set({
       project: result.project,
       documentMode: 'crease-pattern',
@@ -178,6 +192,13 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
       historyPast: [],
       historyFuture: [],
       clipboardPasteCount: 0,
+    });
+    rememberRecent({
+      id: source.path ?? filename,
+      title: result.document.title,
+      filename,
+      savedAt: nowIso(),
+      text,
     });
     useLayoutStore.getState().activatePanel('crease-pattern');
   };
@@ -481,10 +502,17 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
       if (!confirmDiscardDirty(get().dirty)) return;
       const recent = get().recentProjects.find((item) => item.id === id);
       if (!recent) return;
-      await get().loadProjectText(recent.text, {
-        title: recent.title,
-        filename: recent.filename,
-      });
+      if (isCreasePatternFilename(recent.filename)) {
+        await get().loadCreasePatternText(recent.text, {
+          filename: recent.filename,
+          path: recent.id,
+        });
+      } else {
+        await get().loadProjectText(recent.text, {
+          title: recent.title,
+          filename: recent.filename,
+        });
+      }
     },
 
     autosaveProject: async () => {

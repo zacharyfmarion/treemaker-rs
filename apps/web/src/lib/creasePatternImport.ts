@@ -125,6 +125,53 @@ export function parseImportedCreasePattern(
   };
 }
 
+export function withFlatFoldArtifacts(
+  result: ImportedCreasePatternResult,
+  foldArtifacts: FoldArtifacts
+): ImportedCreasePatternResult {
+  const fold = foldArtifacts.fold;
+  const document: ImportedCreasePatternDocument = {
+    ...result.document,
+    fold,
+    lineOnly: fold.faces_vertices.length === 0,
+    simulationModelError: foldArtifacts.simulation_model_error ?? null,
+    diagnostics: mergeDiagnostics(result.document.diagnostics, {
+      warnings: [
+        ...(foldArtifacts.folded_base_error ? [foldArtifacts.folded_base_error] : []),
+        ...(foldArtifacts.simulation_model_error ? [foldArtifacts.simulation_model_error] : []),
+      ],
+      errors: [],
+    }),
+    stats: statsFromFold(fold),
+  };
+  return {
+    document,
+    project: projectFromFold(fold, document.title),
+    foldArtifacts,
+  };
+}
+
+export function withFlatFoldError(
+  result: ImportedCreasePatternResult,
+  message: string
+): ImportedCreasePatternResult {
+  return {
+    ...result,
+    document: {
+      ...result.document,
+      diagnostics: mergeDiagnostics(result.document.diagnostics, {
+        warnings: [],
+        errors: [`Flat-folder solve failed: ${message}`],
+      }),
+    },
+    foldArtifacts: {
+      ...result.foldArtifacts,
+      folded_base: null,
+      folded_base_error: message,
+    },
+  };
+}
+
 function parseCpText(
   text: string,
   filename: string,
@@ -567,6 +614,20 @@ function statsFromFold(fold: FoldDocument): ImportedCreasePatternStats {
       unassigned: 0,
     }
   );
+}
+
+function mergeDiagnostics(
+  current: ImportedCreasePatternDiagnostics,
+  next: ImportedCreasePatternDiagnostics
+): ImportedCreasePatternDiagnostics {
+  return {
+    warnings: unique([...current.warnings, ...next.warnings]),
+    errors: unique([...current.errors, ...next.errors]),
+  };
+}
+
+function unique(values: string[]): string[] {
+  return [...new Set(values.filter((value) => value.trim().length > 0))];
 }
 
 function completeFold(fold: FoldDocument): FoldDocument {

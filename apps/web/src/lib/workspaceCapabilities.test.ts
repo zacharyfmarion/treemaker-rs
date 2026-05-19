@@ -84,6 +84,8 @@ describe('workspace capabilities', () => {
     expect(state['file.save'].enabled).toBe(false);
     expect(state['file.exportFold'].enabled).toBe(true);
     expect(state['file.exportSvg'].enabled).toBe(true);
+    expect(state['view.foldedBase'].enabled).toBe(true);
+    expect(state['foldedBase.refresh'].enabled).toBe(false);
     expect(getNextDocumentAction(state)).toBe(null);
   });
 

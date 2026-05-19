@@ -149,9 +149,9 @@ export function getWorkspaceCapabilities(input: WorkspaceCapabilityInput): Works
       hasCreasePattern ? 'Show the simulator pane' : 'Build or import a crease pattern before simulating'
     ),
     'view.foldedBase': capability(
-      treeMode && hasCreasePattern,
+      hasCreasePattern,
       'Folded Base',
-      treeMode ? 'Build a crease pattern before viewing the folded base' : 'Folded base view requires a TreeMaker tree'
+      hasCreasePattern ? 'Show the folded base pane' : 'Build or import a crease pattern before viewing the folded base'
     ),
     'view.conditions': capability(true, 'Conditions', 'Show the conditions pane'),
     'view.resetLayout': capability(true, 'Reset Layout', 'Reset pane layout'),
@@ -191,7 +191,7 @@ export function getWorkspaceCapabilities(input: WorkspaceCapabilityInput): Works
     'foldedBase.refresh': capability(
       treeMode && hasCreasePattern && !isBusy,
       'Refresh',
-      treeMode ? busyOr('Refresh folded base', input.status) : 'Folded base view requires a TreeMaker tree'
+      treeMode ? busyOr('Refresh folded base', input.status) : 'Imported crease patterns are solved on import'
     ),
   };
 }

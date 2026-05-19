@@ -20,10 +20,7 @@ export function FoldedBasePanel() {
   const [loading, setLoading] = useState(false);
 
   const foldedBase = foldArtifacts?.folded_base ?? null;
-  const foldedBaseError =
-    documentMode === 'crease-pattern'
-      ? 'Folded base view requires a TreeMaker tree document'
-      : foldArtifacts?.folded_base_error ?? foldArtifactError;
+  const foldedBaseError = foldArtifacts?.folded_base_error ?? foldArtifactError;
   const refreshCapability = capabilities['foldedBase.refresh'];
 
   useEffect(() => {
@@ -39,9 +36,7 @@ export function FoldedBasePanel() {
   }, [creaseCount, documentMode, foldArtifacts, refreshFoldArtifacts]);
 
   const statusLabel =
-    documentMode === 'crease-pattern'
-      ? 'Unavailable for imported CP'
-      : creaseCount === 0
+    creaseCount === 0
       ? status === 'building_crease_pattern'
         ? 'Building crease pattern'
         : 'No crease pattern'

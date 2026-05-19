@@ -3,8 +3,8 @@ use wasm_bindgen::JsValue;
 use wasm_bindgen_test::*;
 
 use treemaker_wasm::{
-    apply_edit, build_crease_pattern, cp_status_report, export_v4, free_tree, load_tmd, new_design,
-    optimize_scale, save_tmd5, tree_design, tree_snapshot, tree_summary,
+    apply_edit, build_crease_pattern, cp_status_report, export_v4, flat_fold_artifacts, free_tree,
+    load_tmd, new_design, optimize_scale, save_tmd5, tree_design, tree_snapshot, tree_summary,
 };
 
 const FIXTURE_1: &str = include_str!("../testdata/tmModelTester_1.tmd5");
@@ -102,6 +102,43 @@ fn editable_design_api_returns_snapshots() {
     .expect_err("cycle should be rejected");
     assert_js_error(&err, "invalid_operation", "tree topology");
     free_tree(handle).expect("free handle");
+}
+
+#[wasm_bindgen_test]
+fn flat_folder_artifacts_returns_imported_folded_base() {
+    let fold = serde_json::json!({
+        "file_spec": 1.2,
+        "frame_classes": ["creasePattern"],
+        "vertices_coords": [[0, 0], [1, 0], [1, 1], [0, 1]],
+        "edges_vertices": [[0, 1], [1, 2], [2, 3], [3, 0], [0, 2]],
+        "edges_assignment": ["B", "B", "B", "B", "M"],
+        "edges_foldAngle": [null, null, null, null, -180],
+        "faces_vertices": [[0, 1, 2], [0, 2, 3]]
+    });
+    let options = serde_wasm_bindgen::to_value(&serde_json::json!({
+        "solution_limit": 1
+    }))
+    .expect("options");
+
+    let artifacts =
+        json(flat_fold_artifacts(&fold.to_string(), options).expect("flat-folder artifacts"));
+
+    assert_eq!(
+        artifacts["fold"]["faces_vertices"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+    assert_eq!(
+        artifacts["folded_base"]["facets"]
+            .as_array()
+            .expect("folded facets")
+            .len(),
+        2
+    );
+    assert!(artifacts["fold"]["face_orders"].is_array());
+    assert!(artifacts["simulation_model"].is_object());
 }
 
 fn json(value: JsValue) -> Value {

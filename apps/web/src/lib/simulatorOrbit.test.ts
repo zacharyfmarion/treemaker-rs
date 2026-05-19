@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  SIMULATOR_MAX_PITCH,
-  SIMULATOR_MIN_PITCH,
+  normalizeAngle,
   nextSimulatorOrbitView,
   type SimulatorOrbitDrag,
   type SimulatorOrbitView,
@@ -21,9 +20,18 @@ describe('simulator orbit controls', () => {
     expect(nextSimulatorOrbitView(view, drag, { x: 100, y: 60 }).pitch).toBeLessThan(view.pitch);
   });
 
-  it('preserves zoom and clamps pitch', () => {
+  it('allows vertical orbiting past the old pitch limit', () => {
+    expect(nextSimulatorOrbitView(view, drag, { x: 100, y: -80 }).pitch).toBeLessThan(-1.35);
+    expect(nextSimulatorOrbitView(view, drag, { x: 100, y: 300 }).pitch).toBeGreaterThan(1.35);
+  });
+
+  it('preserves zoom and normalizes angles', () => {
     expect(nextSimulatorOrbitView(view, drag, { x: 100, y: 100 }).zoom).toBe(view.zoom);
-    expect(nextSimulatorOrbitView(view, drag, { x: 100, y: -1000 }).pitch).toBe(SIMULATOR_MIN_PITCH);
-    expect(nextSimulatorOrbitView(view, drag, { x: 100, y: 1000 }).pitch).toBe(SIMULATOR_MAX_PITCH);
+    const farOrbit = nextSimulatorOrbitView(view, drag, { x: 5000, y: 5000 });
+    expect(farOrbit.yaw).toBeGreaterThanOrEqual(-Math.PI);
+    expect(farOrbit.yaw).toBeLessThan(Math.PI);
+    expect(farOrbit.pitch).toBeGreaterThanOrEqual(-Math.PI);
+    expect(farOrbit.pitch).toBeLessThan(Math.PI);
+    expect(normalizeAngle(Math.PI * 3)).toBeCloseTo(-Math.PI);
   });
 });

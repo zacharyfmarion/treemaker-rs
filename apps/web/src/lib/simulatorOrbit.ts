@@ -17,8 +17,6 @@ export interface SimulatorOrbitPoint {
 }
 
 export const SIMULATOR_ORBIT_SENSITIVITY = 0.01;
-export const SIMULATOR_MIN_PITCH = -1.35;
-export const SIMULATOR_MAX_PITCH = 1.35;
 
 export function nextSimulatorOrbitView(
   view: SimulatorOrbitView,
@@ -27,15 +25,12 @@ export function nextSimulatorOrbitView(
 ): SimulatorOrbitView {
   return {
     ...view,
-    yaw: drag.yaw - (point.x - drag.x) * SIMULATOR_ORBIT_SENSITIVITY,
-    pitch: clamp(
-      drag.pitch + (point.y - drag.y) * SIMULATOR_ORBIT_SENSITIVITY,
-      SIMULATOR_MIN_PITCH,
-      SIMULATOR_MAX_PITCH
-    ),
+    yaw: normalizeAngle(drag.yaw - (point.x - drag.x) * SIMULATOR_ORBIT_SENSITIVITY),
+    pitch: normalizeAngle(drag.pitch + (point.y - drag.y) * SIMULATOR_ORBIT_SENSITIVITY),
   };
 }
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
+export function normalizeAngle(value: number): number {
+  const fullTurn = Math.PI * 2;
+  return ((((value + Math.PI) % fullTurn) + fullTurn) % fullTurn) - Math.PI;
 }

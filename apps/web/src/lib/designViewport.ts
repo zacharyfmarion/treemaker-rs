@@ -19,6 +19,7 @@ export const DESIGN_BASE_WORLD_RECT: PlotRect = {
 export const DESIGN_PAPER_SHADOW_RECT: PlotRect = { x: 56, y: 44, width: 608, height: 608 };
 
 const WORLD_PADDING = 32;
+export const VIEWPORT_FIT_PADDING = 96;
 const NODE_RADIUS = 14;
 const LEAF_NODE_RADIUS = 14;
 const LABEL_HEIGHT = 22;
@@ -57,6 +58,17 @@ interface Bounds {
 export interface DesignWorldOptions {
   nodeLocations?: ReadonlyMap<number, Point>;
   padding?: number;
+}
+
+export interface ViewportSize {
+  width: number;
+  height: number;
+}
+
+export interface DesignViewportTransform {
+  positionX: number;
+  positionY: number;
+  scale: number;
 }
 
 function includePoint(bounds: Bounds, point: Point): void {
@@ -153,6 +165,35 @@ export function getDesignWorldRect(
     y: bounds.minY - padding,
     width: bounds.maxX - bounds.minX + padding * 2,
     height: bounds.maxY - bounds.minY + padding * 2,
+  };
+}
+
+export function getViewportFitScale(
+  viewport: ViewportSize,
+  targetRect: Pick<PlotRect, 'width' | 'height'>,
+  padding = VIEWPORT_FIT_PADDING,
+  maxScale = 1
+): number {
+  const width = Math.max(1, viewport.width - padding);
+  const height = Math.max(1, viewport.height - padding);
+  return Math.max(0.05, Math.min(width / targetRect.width, height / targetRect.height, maxScale));
+}
+
+export function getCenteredDesignTransform(
+  viewport: ViewportSize,
+  worldRect: PlotRect,
+  targetRect: PlotRect,
+  padding = VIEWPORT_FIT_PADDING,
+  maxScale = 1
+): DesignViewportTransform {
+  const scale = getViewportFitScale(viewport, targetRect, padding, maxScale);
+  const targetCenterX = targetRect.x - worldRect.x + targetRect.width / 2;
+  const targetCenterY = targetRect.y - worldRect.y + targetRect.height / 2;
+
+  return {
+    scale,
+    positionX: viewport.width / 2 - targetCenterX * scale,
+    positionY: viewport.height / 2 - targetCenterY * scale,
   };
 }
 

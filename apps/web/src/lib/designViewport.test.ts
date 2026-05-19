@@ -5,7 +5,9 @@ import {
   DEFAULT_DESIGN_VIEW_LAYERS,
   DESIGN_PAPER_RECT,
   clientPointToPaper,
+  getCenteredDesignTransform,
   getDesignWorldRect,
+  getViewportFitScale,
   setDesignLayerVisibility,
 } from './designViewport';
 
@@ -36,6 +38,25 @@ describe('design viewport helpers', () => {
 
     expect(paperPoint.x).toBeCloseTo(targetPaperPoint.x);
     expect(paperPoint.y).toBeCloseTo(targetPaperPoint.y);
+  });
+
+  it('computes centered transforms for fitting a target rect inside the viewport', () => {
+    const viewport = { width: 900, height: 720 };
+    const worldRect = { x: -300, y: -200, width: 1500, height: 1400 };
+
+    const transform = getCenteredDesignTransform(viewport, worldRect, DESIGN_PAPER_RECT);
+
+    expect(transform.scale).toBe(1);
+    expect(transform.positionX).toBeCloseTo(-210);
+    expect(transform.positionY).toBeCloseTo(-188);
+  });
+
+  it('uses the target rect, not the world rect, when computing fit scale', () => {
+    const viewport = { width: 500, height: 400 };
+    const oversizedWorld = { width: 1800, height: 1600 };
+
+    expect(getViewportFitScale(viewport, DESIGN_PAPER_RECT)).toBeCloseTo(304 / 588);
+    expect(getViewportFitScale(viewport, oversizedWorld)).toBeCloseTo(304 / 1600);
   });
 
   it('keeps layer visibility state separate from project data', () => {

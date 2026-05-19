@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -25,8 +26,11 @@ import {
   DEFAULT_DESIGN_VIEW_LAYERS,
   DESIGN_PAPER_RECT,
   DESIGN_PAPER_SHADOW_RECT,
+  type ViewportSize,
   clientPointToPaper,
+  getCenteredDesignTransform,
   getDesignWorldRect,
+  getViewportFitScale,
   leafCircleRadius,
   setDesignLayerVisibility,
   type DesignViewLayerKey,
@@ -197,6 +201,9 @@ export function DesignPanel() {
   const addNodeAt = useWorkspaceStore((state) => state.addNodeAt);
   const moveNode = useWorkspaceStore((state) => state.moveNode);
   const projectLoadId = useWorkspaceStore((state) => state.projectLoadId);
+  const designViewportFitRequestId = useWorkspaceStore(
+    (state) => state.designViewportFitRequestId
+  );
 
   const nodeLocations = useMemo(() => {
     if (!dragging) return undefined;
@@ -235,14 +242,35 @@ export function DesignPanel() {
     [worldRect]
   );
 
+  const getViewportSize = useCallback((): ViewportSize | null => {
+    const viewport = containerRef.current;
+    if (!viewport) return null;
+    return {
+      width: viewport.clientWidth || viewport.offsetWidth,
+      height: viewport.clientHeight || viewport.offsetHeight,
+    };
+  }, []);
+
   const computeFitScale = useCallback(() => {
-    const container = containerRef.current;
-    if (!container) return 1;
-    const padding = 96;
-    const width = Math.max(1, container.clientWidth - padding);
-    const height = Math.max(1, container.clientHeight - padding);
-    return Math.max(0.05, Math.min(width / worldRect.width, height / worldRect.height, 1));
-  }, [worldRect]);
+    const viewport = getViewportSize();
+    if (!viewport) return 1;
+    return getViewportFitScale(viewport, worldRect);
+  }, [getViewportSize, worldRect]);
+
+  const fitPaperToView = useCallback(
+    (animationTime = 180) => {
+      const viewport = getViewportSize();
+      if (!viewport) return;
+      const transform = getCenteredDesignTransform(viewport, worldRect, DESIGN_PAPER_RECT);
+      transformRef.current?.setTransform(
+        transform.positionX,
+        transform.positionY,
+        transform.scale,
+        animationTime
+      );
+    },
+    [getViewportSize, worldRect]
+  );
 
   const fitToView = useCallback(
     (animationTime = 180) => {
@@ -260,6 +288,18 @@ export function DesignPanel() {
   }, []);
 
   const lastFittedProjectLoadIdRef = useRef<number | null>(null);
+  const lastHandledFitRequestRef = useRef(0);
+  useLayoutEffect(() => {
+    if (designViewportFitRequestId === 0) return undefined;
+    if (lastHandledFitRequestRef.current === designViewportFitRequestId) return undefined;
+    lastHandledFitRequestRef.current = designViewportFitRequestId;
+    lastFittedProjectLoadIdRef.current = projectLoadId;
+
+    fitPaperToView(0);
+    const frame = requestAnimationFrame(() => fitPaperToView(0));
+    return () => cancelAnimationFrame(frame);
+  }, [designViewportFitRequestId, fitPaperToView, projectLoadId]);
+
   const fitLoadedProject = useCallback(
     (animationTime = 0) => {
       if (lastFittedProjectLoadIdRef.current === projectLoadId) return true;

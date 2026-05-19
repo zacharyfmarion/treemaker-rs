@@ -526,6 +526,7 @@ function loadSnapshotIntoStore(snapshot: TreeSnapshot, title = 'Seed project') {
     engineReady: true,
     error: null,
     lastOptimization: null,
+    designViewportFitRequestId: 0,
     historyPast: [],
     historyFuture: [],
     historyBusy: false,
@@ -596,6 +597,7 @@ describe('workspace store slices', () => {
     expect(state.toolMode).toBe('select');
     expect(state.creaseColorMode).toBe(DEFAULT_CREASE_COLOR_MODE);
     expect(state.foldArtifacts).toBeNull();
+    expect(state.designViewportFitRequestId).toBe(0);
     expect(state.historyPast).toEqual([]);
     expect(state.clipboard).toBeNull();
     expect(state.projectLoadId).toBe(0);
@@ -877,15 +879,25 @@ describe('workspace store slices', () => {
     const activatePanel = vi.fn();
     useLayoutStore.setState({ activatePanel });
 
+    const initialFitRequestId = useWorkspaceStore.getState().designViewportFitRequestId;
     await useWorkspaceStore.getState().optimizeScale();
     expect(useWorkspaceStore.getState().status).toBe('optimized');
     expect(useWorkspaceStore.getState().lastOptimization).toMatchObject({ kind: 'scale' });
+    expect(useWorkspaceStore.getState().designViewportFitRequestId).toBe(
+      initialFitRequestId + 1
+    );
 
     await useWorkspaceStore.getState().optimizeEdges();
     expect(useWorkspaceStore.getState().lastOptimization).toMatchObject({ kind: 'edges' });
+    expect(useWorkspaceStore.getState().designViewportFitRequestId).toBe(
+      initialFitRequestId + 1
+    );
 
     await useWorkspaceStore.getState().optimizeStrain();
     expect(useWorkspaceStore.getState().lastOptimization).toMatchObject({ kind: 'strain' });
+    expect(useWorkspaceStore.getState().designViewportFitRequestId).toBe(
+      initialFitRequestId + 1
+    );
 
     await useWorkspaceStore.getState().buildCreasePattern();
     expect(useWorkspaceStore.getState().status).toBe('crease_pattern_ready');

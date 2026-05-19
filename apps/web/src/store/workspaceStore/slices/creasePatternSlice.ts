@@ -37,7 +37,8 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
 
   async function runOptimization(
     label: string,
-    optimize: (api: EngineClient, treeHandle: number) => Promise<OptimizationReport>
+    optimize: (api: EngineClient, treeHandle: number) => Promise<OptimizationReport>,
+    options: { fitPaperView?: boolean } = {}
   ) {
     set({ status: 'optimizing', error: null });
     const checkpoint = await get().beginHistoryCheckpoint();
@@ -54,6 +55,9 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
         foldArtifactError: null,
         dirty: true,
         projectMessage: label,
+        designViewportFitRequestId: options.fitPaperView
+          ? get().designViewportFitRequestId + 1
+          : get().designViewportFitRequestId,
       });
       get().commitHistoryCheckpoint(checkpoint, label);
       void get().autosaveProject();
@@ -68,7 +72,9 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
     foldArtifactError: null,
 
     optimizeScale: async () => {
-      await runOptimization('Optimize scale', (api, treeHandle) => api.optimizeScale(treeHandle));
+      await runOptimization('Optimize scale', (api, treeHandle) => api.optimizeScale(treeHandle), {
+        fitPaperView: true,
+      });
     },
 
     optimizeEdges: async () => {

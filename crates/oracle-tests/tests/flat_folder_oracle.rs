@@ -23,7 +23,7 @@ fn flat_folder_normalization_matches_js_oracle_when_enabled() {
     }
     for fixture in ["kabuto.fold", "bad_twist.fold"] {
         let path = root.join("tests/fixtures/flat-folder").join(fixture);
-        let record = run_flat_folder_oracle(&oracle, &root, "project", &path);
+        let record = run_flat_folder_oracle(&oracle, &root, "overlap", &path);
         assert_eq!(record["status"].as_str(), Some("ok"), "{fixture}");
         let text = std::fs::read_to_string(&path)
             .unwrap_or_else(|err| panic!("{}: {err}", path.display()));
@@ -40,7 +40,6 @@ fn flat_folder_normalization_matches_js_oracle_when_enabled() {
         let analysis = treemaker_flatfold::analyze_flat_fold(
             &document,
             treemaker_flatfold::AnalyzeOptions {
-                include_overlap_graph: false,
                 ..treemaker_flatfold::AnalyzeOptions::default()
             },
         )
@@ -51,6 +50,95 @@ fn flat_folder_normalization_matches_js_oracle_when_enabled() {
             &record,
             fixture,
         );
+        let overlap = analysis
+            .overlap
+            .as_ref()
+            .unwrap_or_else(|| panic!("{fixture}: missing overlap graph"));
+        assert_overlap_record(overlap, &record, fixture);
+    }
+}
+
+fn assert_overlap_record(
+    overlap: &treemaker_flatfold::OverlapGraph,
+    record: &Value,
+    fixture: &str,
+) {
+    let oracle = &record["overlap"];
+    assert_eq!(
+        overlap.points.len(),
+        oracle["points"].as_u64().expect("points") as usize,
+        "{fixture}"
+    );
+    assert_eq!(
+        overlap.segments_points.len(),
+        oracle["segments"].as_u64().expect("segments") as usize,
+        "{fixture}"
+    );
+    assert_eq!(
+        overlap.cells_points.len(),
+        oracle["cells"].as_u64().expect("cells") as usize,
+        "{fixture}"
+    );
+    assert_hash(
+        &overlap.segments_points,
+        oracle,
+        "segments_points_hash",
+        fixture,
+    );
+    assert_hash(
+        &overlap.segments_edges,
+        oracle,
+        "segments_edges_hash",
+        fixture,
+    );
+    assert_semantic_cells_match(overlap, oracle, fixture);
+}
+
+fn assert_semantic_cells_match(
+    overlap: &treemaker_flatfold::OverlapGraph,
+    oracle: &Value,
+    fixture: &str,
+) {
+    let oracle_cells = oracle["cells_points"].as_array().expect("cells_points");
+    let oracle_cells_faces = oracle["cells_faces"].as_array().expect("cells_faces");
+    let oracle_segments_cells = oracle["segments_cells"].as_array().expect("segments_cells");
+    let mut oracle_cell_by_polygon = BTreeMap::<String, usize>::new();
+    for (index, cell) in oracle_cells.iter().enumerate() {
+        let key = serde_json::to_string(cell).expect("cell key");
+        assert!(
+            oracle_cell_by_polygon.insert(key, index).is_none(),
+            "{fixture}: duplicate oracle cell polygon"
+        );
+    }
+
+    let mut rust_to_oracle = Vec::new();
+    for (cell_index, cell) in overlap.cells_points.iter().enumerate() {
+        let key = serde_json::to_string(cell).expect("rust cell key");
+        let Some(oracle_index) = oracle_cell_by_polygon.get(&key).copied() else {
+            panic!("{fixture}: rust cell {cell_index} missing from oracle: {key}");
+        };
+        rust_to_oracle.push(oracle_index);
+        assert_eq!(
+            serde_json::to_value(&overlap.cells_faces[cell_index]).expect("rust cell faces"),
+            oracle_cells_faces[oracle_index],
+            "{fixture}: cell faces for {key}"
+        );
+    }
+
+    for (segment_index, rust_cells) in overlap.segments_cells.iter().enumerate() {
+        let mut mapped_rust = rust_cells
+            .iter()
+            .map(|cell| rust_to_oracle[*cell])
+            .collect::<Vec<_>>();
+        mapped_rust.sort_unstable();
+        let mut expected = oracle_segments_cells[segment_index]
+            .as_array()
+            .expect("oracle segment cells")
+            .iter()
+            .map(|value| value.as_u64().expect("oracle cell") as usize)
+            .collect::<Vec<_>>();
+        expected.sort_unstable();
+        assert_eq!(mapped_rust, expected, "{fixture}: segment {segment_index}");
     }
 }
 

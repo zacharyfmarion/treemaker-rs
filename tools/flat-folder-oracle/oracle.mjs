@@ -73,7 +73,7 @@ function run(command, file, doc, limit) {
     case "project":
       return { ...common, normalize: normalizeRecord(pipeline), project: projectRecord(pipeline, true) };
     case "overlap":
-      return { ...common, normalize: normalizeRecord(pipeline), project: projectRecord(pipeline), overlap: overlapRecord(pipeline) };
+      return { ...common, normalize: normalizeRecord(pipeline), project: projectRecord(pipeline, true), overlap: overlapRecord(pipeline, true) };
     case "constraints":
       return { ...common, normalize: normalizeRecord(pipeline), project: projectRecord(pipeline), overlap: overlapRecord(pipeline), constraints: constraintsRecord(pipeline) };
     case "solve":
@@ -208,8 +208,8 @@ function projectRecord(p, includeData = false) {
   return record;
 }
 
-function overlapRecord(p) {
-  return {
+function overlapRecord(p, includeData = false) {
+  const record = {
     points: p.P.length,
     segments: p.SP.length,
     cells: p.CP.length,
@@ -221,6 +221,12 @@ function overlapRecord(p) {
     cells_faces_hash: hashJson(p.CF),
     faces_cells_hash: hashJson(p.FC),
   };
+  if (includeData) {
+    record.segments_cells = p.SC;
+    record.cells_points = p.CP;
+    record.cells_faces = p.CF;
+  }
+  return record;
 }
 
 function constraintsRecord(p) {

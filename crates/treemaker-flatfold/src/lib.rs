@@ -9,7 +9,7 @@ mod avl;
 mod conversion;
 mod math;
 
-use conversion::{normalize_document, project_normalized};
+use conversion::{build_overlap_graph, normalize_document, project_normalized};
 use serde::{Deserialize, Serialize};
 use treemaker_fold::FoldDocument;
 
@@ -102,6 +102,9 @@ pub struct Analysis {
 pub struct OverlapGraph {
     pub points: Vec<[f64; 2]>,
     pub segments_points: Vec<[usize; 2]>,
+    pub segments_edges: Vec<Vec<usize>>,
+    pub segments_cells: Vec<Vec<usize>>,
+    pub cells_segments: Vec<Vec<usize>>,
     pub cells_points: Vec<Vec<usize>>,
     pub cells_faces: Vec<Vec<usize>>,
     pub faces_cells: Vec<Vec<usize>>,
@@ -132,14 +135,16 @@ pub fn normalize_fold(
 pub fn analyze_flat_fold(document: &FoldDocument, options: AnalyzeOptions) -> Result<Analysis> {
     let normalized = normalize_fold(document, options.normalize)?;
     let (folded_vertices, faces_flip) = project_normalized(&normalized)?;
-    if options.include_overlap_graph {
-        return Err(FlatFoldError::Unimplemented("overlap graph"));
-    }
+    let overlap = if options.include_overlap_graph {
+        Some(build_overlap_graph(&normalized, &folded_vertices)?)
+    } else {
+        None
+    };
     Ok(Analysis {
         normalized,
         folded_vertices,
         faces_flip,
-        overlap: None,
+        overlap,
         diagnostics: Vec::new(),
     })
 }
@@ -168,10 +173,6 @@ mod tests {
     #[test]
     fn unported_analysis_stages_return_explicit_unimplemented_errors() {
         let doc = square_doc();
-        assert_eq!(
-            analyze_flat_fold(&doc, AnalyzeOptions::default()),
-            Err(FlatFoldError::Unimplemented("overlap graph"))
-        );
         assert_eq!(
             solve_flat_fold(&doc, SolveOptions::default()),
             Err(FlatFoldError::Unimplemented("solve_flat_fold"))
@@ -332,5 +333,36 @@ mod tests {
         assert_eq!(analysis.folded_vertices.len(), 4);
         assert_eq!(analysis.faces_flip, vec![false, true]);
         assert!(analysis.overlap.is_none());
+    }
+
+    #[test]
+    fn analyze_builds_overlap_graph_by_default() {
+        let mut doc = FoldDocument::new(
+            vec![
+                vec![0.0, 0.0],
+                vec![1.0, 0.0],
+                vec![1.0, 1.0],
+                vec![0.0, 1.0],
+            ],
+            vec![[0, 1], [1, 2], [2, 3], [3, 0], [0, 2]],
+        );
+        doc.edges_assignment = vec![
+            Assignment::Boundary,
+            Assignment::Boundary,
+            Assignment::Boundary,
+            Assignment::Boundary,
+            Assignment::Mountain,
+        ];
+        doc.faces_vertices = vec![vec![0, 1, 2], vec![0, 2, 3]];
+
+        let analysis = analyze_flat_fold(&doc, AnalyzeOptions::default()).unwrap();
+        let overlap = analysis.overlap.unwrap();
+
+        assert!(!overlap.points.is_empty());
+        assert!(!overlap.segments_points.is_empty());
+        assert_eq!(
+            overlap.faces_cells.len(),
+            analysis.normalized.document.faces_vertices.len()
+        );
     }
 }

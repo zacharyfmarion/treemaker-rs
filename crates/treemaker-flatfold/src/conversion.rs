@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::avl::AvlSet;
 use crate::math::{self, Point};
-use crate::{FlatFoldError, NormalizeOptions, NormalizedFold, PaperSide, Result};
+use crate::{FlatFoldError, NormalizeOptions, NormalizedFold, OverlapGraph, PaperSide, Result};
 use treemaker_fold::{Assignment, FoldDocument};
 
 type Edge = [usize; 2];
@@ -229,6 +229,170 @@ pub(crate) fn project_normalized(normalized: &NormalizedFold) -> Result<(Vec<Poi
         })
         .collect::<Result<Vec<_>>>()
         .map(|vertices| (vertices, faces_flip))
+}
+
+pub(crate) fn build_overlap_graph(
+    normalized: &NormalizedFold,
+    folded_vertices: &[Point],
+) -> Result<OverlapGraph> {
+    let edges = &normalized.document.edges_vertices;
+    let faces = &normalized.document.faces_vertices;
+    let edges_faces = if normalized.document.edges_faces.is_empty() {
+        edges_faces_from_faces(edges, faces)?.0
+    } else {
+        normalized.document.edges_faces.clone()
+    };
+    let folded_lines = edges
+        .iter()
+        .map(|[a, b]| [folded_vertices[*a], folded_vertices[*b]])
+        .collect::<Vec<_>>();
+    let (points, segments_points, segments_edges, _) = lines_to_vertices_edges(&folded_lines)?;
+    if points.is_empty() {
+        return Err(FlatFoldError::PrecisionFailure(
+            "could not find stable folded edge graph".to_string(),
+        ));
+    }
+    let (_, cells_points) = vertices_edges_to_vertices_faces(&points, &segments_points)?;
+    let (segments_cells, cells_segments) = edges_faces_from_faces(&segments_points, &cells_points)?;
+    let (cells_faces, faces_cells) = cells_faces_from_overlap(
+        &edges_faces,
+        faces,
+        &points,
+        &segments_points,
+        &segments_edges,
+        &cells_points,
+        &segments_cells,
+    )?;
+    Ok(OverlapGraph {
+        points,
+        segments_points,
+        segments_edges,
+        segments_cells,
+        cells_segments,
+        cells_points,
+        cells_faces,
+        faces_cells,
+    })
+}
+
+fn cells_faces_from_overlap(
+    edges_faces: &[Vec<usize>],
+    faces: &[Vec<usize>],
+    points: &[Point],
+    segments_points: &[Edge],
+    segments_edges: &[Vec<usize>],
+    cells_points: &[Vec<usize>],
+    segments_cells: &[Vec<usize>],
+) -> Result<FaceAdjacency> {
+    let mut segment_faces = BTreeMap::new();
+    for (segment_index, segment) in segments_points.iter().copied().enumerate() {
+        let mut faces_for_segment = Vec::new();
+        for edge_index in &segments_edges[segment_index] {
+            if let Some(edge_faces) = edges_faces.get(*edge_index) {
+                faces_for_segment.extend(edge_faces.iter().copied());
+            }
+        }
+        segment_faces.insert(
+            math::encode_order_pair(segment[0], segment[1]),
+            faces_for_segment,
+        );
+    }
+    let mut cell_from_directed_segment = BTreeMap::new();
+    for (cell_index, cell) in cells_points.iter().enumerate() {
+        if cell.is_empty() {
+            continue;
+        }
+        let mut p1 = cell[cell.len() - 1];
+        for p2 in cell {
+            cell_from_directed_segment.insert(math::encode(&[*p2, p1]), cell_index);
+            p1 = *p2;
+        }
+    }
+
+    let mut cells_faces = vec![Vec::new(); cells_points.len()];
+    let mut queue = Vec::<(usize, f64)>::new();
+    let mut best = None::<(usize, usize, f64)>;
+    for (segment_index, cells) in segments_cells.iter().enumerate() {
+        if cells.len() == 1 {
+            let [p1, p2] = segments_points[segment_index];
+            let distance = math::distsq(points[p1], points[p2]);
+            if best.is_none_or(|(_, _, best_distance)| distance > best_distance) {
+                best = Some((segment_index, cells[0], distance));
+            }
+        }
+    }
+    let Some((start_segment, start_cell, start_distance)) = best else {
+        return Err(FlatFoldError::PrecisionFailure(
+            "overlap graph has no border segment".to_string(),
+        ));
+    };
+    cells_faces[start_cell] = segment_faces
+        .get(&math::encode_order_pair(
+            segments_points[start_segment][0],
+            segments_points[start_segment][1],
+        ))
+        .cloned()
+        .unwrap_or_default();
+    queue.push((start_cell, start_distance));
+
+    let mut next = 0usize;
+    let mut seen = BTreeSet::new();
+    while next < queue.len() {
+        let cell_index = queue[next].0;
+        next += 1;
+        if seen.contains(&cell_index) {
+            continue;
+        }
+        seen.insert(cell_index);
+        let cell = &cells_points[cell_index];
+        if cell.is_empty() {
+            continue;
+        }
+        let mut p1 = cell[cell.len() - 1];
+        for p2 in cell {
+            let neighbor = cell_from_directed_segment
+                .get(&math::encode(&[p1, *p2]))
+                .copied();
+            if let Some(neighbor) = neighbor
+                && !seen.contains(&neighbor)
+            {
+                let distance = math::distsq(points[p1], points[*p2]);
+                queue.push((neighbor, distance));
+                let mut i = queue.len().saturating_sub(2);
+                while i > next {
+                    if queue[i].1 < distance {
+                        queue.swap(i + 1, i);
+                    }
+                    i -= 1;
+                }
+                let mut face_set = cells_faces[cell_index]
+                    .iter()
+                    .copied()
+                    .collect::<BTreeSet<_>>();
+                let key = math::encode_order_pair(p1, *p2);
+                if let Some(boundary_faces) = segment_faces.get(&key) {
+                    for face in boundary_faces {
+                        if !face_set.remove(face) {
+                            face_set.insert(*face);
+                        }
+                    }
+                }
+                cells_faces[neighbor] = face_set.into_iter().collect();
+            }
+            p1 = *p2;
+        }
+    }
+
+    let mut faces_cells = vec![Vec::new(); faces.len()];
+    for (cell_index, faces_for_cell) in cells_faces.iter_mut().enumerate() {
+        faces_for_cell.sort_unstable();
+        for face in faces_for_cell {
+            if let Some(face_cells) = faces_cells.get_mut(*face) {
+                face_cells.push(cell_index);
+            }
+        }
+    }
+    Ok((cells_faces, faces_cells))
 }
 
 fn document_points(document: &FoldDocument) -> Result<Vec<Point>> {
@@ -977,11 +1141,26 @@ fn edges_faces_from_faces(edges: &[Edge], faces: &[Vec<usize>]) -> Result<FaceAd
 }
 
 fn sort_faces(faces: &mut [Vec<usize>], vertices: &[Point]) {
-    faces.sort_by(|a, b| {
+    fn cmp_face(a: &[usize], b: &[usize], vertices: &[Point]) -> std::cmp::Ordering {
         let area_a = polygon_area_for_face(vertices, a);
         let area_b = polygon_area_for_face(vertices, b);
-        area_b.total_cmp(&area_a)
-    });
+        let diff = area_b - area_a;
+        if diff < 0.0 {
+            std::cmp::Ordering::Less
+        } else if diff > 0.0 {
+            std::cmp::Ordering::Greater
+        } else {
+            std::cmp::Ordering::Equal
+        }
+    }
+
+    for i in 1..faces.len() {
+        let mut j = i;
+        while j > 0 && cmp_face(&faces[j - 1], &faces[j], vertices) == std::cmp::Ordering::Greater {
+            faces.swap(j - 1, j);
+            j -= 1;
+        }
+    }
 }
 
 fn polygon_area_for_face(vertices: &[Point], face: &[usize]) -> f64 {

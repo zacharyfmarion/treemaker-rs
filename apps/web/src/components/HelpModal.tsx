@@ -1,0 +1,373 @@
+import { useEffect, type ReactElement, type ReactNode } from 'react';
+import {
+  BookOpen,
+  CircleHelp,
+  FileText,
+  Info,
+  LayoutDashboard,
+  Layers3,
+  MousePointer2,
+  ScanLine,
+  Sparkles,
+  Square,
+  Waypoints,
+  X,
+} from 'lucide-react';
+import { useHelpStore, type HelpModalKind } from '../store/helpStore';
+import { Button } from './ui/Button';
+import { IconButton } from './ui/IconButton';
+
+interface HelpTopic {
+  id: string;
+  title: string;
+  summary: string;
+  icon: ReactElement;
+  image: string;
+  imageAlt: string;
+  caption: string;
+  steps: string[];
+}
+
+const HELP_TOPICS: HelpTopic[] = [
+  {
+    id: 'files',
+    title: 'Start, Open, Save, Export',
+    summary: 'Use the toolbar, File menu, or Files pane to manage TreeMaker projects and crease-pattern exports.',
+    icon: <FileText size={15} />,
+    image: 'files-workflow.png',
+    imageAlt: 'Files pane showing New, Open, Save, export buttons, example projects, and file status',
+    caption: 'The Files pane keeps project actions, exports, examples, and recent work in one compact place.',
+    steps: [
+      'New starts a blank .tmd5 tree document; Open accepts .tmd, .tmd4, .tmd5, .fold, and .cp files.',
+      'Save and Save As write canonical TreeMaker 5 projects when you are editing a tree.',
+      'Export V4, FOLD, SVG, and PNG become available when the current document has the data each format needs.',
+      'Examples load checked-in starter designs that are useful for exploring optimization and crease generation.',
+    ],
+  },
+  {
+    id: 'design',
+    title: 'Draw And Edit The Tree',
+    summary: 'The Design pane is the main paper workspace for selecting, drawing, connecting, dragging, and viewing tree structure.',
+    icon: <MousePointer2 size={15} />,
+    image: 'design-workspace.png',
+    imageAlt: 'Design pane with tree nodes, edges, labels, leaf circles, zoom controls, and layer controls',
+    caption: 'Use the compact viewport controls for zoom, fit, symmetry authoring, and layer visibility.',
+    steps: [
+      'Select parts directly on the paper; use Shift, Cmd, or Ctrl clicks to build a multi-selection.',
+      'Click empty paper to add nodes, or select a node and click empty paper to attach a new edge and node.',
+      'Drag nodes to reshape the tree. Space-drag or the zoom controls help move around larger designs.',
+      'Toggle paths, leaf circles, labels, and symmetry overlays from the layer menu when the view gets dense.',
+    ],
+  },
+  {
+    id: 'inspector',
+    title: 'Inspect Selection Details',
+    summary: 'The Inspector edits the currently selected node or edge and summarizes paths, conditions, facets, and imported crease patterns.',
+    icon: <Square size={15} />,
+    image: 'inspector-details.png',
+    imageAlt: 'Inspector pane showing editable node label and coordinate fields beside the selected design',
+    caption: 'Selection drives the inspector; change labels, coordinates, edge lengths, and stiffness without leaving the workspace.',
+    steps: [
+      'Select a node to edit its label and paper coordinates.',
+      'Select an edge to edit its label, target length, and stiffness, while strain stays report-only.',
+      'Select crease-pattern facets, creases, paths, or conditions to review their generated metadata.',
+      'When two nodes are selected, the Inspector can select the path between them for path conditions.',
+    ],
+  },
+  {
+    id: 'conditions',
+    title: 'Set Paper, Symmetry, And Conditions',
+    summary: 'The Conditions pane controls paper size, symmetry presets, and selection-based design constraints.',
+    icon: <Waypoints size={15} />,
+    image: 'conditions-symmetry.png',
+    imageAlt: 'Conditions pane with paper size, symmetry type, advanced symmetry options, and add-from-selection actions',
+    caption: 'Conditions are built from the current selection, so select nodes, edges, or paths before adding constraints.',
+    steps: [
+      'Set paper width and height before tuning exact coordinates.',
+      'Choose book, diagonal, or custom symmetry, then use the Design pane mirror tools to author paired leaves.',
+      'Add fixed node, node-on-edge, node-on-corner, paired-node, fixed-length, same-strain, and path conditions from selected parts.',
+      'Use the condition list to inspect, select, or remove constraints as the model evolves.',
+    ],
+  },
+  {
+    id: 'optimize',
+    title: 'Optimize And Build CP',
+    summary: 'Optimization and crease-pattern generation run through the shared Design menu, toolbar buttons, and native desktop menu.',
+    icon: <Sparkles size={15} />,
+    image: 'optimize-build.png',
+    imageAlt: 'Toolbar showing Optimize Scale and Build CP actions with diagnostics visible',
+    caption: 'TreeMaker enables each command only when the document is ready for that step.',
+    steps: [
+      'Optimize Scale fits the tree to the current paper while preserving the selected TreeMaker model semantics.',
+      'Optimize Edges and Optimize Strain are available from the Design menu for deeper TreeMaker optimization workflows.',
+      'Build CP turns an optimized tree into creases, facets, fold directions, and folded-base data.',
+      'Diagnostics report engine readiness, optimization status, feasibility, and crease-pattern build results.',
+    ],
+  },
+  {
+    id: 'crease-pattern',
+    title: 'Review Crease Patterns',
+    summary: 'The Crease Pattern pane shows generated or imported crease patterns with role and mountain-valley coloring.',
+    icon: <ScanLine size={15} />,
+    image: 'crease-pattern-review.png',
+    imageAlt: 'Crease Pattern pane showing a generated crease pattern with color mode controls',
+    caption: 'Switch between crease-role and mountain-valley color modes depending on what you need to inspect.',
+    steps: [
+      'Use Color by Crease roles to distinguish axial, gusset, ridge, hinge, and pseudohinge lines.',
+      'Use Color by M/V assignment to review mountains, valleys, flats, and borders.',
+      'Click facets or creases to inspect generated metadata in the Inspector.',
+      'Export SVG or PNG after the crease pattern exists; export FOLD for simulator-ready geometry.',
+    ],
+  },
+  {
+    id: 'folding',
+    title: 'Simulate And View The Folded Base',
+    summary: 'Simulator and Folded Base panes use the flat-fold artifacts produced from built or imported crease patterns.',
+    icon: <Layers3 size={15} />,
+    image: 'simulator-folded-base.png',
+    imageAlt: 'Simulator and Folded Base panes showing fold controls and folded-base geometry',
+    caption: 'Refresh controls regenerate flat-fold artifacts when a crease pattern changes.',
+    steps: [
+      'Open Simulator after a crease pattern is built or imported, then drag the viewport to rotate the 3D folded model.',
+      'Use the fold slider, play, step, and view controls to inspect the fold motion.',
+      'Switch render settings between paper and x-ray views, and toggle faces, edges, and hidden lines.',
+      'Use Folded Base to inspect the solved flat-folded facet ordering and projected base geometry.',
+    ],
+  },
+  {
+    id: 'workspace',
+    title: 'Menus, Layout, Settings',
+    summary: 'The app surface is shared between browser and desktop, with web menus, native Tauri menus, dockable panes, and settings.',
+    icon: <LayoutDashboard size={15} />,
+    image: 'workspace-settings.png',
+    imageAlt: 'Settings modal and app menu showing theme and layout controls',
+    caption: 'Reset the pane layout from View or Settings, and choose a theme from the Appearance settings.',
+    steps: [
+      'Use the View menu to activate Design, Crease Pattern, Simulator, Folded Base, Conditions, or Diagnostics panes.',
+      'Drag pane headers to reorganize the workspace; Reset Layout restores the default pane arrangement.',
+      'Settings contains Appearance themes and Workspace layout controls.',
+      'Keyboard shortcuts cover common file, edit, optimize, build, and settings actions.',
+    ],
+  },
+];
+
+const ACKNOWLEDGEMENTS = [
+  {
+    title: 'Robert J. Lang and TreeMaker 5.0.1',
+    detail:
+      "TreeMaker's original model code and behavior are the canonical reference for this Rust, WebAssembly, and desktop port.",
+  },
+  {
+    title: 'Jason S. Ku and Flat-Folder',
+    detail:
+      'The flat-folding analysis path is validated against the vendored Flat-Folder implementation by Jason S. Ku, also known as origamimagiro.',
+  },
+  {
+    title: 'FOLD and origami software references',
+    detail:
+      'The app reads and exports crease-pattern data using community file-format conventions and compares behavior against redistributable fixtures.',
+  },
+  {
+    title: 'Open-source app stack',
+    detail:
+      'Rust, WebAssembly, React, Vite, Tauri, Dockview, Zustand, and lucide-react make the shared browser and desktop surface possible.',
+  },
+];
+
+function helpAsset(filename: string): string {
+  const base = import.meta.env.BASE_URL.endsWith('/')
+    ? import.meta.env.BASE_URL
+    : `${import.meta.env.BASE_URL}/`;
+  return `${base}help/${filename}`;
+}
+
+function useCloseOnEscape(closeHelp: () => void): void {
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopPropagation();
+      closeHelp();
+    };
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => window.removeEventListener('keydown', onKeyDown, true);
+  }, [closeHelp]);
+}
+
+function ModalShell({
+  kind,
+  title,
+  subtitle,
+  icon,
+  children,
+  footer,
+}: {
+  kind: HelpModalKind;
+  title: string;
+  subtitle: string;
+  icon: ReactNode;
+  children: ReactNode;
+  footer?: ReactNode;
+}) {
+  const closeHelp = useHelpStore((state) => state.closeHelp);
+  useCloseOnEscape(closeHelp);
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+      className="help-modal"
+      onMouseDown={closeHelp}
+    >
+      <div
+        role="document"
+        className={`help-modal__document help-modal__document--${kind}`}
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <header className="help-modal__header">
+          <div className="help-modal__heading">
+            <span className="help-modal__icon" aria-hidden="true">
+              {icon}
+            </span>
+            <div>
+              <h2>{title}</h2>
+              <p>{subtitle}</p>
+            </div>
+          </div>
+          <IconButton size="sm" aria-label={`Close ${title}`} onClick={closeHelp}>
+            <X size={15} />
+          </IconButton>
+        </header>
+        <div className="help-modal__body">{children}</div>
+        {footer && <footer className="help-modal__footer">{footer}</footer>}
+      </div>
+    </div>
+  );
+}
+
+function GuideModal() {
+  const openAbout = useHelpStore((state) => state.openAbout);
+
+  return (
+    <ModalShell
+      kind="guide"
+      title="TreeMaker Help"
+      subtitle="A practical map of the current shared browser and desktop app surface."
+      icon={<CircleHelp size={18} />}
+      footer={
+        <>
+          <span>TreeMaker commands are available from the web menubar, native desktop menu, and compact toolbar.</span>
+          <Button size="sm" variant="secondary" onClick={openAbout}>
+            <Info size={14} />
+            About
+          </Button>
+        </>
+      }
+    >
+      <div className="help-guide">
+        <nav className="help-guide__toc" aria-label="Help topics">
+          {HELP_TOPICS.map((topic) => (
+            <a key={topic.id} href={`#help-${topic.id}`}>
+              {topic.icon}
+              <span>{topic.title}</span>
+            </a>
+          ))}
+        </nav>
+        <div className="help-guide__topics">
+          {HELP_TOPICS.map((topic) => (
+            <section key={topic.id} id={`help-${topic.id}`} className="help-topic">
+              <div className="help-topic__copy">
+                <span className="help-topic__eyebrow">{topic.title}</span>
+                <h3>{topic.summary}</h3>
+                <ul>
+                  {topic.steps.map((step) => (
+                    <li key={step}>{step}</li>
+                  ))}
+                </ul>
+              </div>
+              <figure className="help-topic__figure">
+                <img src={helpAsset(topic.image)} alt={topic.imageAlt} loading="lazy" />
+                <figcaption>{topic.caption}</figcaption>
+              </figure>
+            </section>
+          ))}
+        </div>
+      </div>
+    </ModalShell>
+  );
+}
+
+function AboutModal() {
+  const openGuide = useHelpStore((state) => state.openGuide);
+
+  return (
+    <ModalShell
+      kind="about"
+      title="About TreeMaker"
+      subtitle="A modern shared GUI for TreeMaker-style origami design."
+      icon={<BookOpen size={18} />}
+      footer={
+        <>
+          <span>treemaker-rs is GPL-2.0-or-later because it ports TreeMaker's GPL model code.</span>
+          <Button size="sm" variant="secondary" onClick={openGuide}>
+            <CircleHelp size={14} />
+            Help
+          </Button>
+        </>
+      }
+    >
+      <div className="about-modal__intro">
+        <img src="/favicon.png" alt="" aria-hidden="true" />
+        <div>
+          <p>
+            TreeMaker turns a tree structure into an origami crease pattern. This app
+            wraps the Rust and WebAssembly port of Robert J. Lang's TreeMaker 5.0.1
+            engine in a pane-based browser and Tauri desktop workspace.
+          </p>
+          <p>
+            The current surface supports drawing and editing trees, adding conditions,
+            running optimizers, building crease patterns, reviewing folded-base and
+            simulator artifacts, and saving or exporting the result.
+          </p>
+        </div>
+      </div>
+      <section className="about-modal__section">
+        <h3>Acknowledgements</h3>
+        <div className="about-modal__ack-list">
+          {ACKNOWLEDGEMENTS.map((item) => (
+            <article key={item.title} className="about-modal__ack">
+              <strong>{item.title}</strong>
+              <p>{item.detail}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+      <section className="about-modal__section">
+        <h3>Project Notes</h3>
+        <dl className="about-modal__facts">
+          <div>
+            <dt>Engine reference</dt>
+            <dd>TreeMaker 5.0.1 with ALM optimizer parity as the public baseline.</dd>
+          </div>
+          <div>
+            <dt>Runtime surfaces</dt>
+            <dd>Shared React web app plus a thin Tauri desktop shell.</dd>
+          </div>
+          <div>
+            <dt>Primary formats</dt>
+            <dd>TreeMaker .tmd, .tmd4, .tmd5 plus FOLD, SVG, and PNG exports.</dd>
+          </div>
+        </dl>
+      </section>
+    </ModalShell>
+  );
+}
+
+export function HelpModal() {
+  const activeModal = useHelpStore((state) => state.activeModal);
+
+  if (activeModal === 'guide') return <GuideModal />;
+  if (activeModal === 'about') return <AboutModal />;
+  return null;
+}

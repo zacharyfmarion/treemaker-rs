@@ -1,4 +1,5 @@
 import { getFileService, type FileCommand, type FileService } from '../platform/fileService';
+import { useHelpStore } from '../store/helpStore';
 import { useLayoutStore } from '../store/layoutStore';
 import { useSettingsStore } from '../store/settingsStore';
 import { useWorkspaceStore } from '../store/workspaceStore';
@@ -6,6 +7,7 @@ import { selectWorkspaceCapabilities } from '../store/workspaceStore/capabilitie
 import type { WorkspaceCapabilities, WorkspaceCapabilityId } from '../lib/workspaceCapabilities';
 
 export const MENU_ACTION_IDS = [
+  'app.about',
   'app.quit',
   'file.new',
   'file.open',
@@ -34,6 +36,7 @@ export const MENU_ACTION_IDS = [
   'optimize.edges',
   'optimize.strain',
   'cp.build',
+  'help.documentation',
   'help.about',
 ] as const;
 
@@ -74,6 +77,7 @@ export interface MenuActionDependencies {
   fileService: FileService;
   capabilities?: () => WorkspaceCapabilities;
   quit?: () => void;
+  help?: () => void;
   about?: () => void;
   settings?: () => void;
 }
@@ -126,6 +130,9 @@ export function createMenuActionHandler(deps: MenuActionDependencies) {
     }
 
     switch (id) {
+      case 'app.about':
+        deps.about?.();
+        return true;
       case 'app.quit':
         deps.quit?.();
         return true;
@@ -189,6 +196,9 @@ export function createMenuActionHandler(deps: MenuActionDependencies) {
       case 'cp.build':
         await deps.workspace.buildCreasePattern();
         return true;
+      case 'help.documentation':
+        deps.help?.();
+        return true;
       case 'help.about':
         deps.about?.();
         return true;
@@ -207,8 +217,11 @@ export function handleMenuAction(id: string): Promise<boolean> {
     settings: () => {
       useSettingsStore.getState().openSettings();
     },
+    help: () => {
+      useHelpStore.getState().openGuide();
+    },
     about: () => {
-      console.info('TreeMaker web and desktop shell');
+      useHelpStore.getState().openAbout();
     },
   })(id);
 }

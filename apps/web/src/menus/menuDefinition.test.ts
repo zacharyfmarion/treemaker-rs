@@ -18,5 +18,15 @@ describe('web menu definition', () => {
     );
 
     expect(actionIds).not.toContain('app.quit');
+    expect(actionIds).not.toContain('app.about');
+  });
+
+  it('exposes documentation and about from the Help menu', () => {
+    const helpMenu = getMenuBarDef().find((menu) => menu.label === 'Help');
+    const actionIds = helpMenu?.items.flatMap((item) =>
+      item.type === 'action' ? [item.id] : []
+    );
+
+    expect(actionIds).toEqual(['help.documentation', 'help.about']);
   });
 });

@@ -198,6 +198,7 @@ export function DesignPanel() {
   const select = useWorkspaceStore((state) => state.select);
   const addNodeAt = useWorkspaceStore((state) => state.addNodeAt);
   const moveNode = useWorkspaceStore((state) => state.moveNode);
+  const projectLoadId = useWorkspaceStore((state) => state.projectLoadId);
 
   const nodeLocations = useMemo(() => {
     if (!dragging) return undefined;
@@ -259,6 +260,48 @@ export function DesignPanel() {
   const setZoomLevel = useCallback((scale: number) => {
     transformRef.current?.centerView(scale, 160);
   }, []);
+
+  const lastFittedProjectLoadIdRef = useRef<number | null>(null);
+  const fitLoadedProject = useCallback(
+    (animationTime = 0) => {
+      if (lastFittedProjectLoadIdRef.current === projectLoadId) return true;
+      const container = containerRef.current;
+      if (!container || !transformRef.current || container.clientWidth <= 0 || container.clientHeight <= 0) {
+        return false;
+      }
+      transformRef.current.centerView(computeFitScale(), animationTime);
+      lastFittedProjectLoadIdRef.current = projectLoadId;
+      return true;
+    },
+    [computeFitScale, projectLoadId]
+  );
+
+  const fitLoadedProjectRef = useRef(fitLoadedProject);
+  useEffect(() => {
+    fitLoadedProjectRef.current = fitLoadedProject;
+  }, [fitLoadedProject]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    let frame = requestAnimationFrame(() => fitLoadedProjectRef.current(0));
+    const observer =
+      typeof ResizeObserver === 'undefined' || !container
+        ? null
+        : new ResizeObserver(() => {
+            if (lastFittedProjectLoadIdRef.current !== projectLoadId) {
+              cancelAnimationFrame(frame);
+              frame = requestAnimationFrame(() => fitLoadedProjectRef.current(0));
+            }
+          });
+
+    if (observer && container) {
+      observer.observe(container);
+    }
+    return () => {
+      cancelAnimationFrame(frame);
+      observer?.disconnect();
+    };
+  }, [projectLoadId]);
 
   const setLayer = useCallback((layer: DesignViewLayerKey, visible: boolean) => {
     setLayers((current) => setDesignLayerVisibility(current, layer, visible));
@@ -396,7 +439,8 @@ export function DesignPanel() {
           pinch={{ step: 0.5 }}
           doubleClick={{ disabled: true }}
           onInit={(ref) => {
-            requestAnimationFrame(() => ref.centerView(computeFitScale(), 0));
+            transformRef.current = ref;
+            requestAnimationFrame(() => fitLoadedProjectRef.current(0));
           }}
           onTransformed={(_ref, state) => setZoomPercent(Math.round(state.scale * 100))}
         >

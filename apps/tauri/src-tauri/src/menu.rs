@@ -26,6 +26,8 @@ pub fn setup_menu(app: &App) -> Result<(), Box<dyn std::error::Error>> {
         .build(app)?;
     let file_export_v4 =
         MenuItemBuilder::with_id("file.exportV4", "Export TreeMaker 4...").build(app)?;
+    let file_export_fold =
+        MenuItemBuilder::with_id("file.exportFold", "Export FOLD...").build(app)?;
     let file_export_svg = MenuItemBuilder::with_id("file.exportSvg", "Export SVG...").build(app)?;
     let file_export_png = MenuItemBuilder::with_id("file.exportPng", "Export PNG...").build(app)?;
 
@@ -37,6 +39,7 @@ pub fn setup_menu(app: &App) -> Result<(), Box<dyn std::error::Error>> {
         .item(&file_save_as)
         .separator()
         .item(&file_export_v4)
+        .item(&file_export_fold)
         .item(&file_export_svg)
         .item(&file_export_png)
         .build()?;
@@ -79,12 +82,16 @@ pub fn setup_menu(app: &App) -> Result<(), Box<dyn std::error::Error>> {
 
     let view_design = MenuItemBuilder::with_id("view.design", "Design").build(app)?;
     let view_cp = MenuItemBuilder::with_id("view.creasePattern", "Crease Pattern").build(app)?;
+    let view_simulator = MenuItemBuilder::with_id("view.simulator", "Simulator").build(app)?;
+    let view_folded_base = MenuItemBuilder::with_id("view.foldedBase", "Folded Base").build(app)?;
     let view_conditions = MenuItemBuilder::with_id("view.conditions", "Conditions").build(app)?;
     let view_reset = MenuItemBuilder::with_id("view.resetLayout", "Reset Layout").build(app)?;
 
     let view_menu = SubmenuBuilder::new(app, "View")
         .item(&view_design)
         .item(&view_cp)
+        .item(&view_simulator)
+        .item(&view_folded_base)
         .item(&view_conditions)
         .separator()
         .item(&view_reset)

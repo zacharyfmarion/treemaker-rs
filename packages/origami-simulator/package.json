@@ -1,0 +1,49 @@
+{
+  "name": "@treemaker/origami-simulator",
+  "private": true,
+  "version": "0.1.0",
+  "description": "FOLD-in origami simulation library adapted from Origami Simulator",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./three": {
+      "types": "./dist/three.d.ts",
+      "import": "./dist/three.js"
+    },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "import": "./dist/testing.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "earcut": "^3.0.2"
+  },
+  "peerDependencies": {
+    "three": "^0.184.0"
+  },
+  "devDependencies": {
+    "@types/earcut": "^3.0.0",
+    "@types/node": "^24.10.1",
+    "@types/three": "^0.184.1",
+    "three": "^0.184.0",
+    "typescript": "~5.9.3",
+    "vitest": "^4.0.18"
+  }
+}

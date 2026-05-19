@@ -38,6 +38,7 @@ export function getMenuBarDef(): MenuDef[] {
         { type: 'action', id: 'file.saveAs', label: 'Save As...', shortcut: `${mod}+Shift+S` },
         { type: 'separator' },
         { type: 'action', id: 'file.exportV4', label: 'Export TreeMaker 4...' },
+        { type: 'action', id: 'file.exportFold', label: 'Export FOLD...' },
         { type: 'action', id: 'file.exportSvg', label: 'Export SVG...' },
         { type: 'action', id: 'file.exportPng', label: 'Export PNG...' },
       ],
@@ -62,6 +63,8 @@ export function getMenuBarDef(): MenuDef[] {
       items: [
         { type: 'action', id: 'view.design', label: 'Design' },
         { type: 'action', id: 'view.creasePattern', label: 'Crease Pattern' },
+        { type: 'action', id: 'view.simulator', label: 'Simulator' },
+        { type: 'action', id: 'view.foldedBase', label: 'Folded Base' },
         { type: 'action', id: 'view.conditions', label: 'Conditions' },
         { type: 'separator' },
         { type: 'action', id: 'view.resetLayout', label: 'Reset Layout' },

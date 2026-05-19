@@ -13,6 +13,78 @@ export interface TreeSnapshot {
   conditions: ConditionSnapshot[];
 }
 
+export type FoldAssignment = 'B' | 'M' | 'V' | 'F' | 'U' | 'C' | 'J';
+
+export interface FoldDocument {
+  file_spec?: number;
+  file_creator?: string;
+  file_author?: string;
+  frame_title?: string;
+  frame_classes?: string[];
+  vertices_coords: number[][];
+  edges_vertices: [number, number][];
+  edges_assignment?: FoldAssignment[];
+  edges_foldAngle?: Array<number | null>;
+  edges_faces?: number[][];
+  faces_vertices: number[][];
+  faces_edges?: number[][];
+  face_orders?: [number, number, number][];
+  [key: string]: unknown;
+}
+
+export interface FoldedBaseVertex {
+  id: number;
+  source_vertex: number;
+  loc: Point;
+  paper_loc: Point;
+  depth: number;
+  elevation: number;
+  is_border: boolean;
+}
+
+export interface FoldedBaseCrease {
+  id: number;
+  source_crease: number;
+  vertices: [number, number];
+  kind: number;
+  fold: number;
+}
+
+export interface FoldedBaseFacet {
+  id: number;
+  source_facet: number;
+  vertices: number[];
+  color: number;
+  order: number;
+}
+
+export interface FoldedBaseSnapshot {
+  vertices: FoldedBaseVertex[];
+  creases: FoldedBaseCrease[];
+  facets: FoldedBaseFacet[];
+}
+
+export interface FoldCreaseParameter {
+  face1: number;
+  vertex1: number;
+  face2: number;
+  vertex2: number;
+  edge: number;
+  target_angle: number;
+}
+
+export interface RustPreparedFoldModel {
+  fold: FoldDocument;
+  crease_params: FoldCreaseParameter[];
+}
+
+export interface FoldArtifacts {
+  fold: FoldDocument;
+  folded_base?: FoldedBaseSnapshot | null;
+  folded_base_error?: string | null;
+  simulation_model: RustPreparedFoldModel;
+}
+
 export interface TreeSummary {
   scale: number;
   is_feasible: boolean;

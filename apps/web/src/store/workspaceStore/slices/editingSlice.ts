@@ -52,6 +52,8 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
           dirty: true,
           error: null,
           lastOptimization: null,
+          foldArtifacts: null,
+          foldArtifactError: null,
         });
         get().commitHistoryCheckpoint(checkpoint, 'Add node');
         void get().autosaveProject();
@@ -74,6 +76,8 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
           dirty: true,
           error: null,
           lastOptimization: null,
+          foldArtifacts: null,
+          foldArtifactError: null,
         });
         get().commitHistoryCheckpoint(checkpoint, 'Move node');
         void get().autosaveProject();
@@ -103,6 +107,8 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
           dirty: true,
           error: null,
           lastOptimization: null,
+          foldArtifacts: null,
+          foldArtifactError: null,
         });
         get().commitHistoryCheckpoint(checkpoint, 'Add edge');
         void get().autosaveProject();
@@ -123,6 +129,8 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
           selection: nextSelectionForEdit(edit, report.snapshot),
           dirty: true,
           error: null,
+          foldArtifacts: null,
+          foldArtifactError: null,
         });
         get().commitHistoryCheckpoint(checkpoint, 'Rename node');
         void get().autosaveProject();
@@ -145,6 +153,8 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
           dirty: true,
           error: null,
           lastOptimization: null,
+          foldArtifacts: null,
+          foldArtifactError: null,
         });
         get().commitHistoryCheckpoint(checkpoint, 'Edit edge');
         void get().autosaveProject();
@@ -171,6 +181,8 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
             dirty: true,
             error: null,
             lastOptimization: null,
+            foldArtifacts: null,
+            foldArtifactError: null,
             projectMessage: 'Cleared design',
           });
           get().commitHistoryCheckpoint(checkpoint, 'Clear design');
@@ -195,6 +207,8 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
           dirty: true,
           error: null,
           lastOptimization: null,
+          foldArtifacts: null,
+          foldArtifactError: null,
         });
         get().commitHistoryCheckpoint(checkpoint, 'Delete selection');
         void get().autosaveProject();

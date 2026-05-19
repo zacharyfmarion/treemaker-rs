@@ -9,6 +9,7 @@ export const MENU_ACTION_IDS = [
   'file.save',
   'file.saveAs',
   'file.exportV4',
+  'file.exportFold',
   'file.exportSvg',
   'file.exportPng',
   'edit.undo',
@@ -21,6 +22,8 @@ export const MENU_ACTION_IDS = [
   'edit.deselectAll',
   'view.design',
   'view.creasePattern',
+  'view.simulator',
+  'view.foldedBase',
   'view.conditions',
   'view.resetLayout',
   'optimize.scale',
@@ -38,6 +41,7 @@ export interface WorkspaceCommands {
   saveProject(fileService?: FileService): Promise<boolean>;
   saveProjectAs(fileService?: FileService): Promise<boolean>;
   exportV4(fileService?: FileService): Promise<boolean>;
+  exportFold(fileService?: FileService): Promise<boolean>;
   exportSvg(fileService?: FileService): Promise<boolean>;
   exportPng(fileService?: FileService): Promise<boolean>;
   undo(): Promise<void>;
@@ -73,6 +77,7 @@ const FILE_ACTIONS: Partial<Record<MenuActionId, FileCommand>> = {
   'file.save': 'saveProject',
   'file.saveAs': 'saveProjectAs',
   'file.exportV4': 'exportV4',
+  'file.exportFold': 'exportFold',
   'file.exportSvg': 'exportSvg',
   'file.exportPng': 'exportPng',
 };
@@ -99,6 +104,8 @@ export function createMenuActionHandler(deps: MenuActionDependencies) {
           return deps.workspace.saveProjectAs(deps.fileService);
         case 'exportV4':
           return deps.workspace.exportV4(deps.fileService);
+        case 'exportFold':
+          return deps.workspace.exportFold(deps.fileService);
         case 'exportSvg':
           return deps.workspace.exportSvg(deps.fileService);
         case 'exportPng':
@@ -142,6 +149,12 @@ export function createMenuActionHandler(deps: MenuActionDependencies) {
         return true;
       case 'view.creasePattern':
         deps.layout.activatePanel('crease-pattern');
+        return true;
+      case 'view.simulator':
+        deps.layout.activatePanel('simulator');
+        return true;
+      case 'view.foldedBase':
+        deps.layout.activatePanel('folded-base');
         return true;
       case 'view.conditions':
         deps.layout.activatePanel('conditions');

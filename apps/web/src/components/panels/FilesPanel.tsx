@@ -46,6 +46,10 @@ export function FilesPanel() {
             <Download size={14} />
             V4
           </Button>
+          <Button size="sm" variant="secondary" onClick={() => void handleMenuAction('file.exportFold')}>
+            <Download size={14} />
+            FOLD
+          </Button>
           <Button size="sm" variant="secondary" onClick={() => void handleMenuAction('file.exportSvg')}>
             <Download size={14} />
             SVG

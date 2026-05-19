@@ -2,7 +2,9 @@ import { expose } from 'comlink';
 import init, {
   apply_edit,
   build_crease_pattern,
+  export_fold,
   export_v4,
+  fold_artifacts,
   free_tree,
   load_tmd,
   new_design,
@@ -14,6 +16,7 @@ import init, {
 } from '../generated/treemaker-wasm/treemaker_wasm';
 import type {
   EditReport,
+  FoldArtifacts,
   OptimizationReport,
   TreeEdit,
   TreeSnapshot,
@@ -80,11 +83,17 @@ const api = {
       return tree_snapshot(handle) as TreeSnapshot;
     });
   },
+  async foldArtifacts(handle: number): Promise<FoldArtifacts> {
+    return call(() => fold_artifacts(handle) as FoldArtifacts);
+  },
   async saveTmd5(handle: number): Promise<string> {
     return call(() => save_tmd5(handle));
   },
   async exportV4(handle: number): Promise<string> {
     return call(() => export_v4(handle));
+  },
+  async exportFold(handle: number): Promise<string> {
+    return call(() => export_fold(handle));
   },
   async freeTree(handle: number): Promise<void> {
     return call(() => free_tree(handle));

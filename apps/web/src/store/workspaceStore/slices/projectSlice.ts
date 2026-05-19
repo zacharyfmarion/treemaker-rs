@@ -83,12 +83,15 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
     const title = source.title ?? basenameWithoutTreeMakerExtension(filename);
     set({
       ...projectStateFromSnapshot(snapshot, title),
+      projectLoadId: get().projectLoadId + 1,
       currentFileName: filename,
       currentFilePath: source.path ?? null,
       projectMessage: `Loaded ${filename}`,
       selection: { kind: 'tree' },
       toolMode: 'select',
       creaseColorMode: 'mvf',
+      foldArtifacts: null,
+      foldArtifactError: null,
       status: statusFromSnapshot(snapshot),
       dirty: source.dirty ?? false,
       lastOptimization: null,
@@ -139,6 +142,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
 
   return {
     project: createEmptyProject(),
+    projectLoadId: 0,
     currentFilePath: null,
     currentFileName: 'Untitled.tmd5',
     projectMessage: null,
@@ -156,9 +160,12 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
         const snapshot = await initializeBlankTree(api);
         set({
           ...projectStateFromSnapshot(snapshot, get().project.title),
+          projectLoadId: get().projectLoadId + 1,
           selection: { kind: 'tree' },
           dirty: false,
           lastOptimization: null,
+          foldArtifacts: null,
+          foldArtifactError: null,
           historyPast: [],
           historyFuture: [],
         });
@@ -175,12 +182,15 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
         const snapshot = await createBlankTree(api);
         set({
           ...projectStateFromSnapshot(snapshot, 'Untitled'),
+          projectLoadId: get().projectLoadId + 1,
           currentFileName: 'Untitled.tmd5',
           currentFilePath: null,
           projectMessage: null,
           selection: { kind: 'tree' },
           toolMode: 'select',
           creaseColorMode: 'mvf',
+          foldArtifacts: null,
+          foldArtifactError: null,
           dirty: false,
           lastOptimization: null,
           historyPast: [],
@@ -201,12 +211,15 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
         const snapshot = await createStarterTree(api);
         set({
           ...projectStateFromSnapshot(snapshot, 'Three terminal flaps'),
+          projectLoadId: get().projectLoadId + 1,
           currentFileName: 'three-terminal-flaps.tmd5',
           currentFilePath: null,
           projectMessage: 'Loaded starter project',
           selection: { kind: 'tree' },
           toolMode: 'select',
           creaseColorMode: 'mvf',
+          foldArtifacts: null,
+          foldArtifactError: null,
           dirty: false,
           lastOptimization: null,
           historyPast: [],
@@ -271,6 +284,26 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
           suggestedName: defaultFilename(get().project.title, 'tmd4'),
           path: null,
           extensions: ['tmd4'],
+        });
+        if (!result) return false;
+        set({ projectMessage: `Exported ${result.name}` });
+        return true;
+      } catch (error) {
+        set({ status: 'error', error: engineError(error) });
+        return false;
+      }
+    },
+
+    exportFold: async (fileService = getFileService()) => {
+      try {
+        const { api, treeHandle } = await ensureTreeHandle();
+        const contents = await api.exportFold(treeHandle);
+        const result = await fileService.saveTextFile({
+          title: 'Export FOLD Document',
+          contents,
+          suggestedName: defaultFilename(get().project.title, 'fold'),
+          path: null,
+          extensions: ['fold'],
         });
         if (!result) return false;
         set({ projectMessage: `Exported ${result.name}` });

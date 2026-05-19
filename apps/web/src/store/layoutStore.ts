@@ -3,7 +3,7 @@ import type { DockviewApi, SerializedDockview } from 'dockview';
 
 const LAYOUT_STORAGE_KEY = 'treemaker-web-layout';
 const LAYOUT_VERSION_KEY = 'treemaker-web-layout-version';
-const LAYOUT_VERSION = 3;
+const LAYOUT_VERSION = 6;
 
 export function applyDefaultLayout(api: DockviewApi): void {
   const design = api.addPanel({ id: 'design', component: 'design', title: 'Design' });
@@ -11,6 +11,13 @@ export function applyDefaultLayout(api: DockviewApi): void {
     id: 'crease-pattern',
     component: 'crease-pattern',
     title: 'Crease Pattern',
+    position: { referenceGroup: design.group.id },
+    inactive: true,
+  });
+  api.addPanel({
+    id: 'simulator',
+    component: 'simulator',
+    title: 'Simulator',
     position: { referenceGroup: design.group.id },
     inactive: true,
   });
@@ -29,6 +36,13 @@ export function applyDefaultLayout(api: DockviewApi): void {
       title: 'Diagnostics',
       position: { referenceGroup: inspector.group.id },
       inactive: true,
+    });
+    api.addPanel({
+      id: 'folded-base',
+      component: 'folded-base',
+      title: 'Folded Base',
+      position: { referencePanel: 'inspector', direction: 'below' },
+      initialHeight: 320,
     });
     api.addPanel({
       id: 'conditions',

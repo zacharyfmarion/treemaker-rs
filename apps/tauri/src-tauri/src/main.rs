@@ -1,3 +1,3 @@
 fn main() {
-    treemaker_tauri::run();
+    ori_studio::run();
 }

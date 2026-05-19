@@ -41,7 +41,7 @@ function Toolbar() {
   return (
     <header className="toolbar">
       <div className="toolbar__brand">
-        {isDesktop ? <span className="toolbar__title">TreeMaker</span> : <MenuBar />}
+        {isDesktop ? <span className="toolbar__title">Ori Studio</span> : <MenuBar />}
       </div>
       <div className="toolbar__actions">
         <IconButton

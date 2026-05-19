@@ -75,17 +75,17 @@ export function getWorkspaceCapabilities(input: WorkspaceCapabilityInput): Works
   const buildReason = hasCreasePattern ? 'Rebuild crease pattern' : 'Build crease pattern';
 
   return {
-    'file.new': capability(!isBusy, 'New', isBusy ? busyReason(input.status) : 'Create a new TreeMaker project'),
+    'file.new': capability(!isBusy, 'New', isBusy ? busyReason(input.status) : 'Create a new Ori Studio project'),
     'file.open': capability(!isBusy, 'Open...', isBusy ? busyReason(input.status) : 'Open a project or crease pattern'),
     'file.save': capability(
       treeMode && !isBusy,
       'Save',
-      treeMode ? busyOr('Save TreeMaker project', input.status) : 'Imported crease patterns are exported, not saved as TreeMaker projects'
+      treeMode ? busyOr('Save Ori Studio project', input.status) : 'Imported crease patterns are exported, not saved as Ori Studio projects'
     ),
     'file.saveAs': capability(
       treeMode && !isBusy,
       'Save As...',
-      treeMode ? busyOr('Save TreeMaker project as a new file', input.status) : 'Imported crease patterns are exported, not saved as TreeMaker projects'
+      treeMode ? busyOr('Save Ori Studio project as a new file', input.status) : 'Imported crease patterns are exported, not saved as Ori Studio projects'
     ),
     'file.exportV4': capability(
       treeMode && !isBusy,
@@ -224,10 +224,10 @@ function busyOr(reason: string, status: AppStatus): string {
 }
 
 function busyReason(status: AppStatus): string {
-  if (status === 'loading_engine') return 'TreeMaker engine is still loading';
+  if (status === 'loading_engine') return 'Engine is still loading';
   if (status === 'optimizing') return 'Optimization is running';
   if (status === 'building_crease_pattern') return 'Crease pattern build is running';
-  return 'TreeMaker is busy';
+  return 'Ori Studio is busy';
 }
 
 function disabledOptimizeReason(
@@ -235,11 +235,11 @@ function disabledOptimizeReason(
   isBusy: boolean,
   hasTreeEdges: boolean
 ): string {
-  if (input.documentMode !== 'tree') return 'Optimization requires a TreeMaker tree document';
-  if (!input.engineReady || input.status === 'loading_engine') return 'TreeMaker engine is still loading';
+  if (input.documentMode !== 'tree') return 'Optimization requires an editable tree document';
+  if (!input.engineReady || input.status === 'loading_engine') return 'Engine is still loading';
   if (isBusy) return busyReason(input.status);
   if (!hasTreeEdges) return 'Add at least one tree edge before optimizing';
-  if (input.status === 'error') return 'Resolve the current TreeMaker error before optimizing';
+  if (input.status === 'error') return 'Resolve the current engine error before optimizing';
   return 'Optimization is unavailable';
 }
 
@@ -248,10 +248,10 @@ function disabledBuildReason(
   isBusy: boolean,
   hasTreeEdges: boolean
 ): string {
-  if (input.documentMode !== 'tree') return 'Build CP requires a TreeMaker tree document';
-  if (!input.engineReady || input.status === 'loading_engine') return 'TreeMaker engine is still loading';
+  if (input.documentMode !== 'tree') return 'Build CP requires an editable tree document';
+  if (!input.engineReady || input.status === 'loading_engine') return 'Engine is still loading';
   if (isBusy) return busyReason(input.status);
-  if (input.status === 'error') return 'Resolve the current TreeMaker error before building the crease pattern';
+  if (input.status === 'error') return 'Resolve the current engine error before building the crease pattern';
   if (!hasTreeEdges) return 'Add tree edges, then optimize before building the crease pattern';
   return 'Optimize Scale before building the crease pattern';
 }

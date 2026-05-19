@@ -211,7 +211,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
     const contents = await api.saveTmd5(treeHandle);
     const suggestedName = defaultFilename(get().project.title, 'tmd5');
     const result = await fileService.saveTextFile({
-      title: forceSaveAs ? 'Save TreeMaker Project As' : 'Save TreeMaker Project',
+      title: forceSaveAs ? 'Save Ori Studio Project As' : 'Save Ori Studio Project',
       contents,
       suggestedName: get().currentFileName || suggestedName,
       path: forceSaveAs ? null : get().currentFilePath,
@@ -364,7 +364,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
       if (!confirmDiscardDirty(get().dirty)) return false;
       try {
         const file = await fileService.openTextFile({
-          title: 'Open TreeMaker Project or Crease Pattern',
+          title: 'Open Ori Studio Project or Crease Pattern',
           extensions: ['tmd', 'tmd4', 'tmd5', 'fold', 'cp'],
         });
         if (!file) return false;

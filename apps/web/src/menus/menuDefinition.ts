@@ -85,9 +85,9 @@ export function getMenuBarDef(): MenuDef[] {
     {
       label: 'Help',
       items: [
-        { type: 'action', id: 'help.documentation', label: 'TreeMaker Help', shortcut: 'F1' },
+        { type: 'action', id: 'help.documentation', label: 'Ori Studio Help', shortcut: 'F1' },
         { type: 'separator' },
-        { type: 'action', id: 'help.about', label: 'About TreeMaker' },
+        { type: 'action', id: 'help.about', label: 'About Ori Studio' },
       ],
     },
   ];

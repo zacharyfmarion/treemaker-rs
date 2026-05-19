@@ -2,11 +2,11 @@ use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 use tauri::{App, Emitter};
 
 pub fn setup_menu(app: &App) -> Result<(), Box<dyn std::error::Error>> {
-    let app_about = MenuItemBuilder::with_id("app.about", "About TreeMaker").build(app)?;
-    let app_quit = MenuItemBuilder::with_id("app.quit", "Quit TreeMaker")
+    let app_about = MenuItemBuilder::with_id("app.about", "About Ori Studio").build(app)?;
+    let app_quit = MenuItemBuilder::with_id("app.quit", "Quit Ori Studio")
         .accelerator("CmdOrCtrl+Q")
         .build(app)?;
-    let app_menu = SubmenuBuilder::new(app, "TreeMaker")
+    let app_menu = SubmenuBuilder::new(app, "Ori Studio")
         .item(&app_about)
         .separator()
         .item(&app_quit)
@@ -119,10 +119,10 @@ pub fn setup_menu(app: &App) -> Result<(), Box<dyn std::error::Error>> {
         .item(&build_cp)
         .build()?;
 
-    let help_docs = MenuItemBuilder::with_id("help.documentation", "TreeMaker Help")
+    let help_docs = MenuItemBuilder::with_id("help.documentation", "Ori Studio Help")
         .accelerator("F1")
         .build(app)?;
-    let help_about = MenuItemBuilder::with_id("help.about", "About TreeMaker").build(app)?;
+    let help_about = MenuItemBuilder::with_id("help.about", "About Ori Studio").build(app)?;
     let help_menu = SubmenuBuilder::new(app, "Help")
         .item(&help_docs)
         .separator()

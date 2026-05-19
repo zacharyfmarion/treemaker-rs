@@ -4,7 +4,7 @@ use std::fs;
 
 #[tauri::command]
 fn platform_ping() -> &'static str {
-    "treemaker-tauri"
+    "ori-studio"
 }
 
 #[tauri::command]
@@ -37,5 +37,5 @@ pub fn run() {
             write_binary_file
         ])
         .run(tauri::generate_context!())
-        .expect("error while running TreeMaker");
+        .expect("error while running Ori Studio");
 }

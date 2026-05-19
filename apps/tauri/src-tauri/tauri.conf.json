@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "TreeMaker",
+  "productName": "Ori Studio",
   "version": "0.1.0",
-  "identifier": "com.zacharymarion.treemaker",
+  "identifier": "com.zacharymarion.oristudio",
   "build": {
     "beforeDevCommand": {
       "script": "npm run dev",
@@ -18,7 +18,7 @@
   "app": {
     "windows": [
       {
-        "title": "TreeMaker",
+        "title": "Ori Studio",
         "width": 1400,
         "height": 900,
         "resizable": true,

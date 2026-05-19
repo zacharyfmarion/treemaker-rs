@@ -1,6 +1,6 @@
 {
   "identifier": "default",
-  "description": "Default permissions for TreeMaker",
+  "description": "Default permissions for Ori Studio",
   "windows": ["main"],
   "permissions": [
     "core:default",

@@ -137,7 +137,7 @@ export function ConditionsPanel() {
             <FileQuestionMark size={30} />
           </div>
           <span className="document-mode-empty__message">
-            Imported crease patterns do not have TreeMaker conditions.
+            Imported crease patterns do not have editable tree conditions.
           </span>
           <div className="document-mode-empty__actions">
             <Button size="sm" variant="primary" onClick={() => void handleMenuAction('view.creasePattern')}>

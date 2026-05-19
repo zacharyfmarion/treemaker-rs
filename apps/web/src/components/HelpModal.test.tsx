@@ -52,7 +52,7 @@ describe('HelpModal', () => {
     const rendered = renderModal('guide');
 
     expect(rendered.querySelector('[role="dialog"]')).not.toBeNull();
-    expect(rendered.textContent).toContain('TreeMaker Help');
+    expect(rendered.textContent).toContain('Ori Studio Help');
     expect(rendered.textContent).toContain('Start, Open, Save, Export');
     expect(rendered.textContent).toContain('Simulate And View The Folded Base');
 
@@ -73,6 +73,8 @@ describe('HelpModal', () => {
     expect(useHelpStore.getState().activeModal).toBe('about');
     expect(rendered.textContent).toContain('Robert J. Lang and TreeMaker 5.0.1');
     expect(rendered.textContent).toContain('Jason S. Ku and Flat-Folder');
+    expect(rendered.textContent).not.toContain('treemaker-rs');
+    expect(rendered.textContent).not.toContain('GPL-2.0-or-later');
     expect(rendered.textContent).not.toContain('http://127.0.0.1:5275/');
 
     const links = Array.from(rendered.querySelectorAll('.about-modal__ack')).map((link) => ({
@@ -83,7 +85,6 @@ describe('HelpModal', () => {
       { href: 'https://langorigami.com/article/treemaker/', target: '_blank' },
       { href: 'https://github.com/origamimagiro/flat-folder', target: '_blank' },
       { href: 'https://github.com/edemaine/fold', target: '_blank' },
-      { href: 'https://github.com/zacharyfmarion/treemaker-rs', target: '_blank' },
     ]);
 
     act(() => {
@@ -91,7 +92,7 @@ describe('HelpModal', () => {
     });
 
     expect(useHelpStore.getState().activeModal).toBe('guide');
-    expect(rendered.textContent).toContain('TreeMaker Help');
+    expect(rendered.textContent).toContain('Ori Studio Help');
   });
 
   it('closes on Escape', () => {

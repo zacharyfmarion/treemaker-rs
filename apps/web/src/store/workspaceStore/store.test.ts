@@ -731,14 +731,14 @@ describe('workspace store slices', () => {
 
     await expect(useWorkspaceStore.getState().openProject(fileService)).resolves.toBe(true);
     expect(fileService.openTextFile).toHaveBeenCalledWith({
-      title: 'Open TreeMaker Project or Crease Pattern',
+      title: 'Open Ori Studio Project or Crease Pattern',
       extensions: ['tmd', 'tmd4', 'tmd5', 'fold', 'cp'],
     });
 
     await expect(useWorkspaceStore.getState().saveProject(fileService)).resolves.toBe(true);
     expect(fileService.saveTextFile).toHaveBeenCalledWith(
       expect.objectContaining({
-        title: 'Save TreeMaker Project',
+        title: 'Save Ori Studio Project',
         path: '/tmp/opened.tmd5',
         extensions: ['tmd5'],
       })
@@ -748,7 +748,7 @@ describe('workspace store slices', () => {
     await expect(useWorkspaceStore.getState().saveProjectAs(fileService)).resolves.toBe(true);
     expect(fileService.saveTextFile).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        title: 'Save TreeMaker Project As',
+        title: 'Save Ori Studio Project As',
         path: null,
       })
     );
@@ -826,7 +826,7 @@ describe('workspace store slices', () => {
 
     await expect(useWorkspaceStore.getState().saveProject(fileService)).resolves.toBe(false);
     expect(useWorkspaceStore.getState().error?.message).toBe(
-      'Imported crease patterns are exported, not saved as TreeMaker projects'
+      'Imported crease patterns are exported, not saved as Ori Studio projects'
     );
 
     await expect(useWorkspaceStore.getState().exportFold(fileService)).resolves.toBe(true);

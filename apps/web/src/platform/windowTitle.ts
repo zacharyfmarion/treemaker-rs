@@ -9,11 +9,11 @@ export interface WindowTitleInput {
 export function formatWindowTitle({
   projectTitle,
   dirty,
-  surface = getRuntimeSurface(),
+  surface: _surface = getRuntimeSurface(),
 }: WindowTitleInput): string {
   const title = projectTitle.trim() || 'Untitled';
   const dirtyMark = dirty ? '*' : '';
-  const suffix = surface === 'desktop' ? 'TreeMaker' : 'TreeMaker Web';
+  const suffix = 'Ori Studio';
   return `${dirtyMark}${title} - ${suffix}`;
 }
 

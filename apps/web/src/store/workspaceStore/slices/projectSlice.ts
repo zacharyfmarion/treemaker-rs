@@ -152,6 +152,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
     engineReady: false,
     error: null,
     lastOptimization: null,
+    designViewportFitRequestId: 0,
 
     initEngine: async () => {
       set({ status: 'loading_engine', error: null });

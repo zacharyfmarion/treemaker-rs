@@ -36,6 +36,7 @@ export interface ProjectSliceState {
   engineReady: boolean;
   error: WasmErrorEnvelope | null;
   lastOptimization: OptimizationReport | null;
+  designViewportFitRequestId: number;
 }
 
 export interface ProjectSliceActions {

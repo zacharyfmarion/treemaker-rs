@@ -1,6 +1,6 @@
 import { getExampleProject } from '../../../examples/catalog';
 import { serializeCreasePatternSvg, renderCreasePatternPng } from '../../../lib/creaseExport';
-import { createEmptyProject } from '../../../lib/sampleProject';
+import { createEmptyProject, DEFAULT_CREASE_COLOR_MODE } from '../../../lib/sampleProject';
 import { ensureExtension, getFileService, type FileService } from '../../../platform/fileService';
 import { useLayoutStore } from '../../layoutStore';
 import {
@@ -89,7 +89,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
       projectMessage: `Loaded ${filename}`,
       selection: { kind: 'tree' },
       toolMode: 'select',
-      creaseColorMode: 'mvf',
+      creaseColorMode: DEFAULT_CREASE_COLOR_MODE,
       foldArtifacts: null,
       foldArtifactError: null,
       status: statusFromSnapshot(snapshot),
@@ -188,7 +188,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
           projectMessage: null,
           selection: { kind: 'tree' },
           toolMode: 'select',
-          creaseColorMode: 'mvf',
+          creaseColorMode: DEFAULT_CREASE_COLOR_MODE,
           foldArtifacts: null,
           foldArtifactError: null,
           dirty: false,
@@ -217,7 +217,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
           projectMessage: 'Loaded starter project',
           selection: { kind: 'tree' },
           toolMode: 'select',
-          creaseColorMode: 'mvf',
+          creaseColorMode: DEFAULT_CREASE_COLOR_MODE,
           foldArtifacts: null,
           foldArtifactError: null,
           dirty: false,

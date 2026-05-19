@@ -30,6 +30,7 @@ export type AppStatus =
   | 'error';
 export type ToolMode = 'select' | 'node' | 'edge';
 export type CreaseColorMode = 'mvf' | 'agrh';
+export const DEFAULT_CREASE_COLOR_MODE: CreaseColorMode = 'agrh';
 
 export interface TreeNode {
   id: number;

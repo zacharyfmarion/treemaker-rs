@@ -1,5 +1,6 @@
 import { projectFromSnapshot } from '../../../engine/snapshotMapper';
 import type { FoldArtifacts, OptimizationReport } from '../../../engine/types';
+import { DEFAULT_CREASE_COLOR_MODE } from '../../../lib/sampleProject';
 import { useLayoutStore } from '../../layoutStore';
 import {
   engineError,
@@ -61,7 +62,7 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
   }
 
   return {
-    creaseColorMode: 'mvf',
+    creaseColorMode: DEFAULT_CREASE_COLOR_MODE,
     foldArtifacts: null,
     foldArtifactError: null,
 

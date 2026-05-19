@@ -15,6 +15,7 @@ import type {
 } from '../../engine/types';
 import { projectFromSnapshot } from '../../engine/snapshotMapper';
 import type { FileService, SaveBinaryFileOptions, SaveTextFileOptions } from '../../platform/fileService';
+import { DEFAULT_CREASE_COLOR_MODE } from '../../lib/sampleProject';
 import { useLayoutStore } from '../layoutStore';
 
 const engineMocks = vi.hoisted(() => ({
@@ -511,7 +512,7 @@ function loadSnapshotIntoStore(snapshot: TreeSnapshot, title = 'Seed project') {
     toolMode: 'select',
     clipboard: null,
     clipboardPasteCount: 0,
-    creaseColorMode: 'mvf',
+    creaseColorMode: DEFAULT_CREASE_COLOR_MODE,
     foldArtifacts: null,
     foldArtifactError: null,
   });
@@ -572,7 +573,7 @@ describe('workspace store slices', () => {
     expect(state.status).toBe('loading_engine');
     expect(state.selection).toEqual({ kind: 'tree' });
     expect(state.toolMode).toBe('select');
-    expect(state.creaseColorMode).toBe('mvf');
+    expect(state.creaseColorMode).toBe(DEFAULT_CREASE_COLOR_MODE);
     expect(state.foldArtifacts).toBeNull();
     expect(state.historyPast).toEqual([]);
     expect(state.clipboard).toBeNull();
@@ -660,13 +661,13 @@ describe('workspace store slices', () => {
     await expect(useWorkspaceStore.getState().exportSvg(fileService)).resolves.toBe(true);
     expect(exportMocks.serializeCreasePatternSvg).toHaveBeenCalledWith(
       useWorkspaceStore.getState().project,
-      'mvf'
+      DEFAULT_CREASE_COLOR_MODE
     );
 
     await expect(useWorkspaceStore.getState().exportPng(fileService)).resolves.toBe(true);
     expect(exportMocks.renderCreasePatternPng).toHaveBeenCalledWith(
       useWorkspaceStore.getState().project,
-      'mvf'
+      DEFAULT_CREASE_COLOR_MODE
     );
     expect(fileService.saveBinaryFile).toHaveBeenCalledWith(
       expect.objectContaining({ extensions: ['png'], mimeType: 'image/png' })
@@ -840,8 +841,8 @@ describe('workspace store slices', () => {
     expect(api.foldArtifacts).toHaveBeenCalledWith(1);
     expect(activatePanel).toHaveBeenCalledWith('crease-pattern');
 
-    useWorkspaceStore.getState().setCreaseColorMode('agrh');
-    expect(useWorkspaceStore.getState().creaseColorMode).toBe('agrh');
+    useWorkspaceStore.getState().setCreaseColorMode('mvf');
+    expect(useWorkspaceStore.getState().creaseColorMode).toBe('mvf');
   });
 
   it('surfaces engine errors on mutating actions', async () => {

@@ -30,15 +30,28 @@ export function CreasePatternPanel() {
         <div className="panel-toolbar__group">
           <span className="panel-title">Crease Pattern</span>
         </div>
-        <SegmentedControl
-          aria-label="Crease color mode"
-          value={mode}
-          onChange={setMode}
-          options={[
-            { value: 'mvf', label: 'MVF', icon: <ScanLine size={13} /> },
-            { value: 'agrh', label: 'AGRH', icon: <GitBranch size={13} /> },
-          ]}
-        />
+        <div className="cp-panel__mode">
+          <span className="cp-panel__mode-label">Color by</span>
+          <SegmentedControl
+            aria-label="Choose how crease lines are colored"
+            value={mode}
+            onChange={setMode}
+            options={[
+              {
+                value: 'mvf',
+                label: 'Fold types',
+                icon: <ScanLine size={13} />,
+                title: 'Color by mountain, valley, flat, and border folds',
+              },
+              {
+                value: 'agrh',
+                label: 'Crease roles',
+                icon: <GitBranch size={13} />,
+                title: 'Color by axial, gusset, ridge, hinge, and pseudohinge roles',
+              },
+            ]}
+          />
+        </div>
       </div>
       <div className="panel-body cp-panel__body">
         <svg className="cp-canvas" viewBox={`0 0 ${VIEWBOX} ${VIEWBOX}`} role="img" aria-label="Crease pattern">

@@ -212,6 +212,20 @@
   overflow: auto;
 }
 
+.cp-panel__mode {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.cp-panel__mode-label {
+  color: var(--text-tertiary);
+  font-size: 0.68rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
 .control-row {
   display: grid;
   grid-template-columns: minmax(80px, 1fr) minmax(80px, auto);

@@ -615,6 +615,10 @@
   stroke: #2f9e6f;
 }
 
+.tree-path--internal {
+  stroke: #e1a05b;
+}
+
 .tree-path--feasible {
   stroke: var(--accent-secondary);
 }

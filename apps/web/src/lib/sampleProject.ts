@@ -53,9 +53,11 @@ export interface TreeEdge {
 export interface TreePath {
   id: number;
   nodes: [number, number];
+  isLeaf: boolean;
   isActive: boolean;
   isFeasible: boolean;
   isBorder: boolean;
+  isPolygon: boolean;
   isConditioned: boolean;
 }
 
@@ -152,9 +154,36 @@ export function createSampleProject(): TreeProject {
       { id: 3, label: 'e3', nodes: [1, 4], length: 1, strain: 0, stiffness: 1, isConditioned: false },
     ],
     paths: [
-      { id: 1, nodes: [2, 3], isActive: true, isFeasible: true, isBorder: true, isConditioned: false },
-      { id: 2, nodes: [3, 4], isActive: true, isFeasible: true, isBorder: true, isConditioned: false },
-      { id: 3, nodes: [2, 4], isActive: true, isFeasible: true, isBorder: true, isConditioned: false },
+      {
+        id: 1,
+        nodes: [2, 3],
+        isLeaf: true,
+        isActive: true,
+        isFeasible: true,
+        isBorder: true,
+        isPolygon: true,
+        isConditioned: false,
+      },
+      {
+        id: 2,
+        nodes: [3, 4],
+        isLeaf: true,
+        isActive: true,
+        isFeasible: true,
+        isBorder: true,
+        isPolygon: true,
+        isConditioned: false,
+      },
+      {
+        id: 3,
+        nodes: [2, 4],
+        isLeaf: true,
+        isActive: true,
+        isFeasible: true,
+        isBorder: true,
+        isPolygon: true,
+        isConditioned: false,
+      },
     ],
     facets: [
       {

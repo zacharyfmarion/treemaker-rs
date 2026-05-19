@@ -45,6 +45,18 @@ function facetColor(color: number): FacetShape['color'] {
   }
 }
 
+function isDesignVisiblePath(path: TreeSnapshot['paths'][number]): boolean {
+  if (path.nodes.length < 2) return false;
+
+  return (
+    path.is_leaf ||
+    path.is_active ||
+    path.is_border ||
+    path.is_polygon ||
+    path.is_conditioned
+  );
+}
+
 export function projectFromSnapshot(snapshot: TreeSnapshot, titleOverride?: string): TreeProject {
   const vertexLocs = new Map(snapshot.vertices.map((vertex) => [vertex.id, vertex.loc]));
   const title =
@@ -80,13 +92,15 @@ export function projectFromSnapshot(snapshot: TreeSnapshot, titleOverride?: stri
       isConditioned: edge.is_conditioned,
     })),
     paths: snapshot.paths
-      .filter((path) => path.is_leaf && path.nodes.length >= 2)
+      .filter(isDesignVisiblePath)
       .map((path) => ({
         id: path.id,
         nodes: [path.nodes[0], path.nodes[path.nodes.length - 1]] as [number, number],
+        isLeaf: path.is_leaf,
         isActive: path.is_active,
         isFeasible: path.is_feasible,
         isBorder: path.is_border,
+        isPolygon: path.is_polygon,
         isConditioned: path.is_conditioned,
       })),
     creases: snapshot.creases.flatMap((crease) => {

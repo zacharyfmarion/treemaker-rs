@@ -518,11 +518,13 @@ export function DesignPanel() {
                   if (!a || !b) return null;
                   const p1 = paperToSvg(displayLoc(a.id, a.loc), DESIGN_PAPER_RECT);
                   const p2 = paperToSvg(displayLoc(b.id, b.loc), DESIGN_PAPER_RECT);
-                  const className = path.isActive
-                    ? 'tree-path tree-path--active'
-                    : path.isFeasible
-                      ? 'tree-path tree-path--feasible'
-                      : 'tree-path tree-path--bad';
+                  const className = !path.isLeaf
+                    ? 'tree-path tree-path--internal'
+                    : path.isActive
+                      ? 'tree-path tree-path--active'
+                      : path.isFeasible
+                        ? 'tree-path tree-path--feasible'
+                        : 'tree-path tree-path--bad';
                   const conditioned = path.isConditioned ? 'tree-path--conditioned' : '';
                   const active = isPathSelected(selection, path.id);
                   return (

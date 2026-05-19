@@ -9,7 +9,7 @@ mod avl;
 mod conversion;
 mod math;
 
-use conversion::normalize_document;
+use conversion::{normalize_document, project_normalized};
 use serde::{Deserialize, Serialize};
 use treemaker_fold::FoldDocument;
 
@@ -129,8 +129,19 @@ pub fn normalize_fold(
     normalize_document(document, options)
 }
 
-pub fn analyze_flat_fold(_document: &FoldDocument, _options: AnalyzeOptions) -> Result<Analysis> {
-    Err(FlatFoldError::Unimplemented("analyze_flat_fold"))
+pub fn analyze_flat_fold(document: &FoldDocument, options: AnalyzeOptions) -> Result<Analysis> {
+    let normalized = normalize_fold(document, options.normalize)?;
+    let (folded_vertices, faces_flip) = project_normalized(&normalized)?;
+    if options.include_overlap_graph {
+        return Err(FlatFoldError::Unimplemented("overlap graph"));
+    }
+    Ok(Analysis {
+        normalized,
+        folded_vertices,
+        faces_flip,
+        overlap: None,
+        diagnostics: Vec::new(),
+    })
 }
 
 pub fn solve_flat_fold(_document: &FoldDocument, _options: SolveOptions) -> Result<SolveResult> {
@@ -142,16 +153,24 @@ mod tests {
     use super::*;
     use treemaker_fold::Assignment;
 
-    fn empty_doc() -> FoldDocument {
-        FoldDocument::new(vec![vec![0.0, 0.0]], Vec::new())
+    fn square_doc() -> FoldDocument {
+        FoldDocument::new(
+            vec![
+                vec![0.0, 0.0],
+                vec![1.0, 0.0],
+                vec![1.0, 1.0],
+                vec![0.0, 1.0],
+            ],
+            vec![[0, 1], [1, 2], [2, 3], [3, 0]],
+        )
     }
 
     #[test]
     fn unported_analysis_stages_return_explicit_unimplemented_errors() {
-        let doc = empty_doc();
+        let doc = square_doc();
         assert_eq!(
             analyze_flat_fold(&doc, AnalyzeOptions::default()),
-            Err(FlatFoldError::Unimplemented("analyze_flat_fold"))
+            Err(FlatFoldError::Unimplemented("overlap graph"))
         );
         assert_eq!(
             solve_flat_fold(&doc, SolveOptions::default()),
@@ -279,5 +298,39 @@ mod tests {
                 .count(),
             2
         );
+    }
+
+    #[test]
+    fn analyze_projects_flat_fold_when_overlap_graph_is_not_requested() {
+        let mut doc = FoldDocument::new(
+            vec![
+                vec![0.0, 0.0],
+                vec![1.0, 0.0],
+                vec![1.0, 1.0],
+                vec![0.0, 1.0],
+            ],
+            vec![[0, 1], [1, 2], [2, 3], [3, 0], [0, 2]],
+        );
+        doc.edges_assignment = vec![
+            Assignment::Boundary,
+            Assignment::Boundary,
+            Assignment::Boundary,
+            Assignment::Boundary,
+            Assignment::Mountain,
+        ];
+        doc.faces_vertices = vec![vec![0, 1, 2], vec![0, 2, 3]];
+
+        let analysis = analyze_flat_fold(
+            &doc,
+            AnalyzeOptions {
+                include_overlap_graph: false,
+                ..AnalyzeOptions::default()
+            },
+        )
+        .unwrap();
+
+        assert_eq!(analysis.folded_vertices.len(), 4);
+        assert_eq!(analysis.faces_flip, vec![false, true]);
+        assert!(analysis.overlap.is_none());
     }
 }

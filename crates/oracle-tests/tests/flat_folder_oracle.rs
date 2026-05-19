@@ -23,7 +23,7 @@ fn flat_folder_normalization_matches_js_oracle_when_enabled() {
     }
     for fixture in ["kabuto.fold", "bad_twist.fold"] {
         let path = root.join("tests/fixtures/flat-folder").join(fixture);
-        let record = run_flat_folder_oracle(&oracle, &root, "normalize", &path);
+        let record = run_flat_folder_oracle(&oracle, &root, "project", &path);
         assert_eq!(record["status"].as_str(), Some("ok"), "{fixture}");
         let text = std::fs::read_to_string(&path)
             .unwrap_or_else(|err| panic!("{}: {err}", path.display()));
@@ -36,6 +36,61 @@ fn flat_folder_normalization_matches_js_oracle_when_enabled() {
             &normalized.vertex_vertices,
             &record,
             fixture,
+        );
+        let analysis = treemaker_flatfold::analyze_flat_fold(
+            &document,
+            treemaker_flatfold::AnalyzeOptions {
+                include_overlap_graph: false,
+                ..treemaker_flatfold::AnalyzeOptions::default()
+            },
+        )
+        .unwrap_or_else(|err| panic!("{}: {err}", path.display()));
+        assert_project_record(
+            &analysis.folded_vertices,
+            &analysis.faces_flip,
+            &record,
+            fixture,
+        );
+    }
+}
+
+fn assert_project_record(
+    folded_vertices: &[[f64; 2]],
+    faces_flip: &[bool],
+    record: &Value,
+    fixture: &str,
+) {
+    let project = &record["project"];
+    assert_eq!(
+        faces_flip.iter().filter(|flip| !**flip).count(),
+        project["faces_up"].as_u64().expect("faces_up") as usize,
+        "{fixture}"
+    );
+    assert_eq!(
+        faces_flip.iter().filter(|flip| **flip).count(),
+        project["faces_down"].as_u64().expect("faces_down") as usize,
+        "{fixture}"
+    );
+    assert_hash(faces_flip, project, "faces_flip_hash", fixture);
+    let expected = project["folded_vertices"]
+        .as_array()
+        .expect("folded_vertices");
+    assert_eq!(folded_vertices.len(), expected.len(), "{fixture}");
+    for (index, (actual, expected)) in folded_vertices.iter().zip(expected).enumerate() {
+        let expected = expected.as_array().expect("folded vertex");
+        let expected_x = expected[0].as_f64().expect("folded x");
+        let expected_y = expected[1].as_f64().expect("folded y");
+        assert!(
+            (actual[0] - expected_x).abs() <= 1.0e-9,
+            "{fixture} folded vertex {index} x: rust {}, oracle {}",
+            actual[0],
+            expected_x
+        );
+        assert!(
+            (actual[1] - expected_y).abs() <= 1.0e-9,
+            "{fixture} folded vertex {index} y: rust {}, oracle {}",
+            actual[1],
+            expected_y
         );
     }
 }

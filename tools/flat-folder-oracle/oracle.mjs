@@ -71,7 +71,7 @@ function run(command, file, doc, limit) {
     case "normalize":
       return { ...common, normalize: normalizeRecord(pipeline) };
     case "project":
-      return { ...common, normalize: normalizeRecord(pipeline), project: projectRecord(pipeline) };
+      return { ...common, normalize: normalizeRecord(pipeline), project: projectRecord(pipeline, true) };
     case "overlap":
       return { ...common, normalize: normalizeRecord(pipeline), project: projectRecord(pipeline), overlap: overlapRecord(pipeline) };
     case "constraints":
@@ -194,13 +194,18 @@ function normalizeRecord(p) {
   };
 }
 
-function projectRecord(p) {
-  return {
+function projectRecord(p, includeData = false) {
+  const record = {
     folded_vertices_hash: hashJson(p.Vf),
     faces_flip_hash: hashJson(p.Ff),
     faces_up: p.Ff.filter((flip) => !flip).length,
     faces_down: p.Ff.filter((flip) => flip).length,
   };
+  if (includeData) {
+    record.folded_vertices = p.Vf;
+    record.faces_flip = p.Ff;
+  }
+  return record;
 }
 
 function overlapRecord(p) {

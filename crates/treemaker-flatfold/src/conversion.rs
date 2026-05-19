@@ -109,6 +109,128 @@ pub(crate) fn normalize_document(
     })
 }
 
+pub(crate) fn project_normalized(normalized: &NormalizedFold) -> Result<(Vec<Point>, Vec<bool>)> {
+    let vertices = document_points(&normalized.document)?;
+    let edges = &normalized.document.edges_vertices;
+    let assignments = &normalized.document.edges_assignment;
+    let faces = &normalized.document.faces_vertices;
+    if faces.is_empty() {
+        return Err(FlatFoldError::InvalidInput(
+            "cannot project a normalized FOLD without faces".to_string(),
+        ));
+    }
+    if faces[0].len() < 2 {
+        return Err(FlatFoldError::InvalidInput(
+            "first face must contain at least two vertices".to_string(),
+        ));
+    }
+    let mut assignment_by_edge = BTreeMap::new();
+    for (edge_index, [a, b]) in edges.iter().copied().enumerate() {
+        assignment_by_edge.insert(
+            math::encode_order_pair(a, b),
+            assignments
+                .get(edge_index)
+                .copied()
+                .unwrap_or(Assignment::Unassigned),
+        );
+    }
+    let mut face_across_directed_edge = BTreeMap::new();
+    for (face_index, face) in faces.iter().enumerate() {
+        for (offset, v1) in face.iter().copied().enumerate() {
+            let v2 = face[(offset + 1) % face.len()];
+            face_across_directed_edge.insert(math::encode(&[v2, v1]), face_index);
+        }
+    }
+
+    let mut folded_vertices = vec![None; vertices.len()];
+    let [v1, v2] = [faces[0][0], faces[0][1]];
+    folded_vertices[v1] = Some(vertices[v1]);
+    folded_vertices[v2] = Some(vertices[v2]);
+    let mut faces_flip = vec![false; faces.len()];
+    let mut queue = vec![(0usize, v1, v2, f64::INFINITY, true)];
+    let mut next = 0usize;
+    let mut seen = BTreeSet::new();
+    while next < queue.len() {
+        let (face_index, i1, i2, _, side) = queue[next];
+        next += 1;
+        if seen.contains(&face_index) {
+            continue;
+        }
+        seen.insert(face_index);
+        faces_flip[face_index] = !side;
+        let face = &faces[face_index];
+        let x = math::unit(math::sub(vertices[i2], vertices[i1]))?;
+        let y = math::perp(x);
+        let Some(folded_i1) = folded_vertices[i1] else {
+            return Err(FlatFoldError::PrecisionFailure(
+                "face traversal reached an unset folded source vertex".to_string(),
+            ));
+        };
+        let Some(folded_i2) = folded_vertices[i2] else {
+            return Err(FlatFoldError::PrecisionFailure(
+                "face traversal reached an unset folded target vertex".to_string(),
+            ));
+        };
+        let xf = math::unit(math::sub(folded_i2, folded_i1))?;
+        let yf = math::perp(xf);
+        let mut vi = face[face.len() - 1];
+        for vj in face.iter().copied() {
+            if folded_vertices[vj].is_none() {
+                let v = math::sub(vertices[vj], vertices[i1]);
+                let dx = math::mul(xf, math::dot(v, x));
+                let dy_scale = math::dot(v, y) * if side { 1.0 } else { -1.0 };
+                let dy = math::mul(yf, dy_scale);
+                folded_vertices[vj] = Some(math::add(math::add(dx, dy), folded_i1));
+            }
+            let len = math::distsq(vertices[vi], vertices[vj]);
+            let neighbor = face_across_directed_edge
+                .get(&math::encode(&[vi, vj]))
+                .copied();
+            let assignment = assignment_by_edge
+                .get(&math::encode_order_pair(vi, vj))
+                .copied()
+                .unwrap_or(Assignment::Unassigned);
+            let new_side = if matches!(
+                assignment,
+                Assignment::Mountain | Assignment::Valley | Assignment::Unassigned
+            ) {
+                !side
+            } else {
+                side
+            };
+            if let Some(neighbor) = neighbor
+                && !seen.contains(&neighbor)
+            {
+                queue.push((neighbor, vi, vj, len, new_side));
+                let mut i = queue.len() - 1;
+                while i > next {
+                    let prev_len = queue[i - 1].3;
+                    if prev_len < len {
+                        queue.swap(i, i - 1);
+                    } else {
+                        break;
+                    }
+                    i -= 1;
+                }
+            }
+            vi = vj;
+        }
+    }
+
+    folded_vertices
+        .into_iter()
+        .enumerate()
+        .map(|(index, point)| {
+            point.ok_or_else(|| {
+                FlatFoldError::PrecisionFailure(format!(
+                    "vertex {index} was not reached by the face traversal"
+                ))
+            })
+        })
+        .collect::<Result<Vec<_>>>()
+        .map(|vertices| (vertices, faces_flip))
+}
+
 fn document_points(document: &FoldDocument) -> Result<Vec<Point>> {
     if document.vertices_coords.is_empty() {
         return Err(FlatFoldError::InvalidInput(

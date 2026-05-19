@@ -1,6 +1,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { DESIGN_PAPER_RECT } from '../../lib/designViewport';
 import { createEmptyProject, createSampleProject, type TreeProject } from '../../lib/sampleProject';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { TooltipProvider } from '../ui/Tooltip';
@@ -111,6 +112,19 @@ describe('DesignPanel', () => {
 
     expect(container?.textContent).toContain('Sketch the tree behind your design');
     expect(container?.textContent).toContain('Use branches for the flaps, limbs, and features');
+  });
+
+  it('anchors the empty nudge to the paper inside the zoomable SVG canvas', () => {
+    renderPanel(createEmptyProject());
+
+    const emptyState = container?.querySelector<SVGForeignObjectElement>('foreignObject.design-empty-state');
+
+    expect(emptyState).toBeTruthy();
+    expect(emptyState?.closest('svg.design-canvas')).toBeTruthy();
+    expect(emptyState?.getAttribute('x')).toBe(String(DESIGN_PAPER_RECT.x));
+    expect(emptyState?.getAttribute('y')).toBe(String(DESIGN_PAPER_RECT.y));
+    expect(emptyState?.getAttribute('width')).toBe(String(DESIGN_PAPER_RECT.width));
+    expect(emptyState?.getAttribute('height')).toBe(String(DESIGN_PAPER_RECT.height));
   });
 
   it('hides the empty nudge once the design has nodes', () => {

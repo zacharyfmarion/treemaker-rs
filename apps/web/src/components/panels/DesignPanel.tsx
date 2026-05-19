@@ -711,6 +711,22 @@ export function DesignPanel() {
                   />
                 </>
               )}
+              {showEmptyState && (
+                <foreignObject
+                  className="design-empty-state"
+                  x={DESIGN_PAPER_RECT.x}
+                  y={DESIGN_PAPER_RECT.y}
+                  width={DESIGN_PAPER_RECT.width}
+                  height={DESIGN_PAPER_RECT.height}
+                >
+                  <div className="design-empty-state__inner" role="note">
+                    <div className="design-empty-state__copy">
+                      <strong>Sketch the tree behind your design</strong>
+                      <span>Use branches for the flaps, limbs, and features the folded base needs.</span>
+                    </div>
+                  </div>
+                </foreignObject>
+              )}
               {symmetryHoverPreview && (
                 <g className="symmetry-ghost">
                   {(() => {
@@ -863,14 +879,6 @@ export function DesignPanel() {
             </svg>
           </TransformComponent>
         </TransformWrapper>
-        {showEmptyState && (
-          <div className="design-empty-state" role="note">
-            <div className="design-empty-state__copy">
-              <strong>Sketch the tree behind your design</strong>
-              <span>Use branches for the flaps, limbs, and features the folded base needs.</span>
-            </div>
-          </div>
-        )}
         <DesignViewportToolbar
           zoomPercent={zoomPercent}
           layers={layers}

@@ -1324,7 +1324,7 @@
 .edge-label {
   fill: var(--tree-label);
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 400;
   paint-order: stroke;
   stroke: var(--tree-label-stroke);
   stroke-width: 3px;

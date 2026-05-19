@@ -82,7 +82,8 @@ export interface FoldArtifacts {
   fold: FoldDocument;
   folded_base?: FoldedBaseSnapshot | null;
   folded_base_error?: string | null;
-  simulation_model: RustPreparedFoldModel;
+  simulation_model?: RustPreparedFoldModel | null;
+  simulation_model_error?: string | null;
 }
 
 export interface TreeSummary {

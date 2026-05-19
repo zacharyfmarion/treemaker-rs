@@ -199,8 +199,8 @@ export function SimulatorPanel() {
       return;
     }
     if (foldArtifacts) {
-      setModelError(null);
-      setLoadState('ready');
+      setModelError(foldArtifacts.simulation_model_error ?? null);
+      setLoadState(foldArtifacts.simulation_model_error ? 'error' : 'ready');
       return;
     }
 
@@ -229,6 +229,9 @@ export function SimulatorPanel() {
     if (!foldArtifacts) return;
 
     try {
+      if (foldArtifacts.simulation_model_error) {
+        throw new Error(foldArtifacts.simulation_model_error);
+      }
       const model = prepareFoldModel(
         (foldArtifacts.simulation_model?.fold ?? foldArtifacts.fold) as SimulatorFoldDocument,
         { triangulate: false }

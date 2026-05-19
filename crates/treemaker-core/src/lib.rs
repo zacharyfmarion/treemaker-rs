@@ -393,6 +393,19 @@ pub enum CPStatus {
     NotLocalRootConnectable,
 }
 
+fn cp_status_label(status: &CPStatus) -> &'static str {
+    match status {
+        CPStatus::HasFullCp => "has_full_cp",
+        CPStatus::EdgesTooShort => "edges_too_short",
+        CPStatus::PolysNotValid => "polys_not_valid",
+        CPStatus::PolysNotFilled => "polys_not_filled",
+        CPStatus::PolysMultipleIbps => "polys_multiple_ibps",
+        CPStatus::VerticesLackDepth => "vertices_lack_depth",
+        CPStatus::FacetsNotValid => "facets_not_valid",
+        CPStatus::NotLocalRootConnectable => "not_local_root_connectable",
+    }
+}
+
 /// Detailed crease-pattern status report with offending part IDs when available.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CPStatusReport {
@@ -645,7 +658,10 @@ pub struct FoldArtifacts {
     pub folded_base: Option<FoldedBaseSnapshot>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub folded_base_error: Option<String>,
-    pub simulation_model: treemaker_fold::PreparedFoldModel,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub simulation_model: Option<treemaker_fold::PreparedFoldModel>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub simulation_model_error: Option<String>,
 }
 
 /// User-intent edit operation for GUI and wasm consumers.
@@ -1270,6 +1286,9 @@ impl Tree {
 
     /// Return a generic triangulated simulation model for the current crease pattern.
     pub fn simulation_model(&self) -> Result<treemaker_fold::PreparedFoldModel> {
+        if self.cp_status() != CPStatus::HasFullCp {
+            return Err(TreeError::FoldArtifact(self.simulation_unavailable_error()));
+        }
         let fold = self.to_fold_document()?;
         treemaker_fold::prepare_simulation_model(&fold)
             .map_err(|error| TreeError::FoldArtifact(error.to_string()))
@@ -1282,14 +1301,46 @@ impl Tree {
             Ok(snapshot) => (Some(snapshot), None),
             Err(error) => (None, Some(error.to_string())),
         };
-        let simulation_model = treemaker_fold::prepare_simulation_model(&fold)
-            .map_err(|error| TreeError::FoldArtifact(error.to_string()))?;
+        let (simulation_model, simulation_model_error) = if self.cp_status() == CPStatus::HasFullCp
+        {
+            match treemaker_fold::prepare_simulation_model(&fold) {
+                Ok(model) => (Some(model), None),
+                Err(error) => (None, Some(error.to_string())),
+            }
+        } else {
+            (None, Some(self.simulation_unavailable_error()))
+        };
         Ok(FoldArtifacts {
             fold,
             folded_base,
             folded_base_error,
             simulation_model,
+            simulation_model_error,
         })
+    }
+
+    fn simulation_unavailable_error(&self) -> String {
+        let report = self.cp_status_report();
+        let mut parts = vec![format!(
+            "simulation requires a full crease pattern; current status is {}",
+            cp_status_label(&report.status)
+        )];
+        if !report.bad_vertices.is_empty() {
+            parts.push(format!("bad vertices {:?}", report.bad_vertices));
+        }
+        if !report.bad_facets.is_empty() {
+            parts.push(format!("bad facets {:?}", report.bad_facets));
+        }
+        if !report.bad_creases.is_empty() {
+            parts.push(format!("bad creases {:?}", report.bad_creases));
+        }
+        if !report.bad_polys.is_empty() {
+            parts.push(format!("bad polygons {:?}", report.bad_polys));
+        }
+        if !report.bad_edges.is_empty() {
+            parts.push(format!("bad edges {:?}", report.bad_edges));
+        }
+        parts.join("; ")
     }
 
     /// Apply a user-intent edit while preserving TreeMaker invariants.
@@ -9653,7 +9704,38 @@ mod tests {
         assert_eq!(artifacts.fold.edges_vertices.len(), tree.creases.len());
         assert!(artifacts.folded_base.is_some());
         assert!(artifacts.folded_base_error.is_none());
-        assert!(!artifacts.simulation_model.fold.faces_vertices.is_empty());
+        assert!(
+            !artifacts
+                .simulation_model
+                .as_ref()
+                .unwrap()
+                .fold
+                .faces_vertices
+                .is_empty()
+        );
+        assert!(artifacts.simulation_model_error.is_none());
+    }
+
+    #[test]
+    fn fold_artifacts_keep_folded_base_when_simulation_requires_full_cp() {
+        let mut tree = triad_design();
+        tree.optimize_scale().unwrap();
+        tree.build_polys_and_crease_pattern().unwrap();
+        tree.is_facet_data_valid = false;
+        tree.facets[0].is_well_formed = false;
+
+        let artifacts = tree.fold_artifacts().unwrap();
+
+        assert!(artifacts.folded_base.is_some());
+        assert!(artifacts.folded_base_error.is_none());
+        assert!(artifacts.simulation_model.is_none());
+        assert!(
+            artifacts
+                .simulation_model_error
+                .as_deref()
+                .unwrap()
+                .contains("facets_not_valid")
+        );
     }
 
     fn triad_design() -> Tree {

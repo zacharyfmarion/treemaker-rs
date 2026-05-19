@@ -1,5 +1,6 @@
 import type { ConditionKind, TreeSnapshot } from '../../../engine/types';
 import { projectFromSnapshot } from '../../../engine/snapshotMapper';
+import { detectSymmetryLeafPairs } from '../../../lib/symmetryAuthoring';
 import {
   engineError,
   ensureTreeHandle,
@@ -69,6 +70,60 @@ export const createConditionSlice: WorkspaceSliceCreator<ConditionSlice> = (set,
 
     addCondition: async (kind) => {
       await applyConditionEdit({ type: 'add_condition', kind }, 'Added condition');
+    },
+
+    previewSymmetryLeafPairs: (nodeIds) =>
+      detectSymmetryLeafPairs(get().project, nodeIds),
+
+    applySymmetryLeafPairs: async (nodeIds) => {
+      const preview = detectSymmetryLeafPairs(get().project, nodeIds);
+      if (preview.pairs.length === 0 && preview.onAxis.length === 0) {
+        set({ projectMessage: 'No symmetry leaf conditions to add' });
+        return preview;
+      }
+
+      set({ error: null });
+      const checkpoint = await get().beginHistoryCheckpoint();
+      try {
+        const { api, treeHandle, initializedSnapshot } = await ensureTreeHandle();
+        if (initializedSnapshot) {
+          set(projectStateFromSnapshot(initializedSnapshot, get().project.title));
+        }
+
+        let snapshot: TreeSnapshot | null = null;
+        for (const pair of preview.pairs) {
+          const report = await api.applyEdit(treeHandle, {
+            type: 'add_condition',
+            kind: { type: 'nodes_paired', node1: pair.node1, node2: pair.node2 },
+          });
+          snapshot = report.snapshot;
+        }
+        for (const onAxis of preview.onAxis) {
+          const report = await api.applyEdit(treeHandle, {
+            type: 'add_condition',
+            kind: { type: 'node_symmetric', node: onAxis.node },
+          });
+          snapshot = report.snapshot;
+        }
+        if (!snapshot) return preview;
+
+        const count = preview.pairs.length + preview.onAxis.length;
+        set({
+          project: projectFromSnapshot(snapshot, get().project.title),
+          status: statusAfterEdit(snapshot),
+          dirty: true,
+          error: null,
+          lastOptimization: null,
+          foldArtifacts: null,
+          foldArtifactError: null,
+          projectMessage: `Added ${count} symmetry ${count === 1 ? 'condition' : 'conditions'}`,
+        });
+        get().commitHistoryCheckpoint(checkpoint, 'Apply symmetry pairs');
+        void get().autosaveProject();
+      } catch (error) {
+        set({ status: 'error', error: engineError(error) });
+      }
+      return preview;
     },
 
     deleteCondition: async (id) => {

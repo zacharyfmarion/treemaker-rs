@@ -1,7 +1,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createSampleProject } from '../../lib/sampleProject';
+import { createSampleProject, type TreeProject } from '../../lib/sampleProject';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { TooltipProvider } from '../ui/Tooltip';
 import { DesignPanel } from './DesignPanel';
@@ -59,11 +59,11 @@ beforeEach(() => {
   vi.stubGlobal('cancelAnimationFrame', vi.fn());
 });
 
-function renderPanel() {
+function renderPanel(project: TreeProject = createSampleProject()) {
   useWorkspaceStore.setState(
     {
       ...useWorkspaceStore.getInitialState(),
-      project: createSampleProject(),
+      project,
       engineReady: true,
     },
     true
@@ -141,5 +141,75 @@ describe('DesignPanel', () => {
 
     expect(transformMocks.centerView).not.toHaveBeenCalled();
     expect(transformMocks.setTransform).not.toHaveBeenCalled();
+  });
+
+  it('toggles mirror mode from the design toolbar when symmetry is already enabled', () => {
+    renderPanel({ ...createSampleProject(), hasSymmetry: true });
+
+    const mirrorButton = container?.querySelector<HTMLButtonElement>('button[aria-label="Mirror"]');
+    expect(mirrorButton).toBeTruthy();
+
+    act(() => {
+      mirrorButton?.click();
+    });
+
+    expect(useWorkspaceStore.getState().toolMode).toBe('symmetry');
+    expect(container?.querySelector('button[aria-label="Mirror On"]')).toBeTruthy();
+  });
+
+  it('opens a symmetry leaf preview with pair and on-axis counts', () => {
+    renderPanel({
+      ...createSampleProject(),
+      hasSymmetry: true,
+      nodes: [
+        {
+          id: 1,
+          label: 'root',
+          loc: { x: 0.5, y: 0.5 },
+          isLeaf: false,
+          isPinned: false,
+          isConditioned: false,
+        },
+        {
+          id: 2,
+          label: 'left',
+          loc: { x: 0.2, y: 0.25 },
+          isLeaf: true,
+          isPinned: false,
+          isConditioned: false,
+        },
+        {
+          id: 3,
+          label: 'right',
+          loc: { x: 0.8, y: 0.25 },
+          isLeaf: true,
+          isPinned: false,
+          isConditioned: false,
+        },
+        {
+          id: 4,
+          label: 'axis',
+          loc: { x: 0.504, y: 0.8 },
+          isLeaf: true,
+          isPinned: false,
+          isConditioned: false,
+        },
+      ],
+      edges: [],
+      paths: [],
+      conditions: [],
+    });
+
+    const pairButton = container?.querySelector<HTMLButtonElement>('button[aria-label="Pair Leaves"]');
+    expect(pairButton).toBeTruthy();
+
+    act(() => {
+      pairButton?.click();
+    });
+
+    const counts = Array.from(
+      container?.querySelectorAll('.symmetry-preview-popover__grid strong') ?? []
+    ).map((node) => node.textContent);
+    expect(counts).toEqual(['1', '1', '0', '0']);
   });
 });

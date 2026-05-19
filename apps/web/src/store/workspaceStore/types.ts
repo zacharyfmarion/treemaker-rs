@@ -14,6 +14,10 @@ import type {
   ToolMode,
   TreeProject,
 } from '../../lib/sampleProject';
+import type {
+  SymmetryAuthoringPair,
+  SymmetryLeafPreview,
+} from '../../lib/symmetryAuthoring';
 import type { FileService } from '../../platform/fileService';
 
 export interface RecentProject {
@@ -87,11 +91,14 @@ export type HistorySlice = HistorySliceState & HistorySliceActions;
 export interface EditingSliceState {
   selection: Selection;
   toolMode: ToolMode;
+  symmetryAuthoringPairs: SymmetryAuthoringPair[];
 }
 
 export interface EditingSliceActions {
   addNodeAt: (loc: Point, connectTo?: number) => Promise<void>;
+  addNodeWithSymmetry: (loc: Point, connectTo?: number) => Promise<void>;
   moveNode: (id: number, loc: Point) => Promise<void>;
+  moveNodeWithSymmetry: (id: number, loc: Point) => Promise<void>;
   addEdge: (node1: number, node2: number) => Promise<void>;
   updateNodeLabel: (id: number, label: string) => Promise<void>;
   updateEdge: (
@@ -116,6 +123,8 @@ export interface ConditionSliceActions {
     symAngle?: number;
   }) => Promise<void>;
   addCondition: (kind: ConditionKind) => Promise<void>;
+  previewSymmetryLeafPairs: (nodeIds?: number[]) => SymmetryLeafPreview;
+  applySymmetryLeafPairs: (nodeIds?: number[]) => Promise<SymmetryLeafPreview>;
   deleteCondition: (id: number) => Promise<void>;
   clearConditions: () => Promise<void>;
 }

@@ -14,6 +14,7 @@ import {
   Circle,
   CircleDot,
   Layers,
+  Link2,
   Maximize2,
   Plus,
   Tag,
@@ -40,9 +41,19 @@ import {
   isEdgeSelected,
   isNodeSelected,
   isPathSelected,
+  selectedNodeIds,
   toggleEdgeSelection,
   toggleNodeSelection,
 } from '../../lib/selection';
+import { paperCenter } from '../../lib/symmetryPresets';
+import {
+  findMirrorNodeId,
+  reflectPointAcrossSymmetryAxis,
+  snapPointToSymmetryAxis,
+  symmetryAxisForProject,
+  symmetrySide,
+  type SymmetryLeafPreview,
+} from '../../lib/symmetryAuthoring';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { IconButton } from '../ui/IconButton';
 
@@ -70,7 +81,11 @@ function viewBox(rect: { x: number; y: number; width: number; height: number }):
 interface DesignViewportToolbarProps {
   zoomPercent: number;
   layers: DesignViewLayers;
+  mirrorMode: boolean;
+  hasSymmetry: boolean;
   onLayerChange: (layer: DesignViewLayerKey, visible: boolean) => void;
+  onToggleMirror: () => void;
+  onPairLeaves: () => void;
   zoomIn: () => void;
   zoomOut: () => void;
   fitToView: () => void;
@@ -81,7 +96,11 @@ interface DesignViewportToolbarProps {
 function DesignViewportToolbar({
   zoomPercent,
   layers,
+  mirrorMode,
+  hasSymmetry,
   onLayerChange,
+  onToggleMirror,
+  onPairLeaves,
   zoomIn,
   zoomOut,
   fitToView,
@@ -151,6 +170,25 @@ function DesignViewportToolbar({
         1:1
       </button>
       <span className="design-view-toolbar__separator" />
+      <IconButton
+        size="sm"
+        variant="toolbar"
+        title={mirrorMode ? 'Mirror On' : 'Mirror'}
+        isActive={mirrorMode}
+        onClick={onToggleMirror}
+      >
+        <Axis3d size={14} />
+      </IconButton>
+      <IconButton
+        size="sm"
+        variant="toolbar"
+        title="Pair Leaves"
+        disabled={!hasSymmetry}
+        onClick={onPairLeaves}
+      >
+        <Link2 size={14} />
+      </IconButton>
+      <span className="design-view-toolbar__separator" />
       <div className="design-view-toolbar__menu-anchor" ref={layersMenuRef}>
         <IconButton
           size="sm"
@@ -197,25 +235,43 @@ export function DesignPanel() {
   const [hoverPoint, setHoverPoint] = useState<Point | null>(null);
   const project = useWorkspaceStore((state) => state.project);
   const selection = useWorkspaceStore((state) => state.selection);
+  const toolMode = useWorkspaceStore((state) => state.toolMode);
+  const symmetryAuthoringPairs = useWorkspaceStore((state) => state.symmetryAuthoringPairs);
   const select = useWorkspaceStore((state) => state.select);
   const addNodeAt = useWorkspaceStore((state) => state.addNodeAt);
+  const addNodeWithSymmetry = useWorkspaceStore((state) => state.addNodeWithSymmetry);
   const moveNode = useWorkspaceStore((state) => state.moveNode);
+  const moveNodeWithSymmetry = useWorkspaceStore((state) => state.moveNodeWithSymmetry);
+  const setToolMode = useWorkspaceStore((state) => state.setToolMode);
+  const setSymmetry = useWorkspaceStore((state) => state.setSymmetry);
+  const previewSymmetryLeafPairs = useWorkspaceStore((state) => state.previewSymmetryLeafPairs);
+  const applySymmetryLeafPairs = useWorkspaceStore((state) => state.applySymmetryLeafPairs);
   const projectLoadId = useWorkspaceStore((state) => state.projectLoadId);
   const designViewportFitRequestId = useWorkspaceStore(
     (state) => state.designViewportFitRequestId
   );
+  const [symmetryPreview, setSymmetryPreview] = useState<SymmetryLeafPreview | null>(null);
+  const mirrorMode = toolMode === 'symmetry';
+  const symmetryAxis = useMemo(() => symmetryAxisForProject(project), [project]);
 
   const nodeLocations = useMemo(() => {
     if (!dragging) return undefined;
-    return new Map([[dragging.id, dragging.loc]]);
-  }, [dragging]);
+    const locations = new Map([[dragging.id, dragging.loc]]);
+    if (mirrorMode && project.hasSymmetry) {
+      const pairedNode = findMirrorNodeId(project, symmetryAuthoringPairs, dragging.id);
+      if (pairedNode) {
+        locations.set(pairedNode, reflectPointAcrossSymmetryAxis(dragging.loc, symmetryAxis));
+      }
+    }
+    return locations;
+  }, [dragging, mirrorMode, project, symmetryAuthoringPairs, symmetryAxis]);
   const worldRect = useMemo(
     () => getDesignWorldRect(project, layers, { nodeLocations }),
     [layers, nodeLocations, project]
   );
 
   const findNode = (id: number) => project.nodes.find((node) => node.id === id);
-  const displayLoc = (id: number, loc: Point) => (dragging?.id === id ? dragging.loc : loc);
+  const displayLoc = (id: number, loc: Point) => nodeLocations?.get(id) ?? loc;
 
   const symmetryLine = useMemo(() => {
     const center = paperToSvg(project.paper.symLoc, DESIGN_PAPER_RECT);
@@ -228,6 +284,39 @@ export function DesignPanel() {
       y2: center.y - Math.sin(angle) * span,
     };
   }, [project.paper.symAngle, project.paper.symLoc, worldRect]);
+
+  const selectedLeafNodeIds = useMemo(
+    () =>
+      selectedNodeIds(selection).filter((id) =>
+        project.nodes.some((node) => node.id === id && node.isLeaf)
+      ),
+    [project.nodes, selection]
+  );
+
+  const symmetryHoverPreview = useMemo(() => {
+    if (!mirrorMode || !project.hasSymmetry || selection.kind !== 'node' || !hoverPoint) return null;
+    const parent = project.nodes.find((node) => node.id === selection.id);
+    if (!parent) return null;
+    const snapped = snapPointToSymmetryAxis(hoverPoint, symmetryAxis);
+    const parentSide = symmetrySide(parent.loc, symmetryAxis);
+    const pairedParentId = findMirrorNodeId(project, symmetryAuthoringPairs, parent.id);
+    const pairedParent = pairedParentId
+      ? project.nodes.find((node) => node.id === pairedParentId)
+      : null;
+    const shouldMirror = !snapped.snapped && (parentSide === 0 || pairedParent);
+    return {
+      primary: { from: parent.loc, to: snapped.point },
+      mirror:
+        shouldMirror && (parentSide === 0 || pairedParent)
+          ? {
+              from: parentSide === 0 ? parent.loc : pairedParent!.loc,
+              to: reflectPointAcrossSymmetryAxis(snapped.point, symmetryAxis),
+            }
+          : null,
+      snapped: snapped.snapped,
+      unresolved: !snapped.snapped && parentSide !== 0 && !pairedParent,
+    };
+  }, [hoverPoint, mirrorMode, project, selection, symmetryAuthoringPairs, symmetryAxis]);
 
   const eventToPaper = useCallback(
     (event: PointerEvent): Point => {
@@ -345,6 +434,32 @@ export function DesignPanel() {
     setLayers((current) => setDesignLayerVisibility(current, layer, visible));
   }, []);
 
+  const toggleMirrorMode = useCallback(() => {
+    if (mirrorMode) {
+      setToolMode('select');
+      return;
+    }
+    if (!project.hasSymmetry) {
+      void setSymmetry({
+        hasSymmetry: true,
+        symAngle: 90,
+        symLoc: paperCenter(project.paper.width, project.paper.height),
+      });
+    }
+    setLayers((current) => setDesignLayerVisibility(current, 'symmetry', true));
+    setToolMode('symmetry');
+  }, [mirrorMode, project.hasSymmetry, project.paper.height, project.paper.width, setSymmetry, setToolMode]);
+
+  const openSymmetryPreview = useCallback(() => {
+    const scope = selectedLeafNodeIds.length > 0 ? selectedLeafNodeIds : undefined;
+    setSymmetryPreview(previewSymmetryLeafPairs(scope));
+  }, [previewSymmetryLeafPairs, selectedLeafNodeIds]);
+
+  const applyOpenSymmetryPreview = useCallback(() => {
+    if (!symmetryPreview) return;
+    void applySymmetryLeafPairs(symmetryPreview.scopedLeafIds).then(() => setSymmetryPreview(null));
+  }, [applySymmetryLeafPairs, symmetryPreview]);
+
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return undefined;
@@ -401,7 +516,9 @@ export function DesignPanel() {
   const onPaperPointerDown = (event: PointerEvent<SVGRectElement>) => {
     if (event.button !== 0 || spacePressed) return;
     const connectTo = selection.kind === 'node' ? selection.id : undefined;
-    void addNodeAt(eventToPaper(event), connectTo);
+    const loc = eventToPaper(event);
+    if (mirrorMode) void addNodeWithSymmetry(loc, connectTo);
+    else void addNodeAt(loc, connectTo);
   };
 
   const onNodePointerDown = (event: PointerEvent<SVGCircleElement>, nodeId: number) => {
@@ -442,7 +559,10 @@ export function DesignPanel() {
     const loc = dragging.loc;
     const moved = dragging.moved;
     setDragging(null);
-    if (moved) void moveNode(nodeId, loc);
+    if (moved) {
+      if (mirrorMode) void moveNodeWithSymmetry(nodeId, loc);
+      else void moveNode(nodeId, loc);
+    }
   };
 
   const onCanvasPointerMove = (event: PointerEvent<SVGSVGElement>) => {
@@ -522,13 +642,70 @@ export function DesignPanel() {
                 onPointerDown={onPaperPointerDown}
               />
               {project.hasSymmetry && layers.symmetry && (
-                <line
-                  className="symmetry-line"
-                  x1={symmetryLine.x1}
-                  y1={symmetryLine.y1}
-                  x2={symmetryLine.x2}
-                  y2={symmetryLine.y2}
-                />
+                <>
+                  {mirrorMode && (
+                    <line
+                      className="symmetry-snap-lane"
+                      x1={symmetryLine.x1}
+                      y1={symmetryLine.y1}
+                      x2={symmetryLine.x2}
+                      y2={symmetryLine.y2}
+                    />
+                  )}
+                  <line
+                    className="symmetry-line"
+                    x1={symmetryLine.x1}
+                    y1={symmetryLine.y1}
+                    x2={symmetryLine.x2}
+                    y2={symmetryLine.y2}
+                  />
+                </>
+              )}
+              {symmetryHoverPreview && (
+                <g className="symmetry-ghost">
+                  {(() => {
+                    const p1 = paperToSvg(symmetryHoverPreview.primary.from, DESIGN_PAPER_RECT);
+                    const p2 = paperToSvg(symmetryHoverPreview.primary.to, DESIGN_PAPER_RECT);
+                    return (
+                      <>
+                        <line
+                          className={[
+                            'symmetry-ghost-edge',
+                            symmetryHoverPreview.unresolved ? 'symmetry-ghost-edge--unresolved' : '',
+                          ].join(' ')}
+                          x1={p1.x}
+                          y1={p1.y}
+                          x2={p2.x}
+                          y2={p2.y}
+                        />
+                        <circle
+                          className="symmetry-ghost-node"
+                          data-snapped={symmetryHoverPreview.snapped || undefined}
+                          cx={p2.x}
+                          cy={p2.y}
+                          r="7"
+                        />
+                      </>
+                    );
+                  })()}
+                  {symmetryHoverPreview.mirror &&
+                    (() => {
+                      const p1 = paperToSvg(symmetryHoverPreview.mirror.from, DESIGN_PAPER_RECT);
+                      const p2 = paperToSvg(symmetryHoverPreview.mirror.to, DESIGN_PAPER_RECT);
+                      return (
+                        <>
+                          <line
+                            className="symmetry-ghost-edge"
+                            x1={p1.x}
+                            y1={p1.y}
+                            x2={p2.x}
+                            y2={p2.y}
+                          />
+                          <circle className="symmetry-ghost-node" cx={p2.x} cy={p2.y} r="7" />
+                        </>
+                      );
+                    })()}
+                </g>
               )}
               {layers.paths &&
                 project.paths.map((path) => {
@@ -639,7 +816,11 @@ export function DesignPanel() {
         <DesignViewportToolbar
           zoomPercent={zoomPercent}
           layers={layers}
+          mirrorMode={mirrorMode}
+          hasSymmetry={project.hasSymmetry}
           onLayerChange={setLayer}
+          onToggleMirror={toggleMirrorMode}
+          onPairLeaves={openSymmetryPreview}
           zoomIn={() => transformRef.current?.zoomIn(0.35, 120)}
           zoomOut={() => transformRef.current?.zoomOut(0.35, 120)}
           fitToView={() => fitToView()}
@@ -654,6 +835,41 @@ export function DesignPanel() {
             </span>
           )}
         </div>
+        {symmetryPreview && (
+          <div className="symmetry-preview-popover" role="dialog" aria-label="Symmetry leaf preview">
+            <div className="symmetry-preview-popover__header">
+              <strong>Symmetry Preview</strong>
+              <button type="button" onClick={() => setSymmetryPreview(null)}>
+                Close
+              </button>
+            </div>
+            <div className="symmetry-preview-popover__grid">
+              <span>Pairs</span>
+              <strong>{symmetryPreview.pairs.length}</strong>
+              <span>On-axis</span>
+              <strong>{symmetryPreview.onAxis.length}</strong>
+              <span>Ambiguous</span>
+              <strong>{symmetryPreview.ambiguous.length}</strong>
+              <span>Unmatched</span>
+              <strong>{symmetryPreview.unmatched.length}</strong>
+            </div>
+            {(symmetryPreview.ambiguous.length > 0 || symmetryPreview.unmatched.length > 0) && (
+              <div className="symmetry-preview-popover__detail">
+                {[...symmetryPreview.ambiguous, ...symmetryPreview.unmatched]
+                  .map((item) => item.node)
+                  .join(', ')}
+              </div>
+            )}
+            <button
+              className="symmetry-preview-popover__apply"
+              type="button"
+              disabled={symmetryPreview.pairs.length + symmetryPreview.onAxis.length === 0}
+              onClick={applyOpenSymmetryPreview}
+            >
+              Apply
+            </button>
+          </div>
+        )}
         <div className="design-legend">
           <span><CircleDot size={13} /> Terminal</span>
           <span><Waypoints size={13} /> Active path</span>

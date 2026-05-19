@@ -84,6 +84,7 @@ export function SimulatorPanel() {
   const rafRef = useRef<number | null>(null);
   const settleRafRef = useRef<number | null>(null);
   const viewRef = useRef<SimulatorView>({ ...DEFAULT_VIEW });
+  const viewSettingsRef = useRef<SimulatorViewSettings>(DEFAULT_VIEW_SETTINGS);
   const dragRef = useRef<DragState | null>(null);
   const foldPercentRef = useRef(INITIAL_FOLD_PERCENT);
 
@@ -107,10 +108,15 @@ export function SimulatorPanel() {
     const model = modelRef.current;
     const frame = frameRef.current;
     if (!canvas || !model || !frame) return;
-    drawFrame(canvas, model, frame, viewRef.current, viewSettings);
+    drawFrame(canvas, model, frame, viewRef.current, viewSettingsRef.current);
     setStep(frame.step);
     setStrain(frame.diagnostics.maxEdgeStrain ?? 0);
-  }, [viewSettings]);
+  }, []);
+
+  useEffect(() => {
+    viewSettingsRef.current = viewSettings;
+    drawCurrentFrame();
+  }, [drawCurrentFrame, viewSettings]);
 
   const stepSimulation = useCallback(
     (steps?: number): SimulationFrame | null => {

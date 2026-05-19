@@ -84,7 +84,11 @@ export function getMenuBarDef(): MenuDef[] {
     },
     {
       label: 'Help',
-      items: [{ type: 'action', id: 'help.about', label: 'About TreeMaker' }],
+      items: [
+        { type: 'action', id: 'help.documentation', label: 'TreeMaker Help', shortcut: 'F1' },
+        { type: 'separator' },
+        { type: 'action', id: 'help.about', label: 'About TreeMaker' },
+      ],
     },
   ];
 }

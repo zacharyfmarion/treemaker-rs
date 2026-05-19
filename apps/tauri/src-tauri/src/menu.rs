@@ -1,8 +1,8 @@
-use tauri::menu::{MenuBuilder, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder};
+use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 use tauri::{App, Emitter};
 
 pub fn setup_menu(app: &App) -> Result<(), Box<dyn std::error::Error>> {
-    let app_about = PredefinedMenuItem::about(app, None, None)?;
+    let app_about = MenuItemBuilder::with_id("app.about", "About TreeMaker").build(app)?;
     let app_quit = MenuItemBuilder::with_id("app.quit", "Quit TreeMaker")
         .accelerator("CmdOrCtrl+Q")
         .build(app)?;
@@ -119,8 +119,15 @@ pub fn setup_menu(app: &App) -> Result<(), Box<dyn std::error::Error>> {
         .item(&build_cp)
         .build()?;
 
+    let help_docs = MenuItemBuilder::with_id("help.documentation", "TreeMaker Help")
+        .accelerator("F1")
+        .build(app)?;
     let help_about = MenuItemBuilder::with_id("help.about", "About TreeMaker").build(app)?;
-    let help_menu = SubmenuBuilder::new(app, "Help").item(&help_about).build()?;
+    let help_menu = SubmenuBuilder::new(app, "Help")
+        .item(&help_docs)
+        .separator()
+        .item(&help_about)
+        .build()?;
 
     let menu = MenuBuilder::new(app)
         .item(&app_menu)

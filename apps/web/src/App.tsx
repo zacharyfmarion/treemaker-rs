@@ -6,6 +6,7 @@ import { Toaster } from 'sonner';
 import {
   FilePlus,
   FolderOpen,
+  CircleHelp,
   Save,
   Settings,
   Sparkles,
@@ -13,6 +14,7 @@ import {
 } from 'lucide-react';
 import { MenuBar } from './components/MenuBar';
 import { GlobalToasts } from './components/GlobalToasts';
+import { HelpModal } from './components/HelpModal';
 import { SettingsModal } from './components/SettingsModal';
 import { TooltipProvider } from './components/ui/Tooltip';
 import { IconButton } from './components/ui/IconButton';
@@ -95,6 +97,14 @@ function Toolbar() {
           </Button>
         )}
         {(optimizeScale.visible || buildCp.visible) && <span className="toolbar__separator" />}
+        <IconButton
+          size="sm"
+          title="Help"
+          tooltipSide="bottom"
+          onClick={() => void handleMenuAction('help.documentation')}
+        >
+          <CircleHelp size={15} />
+        </IconButton>
         <IconButton size="sm" title="Settings" tooltipSide="bottom" onClick={() => openSettings()}>
           <Settings size={15} />
         </IconButton>
@@ -204,6 +214,11 @@ export default function App() {
         void handleMenuAction('file.settings');
         return;
       }
+      if (event.key === 'F1') {
+        event.preventDefault();
+        void handleMenuAction('help.documentation');
+        return;
+      }
       if (event.key !== 'Delete' && event.key !== 'Backspace') return;
       event.preventDefault();
       void deleteSelection();
@@ -255,6 +270,7 @@ export default function App() {
           disableFloatingGroups
         />
       </div>
+      <HelpModal />
       <SettingsModal />
       <GlobalToasts />
       <Toaster

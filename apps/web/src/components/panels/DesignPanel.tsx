@@ -240,6 +240,7 @@ export function DesignPanel() {
   const [spacePressed, setSpacePressed] = useState(false);
   const [hoverPoint, setHoverPoint] = useState<Point | null>(null);
   const project = useWorkspaceStore((state) => state.project);
+  const engineReady = useWorkspaceStore((state) => state.engineReady);
   const documentMode = useWorkspaceStore((state) => state.documentMode);
   const importedCreasePattern = useWorkspaceStore((state) => state.importedCreasePattern);
   const selection = useWorkspaceStore((state) => state.selection);
@@ -261,6 +262,7 @@ export function DesignPanel() {
   const [symmetryPreview, setSymmetryPreview] = useState<SymmetryLeafPreview | null>(null);
   const mirrorMode = toolMode === 'symmetry';
   const symmetryAxis = useMemo(() => symmetryAxisForProject(project), [project]);
+  const showEmptyState = engineReady && project.nodes.length === 0 && project.edges.length === 0;
 
   const nodeLocations = useMemo(() => {
     if (!dragging) return undefined;
@@ -861,6 +863,14 @@ export function DesignPanel() {
             </svg>
           </TransformComponent>
         </TransformWrapper>
+        {showEmptyState && (
+          <div className="design-empty-state" role="note">
+            <div className="design-empty-state__copy">
+              <strong>Sketch the tree behind your design</strong>
+              <span>Use branches for the flaps, limbs, and features the folded base needs.</span>
+            </div>
+          </div>
+        )}
         <DesignViewportToolbar
           zoomPercent={zoomPercent}
           layers={layers}

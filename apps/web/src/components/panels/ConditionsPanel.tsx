@@ -1,13 +1,24 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Link2, LockKeyhole, Plus, Ruler, Trash2 } from 'lucide-react';
+import { ChevronRight, FlipHorizontal2, Link2, LockKeyhole, Plus, Ruler, Trash2 } from 'lucide-react';
 import type { ConditionKind } from '../../engine/types';
 import { conditionDetail, conditionTitle } from '../../lib/conditionLabels';
+import {
+  SYMMETRY_PRESET_LABELS,
+  nextSymmetryOption,
+  paperCenter,
+  symmetryOptionForPreset,
+  symmetrySelectValueForState,
+  type SymmetryPreset,
+  type SymmetrySelectValue,
+} from '../../lib/symmetryPresets';
 import {
   isConditionSelected,
   selectedEdgeIds,
   selectedNodeIds,
 } from '../../lib/selection';
 import { useWorkspaceStore } from '../../store/workspaceStore';
+import { IconButton } from '../ui/IconButton';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/Select';
 
 export function ConditionsPanel() {
   const project = useWorkspaceStore((state) => state.project);
@@ -27,6 +38,27 @@ export function ConditionsPanel() {
   const [angle, setAngle] = useState(0);
   const [quant, setQuant] = useState(4);
   const [quantOffset, setQuantOffset] = useState(0);
+  const [symmetryAdvancedOpen, setSymmetryAdvancedOpen] = useState(false);
+  const [symmetryModeOverride, setSymmetryModeOverride] = useState<SymmetrySelectValue | null>(null);
+  const projectLoadId = useWorkspaceStore((state) => state.projectLoadId);
+  const inferredSymmetryMode = symmetrySelectValueForState({
+    hasSymmetry: project.hasSymmetry,
+    symAngle: project.paper.symAngle,
+    symLoc: project.paper.symLoc,
+    paperWidth: project.paper.width,
+    paperHeight: project.paper.height,
+  });
+  const symmetryMode = project.hasSymmetry ? (symmetryModeOverride ?? inferredSymmetryMode) : 'none';
+  const presetSymmetryMode = symmetryMode === 'book' || symmetryMode === 'diagonal' ? symmetryMode : null;
+  const activePresetOption = presetSymmetryMode
+    ? symmetryOptionForPreset(presetSymmetryMode, project.paper.symAngle)
+    : null;
+  const nextSymmetryPresetOption = activePresetOption ? nextSymmetryOption(activePresetOption) : null;
+  const symmetryPresetCenter = paperCenter(project.paper.width, project.paper.height);
+
+  useEffect(() => {
+    setSymmetryModeOverride(null);
+  }, [projectLoadId]);
 
   const selectedLeafNodeIds = useMemo(
     () =>
@@ -39,6 +71,44 @@ export function ConditionsPanel() {
 
   const add = (kind: ConditionKind) => {
     void addCondition(kind);
+  };
+
+  const applySymmetryPreset = (preset: SymmetryPreset) => {
+    const option = symmetryOptionForPreset(preset, project.paper.symAngle);
+    setSymmetryModeOverride(preset);
+    void setSymmetry({
+      hasSymmetry: true,
+      symAngle: option.angle,
+      symLoc: symmetryPresetCenter,
+    });
+  };
+
+  const setSymmetryMode = (value: SymmetrySelectValue) => {
+    setSymmetryModeOverride(value);
+    if (value === 'none') {
+      void setSymmetry({ hasSymmetry: false });
+      return;
+    }
+    if (value === 'custom') {
+      void setSymmetry({ hasSymmetry: true });
+      return;
+    }
+    applySymmetryPreset(value);
+  };
+
+  const flipSymmetryPreset = () => {
+    if (!nextSymmetryPresetOption || !presetSymmetryMode) return;
+    setSymmetryModeOverride(presetSymmetryMode);
+    void setSymmetry({
+      hasSymmetry: true,
+      symAngle: nextSymmetryPresetOption.angle,
+      symLoc: symmetryPresetCenter,
+    });
+  };
+
+  const updateCustomSymmetry = (update: Parameters<typeof setSymmetry>[0]) => {
+    setSymmetryModeOverride('custom');
+    void setSymmetry({ hasSymmetry: true, ...update });
   };
 
   return (
@@ -75,36 +145,82 @@ export function ConditionsPanel() {
 
         <section className="condition-section">
           <div className="condition-section__title">Symmetry</div>
-          <label className="condition-toggle">
-            <input
-              type="checkbox"
-              checked={project.hasSymmetry}
-              onChange={(event) => void setSymmetry({ hasSymmetry: event.currentTarget.checked })}
-            />
-            <span>Enable symmetry line</span>
-          </label>
-          <NumberControl
-            label="Angle"
-            value={project.paper.symAngle}
-            step={1}
-            onCommit={(symAngle) => void setSymmetry({ symAngle })}
-          />
-          <NumberControl
-            label="X"
-            value={project.paper.symLoc.x}
-            min={0}
-            max={project.paper.width}
-            step={0.01}
-            onCommit={(x) => void setSymmetry({ symLoc: { ...project.paper.symLoc, x } })}
-          />
-          <NumberControl
-            label="Y"
-            value={project.paper.symLoc.y}
-            min={0}
-            max={project.paper.height}
-            step={0.01}
-            onCommit={(y) => void setSymmetry({ symLoc: { ...project.paper.symLoc, y } })}
-          />
+          <div className="condition-control-row">
+            <span>Type</span>
+            <div className="condition-control-row__field">
+              <div className="symmetry-preset-controls">
+                <Select value={symmetryMode} onValueChange={(value) => setSymmetryMode(value as SymmetrySelectValue)}>
+                  <SelectTrigger aria-label="Symmetry type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {Object.entries(SYMMETRY_PRESET_LABELS).map(([value, label]) => (
+                      <SelectItem key={value} value={value}>
+                        {label}
+                      </SelectItem>
+                    ))}
+                    <SelectItem value="custom">Custom</SelectItem>
+                  </SelectContent>
+                </Select>
+                <IconButton
+                  size="sm"
+                  variant="toolbar"
+                  title={nextSymmetryPresetOption ? `Flip to ${nextSymmetryPresetOption.label}` : 'Choose Book or Diagonal to flip'}
+                  aria-label={
+                    nextSymmetryPresetOption
+                      ? `Flip symmetry to ${nextSymmetryPresetOption.label}`
+                      : 'Choose Book or Diagonal to flip symmetry'
+                  }
+                  disabled={!nextSymmetryPresetOption}
+                  onClick={flipSymmetryPreset}
+                >
+                  <FlipHorizontal2 size={14} />
+                </IconButton>
+              </div>
+              {nextSymmetryPresetOption && (
+                <span className="symmetry-preset-label">{activePresetOption?.label}</span>
+              )}
+            </div>
+          </div>
+          <div className="condition-advanced">
+            <button
+              className="condition-disclosure"
+              type="button"
+              data-open={symmetryAdvancedOpen || undefined}
+              aria-expanded={symmetryAdvancedOpen}
+              onClick={() => setSymmetryAdvancedOpen((open) => !open)}
+            >
+              <ChevronRight size={13} />
+              <span>Advanced symmetry options</span>
+            </button>
+            {symmetryAdvancedOpen && (
+              <div className="condition-advanced__body">
+                <NumberControl
+                  label="Angle"
+                  value={project.paper.symAngle}
+                  step={1}
+                  onCommit={(symAngle) => updateCustomSymmetry({ symAngle })}
+                />
+                <NumberControl
+                  label="X"
+                  value={project.paper.symLoc.x}
+                  min={0}
+                  max={project.paper.width}
+                  step={0.01}
+                  onCommit={(x) => updateCustomSymmetry({ symLoc: { ...project.paper.symLoc, x } })}
+                />
+                <NumberControl
+                  label="Y"
+                  value={project.paper.symLoc.y}
+                  min={0}
+                  max={project.paper.height}
+                  step={0.01}
+                  onCommit={(y) => updateCustomSymmetry({ symLoc: { ...project.paper.symLoc, y } })}
+                />
+              </div>
+            )}
+          </div>
         </section>
 
         <section className="condition-section">

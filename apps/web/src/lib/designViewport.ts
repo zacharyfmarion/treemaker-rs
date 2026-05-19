@@ -24,7 +24,6 @@ const LEAF_NODE_RADIUS = 14;
 const LABEL_HEIGHT = 22;
 
 export interface DesignViewLayers {
-  grid: boolean;
   paths: boolean;
   leafCircles: boolean;
   labels: boolean;
@@ -34,7 +33,6 @@ export interface DesignViewLayers {
 export type DesignViewLayerKey = keyof DesignViewLayers;
 
 export const DEFAULT_DESIGN_VIEW_LAYERS: DesignViewLayers = {
-  grid: true,
   paths: true,
   leafCircles: true,
   labels: true,

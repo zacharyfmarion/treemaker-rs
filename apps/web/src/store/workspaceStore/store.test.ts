@@ -258,6 +258,31 @@ function nextId<T extends { id: number }>(items: T[]): number {
   return Math.max(0, ...items.map((item) => item.id)) + 1;
 }
 
+function deleteNodeFromSnapshot(snapshot: TreeSnapshot, deletedId: number): TreeSnapshot {
+  const nodeMap = new Map<number, number>();
+  snapshot.nodes.forEach((node) => {
+    if (node.id !== deletedId) nodeMap.set(node.id, nodeMap.size + 1);
+  });
+  const nodes = snapshot.nodes
+    .filter((node) => nodeMap.has(node.id))
+    .map((node) => ({ ...node, id: nodeMap.get(node.id)! }));
+  const edges = snapshot.edges
+    .filter((edge) => edge.nodes.every((node) => nodeMap.has(node)))
+    .map((edge, index) => ({
+      ...edge,
+      id: index + 1,
+      nodes: edge.nodes.map((node) => nodeMap.get(node)!) as [number, number],
+    }));
+  const paths = snapshot.paths
+    .filter((path) => path.nodes.every((node) => nodeMap.has(node)))
+    .map((path, index) => ({
+      ...path,
+      id: index + 1,
+      nodes: path.nodes.map((node) => nodeMap.get(node)!),
+    }));
+  return makeSnapshot({ ...snapshot, nodes, edges, paths });
+}
+
 function createMockEngineApi(initialSnapshot: TreeSnapshot) {
   let snapshotState = cloneSnapshot(initialSnapshot);
   let saveCount = 0;
@@ -362,12 +387,7 @@ function createMockEngineApi(initialSnapshot: TreeSnapshot) {
           });
           break;
         case 'delete_node':
-          snapshotState = makeSnapshot({
-            ...snapshotState,
-            nodes: snapshotState.nodes.filter((node) => node.id !== edit.id),
-            edges: snapshotState.edges.filter((edge) => !edge.nodes.includes(edit.id)),
-            paths: snapshotState.paths.filter((path) => !path.nodes.includes(edit.id)),
-          });
+          snapshotState = deleteNodeFromSnapshot(snapshotState, edit.id);
           break;
         case 'update_node_label':
           snapshotState = makeSnapshot({
@@ -757,6 +777,39 @@ describe('workspace store slices', () => {
     await useWorkspaceStore.getState().deleteSelection();
     expect(useWorkspaceStore.getState().project.nodes).toEqual([]);
     expect(useWorkspaceStore.getState().projectMessage).toBe('Cleared design');
+  });
+
+  it('deletes a selected design node from the canonical engine snapshot', async () => {
+    const api = resetStores(
+      makeSnapshot({
+        nodes: [
+          nodeSnapshot(1, { x: 0.5, y: 0.5 }, { label: 'root', is_leaf: false }),
+          nodeSnapshot(2, { x: 0.2, y: 0.2 }, { label: 'left' }),
+          nodeSnapshot(3, { x: 0.8, y: 0.2 }, { label: 'right' }),
+        ],
+        edges: [edgeSnapshot(1, [1, 2]), edgeSnapshot(2, [1, 3])],
+        paths: [pathSnapshot(1, [1, 2]), pathSnapshot(2, [1, 3]), pathSnapshot(3, [2, 3])],
+      })
+    );
+    loadSnapshotIntoStore(api.snapshotState);
+
+    useWorkspaceStore.getState().select({ kind: 'node', id: 2 });
+    await useWorkspaceStore.getState().deleteSelection();
+
+    expect(api.applyEdit).toHaveBeenCalledWith(1, { type: 'delete_node', id: 2 });
+    expect(useWorkspaceStore.getState().project.nodes.map((node) => [node.id, node.label])).toEqual([
+      [1, 'root'],
+      [2, 'right'],
+    ]);
+    expect(useWorkspaceStore.getState().project.edges.map((edge) => [edge.id, edge.nodes])).toEqual([
+      [1, [1, 2]],
+    ]);
+    expect(useWorkspaceStore.getState()).toMatchObject({
+      selection: { kind: 'tree' },
+      status: 'needs_optimization',
+      error: null,
+      dirty: true,
+    });
   });
 
   it('copies, cuts, and pastes selected topology', async () => {

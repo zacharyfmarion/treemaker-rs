@@ -134,7 +134,7 @@ class TauriFileService implements FileService {
     const selected = await open({
       title: options.title,
       multiple: false,
-      filters: [{ name: 'TreeMaker', extensions: options.extensions }],
+      filters: [{ name: 'Ori Studio', extensions: options.extensions }],
     });
     if (typeof selected !== 'string') return null;
     const text = await invoke<string>('read_text_file', { path: selected });
@@ -168,7 +168,7 @@ class TauriFileService implements FileService {
     const selected = await save({
       title,
       defaultPath: suggestedName,
-      filters: [{ name: 'TreeMaker', extensions }],
+      filters: [{ name: 'Ori Studio', extensions }],
     });
     return selected || null;
   }

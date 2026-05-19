@@ -593,11 +593,11 @@ export function DesignPanel() {
                   <span className="document-mode-empty__filename">
                     {importedCreasePattern.source.filename}
                   </span>{' '}
-                  is an imported crease pattern without a TreeMaker tree.
+                  is an imported crease pattern without an editable tree.
                 </>
               )
               : (
-                'This document does not have a TreeMaker tree.'
+                'This document does not have an editable tree.'
               )}
           </span>
           <div className="document-mode-empty__actions">

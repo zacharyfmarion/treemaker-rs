@@ -113,7 +113,7 @@ export function parseImportedCreasePattern(
     foldArtifacts: {
       fold: withTopology,
       folded_base: null,
-      folded_base_error: 'Folded base view requires a TreeMaker tree document',
+      folded_base_error: 'Folded base view requires an editable tree document',
       simulation_model: simulation.fold
         ? {
             fold: simulation.fold,

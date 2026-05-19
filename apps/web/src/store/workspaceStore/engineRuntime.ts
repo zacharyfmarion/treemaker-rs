@@ -121,7 +121,7 @@ export async function ensureTreeHandle(): Promise<{
     initializedSnapshot = await initializeBlankTree(api);
   }
   if (handle === null) {
-    throw new Error('TreeMaker engine did not create a tree handle');
+    throw new Error('Engine did not create a tree handle');
   }
   return { api, treeHandle: handle, initializedSnapshot };
 }

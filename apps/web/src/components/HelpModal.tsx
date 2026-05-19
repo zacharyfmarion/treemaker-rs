@@ -33,14 +33,14 @@ const HELP_TOPICS: HelpTopic[] = [
   {
     id: 'files',
     title: 'Start, Open, Save, Export',
-    summary: 'Use the toolbar, File menu, or Files pane to manage TreeMaker projects and crease-pattern exports.',
+    summary: 'Use the toolbar, File menu, or Files pane to manage Ori Studio projects and crease-pattern exports.',
     icon: <FileText size={15} />,
     image: 'files-workflow.png',
     imageAlt: 'Files pane showing New, Open, Save, export buttons, example projects, and file status',
     caption: 'The Files pane keeps project actions, exports, examples, and recent work in one compact place.',
     steps: [
       'New starts a blank .tmd5 tree document; Open accepts .tmd, .tmd4, .tmd5, .fold, and .cp files.',
-      'Save and Save As write canonical TreeMaker 5 projects when you are editing a tree.',
+      'Save and Save As write canonical TreeMaker 5 files when you are editing a tree.',
       'Export V4, FOLD, SVG, and PNG become available when the current document has the data each format needs.',
       'Examples load checked-in starter designs that are useful for exploring optimization and crease generation.',
     ],
@@ -97,10 +97,10 @@ const HELP_TOPICS: HelpTopic[] = [
     icon: <Sparkles size={15} />,
     image: 'optimize-build.png',
     imageAlt: 'Toolbar showing Optimize Scale and Build CP actions with diagnostics visible',
-    caption: 'TreeMaker enables each command only when the document is ready for that step.',
+    caption: 'Ori Studio enables each command only when the document is ready for that step.',
     steps: [
       'Optimize Scale fits the tree to the current paper while preserving the selected TreeMaker model semantics.',
-      'Optimize Edges and Optimize Strain are available from the Design menu for deeper TreeMaker optimization workflows.',
+      'Optimize Edges and Optimize Strain are available from the Design menu for deeper optimization workflows.',
       'Build CP turns an optimized tree into creases, facets, fold directions, and folded-base data.',
       'Diagnostics report engine readiness, optimization status, feasibility, and crease-pattern build results.',
     ],
@@ -170,12 +170,6 @@ const ACKNOWLEDGEMENTS = [
     href: 'https://github.com/edemaine/fold',
     detail:
       'The app reads and exports crease-pattern data using community file-format conventions and compares behavior against redistributable fixtures.',
-  },
-  {
-    title: 'treemaker-rs',
-    href: 'https://github.com/zacharyfmarion/treemaker-rs',
-    detail:
-      'This open-source Rust, WebAssembly, React, Vite, Tauri, Dockview, Zustand, and lucide-react app is developed in this repository.',
   },
 ];
 
@@ -257,12 +251,12 @@ function GuideModal() {
   return (
     <ModalShell
       kind="guide"
-      title="TreeMaker Help"
+      title="Ori Studio Help"
       subtitle="A practical map of the current shared browser and desktop app surface."
       icon={<CircleHelp size={18} />}
       footer={
         <>
-          <span>TreeMaker commands are available from the web menubar, native desktop menu, and compact toolbar.</span>
+          <span>Ori Studio commands are available from the web menubar, native desktop menu, and compact toolbar.</span>
           <Button size="sm" variant="secondary" onClick={openAbout}>
             <Info size={14} />
             About
@@ -309,24 +303,21 @@ function AboutModal() {
   return (
     <ModalShell
       kind="about"
-      title="About TreeMaker"
-      subtitle="A modern shared GUI for TreeMaker-style origami design."
+      title="About Ori Studio"
+      subtitle="A modern shared GUI for tree-based origami design."
       icon={<BookOpen size={18} />}
       footer={
-        <>
-          <span>treemaker-rs is GPL-2.0-or-later because it ports TreeMaker's GPL model code.</span>
-          <Button size="sm" variant="secondary" onClick={openGuide}>
-            <CircleHelp size={14} />
-            Help
-          </Button>
-        </>
+        <Button size="sm" variant="secondary" onClick={openGuide}>
+          <CircleHelp size={14} />
+          Help
+        </Button>
       }
     >
       <div className="about-modal__intro">
         <img src="/favicon.png" alt="" aria-hidden="true" />
         <div>
           <p>
-            TreeMaker turns a tree structure into an origami crease pattern. This app
+            Ori Studio turns a tree structure into an origami crease pattern. This app
             wraps the Rust and WebAssembly port of Robert J. Lang's TreeMaker 5.0.1
             engine in a pane-based browser and Tauri desktop workspace.
           </p>

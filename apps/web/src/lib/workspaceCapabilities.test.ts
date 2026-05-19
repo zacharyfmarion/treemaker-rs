@@ -86,9 +86,9 @@ describe('workspace capabilities', () => {
     });
 
     expect(state['optimize.scale'].enabled).toBe(false);
-    expect(state['optimize.scale'].reason).toBe('Optimization requires a TreeMaker tree document');
+    expect(state['optimize.scale'].reason).toBe('Optimization requires an editable tree document');
     expect(state['cp.build'].enabled).toBe(false);
-    expect(state['cp.build'].reason).toBe('Build CP requires a TreeMaker tree document');
+    expect(state['cp.build'].reason).toBe('Build CP requires an editable tree document');
     expect(state['file.save'].enabled).toBe(false);
     expect(state['file.exportFold'].enabled).toBe(true);
     expect(state['file.exportSvg'].enabled).toBe(true);

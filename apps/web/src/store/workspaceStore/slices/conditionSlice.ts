@@ -15,7 +15,7 @@ export const createConditionSlice: WorkspaceSliceCreator<ConditionSlice> = (set,
     set({
       error: {
         code: 'invalid_operation',
-        message: 'Conditions require a TreeMaker tree document',
+        message: 'Conditions require an editable tree document',
       },
     });
     return true;

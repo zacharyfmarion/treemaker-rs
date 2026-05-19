@@ -27,7 +27,7 @@ export function GlobalToasts() {
     if (lastErrorKey.current === key) return;
     lastErrorKey.current = key;
 
-    toast.error('TreeMaker error', {
+    toast.error('Ori Studio error', {
       id: `treemaker-error-${key}`,
       description: formatUnknownError(error),
       duration: 8000,

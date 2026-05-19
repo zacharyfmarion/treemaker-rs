@@ -3945,6 +3945,8 @@ dependencies = [
  "serde_json",
  "sha2",
  "treemaker-core",
+ "treemaker-flatfold",
+ "treemaker-fold",
  "walkdir",
 ]
 

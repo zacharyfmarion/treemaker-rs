@@ -6,6 +6,8 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use treemaker_core::{CPStatus, Tree, TreeError, TreeSummary};
+use treemaker_flatfold::{ConstraintSummary, SolutionLimit, SolveOptions, solve_flat_fold};
+use treemaker_fold::FoldDocument;
 use walkdir::WalkDir;
 
 #[derive(Parser)]
@@ -52,6 +54,13 @@ enum Command {
         file: PathBuf,
         #[arg(long)]
         out: PathBuf,
+    },
+    Flatfold {
+        file: PathBuf,
+        #[arg(long, default_value = "10")]
+        limit: String,
+        #[arg(long, value_enum, default_value_t = OutputFormat::Text)]
+        format: OutputFormat,
     },
     RunFixtures {
         #[arg(long)]
@@ -126,6 +135,22 @@ fn main() -> Result<()> {
             fs::write(&out, tree.export_v4_string())
                 .with_context(|| format!("failed to write {}", out.display()))?;
         }
+        Command::Flatfold {
+            file,
+            limit,
+            format,
+        } => {
+            let document = read_fold(&file)?;
+            let solved = solve_flat_fold(
+                &document,
+                SolveOptions {
+                    solution_limit: parse_solution_limit(&limit)?,
+                    ..SolveOptions::default()
+                },
+            )
+            .with_context(|| format!("failed to solve flat fold {}", file.display()))?;
+            print_value(format, &FlatfoldReport::from_result(&file, solved))?;
+        }
         Command::RunFixtures { dir } => {
             let dir = dir.unwrap_or_else(|| PathBuf::from("tests/fixtures"));
             run_fixtures(&dir)?;
@@ -152,6 +177,25 @@ fn read_tree(path: &Path) -> Result<Tree> {
     Tree::from_tmd_str(&text).map_err(anyhow_from_tree_error)
 }
 
+fn read_fold(path: &Path) -> Result<FoldDocument> {
+    let text =
+        fs::read_to_string(path).with_context(|| format!("failed to read {}", path.display()))?;
+    serde_json::from_str(&text).with_context(|| format!("failed to parse {}", path.display()))
+}
+
+fn parse_solution_limit(raw: &str) -> Result<SolutionLimit> {
+    if raw == "all" {
+        return Ok(SolutionLimit::All);
+    }
+    let count = raw
+        .parse::<usize>()
+        .with_context(|| format!("flatfold limit must be a positive integer or all, got {raw}"))?;
+    if count == 0 {
+        anyhow::bail!("flatfold limit must be positive");
+    }
+    Ok(SolutionLimit::Count(count))
+}
+
 fn print_value<T: serde::Serialize + std::fmt::Debug>(
     format: OutputFormat,
     value: &T,
@@ -161,6 +205,29 @@ fn print_value<T: serde::Serialize + std::fmt::Debug>(
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(value)?),
     }
     Ok(())
+}
+
+#[derive(Debug, Serialize)]
+struct FlatfoldReport {
+    path: String,
+    constraints: ConstraintSummary,
+    component_sizes: Vec<usize>,
+    solution_counts: Vec<usize>,
+    states: String,
+    face_orders: Vec<[i64; 3]>,
+}
+
+impl FlatfoldReport {
+    fn from_result(path: &Path, result: treemaker_flatfold::SolveResult) -> Self {
+        Self {
+            path: path.display().to_string(),
+            constraints: result.constraints,
+            component_sizes: result.component_sizes,
+            solution_counts: result.solution_counts,
+            states: result.states,
+            face_orders: result.face_orders,
+        }
+    }
 }
 
 fn run_fixtures(dir: &Path) -> Result<()> {

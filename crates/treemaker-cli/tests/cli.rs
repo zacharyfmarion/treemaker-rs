@@ -158,6 +158,30 @@ fn optimize_build_cp_and_export_v4_write_parseable_files() {
 }
 
 #[test]
+fn flatfold_solves_fold_fixture_as_json() {
+    let output = run([
+        OsString::from("flatfold"),
+        repo_root()
+            .join("tests/fixtures/flat-folder/kabuto.fold")
+            .into_os_string(),
+        OsString::from("--limit"),
+        OsString::from("1"),
+        OsString::from("--format"),
+        OsString::from("json"),
+    ]);
+    assert_success(&output);
+    let report: Value = serde_json::from_slice(&output.stdout).expect("flatfold json");
+    assert_eq!(report["constraints"]["variables"], 117);
+    assert_eq!(report["component_sizes"], serde_json::json!([81, 18, 18]));
+    assert_eq!(report["solution_counts"], serde_json::json!([1, 1, 1]));
+    assert_eq!(report["states"], "1");
+    assert_eq!(
+        report["face_orders"].as_array().expect("face orders").len(),
+        117
+    );
+}
+
+#[test]
 fn run_fixtures_reports_all_checked_in_fixtures() {
     let output = run([
         OsString::from("run-fixtures"),

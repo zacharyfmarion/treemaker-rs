@@ -29,4 +29,4 @@ small parity-tested stages. Any not-yet-ported stage returns a typed
 - [x] Stage 5: Port layer-order constraint generation.
 - [x] Stage 6: Port solver and face-order output.
 - [x] Stage 7: Add external corpus oracle harness.
-- [ ] Stage 8: Add CLI/docs and run final validation.
+- [x] Stage 8: Add CLI/docs and run final validation.

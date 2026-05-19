@@ -18,10 +18,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@treemaker/origami-simulator": "0.1.0",
+    "@radix-ui/react-select": "^2.2.6",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@tauri-apps/api": "^2.0.0",
     "@tauri-apps/plugin-dialog": "^2.0.0",
+    "@treemaker/origami-simulator": "0.1.0",
     "class-variance-authority": "^0.7.1",
     "comlink": "^4.4.2",
     "dockview": "^4.13.1",

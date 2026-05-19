@@ -12,7 +12,6 @@ import {
   Axis3d,
   Circle,
   CircleDot,
-  Grid3X3,
   Layers,
   Maximize2,
   Plus,
@@ -46,7 +45,6 @@ import { IconButton } from '../ui/IconButton';
 const ZOOM_PRESETS = [25, 50, 100, 200, 400];
 
 const LAYER_OPTIONS: { key: DesignViewLayerKey; label: string; icon: ReactNode }[] = [
-  { key: 'grid', label: 'Grid', icon: <Grid3X3 size={13} /> },
   { key: 'paths', label: 'Paths', icon: <Waypoints size={13} /> },
   { key: 'leafCircles', label: 'Circles', icon: <Circle size={13} /> },
   { key: 'labels', label: 'Labels', icon: <Tag size={13} /> },
@@ -460,16 +458,6 @@ export function DesignPanel() {
               onPointerMove={onCanvasPointerMove}
               onPointerLeave={() => setHoverPoint(null)}
             >
-              <defs>
-                <pattern id="paper-grid" width="58.8" height="58.8" patternUnits="userSpaceOnUse">
-                  <path
-                    d="M 58.8 0 L 0 0 0 58.8"
-                    fill="none"
-                    stroke="rgba(16,20,23,0.14)"
-                    strokeWidth="1"
-                  />
-                </pattern>
-              </defs>
               <rect
                 className="paper-shadow"
                 x={DESIGN_PAPER_SHADOW_RECT.x}
@@ -485,15 +473,6 @@ export function DesignPanel() {
                 width={DESIGN_PAPER_RECT.width}
                 height={DESIGN_PAPER_RECT.height}
               />
-              {layers.grid && (
-                <rect
-                  x={DESIGN_PAPER_RECT.x}
-                  y={DESIGN_PAPER_RECT.y}
-                  width={DESIGN_PAPER_RECT.width}
-                  height={DESIGN_PAPER_RECT.height}
-                  fill="url(#paper-grid)"
-                />
-              )}
               <rect
                 className="paper-hit-area"
                 x={DESIGN_PAPER_RECT.x}

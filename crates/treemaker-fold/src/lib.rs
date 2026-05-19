@@ -370,6 +370,9 @@ fn build_crease_params(fold: &FoldDocument) -> Result<Vec<CreaseParameter>> {
             continue;
         };
         if faces.len() != 2 {
+            if assignment == Assignment::Flat {
+                continue;
+            }
             return Err(FoldError::BadCreaseTopology { edge: edge_index });
         }
         let [a, b] = fold.edges_vertices[edge_index];
@@ -378,20 +381,35 @@ fn build_crease_params(fold: &FoldDocument) -> Result<Vec<CreaseParameter>> {
         let face1 = &fold.faces_vertices[face1_index];
         let face2 = &fold.faces_vertices[face2_index];
         if face1.len() != 3 || face2.len() != 3 {
+            if assignment == Assignment::Flat {
+                continue;
+            }
             return Err(FoldError::BadCreaseTopology { edge: edge_index });
         }
-        let mut vertex1 = opposite_triangle_vertex(face1, a, b)
-            .ok_or(FoldError::BadCreaseTopology { edge: edge_index })?;
-        let mut vertex2 = opposite_triangle_vertex(face2, a, b)
-            .ok_or(FoldError::BadCreaseTopology { edge: edge_index })?;
-        let v1_index = face2
-            .iter()
-            .position(|vertex| *vertex == a)
-            .ok_or(FoldError::BadCreaseTopology { edge: edge_index })?;
-        let v2_index = face2
-            .iter()
-            .position(|vertex| *vertex == b)
-            .ok_or(FoldError::BadCreaseTopology { edge: edge_index })?;
+        let Some(mut vertex1) = opposite_triangle_vertex(face1, a, b) else {
+            if assignment == Assignment::Flat {
+                continue;
+            }
+            return Err(FoldError::BadCreaseTopology { edge: edge_index });
+        };
+        let Some(mut vertex2) = opposite_triangle_vertex(face2, a, b) else {
+            if assignment == Assignment::Flat {
+                continue;
+            }
+            return Err(FoldError::BadCreaseTopology { edge: edge_index });
+        };
+        let Some(v1_index) = face2.iter().position(|vertex| *vertex == a) else {
+            if assignment == Assignment::Flat {
+                continue;
+            }
+            return Err(FoldError::BadCreaseTopology { edge: edge_index });
+        };
+        let Some(v2_index) = face2.iter().position(|vertex| *vertex == b) else {
+            if assignment == Assignment::Flat {
+                continue;
+            }
+            return Err(FoldError::BadCreaseTopology { edge: edge_index });
+        };
         if v2_index as isize - v1_index as isize == 1 || v2_index as isize - v1_index as isize == -2
         {
             std::mem::swap(&mut face1_index, &mut face2_index);
@@ -583,5 +601,39 @@ mod tests {
         assert_eq!(prepared.crease_params[0].face2, 0);
         assert_eq!(prepared.crease_params[0].vertex2, 1);
         assert_eq!(prepared.crease_params[0].target_angle, -180.0);
+    }
+
+    #[test]
+    fn skips_one_sided_flat_edges_for_simulation_crease_params() {
+        let mut doc = FoldDocument::new(
+            vec![vec![0.0, 0.0], vec![1.0, 0.0], vec![0.0, 1.0]],
+            vec![[0, 1], [1, 2], [2, 0]],
+        );
+        doc.edges_assignment = vec![Assignment::Flat, Assignment::Boundary, Assignment::Boundary];
+        doc.edges_fold_angle = vec![Some(0.0), None, None];
+        doc.faces_vertices = vec![vec![0, 1, 2]];
+
+        let prepared = prepare_simulation_model(&doc).unwrap();
+
+        assert!(prepared.crease_params.is_empty());
+    }
+
+    #[test]
+    fn rejects_one_sided_mountain_edges_for_simulation_crease_params() {
+        let mut doc = FoldDocument::new(
+            vec![vec![0.0, 0.0], vec![1.0, 0.0], vec![0.0, 1.0]],
+            vec![[0, 1], [1, 2], [2, 0]],
+        );
+        doc.edges_assignment = vec![
+            Assignment::Mountain,
+            Assignment::Boundary,
+            Assignment::Boundary,
+        ];
+        doc.edges_fold_angle = vec![Some(-180.0), None, None];
+        doc.faces_vertices = vec![vec![0, 1, 2]];
+
+        let error = prepare_simulation_model(&doc).unwrap_err();
+
+        assert_eq!(error, FoldError::BadCreaseTopology { edge: 0 });
     }
 }

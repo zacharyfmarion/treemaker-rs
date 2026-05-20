@@ -113,4 +113,30 @@ describe('projectFromSnapshot', () => {
       isPolygon: true,
     });
   });
+
+  it('maps facet corridor edges for corridor selection', () => {
+    const project = projectFromSnapshot({
+      ...snapshot([]),
+      summary: { ...snapshot([]).summary, vertices: 3, facets: 1 },
+      vertices: [
+        { id: 1, loc: { x: 0, y: 0 } },
+        { id: 2, loc: { x: 1, y: 0 } },
+        { id: 3, loc: { x: 0, y: 1 } },
+      ],
+      facets: [{ id: 1, vertices: [1, 2, 3], color: 1, corridor_edge: 7 }],
+    });
+
+    expect(project.facets).toEqual([
+      {
+        id: 1,
+        vertices: [
+          { x: 0, y: 0 },
+          { x: 1, y: 0 },
+          { x: 0, y: 1 },
+        ],
+        color: 'white',
+        corridorEdge: 7,
+      },
+    ]);
+  });
 });

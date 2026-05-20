@@ -1,26 +1,67 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronRight } from 'lucide-react';
 import { handleMenuAction } from '../commands/menuActions';
 import { getMenuBarDef, type MenuItemDef } from '../menus/menuDefinition';
 import { useWorkspaceCapabilities } from '../store/workspaceStore/useWorkspaceCapabilities';
 import type { WorkspaceCapabilities, WorkspaceCapabilityId } from '../lib/workspaceCapabilities';
 import './MenuBar.css';
 
+function isMenuItemVisible(item: MenuItemDef, capabilities: WorkspaceCapabilities): boolean {
+  if (item.type === 'separator') return true;
+  if (item.type === 'submenu') {
+    return item.items.some((child) => child.type !== 'separator' && isMenuItemVisible(child, capabilities));
+  }
+
+  const capability = capabilities[item.id as WorkspaceCapabilityId];
+  return !(capability && !capability.visible);
+}
+
 function MenuDropdown({
   items,
   onAction,
   onClose,
   capabilities,
+  nested = false,
 }: {
   items: MenuItemDef[];
   onAction: (id: string) => void;
   onClose: () => void;
   capabilities: WorkspaceCapabilities;
+  nested?: boolean;
 }) {
   return (
-    <div className="menu-dropdown" role="menu">
+    <div className={`menu-dropdown ${nested ? 'menu-dropdown--submenu' : ''}`.trim()} role="menu">
       {items.map((item, index) => {
         if (item.type === 'separator') {
           return <div key={`separator-${index}`} className="menu-dropdown__separator" />;
+        }
+
+        if (item.type === 'submenu') {
+          if (!isMenuItemVisible(item, capabilities)) return null;
+
+          return (
+            <div key={item.label} className="menu-dropdown__submenu" role="none">
+              <button
+                type="button"
+                className="menu-dropdown__item menu-dropdown__item--submenu"
+                role="menuitem"
+                aria-haspopup="menu"
+                onClick={(event) => event.preventDefault()}
+              >
+                <span className="menu-dropdown__item-label">{item.label}</span>
+                <span className="menu-dropdown__submenu-arrow" aria-hidden="true">
+                  <ChevronRight size={13} />
+                </span>
+              </button>
+              <MenuDropdown
+                items={item.items}
+                onAction={onAction}
+                onClose={onClose}
+                capabilities={capabilities}
+                nested
+              />
+            </div>
+          );
         }
 
         const capability = capabilities[item.id as WorkspaceCapabilityId];

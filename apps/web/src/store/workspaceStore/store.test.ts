@@ -550,6 +550,139 @@ function createMockEngineApi(initialSnapshot: TreeSnapshot) {
             conditions: snapshotState.conditions.filter((condition) => condition.index !== edit.id),
           });
           break;
+        case 'make_root':
+          snapshotState = makeSnapshot({
+            ...snapshotState,
+            nodes: snapshotState.nodes.map((node) =>
+              node.id === edit.node ? { ...node, id: 1 } : { ...node, id: node.id + 1 }
+            ),
+          });
+          break;
+        case 'split_edge': {
+          const edge = snapshotState.edges.find((candidate) => candidate.id === edit.edge);
+          if (!edge) break;
+          createdNode = nextId(snapshotState.nodes);
+          createdEdge = nextId(snapshotState.edges);
+          const newNode = createdNode;
+          const newEdge = createdEdge;
+          snapshotState = refreshMockTopology(makeSnapshot({
+            ...snapshotState,
+            nodes: [
+              ...snapshotState.nodes,
+              nodeSnapshot(newNode, { x: 0.5, y: 0.5 }),
+            ],
+            edges: [
+              ...snapshotState.edges.map((candidate) =>
+                candidate.id === edit.edge
+                  ? { ...candidate, nodes: [candidate.nodes[0], newNode], length: edit.distance }
+                  : candidate
+              ),
+              edgeSnapshot(newEdge, [newNode, edge.nodes[1]], { length: edge.length - edit.distance }),
+            ],
+          }));
+          break;
+        }
+        case 'set_edge_lengths':
+          snapshotState = makeSnapshot({
+            ...snapshotState,
+            edges: snapshotState.edges.map((edge) =>
+              edit.edges.includes(edge.id) ? { ...edge, length: edit.length, strain: 0 } : edge
+            ),
+          });
+          break;
+        case 'scale_edge_lengths':
+          snapshotState = makeSnapshot({
+            ...snapshotState,
+            edges: snapshotState.edges.map((edge) =>
+              edit.edges.includes(edge.id) ? { ...edge, length: edge.length * edit.factor } : edge
+            ),
+          });
+          break;
+        case 'renormalize_to_edge': {
+          const edge = snapshotState.edges.find((candidate) => candidate.id === edit.edge);
+          const factor = edge ? 1 / edge.length : 1;
+          snapshotState = makeSnapshot({
+            ...snapshotState,
+            paper: { ...snapshotState.paper, scale: snapshotState.paper.scale / factor },
+            edges: snapshotState.edges.map((candidate) => ({
+              ...candidate,
+              length: candidate.length * factor,
+            })),
+          });
+          break;
+        }
+        case 'renormalize_to_unit_scale':
+          snapshotState = makeSnapshot({
+            ...snapshotState,
+            paper: { ...snapshotState.paper, scale: 1 },
+            edges: snapshotState.edges.map((edge) => ({
+              ...edge,
+              length: edge.length * snapshotState.paper.scale,
+            })),
+          });
+          break;
+        case 'absorb_nodes':
+        case 'absorb_redundant_nodes':
+        case 'absorb_edges':
+          snapshotState = makeSnapshot({ ...snapshotState });
+          break;
+        case 'perturb_nodes':
+          snapshotState = makeSnapshot({
+            ...snapshotState,
+            nodes: snapshotState.nodes.map((node) =>
+              edit.nodes.includes(node.id)
+                ? { ...node, loc: { x: node.loc.x + 0.01, y: node.loc.y + 0.01 } }
+                : node
+            ),
+          });
+          break;
+        case 'perturb_all_nodes':
+          snapshotState = makeSnapshot({
+            ...snapshotState,
+            nodes: snapshotState.nodes.map((node) => ({
+              ...node,
+              loc: { x: node.loc.x + 0.01, y: node.loc.y + 0.01 },
+            })),
+          });
+          break;
+        case 'remove_strain':
+          snapshotState = makeSnapshot({
+            ...snapshotState,
+            edges: snapshotState.edges.map((edge) =>
+              edit.edges.includes(edge.id) ? { ...edge, strain: 0 } : edge
+            ),
+          });
+          break;
+        case 'remove_all_strain':
+          snapshotState = makeSnapshot({
+            ...snapshotState,
+            edges: snapshotState.edges.map((edge) => ({ ...edge, strain: 0 })),
+          });
+          break;
+        case 'relieve_strain':
+          snapshotState = makeSnapshot({
+            ...snapshotState,
+            edges: snapshotState.edges.map((edge) =>
+              edit.edges.includes(edge.id)
+                ? { ...edge, length: edge.length * (1 + edge.strain), strain: 0 }
+                : edge
+            ),
+          });
+          break;
+        case 'relieve_all_strain':
+          snapshotState = makeSnapshot({
+            ...snapshotState,
+            edges: snapshotState.edges.map((edge) => ({
+              ...edge,
+              length: edge.length * (1 + edge.strain),
+              strain: 0,
+            })),
+          });
+          break;
+        case 'add_largest_stub_for_nodes':
+        case 'add_largest_stub_for_poly':
+        case 'triangulate_tree':
+          throw { code: 'unsupported_operation', message: 'Stub finder port is pending' };
       }
 
       return {
@@ -623,7 +756,6 @@ function resetStores(snapshot = makeSnapshot()) {
   useLayoutStore.setState(initialLayoutState, true);
   const api = createMockEngineApi(snapshot);
   configureEngine(api);
-  vi.spyOn(window, 'confirm').mockReturnValue(true);
   return api;
 }
 
@@ -906,6 +1038,135 @@ describe('workspace store slices', () => {
     await useWorkspaceStore.getState().deleteSelection();
     expect(useWorkspaceStore.getState().project.nodes).toEqual([]);
     expect(useWorkspaceStore.getState().projectMessage).toBe('Cleared design');
+  });
+
+  it('selects by index, movable parts, and corridor facets', () => {
+    const api = resetStores(
+      makeSnapshot({
+        nodes: [
+          nodeSnapshot(1, { x: 0.5, y: 0.5 }, { label: 'root', is_leaf: false }),
+          nodeSnapshot(2, { x: 0.2, y: 0.2 }, { is_pinned: true }),
+          nodeSnapshot(3, { x: 0.8, y: 0.2 }),
+        ],
+        edges: [edgeSnapshot(1, [1, 2]), edgeSnapshot(2, [1, 3])],
+        paths: [pathSnapshot(1, [2, 3])],
+        vertices: [
+          { id: 1, loc: { x: 0, y: 0 } },
+          { id: 2, loc: { x: 1, y: 0 } },
+          { id: 3, loc: { x: 0, y: 1 } },
+        ],
+        facets: [
+          { id: 1, vertices: [1, 2, 3], color: 1, corridor_edge: 1 },
+          { id: 2, vertices: [1, 3, 2], color: 2, corridor_edge: 2 },
+        ],
+        conditions: [
+          conditionSnapshot(1, { type: 'edge_length_fixed', edge: 2 }),
+        ],
+      })
+    );
+    loadSnapshotIntoStore(api.snapshotState);
+
+    useWorkspaceStore.getState().selectByIndex('node', 3);
+    expect(useWorkspaceStore.getState().selection).toEqual({ kind: 'node', id: 3 });
+
+    useWorkspaceStore.getState().selectMovableParts();
+    expect(useWorkspaceStore.getState().selection).toEqual({
+      kind: 'multi',
+      nodes: [3],
+      edges: [1],
+      paths: [],
+      creases: [],
+      facets: [],
+      conditions: [],
+    });
+
+    useWorkspaceStore.getState().select({ kind: 'edge', id: 2 });
+    useWorkspaceStore.getState().selectCorridorFacets();
+    expect(useWorkspaceStore.getState().selection).toEqual({
+      kind: 'multi',
+      nodes: [],
+      edges: [],
+      paths: [],
+      creases: [],
+      facets: [2],
+      conditions: [],
+    });
+  });
+
+  it('applies core tree editing commands through the engine', async () => {
+    const api = resetStores(seedSnapshot());
+    loadSnapshotIntoStore(api.snapshotState);
+
+    useWorkspaceStore.getState().select({ kind: 'edge', id: 1 });
+    await useWorkspaceStore.getState().setSelectedEdgeLengths(2);
+    expect(useWorkspaceStore.getState().project.edges[0].length).toBe(2);
+
+    await useWorkspaceStore.getState().scaleSelectedEdgeLengths(0.5);
+    expect(useWorkspaceStore.getState().project.edges[0].length).toBe(1);
+
+    await useWorkspaceStore.getState().splitSelectedEdge(0.4);
+    expect(useWorkspaceStore.getState().selection).toEqual({ kind: 'node', id: 3 });
+    expect(useWorkspaceStore.getState().project.nodes).toHaveLength(3);
+
+    useWorkspaceStore.getState().select({ kind: 'node', id: 2 });
+    await useWorkspaceStore.getState().makeSelectedNodeRoot();
+    expect(api.applyEdit).toHaveBeenLastCalledWith(1, { type: 'make_root', node: 2 });
+
+    useWorkspaceStore.getState().select({ kind: 'edge', id: 1 });
+    await useWorkspaceStore.getState().removeSelectionStrain();
+    await useWorkspaceStore.getState().relieveSelectionStrain();
+    await useWorkspaceStore.getState().renormalizeToSelectedEdge();
+    await useWorkspaceStore.getState().renormalizeToUnitScale();
+    await useWorkspaceStore.getState().perturbAllNodes();
+
+    expect(api.applyEdit).toHaveBeenCalledWith(1, { type: 'remove_strain', edges: [1] });
+    expect(api.applyEdit).toHaveBeenCalledWith(1, { type: 'relieve_strain', edges: [1] });
+    expect(api.applyEdit).toHaveBeenCalledWith(1, { type: 'perturb_all_nodes' });
+    expect(useWorkspaceStore.getState().historyPast.at(-1)?.label).toBe('Perturb all nodes');
+  });
+
+  it('updates conditions and removes conditions scoped to selected parts', async () => {
+    const api = resetStores(
+      makeSnapshot({
+        ...seedSnapshot(),
+        conditions: [
+          conditionSnapshot(1, nodeFixedCondition(2)),
+          conditionSnapshot(2, { type: 'edge_length_fixed', edge: 1 }),
+          conditionSnapshot(3, { type: 'path_active', node1: 1, node2: 2 }),
+        ],
+      })
+    );
+    loadSnapshotIntoStore(api.snapshotState);
+
+    await useWorkspaceStore.getState().updateCondition(1, {
+      type: 'node_fixed',
+      node: 2,
+      x_fixed: true,
+      y_fixed: true,
+      x_fix_value: 0.2,
+      y_fix_value: 0.3,
+    });
+    expect(useWorkspaceStore.getState().project.conditions[0].kind).toMatchObject({
+      y_fixed: true,
+      y_fix_value: 0.3,
+    });
+
+    useWorkspaceStore.getState().select({ kind: 'path', id: 1 });
+    await useWorkspaceStore.getState().deleteConditionsForSelectedPaths();
+    expect(useWorkspaceStore.getState().project.conditions.map((condition) => condition.kind.type)).toEqual([
+      'node_fixed',
+      'edge_length_fixed',
+    ]);
+
+    useWorkspaceStore.getState().select({ kind: 'node', id: 2 });
+    await useWorkspaceStore.getState().deleteConditionsForSelectedNodes();
+    expect(useWorkspaceStore.getState().project.conditions.map((condition) => condition.kind.type)).toEqual([
+      'edge_length_fixed',
+    ]);
+
+    useWorkspaceStore.getState().select({ kind: 'edge', id: 1 });
+    await useWorkspaceStore.getState().deleteConditionsForSelectedEdges();
+    expect(useWorkspaceStore.getState().project.conditions).toEqual([]);
   });
 
   it('creates mirrored branches from an axial parent in one history entry', async () => {

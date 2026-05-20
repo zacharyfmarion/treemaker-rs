@@ -1,8 +1,12 @@
 import type { TreeEdit, TreeSnapshot } from '../../../engine/types';
 import { projectFromSnapshot } from '../../../engine/snapshotMapper';
 import {
+  selectByIndex as selectionByIndex,
+  selectCorridorFacets as corridorFacetSelection,
   selectEverything,
+  selectMovableParts as movablePartSelection,
   selectedEdgeIds,
+  selectedFacetIds,
   selectedNodeIds,
   selectionCoversAllNodes,
 } from '../../../lib/selection';
@@ -44,6 +48,47 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
       set(projectStateFromSnapshot(result.initializedSnapshot, get().project.title));
     }
     return result;
+  }
+
+  async function applyCommandEdit(edit: TreeEdit, label: string) {
+    if (rejectReadOnly()) return;
+    set({ error: null });
+    const checkpoint = await get().beginHistoryCheckpoint();
+    const selectionBeforeEdit = get().selection;
+    try {
+      const { api, treeHandle } = await requireActiveTree();
+      const report = await api.applyEdit(treeHandle, edit);
+      set({
+        project: projectFromSnapshot(report.snapshot, get().project.title),
+        selection:
+          report.created_node !== undefined || report.created_edge !== undefined
+            ? nextSelectionForEdit(edit, report.snapshot, report.created_node, report.created_edge)
+            : selectionBeforeEdit,
+        status: statusAfterEdit(report.snapshot),
+        dirty: true,
+        error: null,
+        lastOptimization: null,
+        foldArtifacts: null,
+        foldArtifactError: null,
+        projectMessage: null,
+      });
+      get().commitHistoryCheckpoint(checkpoint, label);
+      void get().autosaveProject();
+    } catch (error) {
+      set({ status: 'error', error: engineError(error) });
+    }
+  }
+
+  function selectedEdgesOrMessage(): number[] {
+    const edges = selectedEdgeIds(get().selection);
+    if (edges.length === 0) set({ projectMessage: 'Select one or more edges first' });
+    return edges;
+  }
+
+  function selectedNodesOrMessage(): number[] {
+    const nodes = selectedNodeIds(get().selection);
+    if (nodes.length === 0) set({ projectMessage: 'Select one or more nodes first' });
+    return nodes;
   }
 
   return {
@@ -344,6 +389,114 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
       }
     },
 
+    makeSelectedNodeRoot: async () => {
+      const nodes = selectedNodeIds(get().selection);
+      if (nodes.length !== 1) {
+        set({ projectMessage: 'Select one node to make root' });
+        return;
+      }
+      await applyCommandEdit({ type: 'make_root', node: nodes[0] }, 'Make root');
+    },
+
+    splitSelectedEdge: async (distance) => {
+      const edges = selectedEdgeIds(get().selection);
+      if (edges.length !== 1) {
+        set({ projectMessage: 'Select one edge to split' });
+        return;
+      }
+      await applyCommandEdit({ type: 'split_edge', edge: edges[0], distance }, 'Split edge');
+    },
+
+    setSelectedEdgeLengths: async (length) => {
+      const edges = selectedEdgesOrMessage();
+      if (edges.length === 0) return;
+      await applyCommandEdit({ type: 'set_edge_lengths', edges, length }, 'Set edge lengths');
+    },
+
+    scaleSelectedEdgeLengths: async (factor) => {
+      const edges = selectedEdgesOrMessage();
+      if (edges.length === 0) return;
+      await applyCommandEdit({ type: 'scale_edge_lengths', edges, factor }, 'Scale edge lengths');
+    },
+
+    renormalizeToSelectedEdge: async () => {
+      const edges = selectedEdgeIds(get().selection);
+      if (edges.length !== 1) {
+        set({ projectMessage: 'Select one edge to renormalize' });
+        return;
+      }
+      await applyCommandEdit({ type: 'renormalize_to_edge', edge: edges[0] }, 'Renormalize to edge');
+    },
+
+    renormalizeToUnitScale: async () => {
+      await applyCommandEdit({ type: 'renormalize_to_unit_scale' }, 'Renormalize to unit scale');
+    },
+
+    absorbSelectedNodes: async () => {
+      const nodes = selectedNodesOrMessage();
+      if (nodes.length === 0) return;
+      await applyCommandEdit({ type: 'absorb_nodes', nodes }, 'Absorb nodes');
+    },
+
+    absorbRedundantNodes: async () => {
+      await applyCommandEdit({ type: 'absorb_redundant_nodes' }, 'Absorb redundant nodes');
+    },
+
+    absorbSelectedEdges: async () => {
+      const edges = selectedEdgesOrMessage();
+      if (edges.length === 0) return;
+      await applyCommandEdit({ type: 'absorb_edges', edges }, 'Absorb edges');
+    },
+
+    perturbSelectedNodes: async () => {
+      const nodes = selectedNodesOrMessage();
+      if (nodes.length === 0) return;
+      await applyCommandEdit({ type: 'perturb_nodes', nodes }, 'Perturb nodes');
+    },
+
+    perturbAllNodes: async () => {
+      await applyCommandEdit({ type: 'perturb_all_nodes' }, 'Perturb all nodes');
+    },
+
+    removeSelectionStrain: async () => {
+      const edges = selectedEdgesOrMessage();
+      if (edges.length === 0) return;
+      await applyCommandEdit({ type: 'remove_strain', edges }, 'Remove strain');
+    },
+
+    removeAllStrain: async () => {
+      await applyCommandEdit({ type: 'remove_all_strain' }, 'Remove all strain');
+    },
+
+    relieveSelectionStrain: async () => {
+      const edges = selectedEdgesOrMessage();
+      if (edges.length === 0) return;
+      await applyCommandEdit({ type: 'relieve_strain', edges }, 'Relieve strain');
+    },
+
+    relieveAllStrain: async () => {
+      await applyCommandEdit({ type: 'relieve_all_strain' }, 'Relieve all strain');
+    },
+
+    addLargestStubForSelectedNodes: async () => {
+      const nodes = selectedNodesOrMessage();
+      if (nodes.length === 0) return;
+      await applyCommandEdit({ type: 'add_largest_stub_for_nodes', nodes }, 'Add largest stub');
+    },
+
+    addLargestStubForSelectedPoly: async () => {
+      const facets = selectedFacetIds(get().selection);
+      if (facets.length !== 1) {
+        set({ projectMessage: 'Select one generated facet before choosing a stub polygon' });
+        return;
+      }
+      await applyCommandEdit({ type: 'add_largest_stub_for_poly', poly: facets[0] }, 'Add largest polygon stub');
+    },
+
+    triangulateTree: async () => {
+      await applyCommandEdit({ type: 'triangulate_tree' }, 'Triangulate tree');
+    },
+
     deleteSelection: async () => {
       if (rejectReadOnly()) return;
       const selection = get().selection;
@@ -402,6 +555,27 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
     select: (selection) => set({ selection }),
     selectAll: () => set({ selection: selectEverything(get().project) }),
     selectNone: () => set({ selection: { kind: 'tree' } }),
+    selectByIndex: (kind, id) => {
+      const next = selectionByIndex(get().project, kind, id);
+      set({
+        selection: next,
+        projectMessage: next.kind === 'tree' ? `No ${kind} ${id}` : null,
+      });
+    },
+    selectMovableParts: () => {
+      const next = movablePartSelection(get().project);
+      set({
+        selection: next,
+        projectMessage: next.kind === 'tree' ? 'No movable parts' : null,
+      });
+    },
+    selectCorridorFacets: () => {
+      const next = corridorFacetSelection(get().project, selectedEdgeIds(get().selection));
+      set({
+        selection: next,
+        projectMessage: next.kind === 'tree' ? 'No corridor facets for selected edges' : null,
+      });
+    },
     selectPathBetweenSelectedNodes: () => {
       const [a, b] = selectedNodeIds(get().selection);
       if (a === undefined || b === undefined) return;

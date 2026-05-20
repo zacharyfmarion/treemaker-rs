@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactElement } from 'react';
 import { Check, LayoutDashboard, Palette, RotateCcw, X } from 'lucide-react';
+import { requestConfirmation } from '../store/commandDialogStore';
 import { useLayoutStore } from '../store/layoutStore';
 import { type SettingsTab, useSettingsStore } from '../store/settingsStore';
 import { useThemeStore } from '../store/themeStore';
@@ -106,9 +107,15 @@ function WorkspaceTab() {
           variant="secondary"
           className="settings-full-width"
           onClick={() => {
-            if (window.confirm('Reset layout to default?')) {
+            void requestConfirmation({
+              title: 'Reset Layout',
+              message: 'Restore the default panel layout?',
+              confirmLabel: 'Reset',
+              tone: 'danger',
+            }).then((confirmed) => {
+              if (!confirmed) return;
               resetLayout();
-            }
+            });
           }}
         >
           <RotateCcw size={14} />

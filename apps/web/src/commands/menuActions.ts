@@ -1,10 +1,12 @@
 import { getFileService, type FileCommand, type FileService } from '../platform/fileService';
 import { useHelpStore } from '../store/helpStore';
 import { useLayoutStore } from '../store/layoutStore';
+import { useSelectionUiStore } from '../store/selectionUiStore';
 import { useSettingsStore } from '../store/settingsStore';
 import { useWorkspaceStore } from '../store/workspaceStore';
 import { selectWorkspaceCapabilities } from '../store/workspaceStore/capabilities';
 import type { WorkspaceCapabilities, WorkspaceCapabilityId } from '../lib/workspaceCapabilities';
+import { requestPositiveNumber, type NumberDialogOptions } from '../store/commandDialogStore';
 
 export const MENU_ACTION_IDS = [
   'app.about',
@@ -26,6 +28,27 @@ export const MENU_ACTION_IDS = [
   'edit.delete',
   'edit.selectAll',
   'edit.deselectAll',
+  'edit.selectByIndex',
+  'edit.selectMovableParts',
+  'edit.selectCorridorFacets',
+  'edit.makeRoot',
+  'edit.splitEdge',
+  'edit.setEdgeLength',
+  'edit.scaleEdgeLengths',
+  'edit.renormalizeToEdge',
+  'edit.renormalizeToUnitScale',
+  'edit.absorbNodes',
+  'edit.absorbRedundantNodes',
+  'edit.absorbEdges',
+  'edit.perturbNodes',
+  'edit.perturbAllNodes',
+  'edit.removeStrain',
+  'edit.removeAllStrain',
+  'edit.relieveStrain',
+  'edit.relieveAllStrain',
+  'edit.addLargestStubForNodes',
+  'edit.addLargestStubForPoly',
+  'edit.triangulateTree',
   'view.design',
   'view.creasePattern',
   'view.simulator',
@@ -64,6 +87,26 @@ export interface WorkspaceCommands {
   select(selection: { kind: 'tree' }): void;
   selectAll(): void;
   selectNone(): void;
+  selectMovableParts(): void;
+  selectCorridorFacets(): void;
+  makeSelectedNodeRoot(): Promise<void>;
+  splitSelectedEdge(distance: number): Promise<void>;
+  setSelectedEdgeLengths(length: number): Promise<void>;
+  scaleSelectedEdgeLengths(factor: number): Promise<void>;
+  renormalizeToSelectedEdge(): Promise<void>;
+  renormalizeToUnitScale(): Promise<void>;
+  absorbSelectedNodes(): Promise<void>;
+  absorbRedundantNodes(): Promise<void>;
+  absorbSelectedEdges(): Promise<void>;
+  perturbSelectedNodes(): Promise<void>;
+  perturbAllNodes(): Promise<void>;
+  removeSelectionStrain(): Promise<void>;
+  removeAllStrain(): Promise<void>;
+  relieveSelectionStrain(): Promise<void>;
+  relieveAllStrain(): Promise<void>;
+  addLargestStubForSelectedNodes(): Promise<void>;
+  addLargestStubForSelectedPoly(): Promise<void>;
+  triangulateTree(): Promise<void>;
 }
 
 export interface LayoutCommands {
@@ -80,6 +123,8 @@ export interface MenuActionDependencies {
   help?: () => void;
   about?: () => void;
   settings?: () => void;
+  selectByIndex?: () => void;
+  requestPositiveNumber?: (options: NumberDialogOptions) => Promise<number | null>;
 }
 
 const FILE_ACTIONS: Partial<Record<MenuActionId, FileCommand>> = {
@@ -166,6 +211,99 @@ export function createMenuActionHandler(deps: MenuActionDependencies) {
       case 'edit.deselectAll':
         deps.workspace.selectNone();
         return true;
+      case 'edit.selectByIndex':
+        deps.selectByIndex?.();
+        return true;
+      case 'edit.selectMovableParts':
+        deps.workspace.selectMovableParts();
+        return true;
+      case 'edit.selectCorridorFacets':
+        deps.workspace.selectCorridorFacets();
+        return true;
+      case 'edit.makeRoot':
+        await deps.workspace.makeSelectedNodeRoot();
+        return true;
+      case 'edit.splitEdge': {
+        const distance = await (deps.requestPositiveNumber ?? requestPositiveNumber)({
+          title: 'Split Edge',
+          label: 'Distance',
+          initialValue: '0.5',
+          confirmLabel: 'Split',
+          minExclusive: 0,
+          meta: 'Distance along the selected strained edge.',
+        });
+        if (distance === null) return false;
+        await deps.workspace.splitSelectedEdge(distance);
+        return true;
+      }
+      case 'edit.setEdgeLength': {
+        const length = await (deps.requestPositiveNumber ?? requestPositiveNumber)({
+          title: 'Set Edge Length',
+          label: 'Length',
+          initialValue: '1',
+          confirmLabel: 'Set',
+          minExclusive: 0,
+          meta: 'Applies this exact length to the selected edge.',
+        });
+        if (length === null) return false;
+        await deps.workspace.setSelectedEdgeLengths(length);
+        return true;
+      }
+      case 'edit.scaleEdgeLengths': {
+        const factor = await (deps.requestPositiveNumber ?? requestPositiveNumber)({
+          title: 'Scale Edge Lengths',
+          label: 'Factor',
+          initialValue: '1',
+          confirmLabel: 'Scale',
+          minExclusive: 0,
+          meta: 'Multiplies selected edge lengths by this factor.',
+        });
+        if (factor === null) return false;
+        await deps.workspace.scaleSelectedEdgeLengths(factor);
+        return true;
+      }
+      case 'edit.renormalizeToEdge':
+        await deps.workspace.renormalizeToSelectedEdge();
+        return true;
+      case 'edit.renormalizeToUnitScale':
+        await deps.workspace.renormalizeToUnitScale();
+        return true;
+      case 'edit.absorbNodes':
+        await deps.workspace.absorbSelectedNodes();
+        return true;
+      case 'edit.absorbRedundantNodes':
+        await deps.workspace.absorbRedundantNodes();
+        return true;
+      case 'edit.absorbEdges':
+        await deps.workspace.absorbSelectedEdges();
+        return true;
+      case 'edit.perturbNodes':
+        await deps.workspace.perturbSelectedNodes();
+        return true;
+      case 'edit.perturbAllNodes':
+        await deps.workspace.perturbAllNodes();
+        return true;
+      case 'edit.removeStrain':
+        await deps.workspace.removeSelectionStrain();
+        return true;
+      case 'edit.removeAllStrain':
+        await deps.workspace.removeAllStrain();
+        return true;
+      case 'edit.relieveStrain':
+        await deps.workspace.relieveSelectionStrain();
+        return true;
+      case 'edit.relieveAllStrain':
+        await deps.workspace.relieveAllStrain();
+        return true;
+      case 'edit.addLargestStubForNodes':
+        await deps.workspace.addLargestStubForSelectedNodes();
+        return true;
+      case 'edit.addLargestStubForPoly':
+        await deps.workspace.addLargestStubForSelectedPoly();
+        return true;
+      case 'edit.triangulateTree':
+        await deps.workspace.triangulateTree();
+        return true;
       case 'view.design':
         deps.layout.activatePanel('design');
         return true;
@@ -222,6 +360,9 @@ export function handleMenuAction(id: string): Promise<boolean> {
     },
     about: () => {
       useHelpStore.getState().openAbout();
+    },
+    selectByIndex: () => {
+      useSelectionUiStore.getState().openSelectByIndex();
     },
   })(id);
 }

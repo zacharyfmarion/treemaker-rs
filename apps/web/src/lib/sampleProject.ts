@@ -74,6 +74,7 @@ export interface FacetShape {
   id: number;
   vertices: Point[];
   color: 'white' | 'color' | 'unset';
+  corridorEdge?: number;
 }
 
 export interface TreeCondition {

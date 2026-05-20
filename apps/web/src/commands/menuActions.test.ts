@@ -27,6 +27,26 @@ function createDeps() {
       select: vi.fn(),
       selectAll: vi.fn(),
       selectNone: vi.fn(),
+      selectMovableParts: vi.fn(),
+      selectCorridorFacets: vi.fn(),
+      makeSelectedNodeRoot: vi.fn().mockResolvedValue(undefined),
+      splitSelectedEdge: vi.fn().mockResolvedValue(undefined),
+      setSelectedEdgeLengths: vi.fn().mockResolvedValue(undefined),
+      scaleSelectedEdgeLengths: vi.fn().mockResolvedValue(undefined),
+      renormalizeToSelectedEdge: vi.fn().mockResolvedValue(undefined),
+      renormalizeToUnitScale: vi.fn().mockResolvedValue(undefined),
+      absorbSelectedNodes: vi.fn().mockResolvedValue(undefined),
+      absorbRedundantNodes: vi.fn().mockResolvedValue(undefined),
+      absorbSelectedEdges: vi.fn().mockResolvedValue(undefined),
+      perturbSelectedNodes: vi.fn().mockResolvedValue(undefined),
+      perturbAllNodes: vi.fn().mockResolvedValue(undefined),
+      removeSelectionStrain: vi.fn().mockResolvedValue(undefined),
+      removeAllStrain: vi.fn().mockResolvedValue(undefined),
+      relieveSelectionStrain: vi.fn().mockResolvedValue(undefined),
+      relieveAllStrain: vi.fn().mockResolvedValue(undefined),
+      addLargestStubForSelectedNodes: vi.fn().mockResolvedValue(undefined),
+      addLargestStubForSelectedPoly: vi.fn().mockResolvedValue(undefined),
+      triangulateTree: vi.fn().mockResolvedValue(undefined),
     },
     layout: {
       activatePanel: vi.fn(),
@@ -37,6 +57,8 @@ function createDeps() {
     help: vi.fn(),
     about: vi.fn(),
     settings: vi.fn(),
+    selectByIndex: vi.fn(),
+    requestPositiveNumber: vi.fn().mockResolvedValue(0.5),
   };
 }
 
@@ -81,11 +103,59 @@ describe('menu actions', () => {
     await expect(handle('edit.copy')).resolves.toBe(true);
     await expect(handle('edit.selectAll')).resolves.toBe(true);
     await expect(handle('edit.deselectAll')).resolves.toBe(true);
+    await expect(handle('edit.selectByIndex')).resolves.toBe(true);
+    await expect(handle('edit.selectMovableParts')).resolves.toBe(true);
+    await expect(handle('edit.selectCorridorFacets')).resolves.toBe(true);
+    await expect(handle('edit.makeRoot')).resolves.toBe(true);
+    await expect(handle('edit.renormalizeToEdge')).resolves.toBe(true);
+    await expect(handle('edit.absorbNodes')).resolves.toBe(true);
+    await expect(handle('edit.perturbAllNodes')).resolves.toBe(true);
+    await expect(handle('edit.relieveAllStrain')).resolves.toBe(true);
+    await expect(handle('edit.triangulateTree')).resolves.toBe(true);
 
     expect(deps.workspace.undo).toHaveBeenCalledOnce();
     expect(deps.workspace.copySelection).toHaveBeenCalledOnce();
     expect(deps.workspace.selectAll).toHaveBeenCalledOnce();
     expect(deps.workspace.selectNone).toHaveBeenCalledOnce();
+    expect(deps.selectByIndex).toHaveBeenCalledOnce();
+    expect(deps.workspace.selectMovableParts).toHaveBeenCalledOnce();
+    expect(deps.workspace.selectCorridorFacets).toHaveBeenCalledOnce();
+    expect(deps.workspace.makeSelectedNodeRoot).toHaveBeenCalledOnce();
+    expect(deps.workspace.renormalizeToSelectedEdge).toHaveBeenCalledOnce();
+    expect(deps.workspace.absorbSelectedNodes).toHaveBeenCalledOnce();
+    expect(deps.workspace.perturbAllNodes).toHaveBeenCalledOnce();
+    expect(deps.workspace.relieveAllStrain).toHaveBeenCalledOnce();
+    expect(deps.workspace.triangulateTree).toHaveBeenCalledOnce();
+  });
+
+  it('requests in-app numeric values for parameterized edit commands', async () => {
+    const deps = createDeps();
+    deps.requestPositiveNumber
+      .mockResolvedValueOnce(0.25)
+      .mockResolvedValueOnce(2)
+      .mockResolvedValueOnce(1.5);
+    const handle = createMenuActionHandler(deps);
+
+    await expect(handle('edit.splitEdge')).resolves.toBe(true);
+    await expect(handle('edit.setEdgeLength')).resolves.toBe(true);
+    await expect(handle('edit.scaleEdgeLengths')).resolves.toBe(true);
+
+    expect(deps.requestPositiveNumber).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ title: 'Split Edge', initialValue: '0.5' })
+    );
+    expect(deps.workspace.splitSelectedEdge).toHaveBeenCalledWith(0.25);
+    expect(deps.workspace.setSelectedEdgeLengths).toHaveBeenCalledWith(2);
+    expect(deps.workspace.scaleSelectedEdgeLengths).toHaveBeenCalledWith(1.5);
+  });
+
+  it('cancels parameterized edit commands when the in-app number modal is dismissed', async () => {
+    const deps = createDeps();
+    deps.requestPositiveNumber.mockResolvedValueOnce(null);
+
+    await expect(createMenuActionHandler(deps)('edit.splitEdge')).resolves.toBe(false);
+
+    expect(deps.workspace.splitSelectedEdge).not.toHaveBeenCalled();
   });
 
   it('routes file commands through the selected file service', async () => {

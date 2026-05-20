@@ -248,7 +248,7 @@ Done when:
 
 ### Phase 8: History, Clipboard, And Selection
 
-Status: started.
+Status: complete.
 
 Goal: make editing recoverable and selection-safe in both browser and Tauri.
 
@@ -262,8 +262,8 @@ Work items:
 - Add internal clipboard support for connected tree selections.
 - Add multi-selection for design nodes/edges and CP creases/facets.
 - Add select-path-between-two-nodes workflow.
-- Finish select-by-index, movable-part selection, corridor-facet selection, and
-  condition selection after those surfaces exist.
+- Add select-by-index, movable-part selection, corridor-facet selection, and
+  condition multi-selection.
 
 Done when:
 
@@ -290,13 +290,16 @@ Implemented or started:
 - Paper and symmetry controls backed by engine edits.
 - Design-pane symmetry and conditioned-part overlays.
 - Quick-add controls for the common node, edge, and path conditions.
-- Condition list, selection, remove, clear, and feasibility display.
+- Condition list, multi-selection, remove, clear, scoped remove, and
+  feasibility display.
+- Dedicated editor controls for every current condition type.
+- Diagnostics summaries for infeasible conditions, conditioned parts, and
+  optimizer infeasibility state.
 
 Remaining:
 
-- Per-condition editing forms.
-- Remove condition commands scoped to selected nodes, edges, and paths.
-- More detailed diagnostics for infeasible or over-constrained systems.
+- Deeper optimizer overconstraint explanations remain in the optimization
+  workflow backlog.
 
 Done when:
 

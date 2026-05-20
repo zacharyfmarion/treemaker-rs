@@ -13,6 +13,7 @@ import {
   type WorkspaceCapabilityId,
 } from '../../../lib/workspaceCapabilities';
 import { ensureExtension, getFileService, type FileService } from '../../../platform/fileService';
+import { requestConfirmation } from '../../commandDialogStore';
 import { useLayoutStore } from '../../layoutStore';
 import {
   createBlankTree,
@@ -65,10 +66,14 @@ function persistAutosave(recent: RecentProject): void {
   localStorage.setItem(AUTOSAVE_STORAGE_KEY, JSON.stringify(recent));
 }
 
-function confirmDiscardDirty(dirty: boolean): boolean {
+async function confirmDiscardDirty(dirty: boolean): Promise<boolean> {
   if (!dirty) return true;
-  if (typeof window === 'undefined') return true;
-  return window.confirm('Discard unsaved changes?');
+  return requestConfirmation({
+    title: 'Discard unsaved changes?',
+    message: 'Your current project has unsaved changes. Continue and discard them?',
+    confirmLabel: 'Discard',
+    tone: 'danger',
+  });
 }
 
 export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get) => {
@@ -280,7 +285,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
 
     createNewProject: async () => {
       if (rejectDisabled('file.new')) return;
-      if (!confirmDiscardDirty(get().dirty)) return;
+      if (!(await confirmDiscardDirty(get().dirty))) return;
       set({ status: 'loading_engine', error: null, projectMessage: null });
       try {
         const api = await getEngine();
@@ -312,7 +317,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
     },
 
     loadStarterProject: async () => {
-      if (!confirmDiscardDirty(get().dirty)) return;
+      if (!(await confirmDiscardDirty(get().dirty))) return;
       set({ status: 'loading_engine', error: null, projectMessage: null });
       try {
         const api = await getEngine();
@@ -361,7 +366,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
 
     openProject: async (fileService = getFileService()) => {
       if (rejectDisabled('file.open')) return false;
-      if (!confirmDiscardDirty(get().dirty)) return false;
+      if (!(await confirmDiscardDirty(get().dirty))) return false;
       try {
         const file = await fileService.openTextFile({
           title: 'Open Ori Studio Project or Crease Pattern',
@@ -489,7 +494,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
     },
 
     loadExampleProject: async (id) => {
-      if (!confirmDiscardDirty(get().dirty)) return;
+      if (!(await confirmDiscardDirty(get().dirty))) return;
       const example = getExampleProject(id);
       if (!example) return;
       await get().loadProjectText(example.text, {
@@ -499,7 +504,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
     },
 
     loadRecentProject: async (id) => {
-      if (!confirmDiscardDirty(get().dirty)) return;
+      if (!(await confirmDiscardDirty(get().dirty))) return;
       const recent = get().recentProjects.find((item) => item.id === id);
       if (!recent) return;
       if (isCreasePatternFilename(recent.filename)) {

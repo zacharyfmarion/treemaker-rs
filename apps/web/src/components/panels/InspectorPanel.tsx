@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Activity, Circle, GitBranch, MousePointer2, Square, Waypoints } from 'lucide-react';
+import { handleMenuAction } from '../../commands/menuActions';
 import { formatNumber } from '../../lib/geometry';
 import { conditionDetail, conditionTitle } from '../../lib/conditionLabels';
 import { selectedNodeIds, selectionSummary } from '../../lib/selection';
@@ -66,6 +67,8 @@ export function InspectorPanel() {
             <Row label="Leaf" value={selectedNode.isLeaf ? 'Yes' : 'No'} />
             <Row label="Pinned" value={selectedNode.isPinned ? 'Yes' : 'No'} />
             <Row label="Conditioned" value={selectedNode.isConditioned ? 'Yes' : 'No'} />
+            <ActionRow label="Make Root" onClick={() => void handleMenuAction('edit.makeRoot')} />
+            <ActionRow label="Perturb" onClick={() => void handleMenuAction('edit.perturbNodes')} />
           </>
         )}
         {selectedEdge && (
@@ -93,6 +96,10 @@ export function InspectorPanel() {
               step={0.1}
               onCommit={(stiffness) => void updateEdge(selectedEdge.id, { stiffness })}
             />
+            <ActionRow label="Split" onClick={() => void handleMenuAction('edit.splitEdge')} />
+            <ActionRow label="Renormalize" onClick={() => void handleMenuAction('edit.renormalizeToEdge')} />
+            <ActionRow label="Remove strain" onClick={() => void handleMenuAction('edit.removeStrain')} />
+            <ActionRow label="Relieve strain" onClick={() => void handleMenuAction('edit.relieveStrain')} />
           </>
         )}
         {selectedCrease && (
@@ -143,6 +150,8 @@ export function InspectorPanel() {
                 <span className="control-row__value">Select between nodes</span>
               </button>
             )}
+            <ActionRow label="Absorb nodes" onClick={() => void handleMenuAction('edit.absorbNodes')} />
+            <ActionRow label="Perturb nodes" onClick={() => void handleMenuAction('edit.perturbNodes')} />
           </>
         )}
         {selection.kind === 'tree' && documentMode === 'crease-pattern' && (
@@ -170,10 +179,23 @@ export function InspectorPanel() {
             <Row label="Edges" value={String(project.edges.length)} />
             <Row label="Creases" value={String(project.creases.length)} />
             <Row label="Conditions" value={String(project.conditions.length)} />
+            <ActionRow label="Absorb redundant nodes" onClick={() => void handleMenuAction('edit.absorbRedundantNodes')} />
+            <ActionRow label="Renormalize unit scale" onClick={() => void handleMenuAction('edit.renormalizeToUnitScale')} />
+            <ActionRow label="Remove all strain" onClick={() => void handleMenuAction('edit.removeAllStrain')} />
+            <ActionRow label="Relieve all strain" onClick={() => void handleMenuAction('edit.relieveAllStrain')} />
           </>
         )}
       </div>
     </section>
+  );
+}
+
+function ActionRow({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button className="control-row control-row--button" type="button" onClick={onClick}>
+      <span className="control-row__label">Action</span>
+      <span className="control-row__value">{label}</span>
+    </button>
   );
 }
 

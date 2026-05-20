@@ -68,9 +68,92 @@ pub fn setup_menu(app: &App) -> Result<(), Box<dyn std::error::Error>> {
         .accelerator("CmdOrCtrl+A")
         .build(app)?;
     let edit_deselect = MenuItemBuilder::with_id("edit.deselectAll", "Deselect All").build(app)?;
+    let edit_select_by_index =
+        MenuItemBuilder::with_id("edit.selectByIndex", "Select By Index...").build(app)?;
+    let edit_select_movable =
+        MenuItemBuilder::with_id("edit.selectMovableParts", "Select Movable Parts").build(app)?;
+    let edit_select_corridor =
+        MenuItemBuilder::with_id("edit.selectCorridorFacets", "Select Corridor Facets")
+            .build(app)?;
     let edit_delete = MenuItemBuilder::with_id("edit.delete", "Delete Selected")
         .accelerator("Backspace")
         .build(app)?;
+    let edit_make_root = MenuItemBuilder::with_id("edit.makeRoot", "Make Root").build(app)?;
+    let edit_split_edge = MenuItemBuilder::with_id("edit.splitEdge", "Split Edge...").build(app)?;
+    let edit_set_edge_length =
+        MenuItemBuilder::with_id("edit.setEdgeLength", "Set Edge Length...").build(app)?;
+    let edit_scale_edge_lengths =
+        MenuItemBuilder::with_id("edit.scaleEdgeLengths", "Scale Edge Lengths...").build(app)?;
+    let edit_renormalize_edge =
+        MenuItemBuilder::with_id("edit.renormalizeToEdge", "Renormalize To Edge").build(app)?;
+    let edit_renormalize_scale =
+        MenuItemBuilder::with_id("edit.renormalizeToUnitScale", "Renormalize To Unit Scale")
+            .build(app)?;
+    let edit_absorb_nodes =
+        MenuItemBuilder::with_id("edit.absorbNodes", "Absorb Nodes").build(app)?;
+    let edit_absorb_redundant =
+        MenuItemBuilder::with_id("edit.absorbRedundantNodes", "Absorb Redundant Nodes")
+            .build(app)?;
+    let edit_absorb_edges =
+        MenuItemBuilder::with_id("edit.absorbEdges", "Absorb Edges").build(app)?;
+    let edit_perturb_nodes =
+        MenuItemBuilder::with_id("edit.perturbNodes", "Perturb Nodes").build(app)?;
+    let edit_perturb_all =
+        MenuItemBuilder::with_id("edit.perturbAllNodes", "Perturb All Nodes").build(app)?;
+    let edit_remove_strain =
+        MenuItemBuilder::with_id("edit.removeStrain", "Remove Strain").build(app)?;
+    let edit_remove_all_strain =
+        MenuItemBuilder::with_id("edit.removeAllStrain", "Remove All Strain").build(app)?;
+    let edit_relieve_strain =
+        MenuItemBuilder::with_id("edit.relieveStrain", "Relieve Strain").build(app)?;
+    let edit_relieve_all_strain =
+        MenuItemBuilder::with_id("edit.relieveAllStrain", "Relieve All Strain").build(app)?;
+    let edit_stub_nodes =
+        MenuItemBuilder::with_id("edit.addLargestStubForNodes", "Add Largest Stub From Nodes")
+            .build(app)?;
+    let edit_stub_poly =
+        MenuItemBuilder::with_id("edit.addLargestStubForPoly", "Add Largest Stub From Poly")
+            .build(app)?;
+    let edit_triangulate =
+        MenuItemBuilder::with_id("edit.triangulateTree", "Triangulate Tree").build(app)?;
+
+    let edit_select_menu = SubmenuBuilder::new(app, "Select")
+        .item(&edit_select_all)
+        .item(&edit_deselect)
+        .item(&edit_select_by_index)
+        .item(&edit_select_movable)
+        .item(&edit_select_corridor)
+        .build()?;
+    let edit_node_menu = SubmenuBuilder::new(app, "Node")
+        .item(&edit_make_root)
+        .item(&edit_absorb_nodes)
+        .item(&edit_absorb_redundant)
+        .separator()
+        .item(&edit_perturb_nodes)
+        .item(&edit_perturb_all)
+        .build()?;
+    let edit_edge_menu = SubmenuBuilder::new(app, "Edge")
+        .item(&edit_split_edge)
+        .item(&edit_set_edge_length)
+        .item(&edit_scale_edge_lengths)
+        .separator()
+        .item(&edit_renormalize_edge)
+        .item(&edit_renormalize_scale)
+        .item(&edit_absorb_edges)
+        .build()?;
+    let edit_strain_menu = SubmenuBuilder::new(app, "Strain")
+        .item(&edit_remove_strain)
+        .item(&edit_remove_all_strain)
+        .separator()
+        .item(&edit_relieve_strain)
+        .item(&edit_relieve_all_strain)
+        .build()?;
+    let edit_stub_menu = SubmenuBuilder::new(app, "Stubs")
+        .item(&edit_stub_nodes)
+        .item(&edit_stub_poly)
+        .separator()
+        .item(&edit_triangulate)
+        .build()?;
 
     let edit_menu = SubmenuBuilder::new(app, "Edit")
         .item(&edit_undo)
@@ -80,9 +163,13 @@ pub fn setup_menu(app: &App) -> Result<(), Box<dyn std::error::Error>> {
         .item(&edit_copy)
         .item(&edit_paste)
         .separator()
-        .item(&edit_select_all)
-        .item(&edit_deselect)
         .item(&edit_delete)
+        .separator()
+        .item(&edit_select_menu)
+        .item(&edit_node_menu)
+        .item(&edit_edge_menu)
+        .item(&edit_strain_menu)
+        .item(&edit_stub_menu)
         .build()?;
 
     let view_design = MenuItemBuilder::with_id("view.design", "Design").build(app)?;

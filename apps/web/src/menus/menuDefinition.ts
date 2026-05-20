@@ -11,7 +11,13 @@ export type MenuSeparator = {
   type: 'separator';
 };
 
-export type MenuItemDef = MenuActionItem | MenuSeparator;
+export type MenuSubmenu = {
+  type: 'submenu';
+  label: string;
+  items: MenuItemDef[];
+};
+
+export type MenuItemDef = MenuActionItem | MenuSeparator | MenuSubmenu;
 
 export type MenuDef = {
   label: string;
@@ -55,9 +61,65 @@ export function getMenuBarDef(): MenuDef[] {
         { type: 'action', id: 'edit.copy', label: 'Copy', shortcut: `${mod}+C` },
         { type: 'action', id: 'edit.paste', label: 'Paste', shortcut: `${mod}+V` },
         { type: 'separator' },
-        { type: 'action', id: 'edit.selectAll', label: 'Select All', shortcut: `${mod}+A` },
-        { type: 'action', id: 'edit.deselectAll', label: 'Deselect All' },
         { type: 'action', id: 'edit.delete', label: 'Delete Selected', shortcut: 'Delete' },
+        { type: 'separator' },
+        {
+          type: 'submenu',
+          label: 'Select',
+          items: [
+            { type: 'action', id: 'edit.selectAll', label: 'Select All', shortcut: `${mod}+A` },
+            { type: 'action', id: 'edit.deselectAll', label: 'Deselect All' },
+            { type: 'action', id: 'edit.selectByIndex', label: 'Select By Index...' },
+            { type: 'action', id: 'edit.selectMovableParts', label: 'Select Movable Parts' },
+            { type: 'action', id: 'edit.selectCorridorFacets', label: 'Select Corridor Facets' },
+          ],
+        },
+        {
+          type: 'submenu',
+          label: 'Node',
+          items: [
+            { type: 'action', id: 'edit.makeRoot', label: 'Make Root' },
+            { type: 'action', id: 'edit.absorbNodes', label: 'Absorb Nodes' },
+            { type: 'action', id: 'edit.absorbRedundantNodes', label: 'Absorb Redundant Nodes' },
+            { type: 'separator' },
+            { type: 'action', id: 'edit.perturbNodes', label: 'Perturb Nodes' },
+            { type: 'action', id: 'edit.perturbAllNodes', label: 'Perturb All Nodes' },
+          ],
+        },
+        {
+          type: 'submenu',
+          label: 'Edge',
+          items: [
+            { type: 'action', id: 'edit.splitEdge', label: 'Split Edge...' },
+            { type: 'action', id: 'edit.setEdgeLength', label: 'Set Edge Length...' },
+            { type: 'action', id: 'edit.scaleEdgeLengths', label: 'Scale Edge Lengths...' },
+            { type: 'separator' },
+            { type: 'action', id: 'edit.renormalizeToEdge', label: 'Renormalize To Edge' },
+            { type: 'action', id: 'edit.renormalizeToUnitScale', label: 'Renormalize To Unit Scale' },
+            { type: 'action', id: 'edit.absorbEdges', label: 'Absorb Edges' },
+          ],
+        },
+        {
+          type: 'submenu',
+          label: 'Strain',
+          items: [
+            { type: 'action', id: 'edit.removeStrain', label: 'Remove Strain' },
+            { type: 'action', id: 'edit.removeAllStrain', label: 'Remove All Strain' },
+            { type: 'separator' },
+            { type: 'action', id: 'edit.relieveStrain', label: 'Relieve Strain' },
+            { type: 'action', id: 'edit.relieveAllStrain', label: 'Relieve All Strain' },
+          ],
+        },
+        {
+          type: 'submenu',
+          label: 'Stubs',
+          items: [
+            { type: 'action', id: 'edit.addLargestStubForNodes', label: 'Add Largest Stub From Nodes' },
+            { type: 'action', id: 'edit.addLargestStubForPoly', label: 'Add Largest Stub From Poly' },
+            { type: 'separator' },
+            { type: 'action', id: 'edit.triangulateTree', label: 'Triangulate Tree' },
+          ],
+        },
       ],
     },
     {

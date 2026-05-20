@@ -17,6 +17,27 @@ export type WorkspaceCapabilityId =
   | 'edit.delete'
   | 'edit.selectAll'
   | 'edit.deselectAll'
+  | 'edit.selectByIndex'
+  | 'edit.selectMovableParts'
+  | 'edit.selectCorridorFacets'
+  | 'edit.makeRoot'
+  | 'edit.splitEdge'
+  | 'edit.setEdgeLength'
+  | 'edit.scaleEdgeLengths'
+  | 'edit.renormalizeToEdge'
+  | 'edit.renormalizeToUnitScale'
+  | 'edit.absorbNodes'
+  | 'edit.absorbRedundantNodes'
+  | 'edit.absorbEdges'
+  | 'edit.perturbNodes'
+  | 'edit.perturbAllNodes'
+  | 'edit.removeStrain'
+  | 'edit.removeAllStrain'
+  | 'edit.relieveStrain'
+  | 'edit.relieveAllStrain'
+  | 'edit.addLargestStubForNodes'
+  | 'edit.addLargestStubForPoly'
+  | 'edit.triangulateTree'
   | 'view.design'
   | 'view.creasePattern'
   | 'view.simulator'
@@ -71,6 +92,10 @@ export function getWorkspaceCapabilities(input: WorkspaceCapabilityInput): Works
   const canExportImportedFold = creasePatternMode && input.hasImportedCreasePattern;
   const canExportCreasePattern = hasCreasePattern && !isBusy;
   const hasSelection = selectionHasEditableParts(input.selection);
+  const hasSelectedEdges = selectedEdgeCount(input.selection) > 0;
+  const hasOneSelectedEdge = selectedEdgeCount(input.selection) === 1;
+  const hasSelectedNodes = selectedNodeCount(input.selection) > 0;
+  const hasOneSelectedNode = selectedNodeCount(input.selection) === 1;
   const buildLabel = hasCreasePattern ? 'Rebuild CP' : 'Build CP';
   const buildReason = hasCreasePattern ? 'Rebuild crease pattern' : 'Build crease pattern';
 
@@ -143,6 +168,107 @@ export function getWorkspaceCapabilities(input: WorkspaceCapabilityInput): Works
     ),
     'edit.selectAll': capability(true, 'Select All', 'Select visible document parts'),
     'edit.deselectAll': capability(true, 'Deselect All', 'Clear the current selection'),
+    'edit.selectByIndex': capability(true, 'Select By Index...', 'Select a document part by its TreeMaker index'),
+    'edit.selectMovableParts': capability(
+      treeMode && !isBusy,
+      'Select Movable Parts',
+      treeMode ? busyOr('Select unpinned leaf nodes and movable edges', input.status) : 'Movable parts require a tree document'
+    ),
+    'edit.selectCorridorFacets': capability(
+      input.facetCount > 0 && hasSelectedEdges,
+      'Select Corridor Facets',
+      input.facetCount > 0
+        ? hasSelectedEdges
+          ? 'Select facets in selected edge corridors'
+          : 'Select one or more tree edges first'
+        : 'Build a crease pattern before selecting corridor facets'
+    ),
+    'edit.makeRoot': capability(
+      treeMode && hasOneSelectedNode && !isBusy,
+      'Make Root',
+      treeMode ? busyOr('Make selected node the root', input.status) : 'Root edits require a tree document'
+    ),
+    'edit.splitEdge': capability(
+      treeMode && hasOneSelectedEdge && !isBusy,
+      'Split Edge...',
+      treeMode ? busyOr('Split selected edge', input.status) : 'Edge edits require a tree document'
+    ),
+    'edit.setEdgeLength': capability(
+      treeMode && hasSelectedEdges && !isBusy,
+      'Set Edge Length...',
+      treeMode ? busyOr('Set selected edge lengths', input.status) : 'Edge edits require a tree document'
+    ),
+    'edit.scaleEdgeLengths': capability(
+      treeMode && hasSelectedEdges && !isBusy,
+      'Scale Edge Lengths...',
+      treeMode ? busyOr('Scale selected edge lengths', input.status) : 'Edge edits require a tree document'
+    ),
+    'edit.renormalizeToEdge': capability(
+      treeMode && hasOneSelectedEdge && !isBusy,
+      'Renormalize To Edge',
+      treeMode ? busyOr('Renormalize model to selected edge', input.status) : 'Edge edits require a tree document'
+    ),
+    'edit.renormalizeToUnitScale': capability(
+      treeMode && input.edgeCount > 0 && !isBusy,
+      'Renormalize To Unit Scale',
+      treeMode ? busyOr('Renormalize model to unit scale', input.status) : 'Tree edits require a tree document'
+    ),
+    'edit.absorbNodes': capability(
+      treeMode && hasSelectedNodes && !isBusy,
+      'Absorb Nodes',
+      treeMode ? busyOr('Absorb selected redundant nodes', input.status) : 'Node edits require a tree document'
+    ),
+    'edit.absorbRedundantNodes': capability(
+      treeMode && input.edgeCount > 0 && !isBusy,
+      'Absorb Redundant Nodes',
+      treeMode ? busyOr('Absorb all degree-two internal nodes', input.status) : 'Node edits require a tree document'
+    ),
+    'edit.absorbEdges': capability(
+      treeMode && hasSelectedEdges && !isBusy,
+      'Absorb Edges',
+      treeMode ? busyOr('Absorb selected edges', input.status) : 'Edge edits require a tree document'
+    ),
+    'edit.perturbNodes': capability(
+      treeMode && hasSelectedNodes && !isBusy,
+      'Perturb Nodes',
+      treeMode ? busyOr('Perturb selected nodes', input.status) : 'Node edits require a tree document'
+    ),
+    'edit.perturbAllNodes': capability(
+      treeMode && !isBusy,
+      'Perturb All Nodes',
+      treeMode ? busyOr('Perturb all nodes', input.status) : 'Node edits require a tree document'
+    ),
+    'edit.removeStrain': capability(
+      treeMode && hasSelectedEdges && !isBusy,
+      'Remove Strain',
+      treeMode ? busyOr('Clear selected edge strain', input.status) : 'Edge edits require a tree document'
+    ),
+    'edit.removeAllStrain': capability(
+      treeMode && input.edgeCount > 0 && !isBusy,
+      'Remove All Strain',
+      treeMode ? busyOr('Clear all edge strain', input.status) : 'Edge edits require a tree document'
+    ),
+    'edit.relieveStrain': capability(
+      treeMode && hasSelectedEdges && !isBusy,
+      'Relieve Strain',
+      treeMode ? busyOr('Absorb selected strain into edge length', input.status) : 'Edge edits require a tree document'
+    ),
+    'edit.relieveAllStrain': capability(
+      treeMode && input.edgeCount > 0 && !isBusy,
+      'Relieve All Strain',
+      treeMode ? busyOr('Absorb all strain into edge lengths', input.status) : 'Edge edits require a tree document'
+    ),
+    'edit.addLargestStubForNodes': capability(
+      false,
+      'Add Largest Stub From Nodes',
+      'Stub finder port is pending'
+    ),
+    'edit.addLargestStubForPoly': capability(
+      false,
+      'Add Largest Stub From Poly',
+      'Stub finder port is pending'
+    ),
+    'edit.triangulateTree': capability(false, 'Triangulate Tree', 'Stub finder triangulation port is pending'),
     'view.design': capability(true, 'Design', 'Show the design pane'),
     'view.creasePattern': capability(true, 'Crease Pattern', 'Show the crease pattern pane'),
     'view.simulator': capability(
@@ -254,6 +380,18 @@ function disabledBuildReason(
   if (input.status === 'error') return 'Resolve the current engine error before building the crease pattern';
   if (!hasTreeEdges) return 'Add tree edges, then optimize before building the crease pattern';
   return 'Optimize Scale before building the crease pattern';
+}
+
+function selectedEdgeCount(selection: Selection): number {
+  if (selection.kind === 'edge') return 1;
+  if (selection.kind === 'multi') return selection.edges.length;
+  return 0;
+}
+
+function selectedNodeCount(selection: Selection): number {
+  if (selection.kind === 'node') return 1;
+  if (selection.kind === 'multi') return selection.nodes.length;
+  return 0;
 }
 
 function selectionHasEditableParts(selection: Selection): boolean {

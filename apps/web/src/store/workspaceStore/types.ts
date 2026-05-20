@@ -15,6 +15,7 @@ import type {
   ToolMode,
   TreeProject,
 } from '../../lib/sampleProject';
+import type { SelectablePartKind } from '../../lib/selection';
 import type { SymmetryAuthoringPair } from '../../lib/symmetryAuthoring';
 import type { FileService } from '../../platform/fileService';
 import type { ImportedCreasePatternDocument } from '../../lib/creasePatternImport';
@@ -110,10 +111,31 @@ export interface EditingSliceActions {
     id: number,
     update: { label?: string; length?: number; strain?: number; stiffness?: number }
   ) => Promise<void>;
+  makeSelectedNodeRoot: () => Promise<void>;
+  splitSelectedEdge: (distance: number) => Promise<void>;
+  setSelectedEdgeLengths: (length: number) => Promise<void>;
+  scaleSelectedEdgeLengths: (factor: number) => Promise<void>;
+  renormalizeToSelectedEdge: () => Promise<void>;
+  renormalizeToUnitScale: () => Promise<void>;
+  absorbSelectedNodes: () => Promise<void>;
+  absorbRedundantNodes: () => Promise<void>;
+  absorbSelectedEdges: () => Promise<void>;
+  perturbSelectedNodes: () => Promise<void>;
+  perturbAllNodes: () => Promise<void>;
+  removeSelectionStrain: () => Promise<void>;
+  removeAllStrain: () => Promise<void>;
+  relieveSelectionStrain: () => Promise<void>;
+  relieveAllStrain: () => Promise<void>;
+  addLargestStubForSelectedNodes: () => Promise<void>;
+  addLargestStubForSelectedPoly: () => Promise<void>;
+  triangulateTree: () => Promise<void>;
   deleteSelection: () => Promise<void>;
   select: (selection: Selection) => void;
   selectAll: () => void;
   selectNone: () => void;
+  selectByIndex: (kind: SelectablePartKind, id: number) => void;
+  selectMovableParts: () => void;
+  selectCorridorFacets: () => void;
   selectPathBetweenSelectedNodes: () => void;
   setToolMode: (toolMode: ToolMode) => void;
 }
@@ -128,7 +150,11 @@ export interface ConditionSliceActions {
     symAngle?: number;
   }) => Promise<void>;
   addCondition: (kind: ConditionKind) => Promise<void>;
+  updateCondition: (id: number, kind: ConditionKind) => Promise<void>;
   deleteCondition: (id: number) => Promise<void>;
+  deleteConditionsForSelectedNodes: () => Promise<void>;
+  deleteConditionsForSelectedEdges: () => Promise<void>;
+  deleteConditionsForSelectedPaths: () => Promise<void>;
   clearConditions: () => Promise<void>;
 }
 

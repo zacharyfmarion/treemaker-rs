@@ -22,6 +22,7 @@ javac \
   -sourcepath "$oracle_root/stubs:$oracle_root/src:$origami_source" \
   "$oracle_root/stubs/origami/crease_pattern/FoldLineSet.java" \
   "$origami_source/origami/Epsilon.java" \
+  "$origami_source/origami/crease_pattern/CustomLineTypes.java" \
   "$origami_source/origami/crease_pattern/element/Point.java" \
   "$origami_source/origami/crease_pattern/element/LineColor.java" \
   "$origami_source/origami/crease_pattern/element/LineSegment.java" \

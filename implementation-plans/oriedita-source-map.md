@@ -69,8 +69,8 @@ stage explicitly changes it.
 | `origami/crease_pattern/element/Circle.java` | Circle primitive and color metadata. | `geometry::circle`, `model::circle` | kernel | 2-3 | Unit-tested |
 | `origami/crease_pattern/element/Polygon.java` | Polygon containment and selection geometry. | `geometry::polygon` | kernel | 2 | Unit-tested |
 | `origami/crease_pattern/element/Rectangle.java` | Rectangular selection and bounds. | `geometry::rectangle` | kernel | 2 | Unit-tested |
-| `origami/crease_pattern/CustomLineTypes.java` | Custom line metadata. | `model::line_color` | kernel | 3 | Unsupported |
-| `origami/crease_pattern/FoldLineSet.java` | Main editable line/circle set. | `model`, `operations::*` | kernel | 3-9 | Unsupported |
+| `origami/crease_pattern/CustomLineTypes.java` | Custom line metadata. | `model::line_color` | kernel | 3 | Oracle-tested |
+| `origami/crease_pattern/FoldLineSet.java` | Main editable line/circle set. | `model`, `operations::*` | kernel | 3-9 | Porting |
 | `origami/crease_pattern/LineSegmentSet.java` | Line arrangement set used for folding and export. | `fold_graph`, `operations::arrangement` | kernel | 3-5 | Unsupported |
 | `origami/crease_pattern/PointSet.java` | Vertex/edge/face topology for folding/export. | `fold_graph` | kernel | 3-4 | Unsupported |
 | `origami/crease_pattern/PointLineMap.java` | Point-to-line neighborhood lookup. | `model::topology` | kernel | 3 | Unsupported |
@@ -99,8 +99,10 @@ stage explicitly changes it.
 | `origami/data/listMatrix/*` | Matrix-like adjacency storage. | `folding`, `fold_graph` | kernel | 10 | Unsupported |
 | `origami/data/symmetricMatrix/*` | Symmetric relation storage. | `folding` | kernel | 10 | Unsupported |
 | `origami/data/tree/*` | AVL/BST utilities. | `folding` | kernel | 10 | Unsupported |
-| `origami/data/save/LineSegmentSave.java` | Save DTO for lines/circles. | `io::save` | io | 4 | Unsupported |
-| `origami/data/save/PointSave.java` | Save DTO for points. | `io::save` | io | 4 | Unsupported |
+| `origami/data/save/LineSegmentSave.java` | Save DTO for lines/circles. | `io::save` | io | 4 | Unit-tested |
+| `origami/data/save/PointSave.java` | Save DTO for points. | `io::save` | io | 4 | Unit-tested |
+| `oriedita-data/src/main/java/oriedita/editor/databinding/GridModel.java` | Grid metadata saved in Oriedita extras. | `model::grid` | kernel | 3 | Unit-tested |
+| `oriedita-common/src/main/java/oriedita/editor/text/Text.java` | Text annotation carrier. | `model::text` | kernel | 3 | Unit-tested |
 | `origami/folding/FoldedFigure.java` | Folding-stage coordinator. | `folding` | kernel | 10 | Unsupported |
 | `origami/folding/HierarchyList.java` | Face-order relation table. | `folding::hierarchy` | kernel | 10 | Unsupported |
 | `origami/folding/element/Face.java` | Folded face data. | `folding::face` | kernel | 10 | Unsupported |
@@ -246,7 +248,7 @@ mutation.
 | `SaveConverter.java` | Save-version conversion. | `io::save::convert` | 4 | Unsupported |
 | `SaveProvider.java` | Save instance factory. | `io::save` | 4 | Unsupported |
 | `FileVersionTester.java` | Save-version detection. | `io::save::version` | 4 | Unsupported |
-| `TextSave.java` | Text persistence. | `model::text`, `io::save` | 3-4 | Unsupported |
+| `TextSave.java` | Text persistence. | `model::text`, `io::save` | 3-4 | Unit-tested |
 
 ## Task and Service Matrix
 

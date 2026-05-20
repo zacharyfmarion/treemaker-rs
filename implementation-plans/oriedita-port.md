@@ -723,7 +723,20 @@ Oracle:
 Validation:
 
 - `cargo test -p oristudio-cp model`
-- `ORIEDITA_ORACLE=... cargo test -p oracle-tests --test oriedita_oracle model`
+- `ORIEDITA_MODEL_ORACLE=... cargo test -p oristudio-cp --test oriedita_model_oracle`
+
+Status:
+
+- Complete for the editable save/model carriers: fold lines, auxiliary lines,
+  circles, points, text annotations, custom colors, selected/active line
+  fields, grid metadata, Oriedita custom line type selectors, FOLD assignment
+  mapping, deterministic element IDs, and canonical comparison.
+- The model oracle currently validates `CustomLineTypes` against pinned
+  Oriedita source. Full save-file and `FoldLineSet` mutation oracle coverage
+  starts in Stage 4 and Stage 5 because it depends on import/export and line
+  arrangement behavior.
+- Spatial acceleration, `PointLineMap`, face/topology generation, and
+  split/merge mutations remain explicitly tracked in later stages.
 
 ### Stage 4: Import and Export Parity
 
@@ -922,7 +935,7 @@ Validation:
 - [x] Stage 0: Source map and parity matrix.
 - [x] Stage 1: Crate and error contract.
 - [x] Stage 2: Oriedita geometry primitives.
-- [ ] Stage 3: Editable CP model and canonical comparison.
+- [x] Stage 3: Editable CP model and canonical comparison.
 - [ ] Stage 4: Import and export parity.
 - [ ] Stage 5: Arrangement, split, merge, and cleanup.
 - [ ] Stage 6: Selection, color, and transform commands.

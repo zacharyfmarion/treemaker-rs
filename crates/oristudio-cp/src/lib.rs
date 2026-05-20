@@ -5,10 +5,15 @@
 //! unsupported operations fail with a typed error instead of fabricating nearby
 //! behavior.
 
+pub mod canonical;
 pub mod geometry;
+pub mod model;
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+
+pub use canonical::CanonicalCreasePattern;
+pub use model::CreasePatternModel;
 
 /// Crate-local result type.
 pub type Result<T> = std::result::Result<T, CommandError>;
@@ -23,9 +28,19 @@ pub struct CreasePatternDocument {
     /// Optional user-visible document title.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
+    /// Editable Oriedita-compatible crease-pattern model state.
+    #[serde(default)]
+    pub crease_pattern: CreasePatternModel,
     /// Namespaced metadata preserved before full model support lands.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub metadata: BTreeMap<String, serde_json::Value>,
+}
+
+impl CreasePatternDocument {
+    /// Return a canonical semantic view suitable for parity comparisons.
+    pub fn canonical(&self, tolerance: f64) -> CanonicalCreasePattern {
+        CanonicalCreasePattern::from_document(self, tolerance)
+    }
 }
 
 /// A command request against a crease-pattern document.
@@ -1212,6 +1227,7 @@ mod tests {
         let mut document = CreasePatternDocument {
             title: Some("fixture".to_string()),
             metadata: BTreeMap::new(),
+            ..CreasePatternDocument::default()
         };
         let original = document.clone();
 

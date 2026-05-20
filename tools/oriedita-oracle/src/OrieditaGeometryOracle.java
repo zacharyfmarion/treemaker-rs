@@ -1,4 +1,6 @@
+import origami.crease_pattern.CustomLineTypes;
 import origami.crease_pattern.OritaCalc;
+import origami.crease_pattern.element.LineColor;
 import origami.crease_pattern.element.LineSegment;
 
 public class OrieditaGeometryOracle {
@@ -9,8 +11,26 @@ public class OrieditaGeometryOracle {
 
         switch (args[0]) {
             case "intersection" -> intersection(args);
+            case "custom-line-type" -> customLineType(args);
             default -> usage("unknown command: " + args[0]);
         }
+    }
+
+    private static void customLineType(String[] args) {
+        if (args.length != 3) {
+            usage("custom-line-type expects custom type number and line color number");
+        }
+
+        CustomLineTypes customLineType = CustomLineTypes.from(Integer.parseInt(args[1]));
+        LineColor lineColor = LineColor.fromNumber(Integer.parseInt(args[2]));
+
+        System.out.println(customLineType.getNumber()
+                + ","
+                + customLineType.getNumberForLineColor()
+                + ","
+                + customLineType.getLineColor().getNumber()
+                + ","
+                + customLineType.matches(lineColor));
     }
 
     private static void intersection(String[] args) {
@@ -57,6 +77,7 @@ public class OrieditaGeometryOracle {
     private static void usage(String message) {
         System.err.println(message);
         System.err.println("usage: OrieditaGeometryOracle intersection <strict|sweet> <default|precision> ax ay bx by cx cy dx dy");
+        System.err.println("   or: OrieditaGeometryOracle custom-line-type <customType> <lineColor>");
         System.exit(2);
     }
 }

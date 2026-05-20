@@ -1,7 +1,7 @@
 {
   "name": "@treemaker/web",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "scripts": {
     "build:wasm": "wasm-pack build ../../crates/treemaker-wasm --target web --out-dir ../../apps/web/src/generated/treemaker-wasm",

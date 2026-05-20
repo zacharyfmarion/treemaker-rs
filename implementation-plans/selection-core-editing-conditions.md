@@ -31,7 +31,7 @@ menu wiring.
       lengths, renormalize, absorb nodes/edges, strain tools, and perturb
       tools. Stub finder and triangulation commands are wired but remain
       explicit unsupported operations until the C++ stub solver is ported.
-- [ ] Add dedicated editors for every condition type, scoped condition removal,
+- [x] Add dedicated editors for every condition type, scoped condition removal,
       and richer feasibility diagnostics.
 - [ ] Run staged tests and final validation.
 - [ ] Push the branch, open a draft PR, and start the local app.

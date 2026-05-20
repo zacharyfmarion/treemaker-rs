@@ -11,6 +11,10 @@ export function DiagnosticsPanel() {
   const lastOptimization = useWorkspaceStore((state) => state.lastOptimization);
 
   const cpReady = project.creases.length > 0 && project.facets.length > 0;
+  const infeasibleConditions = project.conditions.filter((condition) => !condition.isFeasible);
+  const conditionedNodes = project.nodes.filter((node) => node.isConditioned).length;
+  const conditionedEdges = project.edges.filter((edge) => edge.isConditioned).length;
+  const conditionedPaths = project.paths.filter((path) => path.isConditioned).length;
   const optimizationTone = lastOptimization?.is_feasible
     ? 'good'
     : lastOptimization
@@ -106,6 +110,29 @@ export function DiagnosticsPanel() {
                 : 'Optimization pending'}
           </span>
         </div>
+        <div className="status-row" data-tone={infeasibleConditions.length === 0 ? 'good' : 'bad'}>
+          {infeasibleConditions.length === 0 ? <CheckCircle2 size={15} /> : <AlertTriangle size={15} />}
+          <span>
+            {infeasibleConditions.length === 0
+              ? 'All conditions feasible'
+              : `${infeasibleConditions.length} infeasible condition${infeasibleConditions.length === 1 ? '' : 's'}: ${infeasibleConditions
+                  .slice(0, 3)
+                  .map((condition) => condition.id)
+                  .join(', ')}`}
+          </span>
+        </div>
+        <div className="status-row" data-tone="warn">
+          <CircleDashed size={15} />
+          <span>
+            Conditioned parts: {conditionedNodes} nodes, {conditionedEdges} edges, {conditionedPaths} paths
+          </span>
+        </div>
+        {lastOptimization && !lastOptimization.is_feasible && (
+          <div className="status-row" data-tone="bad">
+            <AlertTriangle size={15} />
+            <span>Optimizer reported an infeasible constrained system</span>
+          </div>
+        )}
         <div className="status-row" data-tone={cpReady ? 'good' : 'warn'}>
           {cpReady ? <CheckCircle2 size={15} /> : <CircleDashed size={15} />}
           <span>

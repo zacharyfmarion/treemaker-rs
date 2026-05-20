@@ -16,7 +16,10 @@ import type {
   TreeProject,
 } from '../../lib/sampleProject';
 import type { SelectablePartKind } from '../../lib/selection';
-import type { SymmetryAuthoringPair } from '../../lib/symmetryAuthoring';
+import type {
+  SymmetryAuthoringPair,
+  SymmetryLeafPreview,
+} from '../../lib/symmetryAuthoring';
 import type { FileService } from '../../platform/fileService';
 import type { ImportedCreasePatternDocument } from '../../lib/creasePatternImport';
 
@@ -150,7 +153,13 @@ export interface ConditionSliceActions {
     symAngle?: number;
   }) => Promise<void>;
   addCondition: (kind: ConditionKind) => Promise<void>;
+  updateCondition: (id: number, kind: ConditionKind) => Promise<void>;
+  previewSymmetryLeafPairs: (nodeIds?: number[]) => SymmetryLeafPreview;
+  applySymmetryLeafPairs: (nodeIds?: number[]) => Promise<SymmetryLeafPreview>;
   deleteCondition: (id: number) => Promise<void>;
+  deleteConditionsForSelectedNodes: () => Promise<void>;
+  deleteConditionsForSelectedEdges: () => Promise<void>;
+  deleteConditionsForSelectedPaths: () => Promise<void>;
   clearConditions: () => Promise<void>;
 }
 

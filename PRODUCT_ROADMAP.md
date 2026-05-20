@@ -103,7 +103,7 @@ Done when:
 
 ## Phase 3: History, Clipboard, And Selection
 
-Status: started.
+Status: complete.
 
 Priority: highest after files.
 
@@ -130,13 +130,7 @@ Implemented or started:
 
 Remaining:
 
-- Select by index UI.
-- Select movable parts and corridor facets.
-- Condition selection once condition editing lands.
-
-Active implementation:
-
-- `implementation-plans/selection-core-editing-conditions.md`
+- None for the current product surface.
 
 Done when:
 
@@ -145,7 +139,7 @@ Done when:
 
 ## Phase 4: Core Tree Editing Tools
 
-Status: active implementation.
+Status: started.
 
 Priority: high.
 
@@ -172,6 +166,19 @@ Features:
 - Stub tools: pick stub nodes, pick stub poly, add largest stub nodes, add
   largest stub poly.
 - Triangulate tree.
+
+Implemented or started:
+
+- Make root, split edge, set/scale edge lengths, renormalize, absorb
+  nodes/edges, perturb nodes, remove strain, and relieve strain are implemented
+  through shared engine edits with web and desktop menu wiring.
+- Stub finder and triangulation commands are wired to explicit unsupported
+  errors until the original C++ stub solver is ported.
+
+Remaining:
+
+- Port the TreeMaker 5.0.1 stub finder for pick/add-largest-stub workflows and
+  triangulate tree.
 
 Done when:
 
@@ -251,18 +258,16 @@ Implemented or started:
 - Condition creation for fixed nodes, paper edge/corner nodes, symmetry-line
   nodes, paired nodes, collinear nodes, fixed edge length, same-strain edges,
   active paths, fixed path angles, and quantized path angles.
-- Condition list with selection, feasibility state, and removal.
+- Condition list with multi-selection, feasibility state, scoped removal, and
+  removal by selected node, edge, or path.
+- Dedicated editors for every condition type.
+- Diagnostics panel summaries for infeasible conditions, conditioned parts, and
+  optimizer infeasibility state.
 - Conditioned node, edge, and path overlays in the design pane.
 
 Remaining:
 
-- Dedicated inspector editors for every existing condition type.
-- Remove-by-selected-node/edge/path commands.
-- Richer feasibility diagnostics tied to optimizer warnings.
-
-Active implementation:
-
-- `implementation-plans/selection-core-editing-conditions.md`
+- Deeper optimizer overconstraint diagnostics remain tracked with Phase 5.
 
 Done when:
 

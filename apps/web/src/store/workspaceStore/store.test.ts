@@ -1126,6 +1126,50 @@ describe('workspace store slices', () => {
     expect(useWorkspaceStore.getState().historyPast.at(-1)?.label).toBe('Perturb all nodes');
   });
 
+  it('updates conditions and removes conditions scoped to selected parts', async () => {
+    const api = resetStores(
+      makeSnapshot({
+        ...seedSnapshot(),
+        conditions: [
+          conditionSnapshot(1, nodeFixedCondition(2)),
+          conditionSnapshot(2, { type: 'edge_length_fixed', edge: 1 }),
+          conditionSnapshot(3, { type: 'path_active', node1: 1, node2: 2 }),
+        ],
+      })
+    );
+    loadSnapshotIntoStore(api.snapshotState);
+
+    await useWorkspaceStore.getState().updateCondition(1, {
+      type: 'node_fixed',
+      node: 2,
+      x_fixed: true,
+      y_fixed: true,
+      x_fix_value: 0.2,
+      y_fix_value: 0.3,
+    });
+    expect(useWorkspaceStore.getState().project.conditions[0].kind).toMatchObject({
+      y_fixed: true,
+      y_fix_value: 0.3,
+    });
+
+    useWorkspaceStore.getState().select({ kind: 'path', id: 1 });
+    await useWorkspaceStore.getState().deleteConditionsForSelectedPaths();
+    expect(useWorkspaceStore.getState().project.conditions.map((condition) => condition.kind.type)).toEqual([
+      'node_fixed',
+      'edge_length_fixed',
+    ]);
+
+    useWorkspaceStore.getState().select({ kind: 'node', id: 2 });
+    await useWorkspaceStore.getState().deleteConditionsForSelectedNodes();
+    expect(useWorkspaceStore.getState().project.conditions.map((condition) => condition.kind.type)).toEqual([
+      'edge_length_fixed',
+    ]);
+
+    useWorkspaceStore.getState().select({ kind: 'edge', id: 1 });
+    await useWorkspaceStore.getState().deleteConditionsForSelectedEdges();
+    expect(useWorkspaceStore.getState().project.conditions).toEqual([]);
+  });
+
   it('creates mirrored branches from an axial parent in one history entry', async () => {
     const api = resetStores(
       makeSnapshot({

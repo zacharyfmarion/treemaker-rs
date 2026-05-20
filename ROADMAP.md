@@ -35,6 +35,9 @@ Implemented:
 - `CPStatus` diagnostic bad-part lists exposed through core, CLI, and wasm.
 - CLI and wasm bindings for parsing, checking, optimizing, building crease
   patterns, reporting diagnostics, and saving.
+- Shared edit API coverage for direct tree editing workflows: make root, split
+  edge, edge length scaling, renormalization, absorption, perturbation, and
+  strain removal/relief.
 
 Engine confidence:
 
@@ -47,6 +50,9 @@ Engine confidence:
 - Keep CFSQP/RFSQP out of scope unless redistributable source and compatible
   license terms are provided. Those backends are not required for TreeMaker
   5.0.1 ALM parity.
+- The TreeMaker 5.0.1 stub-finder solver is still unported. Stub and
+  triangulation commands return explicit unsupported-operation errors until
+  that solver is ported directly.
 
 ## Phase 1: Oracle Foundation
 

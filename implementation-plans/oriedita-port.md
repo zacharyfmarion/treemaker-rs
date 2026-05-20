@@ -809,6 +809,13 @@ Validation:
 - `cargo test -p oristudio-cp arrangement`
 - `ORIEDITA_ORACLE=... cargo test -p oracle-tests --test oriedita_oracle arrangement`
 
+Status:
+
+- In progress. `OverlappingLineRemoval` has a direct Rust implementation with
+  unit coverage for Oriedita's "keep the earlier duplicate" behavior and the
+  optional precision radius. Spatial acceleration remains deferred until the
+  mutation semantics are broader and oracle-backed.
+
 ### Stage 6: Selection, Color, and Transform Commands
 
 Deliverables:

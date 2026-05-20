@@ -9,6 +9,7 @@ pub mod canonical;
 pub mod geometry;
 pub mod io;
 pub mod model;
+pub mod operations;
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;

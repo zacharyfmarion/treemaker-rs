@@ -71,7 +71,7 @@ stage explicitly changes it.
 | `origami/crease_pattern/element/Rectangle.java` | Rectangular selection and bounds. | `geometry::rectangle` | kernel | 2 | Unit-tested |
 | `origami/crease_pattern/CustomLineTypes.java` | Custom line metadata. | `model::line_color` | kernel | 3 | Oracle-tested |
 | `origami/crease_pattern/FoldLineSet.java` | Main editable line/circle set. | `model`, `operations::*` | kernel | 3-9 | Porting |
-| `origami/crease_pattern/LineSegmentSet.java` | Line arrangement set used for folding and export. | `fold_graph`, `operations::arrangement` | kernel | 3-5 | Unsupported |
+| `origami/crease_pattern/LineSegmentSet.java` | Line arrangement set used for folding and export. | `fold_graph`, `operations::arrangement` | kernel | 3-5 | Porting |
 | `origami/crease_pattern/PointSet.java` | Vertex/edge/face topology for folding/export. | `fold_graph` | kernel | 3-4 | Unsupported |
 | `origami/crease_pattern/PointLineMap.java` | Point-to-line neighborhood lookup. | `model::topology` | kernel | 3 | Unsupported |
 | `origami/crease_pattern/FlatFoldabilityViolation.java` | Diagnostic payload. | `checks::diagnostic` | kernel | 9 | Unsupported |
@@ -93,7 +93,7 @@ stage explicitly changes it.
 | `origami/crease_pattern/worker/foldlineset/Fix2.java` | Repair operation. | `checks`, `operations::arrangement` | kernel | 9 | Unsupported |
 | `origami/crease_pattern/worker/foldlineset/OrganizeCircles.java` | Circle cleanup/organization. | `operations::circle` | kernel | 8 | Unsupported |
 | `origami/crease_pattern/worker/linesegmentset/GetBoundingBox.java` | Bounds helper. | `model::bounds` | kernel | 3 | Unsupported |
-| `origami/crease_pattern/worker/linesegmentset/IntersectDivide.java` | Segment arrangement split helper. | `operations::arrangement` | kernel | 5 | Unsupported |
+| `origami/crease_pattern/worker/linesegmentset/IntersectDivide.java` | Segment arrangement split helper. | `operations::arrangement` | kernel | 5 | Unit-tested |
 | `origami/crease_pattern/worker/linesegmentset/OverlappingLineRemoval.java` | Overlap cleanup helper. | `operations::arrangement` | kernel | 5 | Unit-tested |
 | `origami/data/quadTree/*` | Spatial acceleration and collectors. | `model::spatial` | kernel | 3, 5 | Unsupported |
 | `origami/data/listMatrix/*` | Matrix-like adjacency storage. | `folding`, `fold_graph` | kernel | 10 | Unsupported |

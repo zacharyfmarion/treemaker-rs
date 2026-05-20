@@ -164,7 +164,12 @@ pub struct FoldDocument {
     pub faces_vertices: Vec<Vec<usize>>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub faces_edges: Vec<Vec<usize>>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(
+        rename = "faceOrders",
+        alias = "face_orders",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
     pub face_orders: Vec<[usize; 3]>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
@@ -572,6 +577,31 @@ mod tests {
             FoldAngle::default_for_assignment(Assignment::Flat),
             Some(0.0)
         );
+    }
+
+    #[test]
+    fn fold_document_serializes_face_orders_with_spec_key() {
+        let mut doc = square_doc();
+        doc.face_orders = vec![[0, 1, 1]];
+
+        let value = serde_json::to_value(&doc).unwrap();
+
+        assert_eq!(value["faceOrders"], serde_json::json!([[0, 1, 1]]));
+        assert!(value.get("face_orders").is_none());
+    }
+
+    #[test]
+    fn fold_document_deserializes_legacy_snake_case_face_orders() {
+        let doc: FoldDocument = serde_json::from_value(serde_json::json!({
+            "file_spec": 1.2,
+            "vertices_coords": [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0]],
+            "edges_vertices": [[0, 1], [1, 2], [2, 0]],
+            "faces_vertices": [[0, 1, 2]],
+            "face_orders": [[0, 0, 0]]
+        }))
+        .unwrap();
+
+        assert_eq!(doc.face_orders, vec![[0, 0, 0]]);
     }
 
     #[test]

@@ -3055,11 +3055,16 @@ impl Tree {
         let mut node_map = vec![None; old_node_len + 1];
         node_map[id] = Some(1);
         let mut next = 2usize;
-        for old_id in 1..=old_node_len {
+        for (old_id, slot) in node_map
+            .iter_mut()
+            .enumerate()
+            .take(old_node_len + 1)
+            .skip(1)
+        {
             if old_id == id {
                 continue;
             }
-            node_map[old_id] = Some(next);
+            *slot = Some(next);
             next += 1;
         }
 

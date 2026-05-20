@@ -2271,6 +2271,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "oristudio-cp"
+version = "0.1.1"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "treemaker-fold",
+]
+
+[[package]]
 name = "pango"
 version = "0.18.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"

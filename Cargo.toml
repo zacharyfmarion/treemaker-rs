@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "crates/oristudio-cp",
     "crates/treemaker-flatfold",
     "crates/treemaker-fold",
     "crates/treemaker-sequence",
@@ -30,6 +31,7 @@ thiserror = "2.0"
 treemaker-fold = { version = "0.1.1", path = "crates/treemaker-fold" }
 treemaker-flatfold = { version = "0.1.1", path = "crates/treemaker-flatfold" }
 treemaker-sequence = { version = "0.1.1", path = "crates/treemaker-sequence" }
+oristudio-cp = { version = "0.1.1", path = "crates/oristudio-cp" }
 wasm-bindgen = "0.2"
 wasm-bindgen-test = "0.3"
 walkdir = "2.5"

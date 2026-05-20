@@ -908,7 +908,7 @@ Validation:
 ## Checklist
 
 - [x] Stage 0: Source map and parity matrix.
-- [ ] Stage 1: Crate and error contract.
+- [x] Stage 1: Crate and error contract.
 - [ ] Stage 2: Oriedita geometry primitives.
 - [ ] Stage 3: Editable CP model and canonical comparison.
 - [ ] Stage 4: Import and export parity.

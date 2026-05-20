@@ -689,7 +689,19 @@ Oracle:
 Validation:
 
 - `cargo test -p oristudio-cp geometry`
-- `ORIEDITA_ORACLE=... cargo test -p oracle-tests --test oriedita_oracle geometry`
+- `ORIEDITA_GEOMETRY_ORACLE=... cargo test -p oristudio-cp --test oriedita_geometry_oracle`
+
+Status:
+
+- Complete for primitive carriers and pure geometry helpers in
+  `crates/oristudio-cp/src/geometry`.
+- The Stage 2 oracle currently validates line-segment intersection
+  classifications against pinned Oriedita source. Additional oracle commands
+  for distances, angles, projections, polygons, and circles remain required
+  before those helpers can be promoted from unit-tested to oracle-tested.
+- OritaCalc helpers that require `FoldLineSet` mutation or Java path objects
+  remain tracked under later model, arrangement, and selection stages rather
+  than being exposed as supported Rust operations.
 
 ### Stage 3: Editable CP Model and Canonical Comparison
 
@@ -909,7 +921,7 @@ Validation:
 
 - [x] Stage 0: Source map and parity matrix.
 - [x] Stage 1: Crate and error contract.
-- [ ] Stage 2: Oriedita geometry primitives.
+- [x] Stage 2: Oriedita geometry primitives.
 - [ ] Stage 3: Editable CP model and canonical comparison.
 - [ ] Stage 4: Import and export parity.
 - [ ] Stage 5: Arrangement, split, merge, and cleanup.

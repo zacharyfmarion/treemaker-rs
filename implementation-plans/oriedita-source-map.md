@@ -59,16 +59,16 @@ stage explicitly changes it.
 
 | Upstream path | Role | Rust target | Classification | Stage | Status |
 | --- | --- | --- | --- | --- | --- |
-| `origami/Epsilon.java` | Global tolerance constants. | `geometry::epsilon` | kernel | 2 | Unsupported |
-| `origami/crease_pattern/OritaCalc.java` | Core static geometry helpers. | `geometry::orita_calc` | kernel | 2 | Unsupported |
-| `origami/crease_pattern/element/Point.java` | 2D point primitive. | `geometry::point` | kernel | 2 | Unsupported |
-| `origami/crease_pattern/element/Line.java` | PointSet line primitive. | `geometry::line` | kernel | 2 | Unsupported |
-| `origami/crease_pattern/element/StraightLine.java` | Infinite line primitive. | `geometry::straight_line` | kernel | 2 | Unsupported |
-| `origami/crease_pattern/element/LineSegment.java` | Segment primitive, colors, active state, intersection enum. | `geometry::segment`, `model::line` | kernel | 2-3 | Unsupported |
-| `origami/crease_pattern/element/LineColor.java` | Oriedita line colors and fold-color meanings. | `model::line_color` | kernel | 3 | Unsupported |
-| `origami/crease_pattern/element/Circle.java` | Circle primitive and color metadata. | `geometry::circle`, `model::circle` | kernel | 2-3 | Unsupported |
-| `origami/crease_pattern/element/Polygon.java` | Polygon containment and selection geometry. | `geometry::polygon` | kernel | 2 | Unsupported |
-| `origami/crease_pattern/element/Rectangle.java` | Rectangular selection and bounds. | `geometry::rectangle` | kernel | 2 | Unsupported |
+| `origami/Epsilon.java` | Global tolerance constants. | `geometry::epsilon` | kernel | 2 | Unit-tested |
+| `origami/crease_pattern/OritaCalc.java` | Core static geometry helpers. | `geometry::orita_calc` | kernel | 2 | Porting |
+| `origami/crease_pattern/element/Point.java` | 2D point primitive. | `geometry::point` | kernel | 2 | Unit-tested |
+| `origami/crease_pattern/element/Line.java` | PointSet line primitive. | `geometry::line` | kernel | 2 | Unit-tested |
+| `origami/crease_pattern/element/StraightLine.java` | Infinite line primitive. | `geometry::straight_line` | kernel | 2 | Unit-tested |
+| `origami/crease_pattern/element/LineSegment.java` | Segment primitive, colors, active state, intersection enum. | `geometry::segment`, `model::line` | kernel | 2-3 | Oracle-tested |
+| `origami/crease_pattern/element/LineColor.java` | Oriedita line colors and fold-color meanings. | `model::line_color` | kernel | 3 | Unit-tested |
+| `origami/crease_pattern/element/Circle.java` | Circle primitive and color metadata. | `geometry::circle`, `model::circle` | kernel | 2-3 | Unit-tested |
+| `origami/crease_pattern/element/Polygon.java` | Polygon containment and selection geometry. | `geometry::polygon` | kernel | 2 | Unit-tested |
+| `origami/crease_pattern/element/Rectangle.java` | Rectangular selection and bounds. | `geometry::rectangle` | kernel | 2 | Unit-tested |
 | `origami/crease_pattern/CustomLineTypes.java` | Custom line metadata. | `model::line_color` | kernel | 3 | Unsupported |
 | `origami/crease_pattern/FoldLineSet.java` | Main editable line/circle set. | `model`, `operations::*` | kernel | 3-9 | Unsupported |
 | `origami/crease_pattern/LineSegmentSet.java` | Line arrangement set used for folding and export. | `fold_graph`, `operations::arrangement` | kernel | 3-5 | Unsupported |

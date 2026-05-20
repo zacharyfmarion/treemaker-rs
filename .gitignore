@@ -9,5 +9,6 @@ node_modules/
 coverage/
 apps/web/src/generated/
 tools/oracle/build/
+tools/oriedita-oracle/build/
 .env.release.local
 .DS_Store

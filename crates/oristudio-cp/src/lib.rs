@@ -5,6 +5,8 @@
 //! unsupported operations fail with a typed error instead of fabricating nearby
 //! behavior.
 
+pub mod geometry;
+
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 

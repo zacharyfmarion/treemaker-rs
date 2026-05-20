@@ -37,6 +37,7 @@ javac \
   "$origami_source/origami/crease_pattern/element/Line.java" \
   "$origami_source/origami/crease_pattern/OritaCalc.java" \
   "$origami_source/origami/crease_pattern/LineSegmentSet.java" \
+  "$origami_source/origami/crease_pattern/FoldLineSet.java" \
   "$origami_source/origami/crease_pattern/worker/linesegmentset/IntersectDivide.java" \
   "$origami_source/origami/data/save/LineSegmentSave.java" \
   "$origami_source"/origami/data/quadTree/*.java \

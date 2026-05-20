@@ -815,9 +815,15 @@ Status:
   crossing, T-shape, contained-overlap, and partial-overlap mutation semantics,
   plus a simple dynamic scan for full arrangement splitting. The Oriedita Java
   oracle now validates representative pairwise splits and a full crossing
-  arrangement fixture. `OverlappingLineRemoval` has a direct Rust implementation
-  with unit coverage for Oriedita's "keep the earlier duplicate" behavior and
-  the optional precision radius.
+  arrangement fixture.
+- `FoldLineSet.divideLineSegmentWithNewLines` and `divideIntersectionsFast`
+  have direct Rust implementations for insertion-time splitting, including the
+  Oriedita cyan auxiliary-line branch behavior and exact-duplicate deletion
+  staging. The Java oracle validates representative direct pair cases and
+  full new-line insertion fixtures against real `FoldLineSet`.
+- `OverlappingLineRemoval` has a direct Rust implementation with unit coverage
+  for Oriedita's "keep the earlier duplicate" behavior and the optional
+  precision radius.
 - The current arrangement worker intentionally uses simple scans instead of
   Oriedita's quadtree acceleration. That keeps mutation parity visible first;
   spatial acceleration remains deferred until broader split/merge behavior is

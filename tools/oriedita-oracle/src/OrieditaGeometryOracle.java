@@ -1,4 +1,5 @@
 import origami.crease_pattern.CustomLineTypes;
+import origami.crease_pattern.FoldLineSet;
 import origami.crease_pattern.LineSegmentSet;
 import origami.crease_pattern.OritaCalc;
 import origami.crease_pattern.element.Circle;
@@ -19,6 +20,8 @@ import java.awt.Color;
 import java.io.File;
 import java.lang.reflect.Method;
 import java.nio.file.Files;
+import java.util.HashSet;
+import java.util.Set;
 
 public class OrieditaGeometryOracle {
     public static void main(String[] args) throws Exception {
@@ -30,6 +33,8 @@ public class OrieditaGeometryOracle {
             case "intersection" -> intersection(args);
             case "intersect-divide" -> intersectDivide(args);
             case "intersect-divide-pair" -> intersectDividePair(args);
+            case "foldline-divide-new-lines" -> foldLineDivideNewLines(args);
+            case "foldline-divide-fast" -> foldLineDivideFast(args);
             case "custom-line-type" -> customLineType(args);
             case "orh-import-summary" -> orhImportSummary(args);
             case "orh-export-fixture" -> orhExportFixture(args);
@@ -125,6 +130,35 @@ public class OrieditaGeometryOracle {
         printLineSegmentSet(set);
     }
 
+    private static void foldLineDivideNewLines(String[] args) {
+        if (args.length < 4) {
+            usage("foldline-divide-new-lines expects originalEnd, addedEnd, count, and segment payload");
+        }
+
+        int originalEnd = Integer.parseInt(args[1]);
+        int addedEnd = Integer.parseInt(args[2]);
+        int count = Integer.parseInt(args[3]);
+        FoldLineSet set = foldLineSet(args, 4, count);
+        set.divideLineSegmentWithNewLines(originalEnd, addedEnd);
+        printFoldLineSet(set);
+    }
+
+    private static void foldLineDivideFast(String[] args) {
+        if (args.length < 4) {
+            usage("foldline-divide-fast expects i, j, count, and segment payload");
+        }
+
+        int i = Integer.parseInt(args[1]);
+        int j = Integer.parseInt(args[2]);
+        int count = Integer.parseInt(args[3]);
+        FoldLineSet set = foldLineSet(args, 4, count);
+        Set<Integer> toDelete = new HashSet<>();
+        LineSegment.Intersection intersection = set.divideIntersectionsFast(i + 1, j + 1, toDelete);
+        System.out.println("intersection|" + intersection.getState());
+        printFoldLineSetDeleteSet(toDelete);
+        printFoldLineSet(set);
+    }
+
     private static void orhImportSummary(String[] args) throws Exception {
         if (args.length != 2) {
             usage("orh-import-summary expects a file path");
@@ -207,6 +241,23 @@ public class OrieditaGeometryOracle {
         return set;
     }
 
+    private static FoldLineSet foldLineSet(String[] args, int offset, int count) {
+        int expectedLength = offset + count * 5;
+        if (args.length != expectedLength) {
+            usage("fold line payload expects " + count + " entries of ax ay bx by color");
+        }
+
+        FoldLineSet set = new FoldLineSet();
+        for (int index = 0; index < count; index++) {
+            int base = offset + index * 5;
+            set.addLine(
+                    new Point(parse(args[base]), parse(args[base + 1])),
+                    new Point(parse(args[base + 2]), parse(args[base + 3])),
+                    LineColor.fromNumber(Integer.parseInt(args[base + 4])));
+        }
+        return set;
+    }
+
     private static void printLineSegmentSet(LineSegmentSet set) {
         System.out.println("lines|" + set.getNumLineSegments());
         for (int index = 0; index < set.getNumLineSegments(); index++) {
@@ -218,6 +269,25 @@ public class OrieditaGeometryOracle {
                     + segment.determineBY() + "|"
                     + segment.getColor().getNumber());
         }
+    }
+
+    private static void printFoldLineSet(FoldLineSet set) {
+        System.out.println("lines|" + set.getTotal());
+        for (int index = 1; index <= set.getTotal(); index++) {
+            LineSegment segment = set.get(index);
+            System.out.println("line|"
+                    + segment.determineAX() + "|"
+                    + segment.determineAY() + "|"
+                    + segment.determineBX() + "|"
+                    + segment.determineBY() + "|"
+                    + segment.getColor().getNumber());
+        }
+    }
+
+    private static void printFoldLineSetDeleteSet(Set<Integer> toDelete) {
+        System.out.print("delete");
+        toDelete.stream().sorted().forEach(index -> System.out.print("|" + (index - 1)));
+        System.out.println();
     }
 
     private static void printSaveSummary(Save save) {
@@ -298,6 +368,8 @@ public class OrieditaGeometryOracle {
         System.err.println("usage: OrieditaGeometryOracle intersection <strict|sweet> <default|precision> ax ay bx by cx cy dx dy");
         System.err.println("   or: OrieditaGeometryOracle intersect-divide <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle intersect-divide-pair <i> <j> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-divide-new-lines <originalEnd> <addedEnd> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-divide-fast <i> <j> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle custom-line-type <customType> <lineColor>");
         System.err.println("   or: OrieditaGeometryOracle orh-import-summary <path>");
         System.err.println("   or: OrieditaGeometryOracle orh-export-fixture");

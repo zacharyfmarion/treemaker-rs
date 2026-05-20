@@ -29,4 +29,4 @@ view controls that make the Design pane comfortable to inspect.
 - [x] Port pan, zoom, fit, and keyboard controls to the CP pane.
 - [x] Update styles and component tests.
 - [x] Run focused web validation.
-- [ ] Prepare draft PR handoff.
+- [x] Prepare draft PR handoff.

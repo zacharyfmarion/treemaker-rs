@@ -21,6 +21,7 @@ import { IconButton } from './components/ui/IconButton';
 import { Button } from './components/ui/Button';
 import { panelComponents } from './components/panels/PanelComponents';
 import { handleMenuAction } from './commands/menuActions';
+import { handleAppKeyDown } from './lib/appKeyboard';
 import { useTauriMenuListener } from './menus/tauriMenuListener';
 import { isDesktopRuntime } from './platform/runtime';
 import { applyWindowTitle, formatWindowTitle } from './platform/windowTitle';
@@ -120,6 +121,7 @@ function FixedDockTab(props: IDockviewPanelHeaderProps) {
 export default function App() {
   const initEngine = useWorkspaceStore((state) => state.initEngine);
   const deleteSelection = useWorkspaceStore((state) => state.deleteSelection);
+  const selectNone = useWorkspaceStore((state) => state.selectNone);
   const project = useWorkspaceStore((state) => state.project);
   const dirty = useWorkspaceStore((state) => state.dirty);
   const toasterTheme = useThemeStore((state) => state.currentTheme.type);
@@ -175,57 +177,16 @@ export default function App() {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      const target = event.target;
-      const isEditing =
-        target instanceof HTMLInputElement ||
-        target instanceof HTMLTextAreaElement ||
-        target instanceof HTMLSelectElement;
-      if (isEditing) return;
-
-      const modifier = event.metaKey || event.ctrlKey;
-      const key = event.key.toLowerCase();
-      if (modifier && key === 'z') {
-        event.preventDefault();
-        void handleMenuAction(event.shiftKey ? 'edit.redo' : 'edit.undo');
-        return;
-      }
-      if (modifier && key === 'x') {
-        event.preventDefault();
-        void handleMenuAction('edit.cut');
-        return;
-      }
-      if (modifier && key === 'c') {
-        event.preventDefault();
-        void handleMenuAction('edit.copy');
-        return;
-      }
-      if (modifier && key === 'v') {
-        event.preventDefault();
-        void handleMenuAction('edit.paste');
-        return;
-      }
-      if (modifier && key === 'a') {
-        event.preventDefault();
-        void handleMenuAction('edit.selectAll');
-        return;
-      }
-      if (modifier && key === ',') {
-        event.preventDefault();
-        void handleMenuAction('file.settings');
-        return;
-      }
-      if (event.key === 'F1') {
-        event.preventDefault();
-        void handleMenuAction('help.documentation');
-        return;
-      }
-      if (event.key !== 'Delete' && event.key !== 'Backspace') return;
-      event.preventDefault();
-      void deleteSelection();
+      handleAppKeyDown(event, {
+        deleteSelection,
+        getSelection: () => useWorkspaceStore.getState().selection,
+        handleMenuAction,
+        selectNone,
+      });
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [deleteSelection]);
+  }, [deleteSelection, selectNone]);
 
   const onReady = useCallback(
     (event: DockviewReadyEvent) => {

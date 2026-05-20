@@ -60,12 +60,16 @@ beforeEach(() => {
   vi.stubGlobal('cancelAnimationFrame', vi.fn());
 });
 
-function renderPanel(project: TreeProject = createSampleProject()) {
+function renderPanel(
+  project: TreeProject = createSampleProject(),
+  state: Partial<ReturnType<typeof useWorkspaceStore.getState>> = {}
+) {
   useWorkspaceStore.setState(
     {
       ...useWorkspaceStore.getInitialState(),
       project,
       engineReady: true,
+      ...state,
     },
     true
   );
@@ -186,5 +190,25 @@ describe('DesignPanel', () => {
       .find((button) => button.textContent?.trim() === 'Mirror Nodes');
     expect(activeMirrorButton?.getAttribute('aria-pressed')).toBe('true');
     expect(container?.querySelector('button[aria-label="Pair Leaves"]')).toBeNull();
+  });
+
+  it('clears a Select All selection when the user clicks blank paper', () => {
+    const addNodeAt = vi.fn(async () => undefined);
+    renderPanel(createSampleProject(), { addNodeAt });
+
+    act(() => {
+      useWorkspaceStore.getState().selectAll();
+    });
+    expect(useWorkspaceStore.getState().selection.kind).toBe('multi');
+
+    const hitArea = container?.querySelector<SVGRectElement>('.paper-hit-area');
+    expect(hitArea).toBeTruthy();
+
+    act(() => {
+      hitArea?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
+    });
+
+    expect(useWorkspaceStore.getState().selection).toEqual({ kind: 'tree' });
+    expect(addNodeAt).not.toHaveBeenCalled();
   });
 });

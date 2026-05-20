@@ -1,8 +1,10 @@
+import type { PointerEvent } from 'react';
 import { GitBranch, ScanLine } from 'lucide-react';
 import { paperToSvg, type PlotRect } from '../../lib/geometry';
 import {
   isCreaseSelected,
   isFacetSelected,
+  selectionSize,
   toggleCreaseSelection,
   toggleFacetSelection,
 } from '../../lib/selection';
@@ -29,6 +31,10 @@ export function CreasePatternPanel() {
   const setMode = useWorkspaceStore((state) => state.setCreaseColorMode);
   const select = useWorkspaceStore((state) => state.select);
   const hasCreasePattern = project.creases.length > 0 || project.facets.length > 0;
+  const clearSelectionOnBackgroundPointerDown = (event: PointerEvent<SVGElement>) => {
+    if (event.button !== 0 || selectionSize(selection) === 0) return;
+    select({ kind: 'tree' });
+  };
   const emptyStatusLabel =
     status === 'building_crease_pattern'
       ? 'Building crease pattern'
@@ -80,7 +86,15 @@ export function CreasePatternPanel() {
       {sourceLabel && <div className="panel-subtitle">{sourceLabel}</div>}
       <div className="panel-body cp-panel__body">
         {hasCreasePattern ? (
-          <svg className="cp-canvas" viewBox={`0 0 ${VIEWBOX} ${VIEWBOX}`} role="img" aria-label="Crease pattern">
+          <svg
+            className="cp-canvas"
+            viewBox={`0 0 ${VIEWBOX} ${VIEWBOX}`}
+            role="img"
+            aria-label="Crease pattern"
+            onPointerDown={(event) => {
+              if (event.target === event.currentTarget) clearSelectionOnBackgroundPointerDown(event);
+            }}
+          >
             <rect className="paper-shadow" x="56" y="44" width="608" height="608" rx="6" />
             <rect
               className="paper"
@@ -88,6 +102,7 @@ export function CreasePatternPanel() {
               y={PAPER_RECT.y}
               width={PAPER_RECT.width}
               height={PAPER_RECT.height}
+              onPointerDown={clearSelectionOnBackgroundPointerDown}
             />
             {project.facets.map((facet) => {
               const points = facet.vertices
@@ -142,6 +157,7 @@ export function CreasePatternPanel() {
               y={PAPER_RECT.y}
               width={PAPER_RECT.width}
               height={PAPER_RECT.height}
+              onPointerDown={clearSelectionOnBackgroundPointerDown}
             />
           </svg>
         ) : (

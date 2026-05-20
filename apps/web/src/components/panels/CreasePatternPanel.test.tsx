@@ -167,6 +167,24 @@ describe('CreasePatternPanel', () => {
     expect(container.querySelector('.crease--kind-hinge')).toBeNull();
   });
 
+  it('clears crease-pattern selection when the user clicks the canvas background', () => {
+    const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready');
+
+    act(() => {
+      useWorkspaceStore.getState().selectAll();
+    });
+    expect(useWorkspaceStore.getState().selection.kind).toBe('multi');
+
+    const canvas = container.querySelector<SVGSVGElement>('.cp-canvas');
+    expect(canvas).toBeTruthy();
+
+    act(() => {
+      canvas?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
+    });
+
+    expect(useWorkspaceStore.getState().selection).toEqual({ kind: 'tree' });
+  });
+
   it('does not show tree workflow actions for imported CP-only empty states', () => {
     const project = {
       ...createSampleProject(),

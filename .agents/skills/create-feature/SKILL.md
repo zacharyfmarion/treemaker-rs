@@ -17,6 +17,8 @@ planning, execution, validation, and PR handoff.
 - Add or update tests that match the changed behavior.
 - Run the smallest deterministic validation set that covers the changes.
 - Open a draft PR against `main`.
+- Start the local app on an available port after the PR is ready when the
+  change has a user-testable web UI surface.
 
 ## Required Reads
 
@@ -182,6 +184,22 @@ gh pr create --draft --base main
 
 If `gh` auth or GitHub access is unavailable, stop after local validation and
 report the exact blocker.
+
+## Local Testing Server
+
+After the draft PR exists, start the web app for local testing when the change
+touches the shared frontend or another user-testable browser surface, unless
+the user explicitly asked not to. Prefer:
+
+```bash
+npm --workspace @treemaker/web run dev -- --host 127.0.0.1
+```
+
+Let Vite choose an available port; do not force `--strictPort`. If an existing
+local server for this checkout is already running, reuse it when appropriate.
+Keep the server session running and include the exact local URL in the final
+handoff. If the app cannot be started, report the blocker and the command that
+failed.
 
 ## Guardrails
 

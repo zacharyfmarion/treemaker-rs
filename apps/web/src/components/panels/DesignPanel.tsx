@@ -45,6 +45,7 @@ import {
   isEdgeSelected,
   isNodeSelected,
   isPathSelected,
+  selectionSize,
   toggleEdgeSelection,
   toggleNodeSelection,
 } from '../../lib/selection';
@@ -489,10 +490,19 @@ export function DesignPanel() {
 
   const onPaperPointerDown = (event: PointerEvent<SVGRectElement>) => {
     if (event.button !== 0 || spacePressed) return;
+    if (selection.kind !== 'node' && selectionSize(selection) > 0) {
+      select({ kind: 'tree' });
+      return;
+    }
     const connectTo = selection.kind === 'node' ? selection.id : undefined;
     const loc = eventToPaper(event);
     if (mirrorMode) void addNodeWithSymmetry(loc, connectTo);
     else void addNodeAt(loc, connectTo);
+  };
+
+  const onCanvasPointerDown = (event: PointerEvent<SVGSVGElement>) => {
+    if (event.button !== 0 || event.target !== event.currentTarget || spacePressed) return;
+    if (selectionSize(selection) > 0) select({ kind: 'tree' });
   };
 
   const onNodePointerDown = (event: PointerEvent<SVGCircleElement>, nodeId: number) => {
@@ -629,6 +639,7 @@ export function DesignPanel() {
               style={{ width: worldRect.width, height: worldRect.height }}
               role="img"
               aria-label="Tree design canvas"
+              onPointerDown={onCanvasPointerDown}
               onPointerMove={onCanvasPointerMove}
               onPointerLeave={() => setHoverPoint(null)}
             >

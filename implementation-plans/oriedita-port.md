@@ -769,9 +769,11 @@ Status:
 - The Oriedita Java oracle now validates `.orh` import/export, `.obj` import,
   and `.dxf` export against pinned upstream source. `.dxf` export uses
   Java-style floating-point text formatting for exact exporter parity.
-- FOLD face reconstruction and Oriedita's FOLD import coordinate-normalization
-  transform still need oracle validation before the FOLD path can be promoted
-  beyond porting.
+- FOLD import now applies Oriedita's line-only coordinate-normalization
+  transform; circles and text intentionally remain in their source FOLD
+  coordinates because Oriedita copies them outside the moved `FoldLineSet`.
+  FOLD face reconstruction still needs oracle validation before the FOLD path
+  can be promoted beyond porting.
 - `.ori` unknown/newer-version behavior is explicit: strict import rejects it,
   while a permissive entry point mirrors Oriedita's "open anyway" path. Legacy
   `.ori` conversion beyond the shared `v1`/`v1.1` payload and full

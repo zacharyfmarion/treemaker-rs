@@ -44,6 +44,10 @@ fn fold_import_reads_edges_and_oriedita_extensions() {
     assert_eq!(model.line_segments.len(), 2);
     assert_eq!(model.line_segments[0].color, LineColor::Black0);
     assert_eq!(model.line_segments[1].color, LineColor::Red1);
+    assert_eq!(model.line_segments[0].a, Point::new(-200.0, -200.0));
+    assert_eq!(model.line_segments[0].b, Point::new(200.0, -200.0));
+    assert_eq!(model.line_segments[1].a, Point::new(200.0, -200.0));
+    assert_eq!(model.line_segments[1].b, Point::new(200.0, 200.0));
     assert_eq!(model.line_segments[1].customized, 1);
     assert_eq!(
         model.line_segments[1].customized_color,
@@ -55,6 +59,8 @@ fn fold_import_reads_edges_and_oriedita_extensions() {
         model.circles[0].customized_color,
         RgbColor::new(100, 200, 200)
     );
+    assert_eq!(model.circles[0].determine_center(), Point::new(5.0, 5.0));
+    assert_eq!(model.texts[0].position(), Point::new(1.0, 2.0));
     assert_eq!(model.texts[0].text, "note");
     assert_eq!(model.grid.grid_size, 16);
     assert_eq!(model.grid.base_state, GridState::Full);
@@ -64,13 +70,13 @@ fn fold_import_reads_edges_and_oriedita_extensions() {
 fn fold_export_round_trips_canonical_model_data() {
     let mut model = CreasePatternModel::default();
     model.add_line_segment(
-        LineSegment::from_coordinates(0.0, 0.0, 10.0, 0.0)
+        LineSegment::from_coordinates(-200.0, -200.0, 200.0, -200.0)
             .with_line_color(LineColor::Blue2)
             .with_customized_color(RgbColor::new(1, 2, 3)),
     );
     model.add_line(
-        Point::new(0.0, 0.0),
-        Point::new(0.0, 10.0),
+        Point::new(-200.0, -200.0),
+        Point::new(-200.0, 200.0),
         LineColor::Cyan3,
     );
     model.add_circle(

@@ -1,5 +1,5 @@
 use super::{IoError, Result};
-use crate::geometry::{Circle, LineColor, LineSegment, Point};
+use crate::geometry::{Circle, LineColor, LineSegment, Point, angle, point_rotate_scaled};
 use crate::model::{
     CreasePatternModel, GridState, TextElement, custom_color_from_hex, custom_color_hex,
     fold_angle_for_line_color, fold_assignment_for_line_color, line_color_for_fold_assignment,
@@ -18,10 +18,13 @@ pub fn import_fold_json(input: &str) -> Result<CreasePatternModel> {
 pub fn import_fold_document(fold: &FoldDocument) -> Result<CreasePatternModel> {
     let mut model = CreasePatternModel::default();
     let edge_colors = string_array_extra(fold, "oriedita:edges_colors")?;
+    let mut bounds = FoldImportBounds::default();
 
     for (index, edge) in fold.edges_vertices.iter().enumerate() {
         let a = vertex_point(fold, edge[0])?;
         let b = vertex_point(fold, edge[1])?;
+        bounds.include(a);
+        bounds.include(b);
         let mut segment = LineSegment::with_color(
             a,
             b,
@@ -36,6 +39,7 @@ pub fn import_fold_document(fold: &FoldDocument) -> Result<CreasePatternModel> {
 
         model.add_line_segment(segment);
     }
+    normalize_imported_fold_lines(&mut model, bounds);
 
     import_circles(fold, &mut model)?;
     import_texts(fold, &mut model)?;
@@ -127,6 +131,63 @@ fn vertex_index(vertices: &mut Vec<Vec<f64>>, point: Point) -> usize {
 
     vertices.push(vec![point.x, point.y]);
     vertices.len() - 1
+}
+
+#[derive(Debug, Clone, Copy)]
+struct FoldImportBounds {
+    min_x: f64,
+    min_y: f64,
+    max_y: f64,
+    has_points: bool,
+}
+
+impl Default for FoldImportBounds {
+    fn default() -> Self {
+        Self {
+            min_x: f64::MAX,
+            min_y: f64::MAX,
+            max_y: f64::from_bits(1),
+            has_points: false,
+        }
+    }
+}
+
+impl FoldImportBounds {
+    fn include(&mut self, point: Point) {
+        self.min_x = self.min_x.min(point.x);
+        self.min_y = self.min_y.min(point.y);
+        self.max_y = self.max_y.max(point.y);
+        self.has_points = true;
+    }
+}
+
+fn normalize_imported_fold_lines(model: &mut CreasePatternModel, bounds: FoldImportBounds) {
+    if !bounds.has_points {
+        return;
+    }
+
+    let source_a = Point::new(bounds.min_x, bounds.min_y);
+    let source_b = Point::new(bounds.min_x, bounds.max_y);
+    let target_a = Point::new(-200.0, -200.0);
+    let target_b = Point::new(-200.0, 200.0);
+    let rotation = angle((source_a, source_b, target_a, target_b));
+    let scale = target_a.distance(target_b) / source_a.distance(source_b);
+    let delta = Point::new(target_a.x - source_a.x, target_a.y - source_a.y);
+
+    for segment in &mut model.line_segments {
+        segment.a = normalize_imported_fold_point(segment.a, source_a, rotation, scale, delta);
+        segment.b = normalize_imported_fold_point(segment.b, source_a, rotation, scale, delta);
+    }
+}
+
+fn normalize_imported_fold_point(
+    point: Point,
+    source_a: Point,
+    rotation: f64,
+    scale: f64,
+    delta: Point,
+) -> Point {
+    point_rotate_scaled(source_a, point, rotation, scale).move_by(delta)
 }
 
 fn import_circles(fold: &FoldDocument, model: &mut CreasePatternModel) -> Result<()> {

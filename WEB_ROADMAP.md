@@ -265,6 +265,10 @@ Work items:
 - Finish select-by-index, movable-part selection, corridor-facet selection, and
   condition selection after those surfaces exist.
 
+Active implementation:
+
+- `implementation-plans/selection-core-editing-conditions.md`
+
 Done when:
 
 - Users can experiment, undo mistakes, select the relevant parts, and use
@@ -297,6 +301,10 @@ Remaining:
 - Per-condition editing forms.
 - Remove condition commands scoped to selected nodes, edges, and paths.
 - More detailed diagnostics for infeasible or over-constrained systems.
+
+Active implementation:
+
+- `implementation-plans/selection-core-editing-conditions.md`
 
 Done when:
 

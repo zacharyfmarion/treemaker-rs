@@ -17,7 +17,7 @@ and export a usable pattern from either the browser or the Tauri desktop app.
 
 ## Phase 0: Current Browser Spine
 
-Status: in progress.
+Status: complete.
 
 Goal: prove the end-to-end engine loop in a modern UI.
 
@@ -34,7 +34,7 @@ Implemented or started:
 - Build crease pattern and switch to the CP tab.
 - Basic CP rendering with MVF/AGRH color modes.
 
-Done when:
+Done:
 
 - A user can draw a simple three-leaf tree from a blank document, optimize it,
   build a visible crease pattern, and understand whether the action succeeded.
@@ -134,12 +134,18 @@ Remaining:
 - Select movable parts and corridor facets.
 - Condition selection once condition editing lands.
 
+Active implementation:
+
+- `implementation-plans/selection-core-editing-conditions.md`
+
 Done when:
 
 - A user can experiment without fear, select the parts they mean, and recover
   from mistakes without rebuilding the design.
 
 ## Phase 4: Core Tree Editing Tools
+
+Status: active implementation.
 
 Priority: high.
 
@@ -253,6 +259,10 @@ Remaining:
 - Dedicated inspector editors for every existing condition type.
 - Remove-by-selected-node/edge/path commands.
 - Richer feasibility diagnostics tied to optimizer warnings.
+
+Active implementation:
+
+- `implementation-plans/selection-core-editing-conditions.md`
 
 Done when:
 

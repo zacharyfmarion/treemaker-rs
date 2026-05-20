@@ -36,12 +36,11 @@ Implemented:
 - CLI and wasm bindings for parsing, checking, optimizing, building crease
   patterns, reporting diagnostics, and saving.
 
-Remaining confidence work:
+Engine confidence:
 
-- Run the external corpus harness against real-world `.tmd`, `.tmd4`, and
-  `.tmd5` files from existing TreeMaker users before claiming every historical
-  file works. The harness is present; the private corpus is intentionally not
-  committed.
+- The direct TreeMaker 5.0.1 ALM engine port is confirmed for the current
+  supported surface. The app roadmap can treat the engine as a working
+  foundation for product work rather than an open confidence risk.
 - Ubuntu oracle CI is present. macOS oracle CI remains optional if the extra
   platform-cost tradeoff becomes worth it for tracking ALM floating-point
   drift.

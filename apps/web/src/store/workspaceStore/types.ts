@@ -111,6 +111,24 @@ export interface EditingSliceActions {
     id: number,
     update: { label?: string; length?: number; strain?: number; stiffness?: number }
   ) => Promise<void>;
+  makeSelectedNodeRoot: () => Promise<void>;
+  splitSelectedEdge: (distance: number) => Promise<void>;
+  setSelectedEdgeLengths: (length: number) => Promise<void>;
+  scaleSelectedEdgeLengths: (factor: number) => Promise<void>;
+  renormalizeToSelectedEdge: () => Promise<void>;
+  renormalizeToUnitScale: () => Promise<void>;
+  absorbSelectedNodes: () => Promise<void>;
+  absorbRedundantNodes: () => Promise<void>;
+  absorbSelectedEdges: () => Promise<void>;
+  perturbSelectedNodes: () => Promise<void>;
+  perturbAllNodes: () => Promise<void>;
+  removeSelectionStrain: () => Promise<void>;
+  removeAllStrain: () => Promise<void>;
+  relieveSelectionStrain: () => Promise<void>;
+  relieveAllStrain: () => Promise<void>;
+  addLargestStubForSelectedNodes: () => Promise<void>;
+  addLargestStubForSelectedPoly: () => Promise<void>;
+  triangulateTree: () => Promise<void>;
   deleteSelection: () => Promise<void>;
   select: (selection: Selection) => void;
   selectAll: () => void;

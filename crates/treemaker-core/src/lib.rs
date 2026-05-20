@@ -721,6 +721,51 @@ pub enum TreeEdit {
     DeleteCondition {
         id: usize,
     },
+    MakeRoot {
+        node: usize,
+    },
+    SplitEdge {
+        edge: usize,
+        distance: TmFloat,
+    },
+    SetEdgeLengths {
+        edges: Vec<usize>,
+        length: TmFloat,
+    },
+    ScaleEdgeLengths {
+        edges: Vec<usize>,
+        factor: TmFloat,
+    },
+    RenormalizeToEdge {
+        edge: usize,
+    },
+    RenormalizeToUnitScale,
+    AbsorbNodes {
+        nodes: Vec<usize>,
+    },
+    AbsorbRedundantNodes,
+    AbsorbEdges {
+        edges: Vec<usize>,
+    },
+    PerturbNodes {
+        nodes: Vec<usize>,
+    },
+    PerturbAllNodes,
+    RemoveStrain {
+        edges: Vec<usize>,
+    },
+    RemoveAllStrain,
+    RelieveStrain {
+        edges: Vec<usize>,
+    },
+    RelieveAllStrain,
+    AddLargestStubForNodes {
+        nodes: Vec<usize>,
+    },
+    AddLargestStubForPoly {
+        poly: usize,
+    },
+    TriangulateTree,
 }
 
 /// Result of applying a user-intent edit.
@@ -1356,6 +1401,24 @@ impl Tree {
                 | TreeEdit::DeleteNode { .. }
                 | TreeEdit::AddEdge { .. }
                 | TreeEdit::DeleteEdge { .. }
+                | TreeEdit::MakeRoot { .. }
+                | TreeEdit::SplitEdge { .. }
+                | TreeEdit::SetEdgeLengths { .. }
+                | TreeEdit::ScaleEdgeLengths { .. }
+                | TreeEdit::RenormalizeToEdge { .. }
+                | TreeEdit::RenormalizeToUnitScale
+                | TreeEdit::AbsorbNodes { .. }
+                | TreeEdit::AbsorbRedundantNodes
+                | TreeEdit::AbsorbEdges { .. }
+                | TreeEdit::PerturbNodes { .. }
+                | TreeEdit::PerturbAllNodes
+                | TreeEdit::RemoveStrain { .. }
+                | TreeEdit::RemoveAllStrain
+                | TreeEdit::RelieveStrain { .. }
+                | TreeEdit::RelieveAllStrain
+                | TreeEdit::AddLargestStubForNodes { .. }
+                | TreeEdit::AddLargestStubForPoly { .. }
+                | TreeEdit::TriangulateTree
         );
 
         let result = (|| -> Result<()> {
@@ -1545,6 +1608,119 @@ impl Tree {
                     }
                     self.conditions.remove(id - 1);
                     generated_geometry_stale = true;
+                }
+                TreeEdit::MakeRoot { node } => {
+                    self.make_node_root(node)?;
+                    topology_changed = true;
+                }
+                TreeEdit::SplitEdge { edge, distance } => {
+                    created_node = Some(self.split_design_edge(edge, distance)?);
+                    created_edge = Some(self.edges.len());
+                    topology_changed = true;
+                }
+                TreeEdit::SetEdgeLengths { edges, length } => {
+                    validate_positive("edge length", length)?;
+                    for edge_id in &edges {
+                        let edge = self.edge_mut(*edge_id)?;
+                        edge.length = length;
+                        edge.strain = 0.0;
+                    }
+                    generated_geometry_stale = true;
+                }
+                TreeEdit::ScaleEdgeLengths { edges, factor } => {
+                    validate_positive("scale factor", factor)?;
+                    for edge_id in &edges {
+                        self.edge_mut(*edge_id)?.length *= factor;
+                    }
+                    generated_geometry_stale = true;
+                }
+                TreeEdit::RenormalizeToEdge { edge } => {
+                    let length = self.edge_mut(edge)?.length;
+                    validate_positive("edge length", length)?;
+                    self.scale_tree_lengths(1.0 / length)?;
+                    generated_geometry_stale = true;
+                }
+                TreeEdit::RenormalizeToUnitScale => {
+                    self.scale_tree_lengths(self.scale)?;
+                    generated_geometry_stale = true;
+                }
+                TreeEdit::AbsorbNodes { nodes } => {
+                    let mut ids = nodes;
+                    ids.sort_unstable_by(|a, b| b.cmp(a));
+                    for node in ids {
+                        self.absorb_design_node(node)?;
+                        self.rebuild_tree_paths()?;
+                        self.cleanup_after_edit();
+                    }
+                    topology_changed = true;
+                }
+                TreeEdit::AbsorbRedundantNodes => {
+                    loop {
+                        self.rebuild_tree_paths()?;
+                        self.cleanup_after_edit();
+                        let node = self
+                            .nodes
+                            .iter()
+                            .rev()
+                            .find(|node| !node.is_leaf && node.edges.len() == 2)
+                            .map(|node| node.index);
+                        let Some(node) = node else { break };
+                        self.absorb_design_node(node)?;
+                    }
+                    topology_changed = true;
+                }
+                TreeEdit::AbsorbEdges { edges } => {
+                    let mut ids = edges;
+                    ids.sort_unstable_by(|a, b| b.cmp(a));
+                    for edge in ids {
+                        self.absorb_design_edge(edge)?;
+                        self.rebuild_tree_paths()?;
+                        self.cleanup_after_edit();
+                    }
+                    topology_changed = true;
+                }
+                TreeEdit::PerturbNodes { nodes } => {
+                    self.perturb_design_nodes(&nodes)?;
+                    generated_geometry_stale = true;
+                }
+                TreeEdit::PerturbAllNodes => {
+                    let nodes = self.owned_nodes.clone();
+                    self.perturb_design_nodes(&nodes)?;
+                    generated_geometry_stale = true;
+                }
+                TreeEdit::RemoveStrain { edges } => {
+                    for edge in edges {
+                        self.edge_mut(edge)?.strain = 0.0;
+                    }
+                    generated_geometry_stale = true;
+                }
+                TreeEdit::RemoveAllStrain => {
+                    for edge in &mut self.edges {
+                        edge.strain = 0.0;
+                    }
+                    generated_geometry_stale = true;
+                }
+                TreeEdit::RelieveStrain { edges } => {
+                    for edge_id in edges {
+                        let edge = self.edge_mut(edge_id)?;
+                        edge.length = edge.strained_length();
+                        edge.strain = 0.0;
+                    }
+                    generated_geometry_stale = true;
+                }
+                TreeEdit::RelieveAllStrain => {
+                    for edge in &mut self.edges {
+                        edge.length = edge.strained_length();
+                        edge.strain = 0.0;
+                    }
+                    generated_geometry_stale = true;
+                }
+                TreeEdit::AddLargestStubForNodes { .. }
+                | TreeEdit::AddLargestStubForPoly { .. }
+                | TreeEdit::TriangulateTree => {
+                    return Err(TreeError::UnsupportedOperation(
+                        "TreeMaker stub-finder triangulation has not been ported yet",
+                    ));
                 }
             }
 
@@ -2867,6 +3043,269 @@ impl Tree {
             condition.index = i + 1;
         }
         self.owned_edges = (1..=self.edges.len()).collect();
+    }
+
+    fn make_node_root(&mut self, id: usize) -> Result<()> {
+        self.check_ref("node", id, self.nodes.len())?;
+        if id == 1 {
+            return Ok(());
+        }
+
+        let old_node_len = self.nodes.len();
+        let mut node_map = vec![None; old_node_len + 1];
+        node_map[id] = Some(1);
+        let mut next = 2usize;
+        for old_id in 1..=old_node_len {
+            if old_id == id {
+                continue;
+            }
+            node_map[old_id] = Some(next);
+            next += 1;
+        }
+
+        for node in &mut self.nodes {
+            remap_value(&mut node.index, &node_map);
+        }
+        self.nodes.sort_by_key(|node| node.index);
+        for edge in &mut self.edges {
+            remap_vec(&mut edge.nodes, &node_map);
+        }
+        for condition in &mut self.conditions {
+            condition.kind.remap_nodes(&node_map);
+        }
+        self.owned_nodes = (1..=self.nodes.len()).collect();
+        Ok(())
+    }
+
+    fn split_design_edge(&mut self, edge_id: usize, distance: TmFloat) -> Result<usize> {
+        self.check_ref("edge", edge_id, self.edges.len())?;
+        let edge = self.edges[edge_id - 1].clone();
+        let strained_length = edge.strained_length();
+        if !distance.is_finite() || distance <= 0.0 || distance >= strained_length {
+            return Err(TreeError::InvalidOperation(
+                "split distance must be inside the strained edge length",
+            ));
+        }
+        let strain_factor = 1.0 + edge.strain;
+        if strain_factor <= 0.0 {
+            return Err(TreeError::InvalidOperation(
+                "cannot split an edge with nonpositive strained length",
+            ));
+        }
+
+        let node1 = edge.nodes[0];
+        let node2 = edge.nodes[1];
+        let loc1 = self.nodes[node1 - 1].loc;
+        let loc2 = self.nodes[node2 - 1].loc;
+        let t = distance / strained_length;
+        let new_node_id = self.nodes.len() + 1;
+        self.nodes.push(Node {
+            index: new_node_id,
+            label: format!("n{new_node_id}"),
+            loc: Point {
+                x: loc1.x + (loc2.x - loc1.x) * t,
+                y: loc1.y + (loc2.y - loc1.y) * t,
+            },
+            depth: DEPTH_NOT_SET,
+            elevation: 0.0,
+            is_leaf: false,
+            is_sub: false,
+            is_border: false,
+            is_pinned: false,
+            is_polygon: false,
+            is_junction: false,
+            is_conditioned: false,
+            owned_vertices: Vec::new(),
+            edges: Vec::new(),
+            leaf_paths: Vec::new(),
+            owner: OwnerRef::Tree,
+        });
+
+        self.edges[edge_id - 1] = Edge {
+            index: edge_id,
+            label: edge.label,
+            length: distance / strain_factor,
+            strain: edge.strain,
+            stiffness: edge.stiffness,
+            is_pinned: false,
+            is_conditioned: false,
+            nodes: vec![node1, new_node_id],
+        };
+        let new_edge_id = self.edges.len() + 1;
+        self.edges.push(Edge {
+            index: new_edge_id,
+            label: format!("e{new_edge_id}"),
+            length: (strained_length - distance) / strain_factor,
+            strain: edge.strain,
+            stiffness: edge.stiffness,
+            is_pinned: false,
+            is_conditioned: false,
+            nodes: vec![new_node_id, node2],
+        });
+
+        let mut edge_map = (0..=self.edges.len()).map(Some).collect::<Vec<_>>();
+        edge_map[edge_id] = None;
+        self.conditions
+            .retain(|condition| condition.kind.edge_refs_survive(&edge_map));
+        for (i, condition) in self.conditions.iter_mut().enumerate() {
+            condition.index = i + 1;
+        }
+        self.owned_nodes = (1..=self.nodes.len()).collect();
+        self.owned_edges = (1..=self.edges.len()).collect();
+        Ok(new_node_id)
+    }
+
+    fn absorb_design_node(&mut self, id: usize) -> Result<()> {
+        self.check_ref("node", id, self.nodes.len())?;
+        let incident = self.nodes[id - 1].edges.clone();
+        if incident.len() != 2 || self.nodes[id - 1].is_leaf {
+            return Err(TreeError::InvalidOperation(
+                "absorbed nodes must be internal nodes with exactly two incident edges",
+            ));
+        }
+        let edge1 = self.edges[incident[0] - 1].clone();
+        let edge2 = self.edges[incident[1] - 1].clone();
+        let other1 = other_edge_node(&edge1, id)?;
+        let other2 = other_edge_node(&edge2, id)?;
+        let new_length = edge1.strained_length() + edge2.strained_length();
+
+        let old_node_len = self.nodes.len();
+        self.nodes.remove(id - 1);
+        let mut node_map = vec![None; old_node_len + 1];
+        let mut next_node = 1usize;
+        for (old_id, slot) in node_map.iter_mut().enumerate().skip(1) {
+            if old_id == id {
+                continue;
+            }
+            *slot = Some(next_node);
+            next_node += 1;
+        }
+        for node in &mut self.nodes {
+            remap_value(&mut node.index, &node_map);
+        }
+
+        let mut edge_map = vec![None; self.edges.len() + 1];
+        let old_edges = std::mem::take(&mut self.edges);
+        for edge in old_edges {
+            if incident.contains(&edge.index) {
+                continue;
+            }
+            let old_id = edge.index;
+            let mut remapped = edge;
+            remap_vec(&mut remapped.nodes, &node_map);
+            remapped.index = self.edges.len() + 1;
+            edge_map[old_id] = Some(remapped.index);
+            self.edges.push(remapped);
+        }
+        let new_edge_id = self.edges.len() + 1;
+        self.edges.push(Edge {
+            index: new_edge_id,
+            label: format!("e{new_edge_id}"),
+            length: new_length,
+            strain: 0.0,
+            stiffness: 1.0,
+            is_pinned: false,
+            is_conditioned: false,
+            nodes: vec![
+                node_map[other1].ok_or(TreeError::InvalidOperation("bad absorbed node"))?,
+                node_map[other2].ok_or(TreeError::InvalidOperation("bad absorbed node"))?,
+            ],
+        });
+
+        self.conditions
+            .retain(|condition| condition.kind.node_refs_survive(&node_map));
+        self.conditions
+            .retain(|condition| condition.kind.edge_refs_survive(&edge_map));
+        for condition in &mut self.conditions {
+            condition.kind.remap_nodes(&node_map);
+            condition.kind.remap_edges(&edge_map);
+        }
+        for (i, condition) in self.conditions.iter_mut().enumerate() {
+            condition.index = i + 1;
+        }
+        self.owned_nodes = (1..=self.nodes.len()).collect();
+        self.owned_edges = (1..=self.edges.len()).collect();
+        Ok(())
+    }
+
+    fn absorb_design_edge(&mut self, id: usize) -> Result<()> {
+        self.check_ref("edge", id, self.edges.len())?;
+        let edge = self.edges[id - 1].clone();
+        let keep_node = edge.nodes[0];
+        let kill_node = edge.nodes[1];
+
+        let old_node_len = self.nodes.len();
+        self.nodes.remove(kill_node - 1);
+        let mut node_map = vec![None; old_node_len + 1];
+        let mut next_node = 1usize;
+        for (old_id, slot) in node_map.iter_mut().enumerate().skip(1) {
+            if old_id == kill_node {
+                continue;
+            }
+            *slot = Some(next_node);
+            next_node += 1;
+        }
+        for node in &mut self.nodes {
+            remap_value(&mut node.index, &node_map);
+        }
+
+        let mut edge_map = vec![None; self.edges.len() + 1];
+        let old_edges = std::mem::take(&mut self.edges);
+        for mut edge in old_edges {
+            if edge.index == id {
+                continue;
+            }
+            let old_id = edge.index;
+            for node in &mut edge.nodes {
+                if *node == kill_node {
+                    *node = keep_node;
+                }
+            }
+            remap_vec(&mut edge.nodes, &node_map);
+            if edge.nodes.len() != 2 || edge.nodes[0] == edge.nodes[1] {
+                continue;
+            }
+            edge.index = self.edges.len() + 1;
+            edge_map[old_id] = Some(edge.index);
+            self.edges.push(edge);
+        }
+
+        self.conditions
+            .retain(|condition| condition.kind.node_refs_survive(&node_map));
+        self.conditions
+            .retain(|condition| condition.kind.edge_refs_survive(&edge_map));
+        for condition in &mut self.conditions {
+            condition.kind.remap_nodes(&node_map);
+            condition.kind.remap_edges(&edge_map);
+        }
+        for (i, condition) in self.conditions.iter_mut().enumerate() {
+            condition.index = i + 1;
+        }
+        self.owned_nodes = (1..=self.nodes.len()).collect();
+        self.owned_edges = (1..=self.edges.len()).collect();
+        Ok(())
+    }
+
+    fn scale_tree_lengths(&mut self, scale_factor: TmFloat) -> Result<()> {
+        validate_positive("scale factor", scale_factor)?;
+        self.scale /= scale_factor;
+        for edge in &mut self.edges {
+            edge.length *= scale_factor;
+        }
+        Ok(())
+    }
+
+    fn perturb_design_nodes(&mut self, nodes: &[usize]) -> Result<()> {
+        let mut rng = PerturbRng::new();
+        for id in nodes {
+            self.check_ref("node", *id, self.nodes.len())?;
+        }
+        for id in nodes {
+            let node = &mut self.nodes[*id - 1];
+            node.loc.x += 1.0e-2 * rng.next_delta();
+            node.loc.y += 1.0e-2 * rng.next_delta();
+        }
+        Ok(())
     }
 
     fn find_leaf_path_between(&self, node1: usize, node2: usize) -> Option<&Path> {
@@ -9440,6 +9879,40 @@ fn push_unique(values: &mut Vec<usize>, value: usize) {
     }
 }
 
+fn other_edge_node(edge: &Edge, node: usize) -> Result<usize> {
+    if edge.nodes.len() != 2 {
+        return Err(TreeError::InvalidOperation(
+            "tree edges must have exactly two endpoints",
+        ));
+    }
+    if edge.nodes[0] == node {
+        Ok(edge.nodes[1])
+    } else if edge.nodes[1] == node {
+        Ok(edge.nodes[0])
+    } else {
+        Err(TreeError::InvalidOperation("edge is not incident to node"))
+    }
+}
+
+struct PerturbRng {
+    state: u64,
+}
+
+impl PerturbRng {
+    fn new() -> Self {
+        Self { state: 0 }
+    }
+
+    fn next_delta(&mut self) -> TmFloat {
+        self.state = self
+            .state
+            .wrapping_mul(6_364_136_223_846_793_005)
+            .wrapping_add(1);
+        let unit = ((self.state >> 33) as TmFloat) / ((1u64 << 31) as TmFloat);
+        2.0 * unit - 0.5
+    }
+}
+
 fn angle(p: Point) -> TmFloat {
     p.y.atan2(p.x)
 }
@@ -9980,6 +10453,148 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![(1, [1, 2]), (2, [1, 3])]
         );
+    }
+
+    #[test]
+    fn core_tree_edit_commands_update_design_state() {
+        let mut tree = triad_design();
+
+        tree.apply_edit(TreeEdit::MakeRoot { node: 3 }).unwrap();
+        assert_eq!(tree.nodes[0].label, "t1");
+
+        tree.apply_edit(TreeEdit::SetEdgeLengths {
+            edges: vec![1, 2],
+            length: 2.0,
+        })
+        .unwrap();
+        assert_eq!(tree.edges[0].length, 2.0);
+        assert_eq!(tree.edges[1].length, 2.0);
+
+        tree.apply_edit(TreeEdit::ScaleEdgeLengths {
+            edges: vec![1],
+            factor: 0.5,
+        })
+        .unwrap();
+        assert_eq!(tree.edges[0].length, 1.0);
+
+        tree.apply_edit(TreeEdit::UpdateEdge {
+            id: 1,
+            label: None,
+            length: None,
+            strain: Some(0.25),
+            stiffness: None,
+        })
+        .unwrap();
+        tree.apply_edit(TreeEdit::RelieveStrain { edges: vec![1] })
+            .unwrap();
+        assert_eq!(tree.edges[0].strain, 0.0);
+        assert_eq!(tree.edges[0].length, 1.25);
+
+        tree.apply_edit(TreeEdit::RenormalizeToEdge { edge: 1 })
+            .unwrap();
+        assert!((tree.edges[0].length - 1.0).abs() < 1.0e-12);
+
+        tree.apply_edit(TreeEdit::RenormalizeToUnitScale).unwrap();
+        assert!((tree.scale - 1.0).abs() < 1.0e-12);
+
+        let before = tree.nodes[0].loc;
+        tree.apply_edit(TreeEdit::PerturbNodes { nodes: vec![1] })
+            .unwrap();
+        assert_ne!(tree.nodes[0].loc, before);
+    }
+
+    #[test]
+    fn split_edge_adds_node_and_rebuilds_paths() {
+        let mut tree = triad_design();
+        let report = tree
+            .apply_edit(TreeEdit::SplitEdge {
+                edge: 1,
+                distance: 0.4,
+            })
+            .unwrap();
+
+        assert_eq!(report.created_node, Some(5));
+        assert_eq!(report.created_edge, Some(4));
+        assert_eq!(tree.summary().nodes, 5);
+        assert_eq!(tree.summary().edges, 4);
+        assert_eq!(tree.summary().paths, 10);
+        assert!((tree.edges[0].length - 0.4).abs() < 1.0e-12);
+        assert!((tree.edges[3].length - 0.6).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn absorb_node_and_edge_contract_tree_topology() {
+        let mut chain = Tree::from_design(TreeDesign {
+            paper: PaperSettings {
+                width: 1.0,
+                height: 1.0,
+                scale: 0.1,
+                has_symmetry: false,
+                sym_loc: Point { x: 0.5, y: 0.0 },
+                sym_angle: 90.0,
+            },
+            nodes: vec![
+                DesignNode {
+                    id: 1,
+                    label: "a".to_string(),
+                    loc: Point { x: 0.1, y: 0.5 },
+                },
+                DesignNode {
+                    id: 2,
+                    label: "b".to_string(),
+                    loc: Point { x: 0.5, y: 0.5 },
+                },
+                DesignNode {
+                    id: 3,
+                    label: "c".to_string(),
+                    loc: Point { x: 0.9, y: 0.5 },
+                },
+            ],
+            edges: vec![
+                DesignEdge {
+                    id: 1,
+                    label: "ab".to_string(),
+                    nodes: [1, 2],
+                    length: 1.0,
+                    strain: 0.0,
+                    stiffness: 1.0,
+                },
+                DesignEdge {
+                    id: 2,
+                    label: "bc".to_string(),
+                    nodes: [2, 3],
+                    length: 1.0,
+                    strain: 0.0,
+                    stiffness: 1.0,
+                },
+            ],
+            conditions: Vec::new(),
+        })
+        .unwrap();
+
+        chain
+            .apply_edit(TreeEdit::AbsorbNodes { nodes: vec![2] })
+            .unwrap();
+        assert_eq!(chain.summary().nodes, 2);
+        assert_eq!(chain.summary().edges, 1);
+        assert_eq!(chain.edges[0].nodes, vec![1, 2]);
+        assert_eq!(chain.edges[0].length, 2.0);
+
+        let mut tree = triad_design();
+        tree.apply_edit(TreeEdit::AbsorbEdges { edges: vec![1] })
+            .unwrap();
+        assert_eq!(tree.summary().nodes, 3);
+        assert_eq!(tree.summary().edges, 2);
+        assert!(tree.is_feasible());
+    }
+
+    #[test]
+    fn stub_finder_edits_remain_explicitly_unsupported() {
+        let mut tree = triad_design();
+        let err = tree
+            .apply_edit(TreeEdit::TriangulateTree)
+            .expect_err("triangulation solver is not ported");
+        assert_eq!(err.code(), "unsupported_operation");
     }
 
     #[test]

@@ -27,9 +27,10 @@ menu wiring.
       gaps.
 - [x] Add select-by-index UI, movable-part selection, corridor-facet selection,
       and condition multi-selection polish.
-- [ ] Add core tree editing operations: make root, split edge, set/scale
-      lengths, renormalize, absorb nodes/edges, strain tools, perturb tools,
-      stub tools, and triangulate tree.
+- [x] Add core tree editing operations: make root, split edge, set/scale
+      lengths, renormalize, absorb nodes/edges, strain tools, and perturb
+      tools. Stub finder and triangulation commands are wired but remain
+      explicit unsupported operations until the C++ stub solver is ported.
 - [ ] Add dedicated editors for every condition type, scoped condition removal,
       and richer feasibility diagnostics.
 - [ ] Run staged tests and final validation.

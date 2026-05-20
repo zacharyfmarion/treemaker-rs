@@ -248,7 +248,25 @@ export type TreeEdit =
     }
   | { type: 'add_condition'; kind: ConditionKind }
   | { type: 'update_condition'; id: number; kind: ConditionKind }
-  | { type: 'delete_condition'; id: number };
+  | { type: 'delete_condition'; id: number }
+  | { type: 'make_root'; node: number }
+  | { type: 'split_edge'; edge: number; distance: number }
+  | { type: 'set_edge_lengths'; edges: number[]; length: number }
+  | { type: 'scale_edge_lengths'; edges: number[]; factor: number }
+  | { type: 'renormalize_to_edge'; edge: number }
+  | { type: 'renormalize_to_unit_scale' }
+  | { type: 'absorb_nodes'; nodes: number[] }
+  | { type: 'absorb_redundant_nodes' }
+  | { type: 'absorb_edges'; edges: number[] }
+  | { type: 'perturb_nodes'; nodes: number[] }
+  | { type: 'perturb_all_nodes' }
+  | { type: 'remove_strain'; edges: number[] }
+  | { type: 'remove_all_strain' }
+  | { type: 'relieve_strain'; edges: number[] }
+  | { type: 'relieve_all_strain' }
+  | { type: 'add_largest_stub_for_nodes'; nodes: number[] }
+  | { type: 'add_largest_stub_for_poly'; poly: number }
+  | { type: 'triangulate_tree' };
 
 export interface EditReport {
   snapshot: TreeSnapshot;

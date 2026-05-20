@@ -29,6 +29,24 @@ function createDeps() {
       selectNone: vi.fn(),
       selectMovableParts: vi.fn(),
       selectCorridorFacets: vi.fn(),
+      makeSelectedNodeRoot: vi.fn().mockResolvedValue(undefined),
+      splitSelectedEdge: vi.fn().mockResolvedValue(undefined),
+      setSelectedEdgeLengths: vi.fn().mockResolvedValue(undefined),
+      scaleSelectedEdgeLengths: vi.fn().mockResolvedValue(undefined),
+      renormalizeToSelectedEdge: vi.fn().mockResolvedValue(undefined),
+      renormalizeToUnitScale: vi.fn().mockResolvedValue(undefined),
+      absorbSelectedNodes: vi.fn().mockResolvedValue(undefined),
+      absorbRedundantNodes: vi.fn().mockResolvedValue(undefined),
+      absorbSelectedEdges: vi.fn().mockResolvedValue(undefined),
+      perturbSelectedNodes: vi.fn().mockResolvedValue(undefined),
+      perturbAllNodes: vi.fn().mockResolvedValue(undefined),
+      removeSelectionStrain: vi.fn().mockResolvedValue(undefined),
+      removeAllStrain: vi.fn().mockResolvedValue(undefined),
+      relieveSelectionStrain: vi.fn().mockResolvedValue(undefined),
+      relieveAllStrain: vi.fn().mockResolvedValue(undefined),
+      addLargestStubForSelectedNodes: vi.fn().mockResolvedValue(undefined),
+      addLargestStubForSelectedPoly: vi.fn().mockResolvedValue(undefined),
+      triangulateTree: vi.fn().mockResolvedValue(undefined),
     },
     layout: {
       activatePanel: vi.fn(),
@@ -87,6 +105,12 @@ describe('menu actions', () => {
     await expect(handle('edit.selectByIndex')).resolves.toBe(true);
     await expect(handle('edit.selectMovableParts')).resolves.toBe(true);
     await expect(handle('edit.selectCorridorFacets')).resolves.toBe(true);
+    await expect(handle('edit.makeRoot')).resolves.toBe(true);
+    await expect(handle('edit.renormalizeToEdge')).resolves.toBe(true);
+    await expect(handle('edit.absorbNodes')).resolves.toBe(true);
+    await expect(handle('edit.perturbAllNodes')).resolves.toBe(true);
+    await expect(handle('edit.relieveAllStrain')).resolves.toBe(true);
+    await expect(handle('edit.triangulateTree')).resolves.toBe(true);
 
     expect(deps.workspace.undo).toHaveBeenCalledOnce();
     expect(deps.workspace.copySelection).toHaveBeenCalledOnce();
@@ -95,6 +119,12 @@ describe('menu actions', () => {
     expect(deps.selectByIndex).toHaveBeenCalledOnce();
     expect(deps.workspace.selectMovableParts).toHaveBeenCalledOnce();
     expect(deps.workspace.selectCorridorFacets).toHaveBeenCalledOnce();
+    expect(deps.workspace.makeSelectedNodeRoot).toHaveBeenCalledOnce();
+    expect(deps.workspace.renormalizeToSelectedEdge).toHaveBeenCalledOnce();
+    expect(deps.workspace.absorbSelectedNodes).toHaveBeenCalledOnce();
+    expect(deps.workspace.perturbAllNodes).toHaveBeenCalledOnce();
+    expect(deps.workspace.relieveAllStrain).toHaveBeenCalledOnce();
+    expect(deps.workspace.triangulateTree).toHaveBeenCalledOnce();
   });
 
   it('routes file commands through the selected file service', async () => {

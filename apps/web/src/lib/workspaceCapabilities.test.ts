@@ -80,6 +80,23 @@ describe('workspace capabilities', () => {
     expect(selectedEdge['edit.selectMovableParts'].enabled).toBe(true);
   });
 
+  it('gates core editing commands by selected part type', () => {
+    const edgeState = capabilities({ edgeCount: 2, selection: { kind: 'edge', id: 1 } });
+    expect(edgeState['edit.splitEdge'].enabled).toBe(true);
+    expect(edgeState['edit.setEdgeLength'].enabled).toBe(true);
+    expect(edgeState['edit.renormalizeToEdge'].enabled).toBe(true);
+    expect(edgeState['edit.makeRoot'].enabled).toBe(false);
+
+    const nodeState = capabilities({ edgeCount: 2, selection: { kind: 'node', id: 2 } });
+    expect(nodeState['edit.makeRoot'].enabled).toBe(true);
+    expect(nodeState['edit.perturbNodes'].enabled).toBe(true);
+    expect(nodeState['edit.absorbNodes'].enabled).toBe(true);
+    expect(nodeState['edit.splitEdge'].enabled).toBe(false);
+
+    expect(edgeState['edit.triangulateTree'].enabled).toBe(false);
+    expect(edgeState['edit.triangulateTree'].reason).toBe('Stub finder triangulation port is pending');
+  });
+
   it('does not call an empty CP-ready tree a rebuildable crease pattern', () => {
     const state = capabilities({ status: 'crease_pattern_ready', edgeCount: 2 });
 

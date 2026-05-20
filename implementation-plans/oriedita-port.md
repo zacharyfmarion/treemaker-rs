@@ -813,9 +813,11 @@ Status:
 
 - In progress. `IntersectDivide` has a direct Rust implementation for pairwise
   crossing, T-shape, contained-overlap, and partial-overlap mutation semantics,
-  plus a simple dynamic scan for full arrangement splitting. `OverlappingLineRemoval`
-  has a direct Rust implementation with unit coverage for Oriedita's "keep the
-  earlier duplicate" behavior and the optional precision radius.
+  plus a simple dynamic scan for full arrangement splitting. The Oriedita Java
+  oracle now validates representative pairwise splits and a full crossing
+  arrangement fixture. `OverlappingLineRemoval` has a direct Rust implementation
+  with unit coverage for Oriedita's "keep the earlier duplicate" behavior and
+  the optional precision radius.
 - The current arrangement worker intentionally uses simple scans instead of
   Oriedita's quadtree acceleration. That keeps mutation parity visible first;
   spatial acceleration remains deferred until broader split/merge behavior is

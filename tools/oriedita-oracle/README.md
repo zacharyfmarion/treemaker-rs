@@ -1,10 +1,10 @@
 # Oriedita Oracle
 
 This directory contains the staged headless oracle harness for the Oriedita
-port. It currently exposes geometry/model primitive commands plus Stage 4
-import/export commands for Oriedita's ORH, OBJ, and DXF paths. Later stages
-should extend the same pattern for documents, operations, checks, and folding
-snapshots.
+port. It currently exposes geometry/model primitive commands, Stage 4
+import/export commands for Oriedita's ORH, OBJ, and DXF paths, and Stage 5
+arrangement commands for `IntersectDivide`. Later stages should extend the same
+pattern for documents, operations, checks, and folding snapshots.
 
 The oracle intentionally compiles against a pinned Oriedita source checkout
 instead of reimplementing the behavior in Rust.
@@ -15,9 +15,11 @@ ORIEDITA_GEOMETRY_ORACLE=tools/oriedita-oracle/build/oriedita-geometry-oracle \
   cargo test -p oristudio-cp \
     --test oriedita_geometry_oracle \
     --test oriedita_model_oracle \
-    --test oriedita_io_oracle
+    --test oriedita_io_oracle \
+    --test oriedita_operations_oracle
 ```
 
-`ORIEDITA_IO_ORACLE` can also point at the same built wrapper for IO-only
-parity runs. If the oracle environment variables are unset, the Rust oracle
-tests exit early so normal `cargo test -p oristudio-cp` does not require Java.
+`ORIEDITA_IO_ORACLE` and `ORIEDITA_OPERATIONS_ORACLE` can also point at the
+same built wrapper for scoped parity runs. If the oracle environment variables
+are unset, the Rust oracle tests exit early so normal `cargo test -p
+oristudio-cp` does not require Java.

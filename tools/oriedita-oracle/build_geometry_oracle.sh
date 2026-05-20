@@ -36,6 +36,15 @@ javac \
   "$origami_source/origami/crease_pattern/element/Circle.java" \
   "$origami_source/origami/crease_pattern/element/Line.java" \
   "$origami_source/origami/crease_pattern/OritaCalc.java" \
+  "$origami_source/origami/crease_pattern/LineSegmentSet.java" \
+  "$origami_source/origami/crease_pattern/worker/linesegmentset/IntersectDivide.java" \
+  "$origami_source/origami/data/save/LineSegmentSave.java" \
+  "$origami_source"/origami/data/quadTree/*.java \
+  "$origami_source"/origami/data/quadTree/adapter/QuadTreeAdapter.java \
+  "$origami_source"/origami/data/quadTree/adapter/LineSegmentSetAdapter.java \
+  "$origami_source"/origami/data/quadTree/adapter/LineSegmentSetLineAdapter.java \
+  "$origami_source"/origami/data/quadTree/collector/*.java \
+  "$origami_source"/origami/data/quadTree/comparator/*.java \
   "$common_source/oriedita/editor/AbstractModel.java" \
   "$common_source/oriedita/editor/canvas/LineStyle.java" \
   "$common_source/oriedita/editor/drawing/tools/Camera.java" \

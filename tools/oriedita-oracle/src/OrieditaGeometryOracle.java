@@ -1,9 +1,11 @@
 import origami.crease_pattern.CustomLineTypes;
+import origami.crease_pattern.LineSegmentSet;
 import origami.crease_pattern.OritaCalc;
 import origami.crease_pattern.element.Circle;
 import origami.crease_pattern.element.LineColor;
 import origami.crease_pattern.element.LineSegment;
 import origami.crease_pattern.element.Point;
+import origami.crease_pattern.worker.linesegmentset.IntersectDivide;
 
 import oriedita.editor.databinding.GridModel;
 import oriedita.editor.export.DxfExporter;
@@ -15,6 +17,7 @@ import oriedita.editor.save.SaveProvider;
 
 import java.awt.Color;
 import java.io.File;
+import java.lang.reflect.Method;
 import java.nio.file.Files;
 
 public class OrieditaGeometryOracle {
@@ -25,6 +28,8 @@ public class OrieditaGeometryOracle {
 
         switch (args[0]) {
             case "intersection" -> intersection(args);
+            case "intersect-divide" -> intersectDivide(args);
+            case "intersect-divide-pair" -> intersectDividePair(args);
             case "custom-line-type" -> customLineType(args);
             case "orh-import-summary" -> orhImportSummary(args);
             case "orh-export-fixture" -> orhExportFixture(args);
@@ -86,6 +91,38 @@ public class OrieditaGeometryOracle {
         }
 
         System.out.println(result.getState());
+    }
+
+    private static void intersectDivide(String[] args) throws Exception {
+        if (args.length < 2) {
+            usage("intersect-divide expects a segment count and segment payload");
+        }
+
+        int count = Integer.parseInt(args[1]);
+        LineSegmentSet set = lineSegmentSet(args, 2, count);
+        IntersectDivide.apply(set);
+        printLineSegmentSet(set);
+    }
+
+    private static void intersectDividePair(String[] args) throws Exception {
+        if (args.length < 4) {
+            usage("intersect-divide-pair expects i, j, a segment count, and segment payload");
+        }
+
+        int i = Integer.parseInt(args[1]);
+        int j = Integer.parseInt(args[2]);
+        int count = Integer.parseInt(args[3]);
+        LineSegmentSet set = lineSegmentSet(args, 4, count);
+        Method method = IntersectDivide.class.getDeclaredMethod(
+                "intersect_divide",
+                LineSegmentSet.class,
+                int.class,
+                int.class);
+        method.setAccessible(true);
+
+        int added = (Integer) method.invoke(null, set, i, j);
+        System.out.println("added|" + added);
+        printLineSegmentSet(set);
     }
 
     private static void orhImportSummary(String[] args) throws Exception {
@@ -151,6 +188,36 @@ public class OrieditaGeometryOracle {
         gridModel.setGridSize(24);
         save.setGridModel(gridModel);
         return save;
+    }
+
+    private static LineSegmentSet lineSegmentSet(String[] args, int offset, int count) {
+        int expectedLength = offset + count * 5;
+        if (args.length != expectedLength) {
+            usage("line segment payload expects " + count + " entries of ax ay bx by color");
+        }
+
+        LineSegmentSet set = new LineSegmentSet();
+        for (int index = 0; index < count; index++) {
+            int base = offset + index * 5;
+            set.addLine(
+                    new Point(parse(args[base]), parse(args[base + 1])),
+                    new Point(parse(args[base + 2]), parse(args[base + 3])),
+                    LineColor.fromNumber(Integer.parseInt(args[base + 4])));
+        }
+        return set;
+    }
+
+    private static void printLineSegmentSet(LineSegmentSet set) {
+        System.out.println("lines|" + set.getNumLineSegments());
+        for (int index = 0; index < set.getNumLineSegments(); index++) {
+            LineSegment segment = set.get(index);
+            System.out.println("line|"
+                    + segment.determineAX() + "|"
+                    + segment.determineAY() + "|"
+                    + segment.determineBX() + "|"
+                    + segment.determineBY() + "|"
+                    + segment.getColor().getNumber());
+        }
     }
 
     private static void printSaveSummary(Save save) {
@@ -229,6 +296,8 @@ public class OrieditaGeometryOracle {
     private static void usage(String message) {
         System.err.println(message);
         System.err.println("usage: OrieditaGeometryOracle intersection <strict|sweet> <default|precision> ax ay bx by cx cy dx dy");
+        System.err.println("   or: OrieditaGeometryOracle intersect-divide <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle intersect-divide-pair <i> <j> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle custom-line-type <customType> <lineColor>");
         System.err.println("   or: OrieditaGeometryOracle orh-import-summary <path>");
         System.err.println("   or: OrieditaGeometryOracle orh-export-fixture");

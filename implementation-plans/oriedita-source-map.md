@@ -93,7 +93,7 @@ stage explicitly changes it.
 | `origami/crease_pattern/worker/foldlineset/Fix2.java` | Repair operation. | `checks`, `operations::arrangement` | kernel | 9 | Unsupported |
 | `origami/crease_pattern/worker/foldlineset/OrganizeCircles.java` | Circle cleanup/organization. | `operations::circle` | kernel | 8 | Unsupported |
 | `origami/crease_pattern/worker/linesegmentset/GetBoundingBox.java` | Bounds helper. | `model::bounds` | kernel | 3 | Unsupported |
-| `origami/crease_pattern/worker/linesegmentset/IntersectDivide.java` | Segment arrangement split helper. | `operations::arrangement` | kernel | 5 | Unit-tested |
+| `origami/crease_pattern/worker/linesegmentset/IntersectDivide.java` | Segment arrangement split helper. | `operations::arrangement` | kernel | 5 | Oracle-tested |
 | `origami/crease_pattern/worker/linesegmentset/OverlappingLineRemoval.java` | Overlap cleanup helper. | `operations::arrangement` | kernel | 5 | Unit-tested |
 | `origami/data/quadTree/*` | Spatial acceleration and collectors. | `model::spatial` | kernel | 3, 5 | Unsupported |
 | `origami/data/listMatrix/*` | Matrix-like adjacency storage. | `folding`, `fold_graph` | kernel | 10 | Unsupported |

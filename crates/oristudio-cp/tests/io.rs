@@ -1,6 +1,6 @@
 use oristudio_cp::CreasePatternDocument;
 use oristudio_cp::geometry::{Circle, LineColor, LineSegment, Point, RgbColor};
-use oristudio_cp::io::{cp, dxf, fold, obj, ori};
+use oristudio_cp::io::{cp, dxf, fold, obj, orh, ori};
 use oristudio_cp::model::{CreasePatternModel, GridState, TextElement};
 
 #[test]
@@ -248,4 +248,132 @@ fn ori_import_has_explicit_unknown_version_policy() {
 
     assert!(ori::import_ori_json(input).is_err());
     assert!(ori::import_ori_json_with_unknown_version(input, true).is_ok());
+}
+
+#[test]
+fn orh_import_matches_oriedita_legacy_quirks() {
+    let input = "\
+<タイトル>
+タイトル,orh model
+<線分集合>
+番号,1
+色,1
+<tpp>0</tpp>
+<tpp_color_R>10</tpp_color_R>
+<tpp_color_G>20</tpp_color_G>
+<tpp_color_B>30</tpp_color_B>
+iactive,ACTIVE_BOTH_3
+選択,2
+座標,0.0,0.0,10.0,0.0
+<円集合>
+番号,1
+中心と半径と色,5.0,5.0,2.0,3
+<tpp>1</tpp>
+<tpp_color_R>40</tpp_color_R>
+<tpp_color_G>50</tpp_color_G>
+<tpp_color_B>60</tpp_color_B>
+<補助線分集合>
+補助番号,1
+補助色,4
+補助座標,1.0,1.0,2.0,2.0
+<Kousi>
+<i_kitei_jyoutai>2</i_kitei_jyoutai>
+<nyuuryoku_kitei>12.6</nyuuryoku_kitei>
+<memori_kankaku>6</memori_kankaku>
+<a_to_heikouna_memori_iti>4</a_to_heikouna_memori_iti>
+<b_to_heikouna_memori_iti>5</b_to_heikouna_memori_iti>
+<d_kousi_x_a>2</d_kousi_x_a>
+<d_kousi_x_b>1.5</d_kousi_x_b>
+<d_kousi_x_c>4</d_kousi_x_c>
+<d_kousi_y_a>1</d_kousi_y_a>
+<d_kousi_y_b>0</d_kousi_y_b>
+<d_kousi_y_c>1</d_kousi_y_c>
+<d_kousi_kakudo>45</d_kousi_kakudo>
+</Kousi>
+";
+
+    let document = orh::import_orh_str(input).expect("valid orh");
+    let model = &document.crease_pattern;
+
+    assert_eq!(document.title.as_deref(), Some("orh model"));
+    assert_eq!(model.line_segments.len(), 2);
+    assert_eq!(model.line_segments[0].color, LineColor::Red1);
+    assert_eq!(
+        model.line_segments[0].active,
+        oristudio_cp::geometry::ActiveState::ActiveBoth3
+    );
+    assert_eq!(model.line_segments[0].selected, 2);
+    assert_eq!(model.line_segments[0].customized, 1);
+    assert_eq!(
+        model.line_segments[0].customized_color,
+        RgbColor::new(10, 20, 30)
+    );
+    assert_eq!(model.line_segments[1], LineSegment::default());
+    assert_eq!(model.circles.len(), 2);
+    assert_eq!(model.circles[0].color, LineColor::Cyan3);
+    assert_eq!(model.circles[0].customized, 1);
+    assert_eq!(model.circles[0].customized_color, RgbColor::new(40, 50, 60));
+    assert_eq!(model.circles[1], Circle::default());
+    assert!(model.aux_line_segments.is_empty());
+    assert_eq!(model.grid.base_state, GridState::Full);
+    assert_eq!(model.grid.grid_size, 13);
+    assert_eq!(model.grid.interval_grid_size, 6);
+    assert_eq!(model.grid.determine_grid_x_length(), 5.0);
+    assert_eq!(model.grid.grid_angle, 45.0);
+
+    assert!(orh::import_orh_bytes(input.as_bytes()).is_ok());
+}
+
+#[test]
+fn orh_export_writes_oriedita_sections_and_imports_back_with_quirks() {
+    let mut document = CreasePatternDocument {
+        title: Some("exported".to_string()),
+        ..CreasePatternDocument::default()
+    };
+    document.crease_pattern.add_line_segment(
+        LineSegment::with_color(
+            Point::new(0.0, 0.0),
+            Point::new(10.0, 0.0),
+            LineColor::Blue2,
+        )
+        .with_customized_color(RgbColor::new(1, 2, 3)),
+    );
+    document
+        .crease_pattern
+        .add_circle(Circle::new(5.0, 5.0, 2.0, LineColor::Magenta5));
+    document
+        .crease_pattern
+        .add_aux_line_segment(LineSegment::with_color(
+            Point::new(1.0, 1.0),
+            Point::new(2.0, 2.0),
+            LineColor::Orange4,
+        ));
+    document.crease_pattern.grid.base_state = GridState::Hidden;
+    document.crease_pattern.grid.set_grid_size(24);
+
+    let output = orh::export_orh_string(&document);
+
+    assert!(output.contains("<タイトル>"));
+    assert!(output.contains("タイトル,exported"));
+    assert!(output.contains("色,2"));
+    assert!(output.contains("<tpp_color_R>1</tpp_color_R>"));
+    assert!(output.contains("<補助線分集合>"));
+    assert!(output.contains("補助色,4"));
+    assert!(output.contains("<i_kitei_jyoutai>0</i_kitei_jyoutai>"));
+    assert!(output.contains("<nyuuryoku_kitei>24</nyuuryoku_kitei>"));
+
+    let imported = orh::import_orh_str(&output).expect("imports exported orh");
+    assert_eq!(imported.title.as_deref(), Some("exported"));
+    assert_eq!(imported.crease_pattern.line_segments.len(), 2);
+    assert_eq!(
+        imported.crease_pattern.line_segments[0].a,
+        Point::new(0.0, 0.0)
+    );
+    assert_eq!(
+        imported.crease_pattern.line_segments[0].color,
+        LineColor::Blue2
+    );
+    assert_eq!(imported.crease_pattern.line_segments[0].customized, 1);
+    assert_eq!(imported.crease_pattern.circles.len(), 2);
+    assert!(imported.crease_pattern.aux_line_segments.is_empty());
 }

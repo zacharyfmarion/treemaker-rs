@@ -12,6 +12,7 @@ categories = ["algorithms", "data-structures", "mathematics"]
 include = ["Cargo.toml", "README.md", "src/**", "tests/**"]
 
 [dependencies]
+encoding_rs.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

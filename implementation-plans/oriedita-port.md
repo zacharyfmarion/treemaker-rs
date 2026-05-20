@@ -764,16 +764,19 @@ Validation:
 Status:
 
 - In progress. CP import/export, FOLD JSON import/export for Oriedita extension
-  arrays, `.ori` JSON save import/export for `v1` and `v1.1`, OBJ import, and
-  DXF export have Rust unit coverage.
+  arrays, `.ori` JSON save import/export for `v1` and `v1.1`, `.orh`
+  import/export, OBJ import, and DXF export have Rust unit coverage.
 - FOLD face reconstruction and Oriedita's FOLD import coordinate-normalization
   transform still need oracle validation before the FOLD path can be promoted
   beyond porting.
 - `.ori` unknown/newer-version behavior is explicit: strict import rejects it,
   while a permissive entry point mirrors Oriedita's "open anyway" path. Legacy
-  `.ori` conversion beyond the shared `v1`/`v1.1` payload, `.orh`, and full
+  `.ori` conversion beyond the shared `v1`/`v1.1` payload and full
   save-version detection remain unsupported until their source-compatible
   parsers/exporters land.
+- `.orh` preserves Oriedita's legacy importer quirks: auxiliary lines exported
+  by Oriedita are not imported by Oriedita, and import preallocates an extra
+  default line/circle slot. These are covered as intentional parity behavior.
 
 ### Stage 5: Arrangement, Split, Merge, and Cleanup
 

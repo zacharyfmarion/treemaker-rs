@@ -17,13 +17,10 @@ import {
   FileText,
   FolderOpen,
   Layers,
-  Maximize2,
   Plus,
   ScanLine,
   Tag,
   Waypoints,
-  ZoomIn,
-  ZoomOut,
 } from 'lucide-react';
 import { handleMenuAction } from '../../commands/menuActions';
 import { formatNumber, paperToSvg, type Point } from '../../lib/geometry';
@@ -60,8 +57,11 @@ import {
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { Button } from '../ui/Button';
 import { IconButton } from '../ui/IconButton';
-
-const ZOOM_PRESETS = [25, 50, 100, 200, 400];
+import {
+  isViewportInteractiveTarget,
+  ViewportToolbar,
+  ViewportToolbarSeparator,
+} from './ViewportToolbar';
 
 const LAYER_OPTIONS: { key: DesignViewLayerKey; label: string; icon: ReactNode }[] = [
   { key: 'paths', label: 'Paths', icon: <Waypoints size={13} /> },
@@ -69,10 +69,6 @@ const LAYER_OPTIONS: { key: DesignViewLayerKey; label: string; icon: ReactNode }
   { key: 'labels', label: 'Labels', icon: <Tag size={13} /> },
   { key: 'symmetry', label: 'Symmetry', icon: <Axis3d size={13} /> },
 ];
-
-function isInteractiveTarget(target: EventTarget | null): boolean {
-  return target instanceof Element && Boolean(target.closest('button, input, textarea, select, [role="menu"]'));
-}
 
 function formatZoom(scale: number): string {
   return `${Math.round(scale * 100)}%`;
@@ -107,81 +103,43 @@ function DesignViewportToolbar({
   setActualSize,
   setZoomLevel,
 }: DesignViewportToolbarProps) {
-  const [zoomMenuOpen, setZoomMenuOpen] = useState(false);
   const [layersOpen, setLayersOpen] = useState(false);
-  const zoomMenuRef = useRef<HTMLDivElement | null>(null);
   const layersMenuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (!zoomMenuOpen && !layersOpen) return;
+    if (!layersOpen) return undefined;
     const onPointerDown = (event: MouseEvent) => {
       const target = event.target as Node;
-      if (zoomMenuRef.current?.contains(target) || layersMenuRef.current?.contains(target)) {
-        return;
-      }
-      setZoomMenuOpen(false);
+      if (layersMenuRef.current?.contains(target)) return;
       setLayersOpen(false);
     };
     document.addEventListener('mousedown', onPointerDown);
     return () => document.removeEventListener('mousedown', onPointerDown);
-  }, [layersOpen, zoomMenuOpen]);
+  }, [layersOpen]);
 
   return (
-    <div className="design-view-toolbar" aria-label="Design viewport controls">
-      <IconButton size="sm" variant="toolbar" title="Zoom Out" onClick={zoomOut}>
-        <ZoomOut size={14} />
-      </IconButton>
-      <div className="design-view-toolbar__menu-anchor" ref={zoomMenuRef}>
-        <button
-          type="button"
-          className="design-view-toolbar__zoom-button"
-          aria-haspopup="menu"
-          aria-expanded={zoomMenuOpen}
-          onClick={() => setZoomMenuOpen((open) => !open)}
-        >
-          {zoomPercent}%
-        </button>
-        {zoomMenuOpen && (
-          <div className="design-view-toolbar__dropdown" role="menu">
-            {ZOOM_PRESETS.map((preset) => (
-              <button
-                key={preset}
-                type="button"
-                className="design-view-toolbar__dropdown-item"
-                onClick={() => {
-                  setZoomLevel(preset / 100);
-                  setZoomMenuOpen(false);
-                }}
-              >
-                {preset}%
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-      <IconButton size="sm" variant="toolbar" title="Zoom In" onClick={zoomIn}>
-        <ZoomIn size={14} />
-      </IconButton>
-      <span className="design-view-toolbar__separator" />
-      <IconButton size="sm" variant="toolbar" title="Fit" onClick={fitToView}>
-        <Maximize2 size={14} />
-      </IconButton>
-      <button type="button" className="design-view-toolbar__actual" onClick={setActualSize}>
-        1:1
-      </button>
-      <span className="design-view-toolbar__separator" />
+    <ViewportToolbar
+      ariaLabel="Design viewport controls"
+      zoomPercent={zoomPercent}
+      zoomIn={zoomIn}
+      zoomOut={zoomOut}
+      fitToView={fitToView}
+      setActualSize={setActualSize}
+      setZoomLevel={setZoomLevel}
+    >
+      <ViewportToolbarSeparator />
       <Button
         size="sm"
         variant="secondary"
-        className="design-view-toolbar__mirror"
+        className="viewport-toolbar__mirror"
         isActive={mirrorMode}
         aria-pressed={mirrorMode}
         onClick={onToggleMirror}
       >
         Mirror Nodes
       </Button>
-      <span className="design-view-toolbar__separator" />
-      <div className="design-view-toolbar__menu-anchor" ref={layersMenuRef}>
+      <ViewportToolbarSeparator />
+      <div className="viewport-toolbar__menu-anchor" ref={layersMenuRef}>
         <IconButton
           size="sm"
           variant="toolbar"
@@ -207,7 +165,7 @@ function DesignViewportToolbar({
           </div>
         )}
       </div>
-    </div>
+    </ViewportToolbar>
   );
 }
 
@@ -440,7 +398,7 @@ export function DesignPanel() {
     if (!container) return undefined;
 
     const onKeyDown = (event: KeyboardEvent) => {
-      const interactive = isInteractiveTarget(event.target);
+      const interactive = isViewportInteractiveTarget(event.target);
       if (event.key === ' ' && !interactive) {
         event.preventDefault();
         setSpacePressed(true);
@@ -601,7 +559,7 @@ export function DesignPanel() {
         data-space-pan={spacePressed || undefined}
         tabIndex={-1}
         onPointerDown={(event) => {
-          if (!isInteractiveTarget(event.target)) containerRef.current?.focus();
+          if (!isViewportInteractiveTarget(event.target)) containerRef.current?.focus();
         }}
       >
         <TransformWrapper

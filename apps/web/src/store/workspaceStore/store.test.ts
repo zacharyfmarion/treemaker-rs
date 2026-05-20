@@ -908,6 +908,59 @@ describe('workspace store slices', () => {
     expect(useWorkspaceStore.getState().projectMessage).toBe('Cleared design');
   });
 
+  it('selects by index, movable parts, and corridor facets', () => {
+    const api = resetStores(
+      makeSnapshot({
+        nodes: [
+          nodeSnapshot(1, { x: 0.5, y: 0.5 }, { label: 'root', is_leaf: false }),
+          nodeSnapshot(2, { x: 0.2, y: 0.2 }, { is_pinned: true }),
+          nodeSnapshot(3, { x: 0.8, y: 0.2 }),
+        ],
+        edges: [edgeSnapshot(1, [1, 2]), edgeSnapshot(2, [1, 3])],
+        paths: [pathSnapshot(1, [2, 3])],
+        vertices: [
+          { id: 1, loc: { x: 0, y: 0 } },
+          { id: 2, loc: { x: 1, y: 0 } },
+          { id: 3, loc: { x: 0, y: 1 } },
+        ],
+        facets: [
+          { id: 1, vertices: [1, 2, 3], color: 1, corridor_edge: 1 },
+          { id: 2, vertices: [1, 3, 2], color: 2, corridor_edge: 2 },
+        ],
+        conditions: [
+          conditionSnapshot(1, { type: 'edge_length_fixed', edge: 2 }),
+        ],
+      })
+    );
+    loadSnapshotIntoStore(api.snapshotState);
+
+    useWorkspaceStore.getState().selectByIndex('node', 3);
+    expect(useWorkspaceStore.getState().selection).toEqual({ kind: 'node', id: 3 });
+
+    useWorkspaceStore.getState().selectMovableParts();
+    expect(useWorkspaceStore.getState().selection).toEqual({
+      kind: 'multi',
+      nodes: [3],
+      edges: [1],
+      paths: [],
+      creases: [],
+      facets: [],
+      conditions: [],
+    });
+
+    useWorkspaceStore.getState().select({ kind: 'edge', id: 2 });
+    useWorkspaceStore.getState().selectCorridorFacets();
+    expect(useWorkspaceStore.getState().selection).toEqual({
+      kind: 'multi',
+      nodes: [],
+      edges: [],
+      paths: [],
+      creases: [],
+      facets: [2],
+      conditions: [],
+    });
+  });
+
   it('creates mirrored branches from an axial parent in one history entry', async () => {
     const api = resetStores(
       makeSnapshot({

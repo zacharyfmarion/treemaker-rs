@@ -15,6 +15,7 @@ import {
 import { MenuBar } from './components/MenuBar';
 import { GlobalToasts } from './components/GlobalToasts';
 import { HelpModal } from './components/HelpModal';
+import { SelectByIndexModal } from './components/SelectByIndexModal';
 import { SettingsModal } from './components/SettingsModal';
 import { TooltipProvider } from './components/ui/Tooltip';
 import { IconButton } from './components/ui/IconButton';
@@ -232,6 +233,7 @@ export default function App() {
         />
       </div>
       <HelpModal />
+      <SelectByIndexModal />
       <SettingsModal />
       <GlobalToasts />
       <Toaster

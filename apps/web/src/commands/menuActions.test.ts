@@ -27,6 +27,8 @@ function createDeps() {
       select: vi.fn(),
       selectAll: vi.fn(),
       selectNone: vi.fn(),
+      selectMovableParts: vi.fn(),
+      selectCorridorFacets: vi.fn(),
     },
     layout: {
       activatePanel: vi.fn(),
@@ -37,6 +39,7 @@ function createDeps() {
     help: vi.fn(),
     about: vi.fn(),
     settings: vi.fn(),
+    selectByIndex: vi.fn(),
   };
 }
 
@@ -81,11 +84,17 @@ describe('menu actions', () => {
     await expect(handle('edit.copy')).resolves.toBe(true);
     await expect(handle('edit.selectAll')).resolves.toBe(true);
     await expect(handle('edit.deselectAll')).resolves.toBe(true);
+    await expect(handle('edit.selectByIndex')).resolves.toBe(true);
+    await expect(handle('edit.selectMovableParts')).resolves.toBe(true);
+    await expect(handle('edit.selectCorridorFacets')).resolves.toBe(true);
 
     expect(deps.workspace.undo).toHaveBeenCalledOnce();
     expect(deps.workspace.copySelection).toHaveBeenCalledOnce();
     expect(deps.workspace.selectAll).toHaveBeenCalledOnce();
     expect(deps.workspace.selectNone).toHaveBeenCalledOnce();
+    expect(deps.selectByIndex).toHaveBeenCalledOnce();
+    expect(deps.workspace.selectMovableParts).toHaveBeenCalledOnce();
+    expect(deps.workspace.selectCorridorFacets).toHaveBeenCalledOnce();
   });
 
   it('routes file commands through the selected file service', async () => {

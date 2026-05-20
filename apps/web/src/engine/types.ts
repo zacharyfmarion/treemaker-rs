@@ -167,6 +167,7 @@ export interface CreaseSnapshot {
 export interface FacetSnapshot {
   id: number;
   vertices: number[];
+  corridor_edge?: number | null;
   color: number;
 }
 

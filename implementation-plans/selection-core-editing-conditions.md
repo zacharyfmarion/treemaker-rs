@@ -25,7 +25,7 @@ menu wiring.
 
 - [x] Refresh roadmap docs for confirmed engine confidence and active product
       gaps.
-- [ ] Add select-by-index UI, movable-part selection, corridor-facet selection,
+- [x] Add select-by-index UI, movable-part selection, corridor-facet selection,
       and condition multi-selection polish.
 - [ ] Add core tree editing operations: make root, split edge, set/scale
       lengths, renormalize, absorb nodes/edges, strain tools, perturb tools,

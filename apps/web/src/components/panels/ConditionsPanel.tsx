@@ -28,6 +28,7 @@ import {
   isConditionSelected,
   selectedEdgeIds,
   selectedNodeIds,
+  toggleConditionSelection,
 } from '../../lib/selection';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { Button } from '../ui/Button';
@@ -401,7 +402,13 @@ export function ConditionsPanel() {
                   data-feasible={condition.isFeasible || undefined}
                   key={condition.id}
                   type="button"
-                  onClick={() => select({ kind: 'condition', id: condition.id })}
+                  onClick={(event) => {
+                    if (event.metaKey || event.ctrlKey || event.shiftKey) {
+                      select(toggleConditionSelection(selection, condition.id));
+                      return;
+                    }
+                    select({ kind: 'condition', id: condition.id });
+                  }}
                 >
                   <span>
                     <strong>{conditionTitle(condition.kind)}</strong>

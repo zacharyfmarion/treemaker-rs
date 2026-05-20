@@ -587,6 +587,91 @@
   padding: var(--space-4);
 }
 
+.simple-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+  background: var(--overlay-dim);
+  backdrop-filter: blur(4px);
+}
+
+.simple-modal__document {
+  width: min(360px, calc(100vw - var(--space-6)));
+  overflow: hidden;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--bg-secondary);
+  box-shadow: var(--shadow-context-menu);
+}
+
+.simple-modal__header,
+.simple-modal__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3);
+}
+
+.simple-modal__header {
+  border-bottom: 1px solid var(--border-default);
+}
+
+.simple-modal__header span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-weight: 750;
+  letter-spacing: 0;
+}
+
+.simple-modal__body {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3);
+}
+
+.simple-modal__meta {
+  color: var(--text-tertiary);
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.simple-modal__footer {
+  justify-content: flex-end;
+  padding: 0;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.field-row input {
+  width: 100%;
+  min-width: 0;
+  height: 30px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.78rem;
+  letter-spacing: 0;
+  padding: 0 var(--space-2);
+}
+
 .settings-tab {
   display: grid;
   gap: var(--space-4);

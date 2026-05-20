@@ -15,6 +15,7 @@ import type {
   ToolMode,
   TreeProject,
 } from '../../lib/sampleProject';
+import type { SelectablePartKind } from '../../lib/selection';
 import type { SymmetryAuthoringPair } from '../../lib/symmetryAuthoring';
 import type { FileService } from '../../platform/fileService';
 import type { ImportedCreasePatternDocument } from '../../lib/creasePatternImport';
@@ -114,6 +115,9 @@ export interface EditingSliceActions {
   select: (selection: Selection) => void;
   selectAll: () => void;
   selectNone: () => void;
+  selectByIndex: (kind: SelectablePartKind, id: number) => void;
+  selectMovableParts: () => void;
+  selectCorridorFacets: () => void;
   selectPathBetweenSelectedNodes: () => void;
   setToolMode: (toolMode: ToolMode) => void;
 }

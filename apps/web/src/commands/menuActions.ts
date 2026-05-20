@@ -1,6 +1,7 @@
 import { getFileService, type FileCommand, type FileService } from '../platform/fileService';
 import { useHelpStore } from '../store/helpStore';
 import { useLayoutStore } from '../store/layoutStore';
+import { useSelectionUiStore } from '../store/selectionUiStore';
 import { useSettingsStore } from '../store/settingsStore';
 import { useWorkspaceStore } from '../store/workspaceStore';
 import { selectWorkspaceCapabilities } from '../store/workspaceStore/capabilities';
@@ -26,6 +27,9 @@ export const MENU_ACTION_IDS = [
   'edit.delete',
   'edit.selectAll',
   'edit.deselectAll',
+  'edit.selectByIndex',
+  'edit.selectMovableParts',
+  'edit.selectCorridorFacets',
   'view.design',
   'view.creasePattern',
   'view.simulator',
@@ -64,6 +68,8 @@ export interface WorkspaceCommands {
   select(selection: { kind: 'tree' }): void;
   selectAll(): void;
   selectNone(): void;
+  selectMovableParts(): void;
+  selectCorridorFacets(): void;
 }
 
 export interface LayoutCommands {
@@ -80,6 +86,7 @@ export interface MenuActionDependencies {
   help?: () => void;
   about?: () => void;
   settings?: () => void;
+  selectByIndex?: () => void;
 }
 
 const FILE_ACTIONS: Partial<Record<MenuActionId, FileCommand>> = {
@@ -166,6 +173,15 @@ export function createMenuActionHandler(deps: MenuActionDependencies) {
       case 'edit.deselectAll':
         deps.workspace.selectNone();
         return true;
+      case 'edit.selectByIndex':
+        deps.selectByIndex?.();
+        return true;
+      case 'edit.selectMovableParts':
+        deps.workspace.selectMovableParts();
+        return true;
+      case 'edit.selectCorridorFacets':
+        deps.workspace.selectCorridorFacets();
+        return true;
       case 'view.design':
         deps.layout.activatePanel('design');
         return true;
@@ -222,6 +238,9 @@ export function handleMenuAction(id: string): Promise<boolean> {
     },
     about: () => {
       useHelpStore.getState().openAbout();
+    },
+    selectByIndex: () => {
+      useSelectionUiStore.getState().openSelectByIndex();
     },
   })(id);
 }

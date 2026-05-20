@@ -127,6 +127,7 @@ export function projectFromSnapshot(snapshot: TreeSnapshot, titleOverride?: stri
           id: facet.id,
           vertices,
           color: facetColor(facet.color),
+          corridorEdge: facet.corridor_edge ?? undefined,
         },
       ];
     }),

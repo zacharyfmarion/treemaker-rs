@@ -68,6 +68,12 @@ pub fn setup_menu(app: &App) -> Result<(), Box<dyn std::error::Error>> {
         .accelerator("CmdOrCtrl+A")
         .build(app)?;
     let edit_deselect = MenuItemBuilder::with_id("edit.deselectAll", "Deselect All").build(app)?;
+    let edit_select_by_index =
+        MenuItemBuilder::with_id("edit.selectByIndex", "Select By Index...").build(app)?;
+    let edit_select_movable =
+        MenuItemBuilder::with_id("edit.selectMovableParts", "Select Movable Parts").build(app)?;
+    let edit_select_corridor =
+        MenuItemBuilder::with_id("edit.selectCorridorFacets", "Select Corridor Facets").build(app)?;
     let edit_delete = MenuItemBuilder::with_id("edit.delete", "Delete Selected")
         .accelerator("Backspace")
         .build(app)?;
@@ -82,6 +88,9 @@ pub fn setup_menu(app: &App) -> Result<(), Box<dyn std::error::Error>> {
         .separator()
         .item(&edit_select_all)
         .item(&edit_deselect)
+        .item(&edit_select_by_index)
+        .item(&edit_select_movable)
+        .item(&edit_select_corridor)
         .item(&edit_delete)
         .build()?;
 

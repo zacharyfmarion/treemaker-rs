@@ -1,7 +1,10 @@
 import type { TreeEdit, TreeSnapshot } from '../../../engine/types';
 import { projectFromSnapshot } from '../../../engine/snapshotMapper';
 import {
+  selectByIndex as selectionByIndex,
+  selectCorridorFacets as corridorFacetSelection,
   selectEverything,
+  selectMovableParts as movablePartSelection,
   selectedEdgeIds,
   selectedNodeIds,
   selectionCoversAllNodes,
@@ -402,6 +405,27 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
     select: (selection) => set({ selection }),
     selectAll: () => set({ selection: selectEverything(get().project) }),
     selectNone: () => set({ selection: { kind: 'tree' } }),
+    selectByIndex: (kind, id) => {
+      const next = selectionByIndex(get().project, kind, id);
+      set({
+        selection: next,
+        projectMessage: next.kind === 'tree' ? `No ${kind} ${id}` : null,
+      });
+    },
+    selectMovableParts: () => {
+      const next = movablePartSelection(get().project);
+      set({
+        selection: next,
+        projectMessage: next.kind === 'tree' ? 'No movable parts' : null,
+      });
+    },
+    selectCorridorFacets: () => {
+      const next = corridorFacetSelection(get().project, selectedEdgeIds(get().selection));
+      set({
+        selection: next,
+        projectMessage: next.kind === 'tree' ? 'No corridor facets for selected edges' : null,
+      });
+    },
     selectPathBetweenSelectedNodes: () => {
       const [a, b] = selectedNodeIds(get().selection);
       if (a === undefined || b === undefined) return;

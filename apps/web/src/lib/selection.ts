@@ -122,6 +122,74 @@ export function toggleFacetSelection(selection: Selection, id: number): Selectio
   return selectionSize(next) === 0 ? { kind: 'tree' } : next;
 }
 
+export function toggleConditionSelection(selection: Selection, id: number): Selection {
+  const multi = selection.kind === 'multi' ? selection : emptyMultiSelection();
+  const conditions = multi.conditions.includes(id)
+    ? multi.conditions.filter((conditionId) => conditionId !== id)
+    : uniqueSorted([...multi.conditions, id]);
+  const next = { ...multi, conditions };
+  return selectionSize(next) === 0 ? { kind: 'tree' } : next;
+}
+
+export type SelectablePartKind = 'node' | 'edge' | 'path' | 'crease' | 'facet' | 'condition';
+
+export function selectByIndex(project: TreeProject, kind: SelectablePartKind, id: number): Selection {
+  switch (kind) {
+    case 'node':
+      return project.nodes.some((node) => node.id === id) ? { kind, id } : { kind: 'tree' };
+    case 'edge':
+      return project.edges.some((edge) => edge.id === id) ? { kind, id } : { kind: 'tree' };
+    case 'path':
+      return project.paths.some((path) => path.id === id) ? { kind, id } : { kind: 'tree' };
+    case 'crease':
+      return project.creases.some((crease) => crease.id === id) ? { kind, id } : { kind: 'tree' };
+    case 'facet':
+      return project.facets.some((facet) => facet.id === id) ? { kind, id } : { kind: 'tree' };
+    case 'condition':
+      return project.conditions.some((condition) => condition.id === id) ? { kind, id } : { kind: 'tree' };
+  }
+}
+
+export function selectMovableParts(project: TreeProject): Selection {
+  const fixedLengthEdges = new Set(
+    project.conditions.flatMap((condition) =>
+      condition.kind.type === 'edge_length_fixed' ? [condition.kind.edge] : []
+    )
+  );
+  const selection = {
+    kind: 'multi' as const,
+    nodes: project.nodes
+      .filter((node) => node.isLeaf && !node.isPinned)
+      .map((node) => node.id),
+    edges: project.edges
+      .filter((edge) => !fixedLengthEdges.has(edge.id))
+      .map((edge) => edge.id),
+    paths: [],
+    creases: [],
+    facets: [],
+    conditions: [],
+  };
+  return selectionSize(selection) === 0 ? { kind: 'tree' } : selection;
+}
+
+export function selectCorridorFacets(project: TreeProject, edgeIds: number[]): Selection {
+  const corridorEdges = new Set(edgeIds);
+  const facets = project.facets
+    .filter((facet) => facet.corridorEdge !== undefined && corridorEdges.has(facet.corridorEdge))
+    .map((facet) => facet.id);
+  return facets.length === 0
+    ? { kind: 'tree' }
+    : {
+        kind: 'multi',
+        nodes: [],
+        edges: [],
+        paths: [],
+        creases: [],
+        facets,
+        conditions: [],
+      };
+}
+
 export function selectionSize(selection: Selection): number {
   switch (selection.kind) {
     case 'tree':

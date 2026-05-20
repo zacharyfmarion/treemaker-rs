@@ -17,6 +17,9 @@ export type WorkspaceCapabilityId =
   | 'edit.delete'
   | 'edit.selectAll'
   | 'edit.deselectAll'
+  | 'edit.selectByIndex'
+  | 'edit.selectMovableParts'
+  | 'edit.selectCorridorFacets'
   | 'view.design'
   | 'view.creasePattern'
   | 'view.simulator'
@@ -71,6 +74,7 @@ export function getWorkspaceCapabilities(input: WorkspaceCapabilityInput): Works
   const canExportImportedFold = creasePatternMode && input.hasImportedCreasePattern;
   const canExportCreasePattern = hasCreasePattern && !isBusy;
   const hasSelection = selectionHasEditableParts(input.selection);
+  const hasSelectedEdges = selectedEdgeCount(input.selection) > 0;
   const buildLabel = hasCreasePattern ? 'Rebuild CP' : 'Build CP';
   const buildReason = hasCreasePattern ? 'Rebuild crease pattern' : 'Build crease pattern';
 
@@ -143,6 +147,21 @@ export function getWorkspaceCapabilities(input: WorkspaceCapabilityInput): Works
     ),
     'edit.selectAll': capability(true, 'Select All', 'Select visible document parts'),
     'edit.deselectAll': capability(true, 'Deselect All', 'Clear the current selection'),
+    'edit.selectByIndex': capability(true, 'Select By Index...', 'Select a document part by its TreeMaker index'),
+    'edit.selectMovableParts': capability(
+      treeMode && !isBusy,
+      'Select Movable Parts',
+      treeMode ? busyOr('Select unpinned leaf nodes and movable edges', input.status) : 'Movable parts require a tree document'
+    ),
+    'edit.selectCorridorFacets': capability(
+      input.facetCount > 0 && hasSelectedEdges,
+      'Select Corridor Facets',
+      input.facetCount > 0
+        ? hasSelectedEdges
+          ? 'Select facets in selected edge corridors'
+          : 'Select one or more tree edges first'
+        : 'Build a crease pattern before selecting corridor facets'
+    ),
     'view.design': capability(true, 'Design', 'Show the design pane'),
     'view.creasePattern': capability(true, 'Crease Pattern', 'Show the crease pattern pane'),
     'view.simulator': capability(
@@ -254,6 +273,12 @@ function disabledBuildReason(
   if (input.status === 'error') return 'Resolve the current engine error before building the crease pattern';
   if (!hasTreeEdges) return 'Add tree edges, then optimize before building the crease pattern';
   return 'Optimize Scale before building the crease pattern';
+}
+
+function selectedEdgeCount(selection: Selection): number {
+  if (selection.kind === 'edge') return 1;
+  if (selection.kind === 'multi') return selection.edges.length;
+  return 0;
 }
 
 function selectionHasEditableParts(selection: Selection): boolean {

@@ -32,22 +32,22 @@ pub fn export_dxf_string(model: &CreasePatternModel) -> String {
         push_line(&mut output, "  10");
         push_line(
             &mut output,
-            &scale(segment.a.x + 200.0, 3.0, 4.0).to_string(),
+            &java_double_string(scale(segment.a.x + 200.0, 3.0, 4.0)),
         );
         push_line(&mut output, "  20");
         push_line(
             &mut output,
-            &scale(segment.a.y - 200.0, -3.0, 4.0).to_string(),
+            &java_double_string(scale(segment.a.y - 200.0, -3.0, 4.0)),
         );
         push_line(&mut output, "  11");
         push_line(
             &mut output,
-            &scale(segment.b.x + 200.0, 3.0, 4.0).to_string(),
+            &java_double_string(scale(segment.b.x + 200.0, 3.0, 4.0)),
         );
         push_line(&mut output, "  21");
         push_line(
             &mut output,
-            &scale(segment.b.y - 200.0, -3.0, 4.0).to_string(),
+            &java_double_string(scale(segment.b.y - 200.0, -3.0, 4.0)),
         );
     }
 
@@ -70,6 +70,14 @@ fn dxf_layer(line_color: LineColor) -> (&'static str, i32) {
 
 fn scale(value: f64, scale: f64, center: f64) -> f64 {
     value * scale + center
+}
+
+fn java_double_string(value: f64) -> String {
+    if value.is_finite() && value.fract() == 0.0 {
+        format!("{value:.1}")
+    } else {
+        value.to_string()
+    }
 }
 
 fn push_line(output: &mut String, line: &str) {

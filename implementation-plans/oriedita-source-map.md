@@ -236,10 +236,10 @@ mutation.
 | `FoldExporter.java` | `.fold` export, face reconstruction, Oriedita extras. | `io::fold::export` | 4 | Porting |
 | `OriImporter.java` | `.ori` import. | `io::ori::import` | 4 | Unit-tested |
 | `OriExporter.java` | `.ori` export. | `io::ori::export` | 4 | Unit-tested |
-| `OrhImporter.java` | `.orh` import. | `io::orh::import` | 4 | Unit-tested |
-| `OrhExporter.java` | `.orh` export. | `io::orh::export` | 4 | Unit-tested |
-| `ObjImporter.java` | `.obj` import. | `io::obj::import` | 4 | Unit-tested |
-| `DxfExporter.java` | `.dxf` export. | `io::dxf::export` | 4 | Unit-tested |
+| `OrhImporter.java` | `.orh` import. | `io::orh::import` | 4 | Oracle-tested |
+| `OrhExporter.java` | `.orh` export. | `io::orh::export` | 4 | Oracle-tested |
+| `ObjImporter.java` | `.obj` import. | `io::obj::import` | 4 | Oracle-tested |
+| `DxfExporter.java` | `.dxf` export. | `io::dxf::export` | 4 | Oracle-tested |
 | `OrieditaFoldFile.java` | FOLD extension fields. | `io::fold::oriedita_extensions` | 4 | Porting |
 | `Save.java` | Main save model. | `io::save` | 4 | Unit-tested |
 | `BaseSave.java` | Shared save payload. | `io::save` | 4 | Unit-tested |

@@ -95,8 +95,8 @@ fn dxf_export_uses_oriedita_layers_and_coordinate_transform() {
     let output = dxf::export_dxf_string(&model);
     assert!(output.contains("MountainLine"));
     assert!(output.contains("\n  62\n1\n"));
-    assert!(output.contains("\n  10\n604\n"));
-    assert!(output.contains("\n  20\n604\n"));
+    assert!(output.contains("\n  10\n604.0\n"));
+    assert!(output.contains("\n  20\n604.0\n"));
 }
 
 #[test]
@@ -315,11 +315,11 @@ iactive,ACTIVE_BOTH_3
     assert_eq!(model.circles[0].customized_color, RgbColor::new(40, 50, 60));
     assert_eq!(model.circles[1], Circle::default());
     assert!(model.aux_line_segments.is_empty());
-    assert_eq!(model.grid.base_state, GridState::Full);
-    assert_eq!(model.grid.grid_size, 13);
-    assert_eq!(model.grid.interval_grid_size, 6);
-    assert_eq!(model.grid.determine_grid_x_length(), 5.0);
-    assert_eq!(model.grid.grid_angle, 45.0);
+    assert_eq!(model.grid.base_state, GridState::WithinPaper);
+    assert_eq!(model.grid.grid_size, 8);
+    assert_eq!(model.grid.interval_grid_size, 4);
+    assert_eq!(model.grid.determine_grid_x_length(), 1.0);
+    assert_eq!(model.grid.grid_angle, 90.0);
 
     assert!(orh::import_orh_bytes(input.as_bytes()).is_ok());
 }

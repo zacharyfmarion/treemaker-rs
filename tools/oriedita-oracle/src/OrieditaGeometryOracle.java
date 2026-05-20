@@ -1,10 +1,24 @@
 import origami.crease_pattern.CustomLineTypes;
 import origami.crease_pattern.OritaCalc;
+import origami.crease_pattern.element.Circle;
 import origami.crease_pattern.element.LineColor;
 import origami.crease_pattern.element.LineSegment;
+import origami.crease_pattern.element.Point;
+
+import oriedita.editor.databinding.GridModel;
+import oriedita.editor.export.DxfExporter;
+import oriedita.editor.export.ObjImporter;
+import oriedita.editor.export.OrhExporter;
+import oriedita.editor.export.OrhImporter;
+import oriedita.editor.save.Save;
+import oriedita.editor.save.SaveProvider;
+
+import java.awt.Color;
+import java.io.File;
+import java.nio.file.Files;
 
 public class OrieditaGeometryOracle {
-    public static void main(String[] args) {
+    public static void main(String[] args) throws Exception {
         if (args.length < 1) {
             usage("missing command");
         }
@@ -12,6 +26,10 @@ public class OrieditaGeometryOracle {
         switch (args[0]) {
             case "intersection" -> intersection(args);
             case "custom-line-type" -> customLineType(args);
+            case "orh-import-summary" -> orhImportSummary(args);
+            case "orh-export-fixture" -> orhExportFixture(args);
+            case "obj-import-summary" -> objImportSummary(args);
+            case "dxf-export-fixture" -> dxfExportFixture(args);
             default -> usage("unknown command: " + args[0]);
         }
     }
@@ -70,6 +88,140 @@ public class OrieditaGeometryOracle {
         System.out.println(result.getState());
     }
 
+    private static void orhImportSummary(String[] args) throws Exception {
+        if (args.length != 2) {
+            usage("orh-import-summary expects a file path");
+        }
+
+        Save save = new OrhImporter().doImport(new File(args[1]));
+        printSaveSummary(save);
+    }
+
+    private static void objImportSummary(String[] args) throws Exception {
+        if (args.length != 2) {
+            usage("obj-import-summary expects a file path");
+        }
+
+        Save save = new ObjImporter().doImport(new File(args[1]));
+        printSaveSummary(save);
+    }
+
+    private static void orhExportFixture(String[] args) throws Exception {
+        if (args.length != 1) {
+            usage("orh-export-fixture does not take arguments");
+        }
+
+        File file = File.createTempFile("oriedita-oracle", ".orh");
+        try {
+            new OrhExporter().doExport(fixtureSave(), file);
+            System.out.print(Files.readString(file.toPath()));
+        } finally {
+            file.delete();
+        }
+    }
+
+    private static void dxfExportFixture(String[] args) throws Exception {
+        if (args.length != 1) {
+            usage("dxf-export-fixture does not take arguments");
+        }
+
+        File file = File.createTempFile("oriedita-oracle", ".dxf");
+        try {
+            new DxfExporter().doExport(fixtureSave(), file);
+            System.out.print(Files.readString(file.toPath()));
+        } finally {
+            file.delete();
+        }
+    }
+
+    private static Save fixtureSave() {
+        Save save = SaveProvider.createInstance();
+        save.setTitle("oracle");
+        save.addLineSegment(new LineSegment(
+                new Point(0.0, 0.0),
+                new Point(10.0, 0.0),
+                LineColor.BLUE_2).withCustomizedColor(new Color(1, 2, 3)));
+        save.addCircle(new Circle(5.0, 5.0, 2.0, LineColor.MAGENTA_5));
+        save.addAuxLineSegment(new LineSegment(
+                new Point(1.0, 1.0),
+                new Point(2.0, 2.0),
+                LineColor.ORANGE_4));
+        GridModel gridModel = new GridModel();
+        gridModel.setBaseState(GridModel.State.HIDDEN);
+        gridModel.setGridSize(24);
+        save.setGridModel(gridModel);
+        return save;
+    }
+
+    private static void printSaveSummary(Save save) {
+        System.out.println("title|" + nullToEmpty(save.getTitle()));
+        System.out.println("lines|" + save.getLineSegments().size());
+        for (LineSegment segment : save.getLineSegments()) {
+            System.out.println("line|"
+                    + segment.determineAX() + "|"
+                    + segment.determineAY() + "|"
+                    + segment.determineBX() + "|"
+                    + segment.determineBY() + "|"
+                    + segment.getColor().getNumber() + "|"
+                    + segment.getActive().name() + "|"
+                    + segment.getSelected() + "|"
+                    + segment.getCustomized() + "|"
+                    + segment.getCustomizedColor().getRed() + "|"
+                    + segment.getCustomizedColor().getGreen() + "|"
+                    + segment.getCustomizedColor().getBlue());
+        }
+        System.out.println("circles|" + save.getCircles().size());
+        for (Circle circle : save.getCircles()) {
+            System.out.println("circle|"
+                    + circle.getX() + "|"
+                    + circle.getY() + "|"
+                    + circle.getR() + "|"
+                    + circle.getColor().getNumber() + "|"
+                    + circle.getCustomized() + "|"
+                    + circle.getCustomizedColor().getRed() + "|"
+                    + circle.getCustomizedColor().getGreen() + "|"
+                    + circle.getCustomizedColor().getBlue());
+        }
+        System.out.println("aux|" + save.getAuxLineSegments().size());
+        for (LineSegment segment : save.getAuxLineSegments()) {
+            System.out.println("auxline|"
+                    + segment.determineAX() + "|"
+                    + segment.determineAY() + "|"
+                    + segment.determineBX() + "|"
+                    + segment.determineBY() + "|"
+                    + segment.getColor().getNumber() + "|"
+                    + segment.getActive().name() + "|"
+                    + segment.getSelected() + "|"
+                    + segment.getCustomized() + "|"
+                    + segment.getCustomizedColor().getRed() + "|"
+                    + segment.getCustomizedColor().getGreen() + "|"
+                    + segment.getCustomizedColor().getBlue());
+        }
+        GridModel grid = save.getGridModel();
+        if (grid == null) {
+            System.out.println("grid|null");
+        } else {
+            System.out.println("grid|"
+                    + grid.getIntervalGridSize() + "|"
+                    + grid.getGridSize() + "|"
+                    + grid.getGridXA() + "|"
+                    + grid.getGridXB() + "|"
+                    + grid.getGridXC() + "|"
+                    + grid.getGridYA() + "|"
+                    + grid.getGridYB() + "|"
+                    + grid.getGridYC() + "|"
+                    + grid.getGridAngle() + "|"
+                    + grid.getBaseState().getState() + "|"
+                    + grid.getVerticalScalePosition() + "|"
+                    + grid.getHorizontalScalePosition() + "|"
+                    + grid.getDrawDiagonalGridlines());
+        }
+    }
+
+    private static String nullToEmpty(String value) {
+        return value == null ? "" : value;
+    }
+
     private static double parse(String value) {
         return Double.parseDouble(value);
     }
@@ -78,6 +230,10 @@ public class OrieditaGeometryOracle {
         System.err.println(message);
         System.err.println("usage: OrieditaGeometryOracle intersection <strict|sweet> <default|precision> ax ay bx by cx cy dx dy");
         System.err.println("   or: OrieditaGeometryOracle custom-line-type <customType> <lineColor>");
+        System.err.println("   or: OrieditaGeometryOracle orh-import-summary <path>");
+        System.err.println("   or: OrieditaGeometryOracle orh-export-fixture");
+        System.err.println("   or: OrieditaGeometryOracle obj-import-summary <path>");
+        System.err.println("   or: OrieditaGeometryOracle dxf-export-fixture");
         System.exit(2);
     }
 }

@@ -1,7 +1,7 @@
 use super::{IoError, Result};
 use crate::CreasePatternDocument;
 use crate::geometry::{ActiveState, Circle, LineColor, LineSegment, Point, RgbColor};
-use crate::model::{CreasePatternModel, GridState};
+use crate::model::CreasePatternModel;
 use encoding_rs::{EUC_JP, Encoding, GBK, SHIFT_JIS, UTF_8};
 
 const ORH_CHARSETS: &[&Encoding] = &[UTF_8, EUC_JP, GBK, SHIFT_JIS];
@@ -30,8 +30,6 @@ pub fn import_orh_str(input: &str) -> Result<CreasePatternDocument> {
         crease_pattern: CreasePatternModel::default(),
         metadata: Default::default(),
     };
-
-    import_grid(&lines, &mut document.crease_pattern)?;
 
     let num_lines = count_orh_lines(&lines)?;
     document.crease_pattern.line_segments = vec![LineSegment::default(); num_lines + 1];
@@ -249,64 +247,6 @@ pub fn export_orh_string(document: &CreasePatternDocument) -> String {
     output
 }
 
-fn import_grid(lines: &[&str], model: &mut CreasePatternModel) -> Result<()> {
-    let mut reading = false;
-    let mut grid_x = (0.0, 1.0, 1.0);
-    let mut grid_y = (0.0, 1.0, 1.0);
-
-    for (line_index, line) in lines.iter().enumerate() {
-        match *line {
-            "<Kousi>" => {
-                reading = true;
-                continue;
-            }
-            "</Kousi>" => {
-                reading = false;
-                continue;
-            }
-            _ if !reading => continue,
-            _ => {}
-        }
-
-        let Some((tag, value)) = tag_value(line) else {
-            continue;
-        };
-        match tag {
-            "i_kitei_jyoutai" => model.grid.base_state = parse_grid_state(value, line_index + 1)?,
-            "nyuuryoku_kitei" => model
-                .grid
-                .set_grid_size(string_to_i32(value, model.grid.grid_size)),
-            "memori_kankaku" => {
-                model
-                    .grid
-                    .set_interval_grid_size(parse_i32_value(value, line_index + 1)?);
-            }
-            "a_to_heikouna_memori_iti" => {
-                model.grid.horizontal_scale_position = parse_i32_value(value, line_index + 1)?;
-            }
-            "b_to_heikouna_memori_iti" => {
-                model.grid.vertical_scale_position = parse_i32_value(value, line_index + 1)?;
-            }
-            "d_kousi_x_a" => grid_x.0 = string_to_f64(value, model.grid.grid_xa),
-            "d_kousi_x_b" => grid_x.1 = string_to_f64(value, model.grid.grid_xb),
-            "d_kousi_x_c" => grid_x.2 = string_to_f64(value, model.grid.grid_xc),
-            "d_kousi_y_a" => grid_y.0 = string_to_f64(value, model.grid.grid_ya),
-            "d_kousi_y_b" => grid_y.1 = string_to_f64(value, model.grid.grid_yb),
-            "d_kousi_y_c" => grid_y.2 = string_to_f64(value, model.grid.grid_yc),
-            "d_kousi_kakudo" => {
-                model
-                    .grid
-                    .set_grid_angle(string_to_f64(value, model.grid.grid_angle));
-            }
-            _ => {}
-        }
-    }
-
-    model.grid.apply_grid_x(grid_x.0, grid_x.1, grid_x.2);
-    model.grid.apply_grid_y(grid_y.0, grid_y.1, grid_y.2);
-    Ok(())
-}
-
 fn count_orh_lines(lines: &[&str]) -> Result<usize> {
     let mut reading_flag = 0;
     let mut count = 0;
@@ -376,22 +316,6 @@ fn parse_active_state(value: Option<&&str>, line: usize) -> Result<ActiveState> 
     }
 }
 
-fn parse_grid_state(value: &str, line: usize) -> Result<GridState> {
-    match value {
-        "HIDDEN" => Ok(GridState::Hidden),
-        "WITHIN_PAPER" => Ok(GridState::WithinPaper),
-        "FULL" => Ok(GridState::Full),
-        _ => value
-            .parse::<i32>()
-            .map_err(|error| IoError::InvalidLine {
-                format: "orh",
-                line,
-                message: error.to_string(),
-            })
-            .and_then(|state| GridState::from_state(state).map_err(IoError::from)),
-    }
-}
-
 fn required_token<'a>(value: Option<&&'a str>, line: usize) -> Result<&'a str> {
     value.copied().ok_or_else(|| IoError::InvalidLine {
         format: "orh",
@@ -428,23 +352,6 @@ fn parse_u8(value: &str, line: usize) -> Result<u8> {
         line,
         message: error.to_string(),
     })
-}
-
-fn string_to_i32(value: &str, fallback: i32) -> i32 {
-    if let Ok(integer) = value.parse::<i32>() {
-        return integer;
-    }
-    if let Ok(number) = value.parse::<f64>() {
-        return number.round() as i32;
-    }
-    fallback
-}
-
-fn string_to_f64(value: &str, fallback: f64) -> f64 {
-    if let Ok(integer) = value.parse::<i32>() {
-        return f64::from(integer);
-    }
-    value.parse::<f64>().unwrap_or(fallback)
 }
 
 fn csv_tokens(line: &str) -> Vec<&str> {

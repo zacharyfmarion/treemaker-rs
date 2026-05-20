@@ -766,6 +766,9 @@ Status:
 - In progress. CP import/export, FOLD JSON import/export for Oriedita extension
   arrays, `.ori` JSON save import/export for `v1` and `v1.1`, `.orh`
   import/export, OBJ import, and DXF export have Rust unit coverage.
+- The Oriedita Java oracle now validates `.orh` import/export, `.obj` import,
+  and `.dxf` export against pinned upstream source. `.dxf` export uses
+  Java-style floating-point text formatting for exact exporter parity.
 - FOLD face reconstruction and Oriedita's FOLD import coordinate-normalization
   transform still need oracle validation before the FOLD path can be promoted
   beyond porting.
@@ -776,7 +779,10 @@ Status:
   parsers/exporters land.
 - `.orh` preserves Oriedita's legacy importer quirks: auxiliary lines exported
   by Oriedita are not imported by Oriedita, and import preallocates an extra
-  default line/circle slot. These are covered as intentional parity behavior.
+  default line/circle slot. The `<Kousi>` grid section is parsed by Oriedita
+  into a local copy after default grid state has already been copied into the
+  save, so imported saves keep the default grid. These are covered as
+  intentional parity behavior.
 
 ### Stage 5: Arrangement, Split, Merge, and Cleanup
 

@@ -43,6 +43,8 @@
   --shadow-overlay: rgba(0, 0, 0, 0.35);
   --shadow-context-menu: 0 4px 12px rgba(0, 0, 0, 0.35);
   --overlay-dim: rgba(0, 0, 0, 0.52);
+  --z-modal: 9999;
+  --z-portaled-popover: 10000;
 
   --paper-shadow: rgba(0, 0, 0, 0.28);
   --paper-stroke: rgba(16, 20, 23, 0.65);
@@ -236,7 +238,7 @@
 }
 
 .select-content {
-  z-index: 1000;
+  z-index: var(--z-portaled-popover);
   overflow: hidden;
   min-width: var(--radix-select-trigger-width);
   max-height: min(var(--radix-select-content-available-height), 220px);
@@ -423,7 +425,7 @@
 }
 
 .tooltip-content {
-  z-index: 1000;
+  z-index: var(--z-portaled-popover);
   max-width: 220px;
   padding: 6px 8px;
   border: 1px solid var(--border-default);
@@ -473,7 +475,7 @@
 .settings-modal {
   position: fixed;
   inset: 0;
-  z-index: 9999;
+  z-index: var(--z-modal);
   display: grid;
   place-items: center;
   padding: var(--space-4);
@@ -590,7 +592,7 @@
 .simple-modal {
   position: fixed;
   inset: 0;
-  z-index: 9999;
+  z-index: var(--z-modal);
   display: grid;
   place-items: center;
   padding: var(--space-4);
@@ -827,7 +829,7 @@
 .help-modal {
   position: fixed;
   inset: 0;
-  z-index: 9998;
+  z-index: var(--z-modal);
   display: grid;
   place-items: center;
   padding: var(--space-4);

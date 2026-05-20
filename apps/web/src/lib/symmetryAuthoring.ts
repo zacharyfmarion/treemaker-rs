@@ -1,4 +1,3 @@
-import type { ConditionKind } from '../engine/types';
 import type { Point } from './geometry';
 import type { TreeProject } from './sampleProject';
 
@@ -9,60 +8,14 @@ export interface SymmetryAxis {
   angle: number;
 }
 
-export interface SymmetryLeafPair {
-  node1: number;
-  node2: number;
-  distance: number;
-}
-
-export interface SymmetryOnAxisLeaf {
-  node: number;
-  distance: number;
-}
-
-export interface SymmetryAmbiguousLeaf {
-  node: number;
-  candidates: number[];
-}
-
-export interface SymmetryUnmatchedLeaf {
-  node: number;
-}
-
-export interface SymmetryLeafPreview {
-  pairs: SymmetryLeafPair[];
-  onAxis: SymmetryOnAxisLeaf[];
-  ambiguous: SymmetryAmbiguousLeaf[];
-  unmatched: SymmetryUnmatchedLeaf[];
-  scopedLeafIds: number[];
-}
-
 export interface SymmetryAuthoringPair {
   node1: number;
   node2: number;
 }
 
-interface CandidateMatch {
-  node: number;
-  distance: number;
-  candidates: number[];
-}
-
 function axisDirection(axis: SymmetryAxis): Point {
   const radians = (axis.angle * Math.PI) / 180;
   return { x: Math.cos(radians), y: Math.sin(radians) };
-}
-
-function nodePairKey(node1: number, node2: number): string {
-  return node1 < node2 ? `${node1}:${node2}` : `${node2}:${node1}`;
-}
-
-function conditionIsPair(kind: ConditionKind, node1: number, node2: number): boolean {
-  return (
-    kind.type === 'nodes_paired' &&
-    ((kind.node1 === node1 && kind.node2 === node2) ||
-      (kind.node1 === node2 && kind.node2 === node1))
-  );
 }
 
 function nodeExists(project: TreeProject, nodeId: number): boolean {
@@ -210,99 +163,4 @@ export function findMirrorEdgeId(
         (candidate.nodes[0] === node2 && candidate.nodes[1] === node1))
   );
   return mirrored?.id ?? null;
-}
-
-export function hasNodeSymmetricCondition(project: TreeProject, nodeId: number): boolean {
-  return project.conditions.some(
-    (condition) => condition.kind.type === 'node_symmetric' && condition.kind.node === nodeId
-  );
-}
-
-export function hasPairedCondition(project: TreeProject, node1: number, node2: number): boolean {
-  return project.conditions.some((condition) => conditionIsPair(condition.kind, node1, node2));
-}
-
-export function detectSymmetryLeafPairs(
-  project: TreeProject,
-  nodeIds?: number[],
-  tolerance = SYMMETRY_AUTHORING_TOLERANCE
-): SymmetryLeafPreview {
-  if (!project.hasSymmetry) {
-    return { pairs: [], onAxis: [], ambiguous: [], unmatched: [], scopedLeafIds: [] };
-  }
-
-  const axis = symmetryAxisForProject(project);
-  const selectedIds = nodeIds && nodeIds.length > 0 ? new Set(nodeIds) : null;
-  const leaves = project.nodes.filter((node) => node.isLeaf && (!selectedIds || selectedIds.has(node.id)));
-  const leafIds = new Set(leaves.map((node) => node.id));
-  const scopedLeafIds = leaves.map((node) => node.id);
-  const actionableLeaves = leaves.filter(
-    (node) => !hasNodeSymmetricCondition(project, node.id) && findPairedNodeId(project, node.id) === null
-  );
-  const onAxis: SymmetryOnAxisLeaf[] = [];
-  const offAxis = actionableLeaves.filter((node) => {
-    const distance = distanceToSymmetryAxis(node.loc, axis);
-    if (distance <= tolerance) {
-      onAxis.push({ node: node.id, distance });
-      return false;
-    }
-    return true;
-  });
-
-  const candidates = new Map<number, CandidateMatch>();
-  const ambiguous: SymmetryAmbiguousLeaf[] = [];
-  const unmatched: SymmetryUnmatchedLeaf[] = [];
-
-  for (const node of offAxis) {
-    const reflected = reflectPointAcrossSymmetryAxis(node.loc, axis);
-    const side = symmetrySide(node.loc, axis, tolerance);
-    const matches = offAxis
-      .filter((candidate) => candidate.id !== node.id && leafIds.has(candidate.id))
-      .filter((candidate) => symmetrySide(candidate.loc, axis, tolerance) === -side)
-      .map((candidate) => ({
-        node: candidate.id,
-        distance: Math.hypot(candidate.loc.x - reflected.x, candidate.loc.y - reflected.y),
-      }))
-      .filter((candidate) => candidate.distance <= tolerance)
-      .sort((a, b) => a.distance - b.distance || a.node - b.node);
-
-    if (matches.length === 0) {
-      unmatched.push({ node: node.id });
-      continue;
-    }
-    if (matches.length > 1) {
-      ambiguous.push({ node: node.id, candidates: matches.map((match) => match.node) });
-      continue;
-    }
-    candidates.set(node.id, { ...matches[0], candidates: [matches[0].node] });
-  }
-
-  const pairs: SymmetryLeafPair[] = [];
-  const pairedKeys = new Set<string>();
-  for (const [nodeId, match] of candidates) {
-    const reciprocal = candidates.get(match.node);
-    if (!reciprocal || reciprocal.node !== nodeId) {
-      if (ambiguous.some((item) => item.node === match.node || item.candidates.includes(match.node))) {
-        continue;
-      }
-      unmatched.push({ node: nodeId });
-      continue;
-    }
-    const key = nodePairKey(nodeId, match.node);
-    if (pairedKeys.has(key) || hasPairedCondition(project, nodeId, match.node)) continue;
-    pairedKeys.add(key);
-    pairs.push({
-      node1: Math.min(nodeId, match.node),
-      node2: Math.max(nodeId, match.node),
-      distance: Math.max(match.distance, reciprocal.distance),
-    });
-  }
-
-  return {
-    pairs: pairs.sort((a, b) => a.node1 - b.node1 || a.node2 - b.node2),
-    onAxis: onAxis.sort((a, b) => a.node - b.node),
-    ambiguous: ambiguous.sort((a, b) => a.node - b.node),
-    unmatched: unmatched.sort((a, b) => a.node - b.node),
-    scopedLeafIds,
-  };
 }

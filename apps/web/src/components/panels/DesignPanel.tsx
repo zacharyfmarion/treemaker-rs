@@ -17,7 +17,6 @@ import {
   FileText,
   FolderOpen,
   Layers,
-  Link2,
   Maximize2,
   Plus,
   ScanLine,
@@ -46,7 +45,6 @@ import {
   isEdgeSelected,
   isNodeSelected,
   isPathSelected,
-  selectedNodeIds,
   toggleEdgeSelection,
   toggleNodeSelection,
 } from '../../lib/selection';
@@ -57,7 +55,6 @@ import {
   snapPointToSymmetryAxis,
   symmetryAxisForProject,
   symmetrySide,
-  type SymmetryLeafPreview,
 } from '../../lib/symmetryAuthoring';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { Button } from '../ui/Button';
@@ -88,10 +85,8 @@ interface DesignViewportToolbarProps {
   zoomPercent: number;
   layers: DesignViewLayers;
   mirrorMode: boolean;
-  hasSymmetry: boolean;
   onLayerChange: (layer: DesignViewLayerKey, visible: boolean) => void;
   onToggleMirror: () => void;
-  onPairLeaves: () => void;
   zoomIn: () => void;
   zoomOut: () => void;
   fitToView: () => void;
@@ -103,10 +98,8 @@ function DesignViewportToolbar({
   zoomPercent,
   layers,
   mirrorMode,
-  hasSymmetry,
   onLayerChange,
   onToggleMirror,
-  onPairLeaves,
   zoomIn,
   zoomOut,
   fitToView,
@@ -176,24 +169,16 @@ function DesignViewportToolbar({
         1:1
       </button>
       <span className="design-view-toolbar__separator" />
-      <IconButton
+      <Button
         size="sm"
-        variant="toolbar"
-        title={mirrorMode ? 'Mirror On' : 'Mirror'}
+        variant="secondary"
+        className="design-view-toolbar__mirror"
         isActive={mirrorMode}
+        aria-pressed={mirrorMode}
         onClick={onToggleMirror}
       >
-        <Axis3d size={14} />
-      </IconButton>
-      <IconButton
-        size="sm"
-        variant="toolbar"
-        title="Pair Leaves"
-        disabled={!hasSymmetry}
-        onClick={onPairLeaves}
-      >
-        <Link2 size={14} />
-      </IconButton>
+        Mirror Nodes
+      </Button>
       <span className="design-view-toolbar__separator" />
       <div className="design-view-toolbar__menu-anchor" ref={layersMenuRef}>
         <IconButton
@@ -253,13 +238,10 @@ export function DesignPanel() {
   const moveNodeWithSymmetry = useWorkspaceStore((state) => state.moveNodeWithSymmetry);
   const setToolMode = useWorkspaceStore((state) => state.setToolMode);
   const setSymmetry = useWorkspaceStore((state) => state.setSymmetry);
-  const previewSymmetryLeafPairs = useWorkspaceStore((state) => state.previewSymmetryLeafPairs);
-  const applySymmetryLeafPairs = useWorkspaceStore((state) => state.applySymmetryLeafPairs);
   const projectLoadId = useWorkspaceStore((state) => state.projectLoadId);
   const designViewportFitRequestId = useWorkspaceStore(
     (state) => state.designViewportFitRequestId
   );
-  const [symmetryPreview, setSymmetryPreview] = useState<SymmetryLeafPreview | null>(null);
   const mirrorMode = toolMode === 'symmetry';
   const symmetryAxis = useMemo(() => symmetryAxisForProject(project), [project]);
   const showEmptyState = engineReady && project.nodes.length === 0 && project.edges.length === 0;
@@ -294,14 +276,6 @@ export function DesignPanel() {
       y2: center.y - Math.sin(angle) * span,
     };
   }, [project.paper.symAngle, project.paper.symLoc, worldRect]);
-
-  const selectedLeafNodeIds = useMemo(
-    () =>
-      selectedNodeIds(selection).filter((id) =>
-        project.nodes.some((node) => node.id === id && node.isLeaf)
-      ),
-    [project.nodes, selection]
-  );
 
   const symmetryHoverPreview = useMemo(() => {
     if (!mirrorMode || !project.hasSymmetry || selection.kind !== 'node' || !hoverPoint) return null;
@@ -459,16 +433,6 @@ export function DesignPanel() {
     setLayers((current) => setDesignLayerVisibility(current, 'symmetry', true));
     setToolMode('symmetry');
   }, [mirrorMode, project.hasSymmetry, project.paper.height, project.paper.width, setSymmetry, setToolMode]);
-
-  const openSymmetryPreview = useCallback(() => {
-    const scope = selectedLeafNodeIds.length > 0 ? selectedLeafNodeIds : undefined;
-    setSymmetryPreview(previewSymmetryLeafPairs(scope));
-  }, [previewSymmetryLeafPairs, selectedLeafNodeIds]);
-
-  const applyOpenSymmetryPreview = useCallback(() => {
-    if (!symmetryPreview) return;
-    void applySymmetryLeafPairs(symmetryPreview.scopedLeafIds).then(() => setSymmetryPreview(null));
-  }, [applySymmetryLeafPairs, symmetryPreview]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -883,10 +847,8 @@ export function DesignPanel() {
           zoomPercent={zoomPercent}
           layers={layers}
           mirrorMode={mirrorMode}
-          hasSymmetry={project.hasSymmetry}
           onLayerChange={setLayer}
           onToggleMirror={toggleMirrorMode}
-          onPairLeaves={openSymmetryPreview}
           zoomIn={() => transformRef.current?.zoomIn(0.35, 120)}
           zoomOut={() => transformRef.current?.zoomOut(0.35, 120)}
           fitToView={() => fitToView()}
@@ -901,41 +863,6 @@ export function DesignPanel() {
             </span>
           )}
         </div>
-        {symmetryPreview && (
-          <div className="symmetry-preview-popover" role="dialog" aria-label="Symmetry leaf preview">
-            <div className="symmetry-preview-popover__header">
-              <strong>Symmetry Preview</strong>
-              <button type="button" onClick={() => setSymmetryPreview(null)}>
-                Close
-              </button>
-            </div>
-            <div className="symmetry-preview-popover__grid">
-              <span>Pairs</span>
-              <strong>{symmetryPreview.pairs.length}</strong>
-              <span>On-axis</span>
-              <strong>{symmetryPreview.onAxis.length}</strong>
-              <span>Ambiguous</span>
-              <strong>{symmetryPreview.ambiguous.length}</strong>
-              <span>Unmatched</span>
-              <strong>{symmetryPreview.unmatched.length}</strong>
-            </div>
-            {(symmetryPreview.ambiguous.length > 0 || symmetryPreview.unmatched.length > 0) && (
-              <div className="symmetry-preview-popover__detail">
-                {[...symmetryPreview.ambiguous, ...symmetryPreview.unmatched]
-                  .map((item) => item.node)
-                  .join(', ')}
-              </div>
-            )}
-            <button
-              className="symmetry-preview-popover__apply"
-              type="button"
-              disabled={symmetryPreview.pairs.length + symmetryPreview.onAxis.length === 0}
-              onClick={applyOpenSymmetryPreview}
-            >
-              Apply
-            </button>
-          </div>
-        )}
         <div className="design-legend">
           <span><CircleDot size={13} /> Terminal</span>
           <span><Waypoints size={13} /> Active path</span>

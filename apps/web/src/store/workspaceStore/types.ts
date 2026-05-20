@@ -15,10 +15,7 @@ import type {
   ToolMode,
   TreeProject,
 } from '../../lib/sampleProject';
-import type {
-  SymmetryAuthoringPair,
-  SymmetryLeafPreview,
-} from '../../lib/symmetryAuthoring';
+import type { SymmetryAuthoringPair } from '../../lib/symmetryAuthoring';
 import type { FileService } from '../../platform/fileService';
 import type { ImportedCreasePatternDocument } from '../../lib/creasePatternImport';
 
@@ -131,8 +128,6 @@ export interface ConditionSliceActions {
     symAngle?: number;
   }) => Promise<void>;
   addCondition: (kind: ConditionKind) => Promise<void>;
-  previewSymmetryLeafPairs: (nodeIds?: number[]) => SymmetryLeafPreview;
-  applySymmetryLeafPairs: (nodeIds?: number[]) => Promise<SymmetryLeafPreview>;
   deleteCondition: (id: number) => Promise<void>;
   clearConditions: () => Promise<void>;
 }

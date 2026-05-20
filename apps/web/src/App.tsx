@@ -13,6 +13,7 @@ import {
   Play,
 } from 'lucide-react';
 import { MenuBar } from './components/MenuBar';
+import { CommandDialogModal } from './components/CommandDialogModal';
 import { GlobalToasts } from './components/GlobalToasts';
 import { HelpModal } from './components/HelpModal';
 import { SelectByIndexModal } from './components/SelectByIndexModal';
@@ -26,6 +27,7 @@ import { handleAppKeyDown } from './lib/appKeyboard';
 import { useTauriMenuListener } from './menus/tauriMenuListener';
 import { isDesktopRuntime } from './platform/runtime';
 import { applyWindowTitle, formatWindowTitle } from './platform/windowTitle';
+import { requestConfirmation } from './store/commandDialogStore';
 import { applyDefaultLayout, useLayoutStore } from './store/layoutStore';
 import { useSettingsStore } from './store/settingsStore';
 import { useThemeStore } from './store/themeStore';
@@ -156,14 +158,21 @@ export default function App() {
 
     if (!isDesktopRuntime()) return undefined;
     import('@tauri-apps/api/window')
-      .then(({ getCurrentWindow }) =>
-        getCurrentWindow().onCloseRequested((event) => {
+      .then(({ getCurrentWindow }) => {
+        const appWindow = getCurrentWindow();
+        return appWindow.onCloseRequested((event) => {
           if (!useWorkspaceStore.getState().dirty) return;
-          if (!window.confirm('Discard unsaved changes?')) {
-            event.preventDefault();
-          }
-        })
-      )
+          event.preventDefault();
+          void requestConfirmation({
+            title: 'Discard unsaved changes?',
+            message: 'Your current project has unsaved changes. Close Ori Studio and discard them?',
+            confirmLabel: 'Discard',
+            tone: 'danger',
+          }).then((confirmed) => {
+            if (confirmed) void appWindow.destroy();
+          });
+        });
+      })
       .then((dispose) => {
         unlisten = dispose;
       })
@@ -235,6 +244,7 @@ export default function App() {
       <HelpModal />
       <SelectByIndexModal />
       <SettingsModal />
+      <CommandDialogModal />
       <GlobalToasts />
       <Toaster
         theme={toasterTheme}

@@ -5,6 +5,7 @@ import { useLayoutStore } from '../store/layoutStore';
 import { useSettingsStore, type SettingsTab } from '../store/settingsStore';
 import { useThemeStore } from '../store/themeStore';
 import { applyTheme, DEFAULT_THEME, PRESET_THEMES } from '../themes';
+import { CommandDialogModal } from './CommandDialogModal';
 import { SettingsModal } from './SettingsModal';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -18,6 +19,14 @@ let container: HTMLDivElement | null = null;
 function findButton(label: string): HTMLButtonElement {
   const button = Array.from(container?.querySelectorAll('button') ?? []).find((element) =>
     element.textContent?.includes(label)
+  );
+  expect(button).toBeDefined();
+  return button as HTMLButtonElement;
+}
+
+function findExactButton(label: string): HTMLButtonElement {
+  const button = Array.from(container?.querySelectorAll('button') ?? []).find(
+    (element) => element.textContent === label
   );
   expect(button).toBeDefined();
   return button as HTMLButtonElement;
@@ -39,7 +48,12 @@ function renderModal(tab?: SettingsTab) {
   document.body.append(container);
   root = createRoot(container);
   act(() => {
-    root?.render(<SettingsModal />);
+    root?.render(
+      <>
+        <SettingsModal />
+        <CommandDialogModal />
+      </>
+    );
   });
   return container;
 }
@@ -87,9 +101,8 @@ describe('SettingsModal', () => {
     expect(document.documentElement.getAttribute('data-theme-type')).toBe('light');
   });
 
-  it('opens the requested tab and can reset the layout', () => {
+  it('opens the requested tab and can reset the layout', async () => {
     const resetLayout = vi.fn();
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
     useLayoutStore.setState({ resetLayout });
 
     const rendered = renderModal('workspace');
@@ -99,7 +112,13 @@ describe('SettingsModal', () => {
       findButton('Reset Layout').click();
     });
 
-    expect(confirm).toHaveBeenCalledOnce();
+    expect(rendered.textContent).toContain('Restore the default panel layout?');
+
+    await act(async () => {
+      findExactButton('Reset').click();
+      await Promise.resolve();
+    });
+
     expect(resetLayout).toHaveBeenCalledOnce();
   });
 

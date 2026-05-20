@@ -756,7 +756,6 @@ function resetStores(snapshot = makeSnapshot()) {
   useLayoutStore.setState(initialLayoutState, true);
   const api = createMockEngineApi(snapshot);
   configureEngine(api);
-  vi.spyOn(window, 'confirm').mockReturnValue(true);
   return api;
 }
 

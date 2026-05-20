@@ -58,6 +58,7 @@ function createDeps() {
     about: vi.fn(),
     settings: vi.fn(),
     selectByIndex: vi.fn(),
+    requestPositiveNumber: vi.fn().mockResolvedValue(0.5),
   };
 }
 
@@ -125,6 +126,36 @@ describe('menu actions', () => {
     expect(deps.workspace.perturbAllNodes).toHaveBeenCalledOnce();
     expect(deps.workspace.relieveAllStrain).toHaveBeenCalledOnce();
     expect(deps.workspace.triangulateTree).toHaveBeenCalledOnce();
+  });
+
+  it('requests in-app numeric values for parameterized edit commands', async () => {
+    const deps = createDeps();
+    deps.requestPositiveNumber
+      .mockResolvedValueOnce(0.25)
+      .mockResolvedValueOnce(2)
+      .mockResolvedValueOnce(1.5);
+    const handle = createMenuActionHandler(deps);
+
+    await expect(handle('edit.splitEdge')).resolves.toBe(true);
+    await expect(handle('edit.setEdgeLength')).resolves.toBe(true);
+    await expect(handle('edit.scaleEdgeLengths')).resolves.toBe(true);
+
+    expect(deps.requestPositiveNumber).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ title: 'Split Edge', initialValue: '0.5' })
+    );
+    expect(deps.workspace.splitSelectedEdge).toHaveBeenCalledWith(0.25);
+    expect(deps.workspace.setSelectedEdgeLengths).toHaveBeenCalledWith(2);
+    expect(deps.workspace.scaleSelectedEdgeLengths).toHaveBeenCalledWith(1.5);
+  });
+
+  it('cancels parameterized edit commands when the in-app number modal is dismissed', async () => {
+    const deps = createDeps();
+    deps.requestPositiveNumber.mockResolvedValueOnce(null);
+
+    await expect(createMenuActionHandler(deps)('edit.splitEdge')).resolves.toBe(false);
+
+    expect(deps.workspace.splitSelectedEdge).not.toHaveBeenCalled();
   });
 
   it('routes file commands through the selected file service', async () => {

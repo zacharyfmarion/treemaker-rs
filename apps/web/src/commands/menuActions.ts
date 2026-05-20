@@ -6,6 +6,7 @@ import { useSettingsStore } from '../store/settingsStore';
 import { useWorkspaceStore } from '../store/workspaceStore';
 import { selectWorkspaceCapabilities } from '../store/workspaceStore/capabilities';
 import type { WorkspaceCapabilities, WorkspaceCapabilityId } from '../lib/workspaceCapabilities';
+import { requestPositiveNumber, type NumberDialogOptions } from '../store/commandDialogStore';
 
 export const MENU_ACTION_IDS = [
   'app.about',
@@ -123,6 +124,7 @@ export interface MenuActionDependencies {
   about?: () => void;
   settings?: () => void;
   selectByIndex?: () => void;
+  requestPositiveNumber?: (options: NumberDialogOptions) => Promise<number | null>;
 }
 
 const FILE_ACTIONS: Partial<Record<MenuActionId, FileCommand>> = {
@@ -134,13 +136,6 @@ const FILE_ACTIONS: Partial<Record<MenuActionId, FileCommand>> = {
   'file.exportSvg': 'exportSvg',
   'file.exportPng': 'exportPng',
 };
-
-function promptPositiveNumber(label: string, initial = '1'): number | null {
-  const raw = window.prompt(label, initial);
-  if (raw === null) return null;
-  const value = Number.parseFloat(raw);
-  return Number.isFinite(value) && value > 0 ? value : null;
-}
 
 export function isMenuActionId(id: string): id is MenuActionId {
   return (MENU_ACTION_IDS as readonly string[]).includes(id);
@@ -229,19 +224,40 @@ export function createMenuActionHandler(deps: MenuActionDependencies) {
         await deps.workspace.makeSelectedNodeRoot();
         return true;
       case 'edit.splitEdge': {
-        const distance = promptPositiveNumber('Split distance along strained edge', '0.5');
+        const distance = await (deps.requestPositiveNumber ?? requestPositiveNumber)({
+          title: 'Split Edge',
+          label: 'Distance',
+          initialValue: '0.5',
+          confirmLabel: 'Split',
+          minExclusive: 0,
+          meta: 'Distance along the selected strained edge.',
+        });
         if (distance === null) return false;
         await deps.workspace.splitSelectedEdge(distance);
         return true;
       }
       case 'edit.setEdgeLength': {
-        const length = promptPositiveNumber('Set selected edge length', '1');
+        const length = await (deps.requestPositiveNumber ?? requestPositiveNumber)({
+          title: 'Set Edge Length',
+          label: 'Length',
+          initialValue: '1',
+          confirmLabel: 'Set',
+          minExclusive: 0,
+          meta: 'Applies this exact length to the selected edge.',
+        });
         if (length === null) return false;
         await deps.workspace.setSelectedEdgeLengths(length);
         return true;
       }
       case 'edit.scaleEdgeLengths': {
-        const factor = promptPositiveNumber('Scale selected edge lengths by', '1');
+        const factor = await (deps.requestPositiveNumber ?? requestPositiveNumber)({
+          title: 'Scale Edge Lengths',
+          label: 'Factor',
+          initialValue: '1',
+          confirmLabel: 'Scale',
+          minExclusive: 0,
+          meta: 'Multiplies selected edge lengths by this factor.',
+        });
         if (factor === null) return false;
         await deps.workspace.scaleSelectedEdgeLengths(factor);
         return true;

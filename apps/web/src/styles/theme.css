@@ -645,6 +645,19 @@
   line-height: 1.45;
 }
 
+.simple-modal__message {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.simple-modal__error {
+  color: var(--status-danger);
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
 .simple-modal__footer {
   justify-content: flex-end;
   padding: 0;

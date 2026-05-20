@@ -1,6 +1,8 @@
 # Ori Studio
 
 [![CI](https://github.com/zacharyfmarion/ori-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/zacharyfmarion/ori-studio/actions/workflows/ci.yml)
+[![Web](https://img.shields.io/badge/Web-oristudio.pages.dev-brightgreen.svg)](https://oristudio.pages.dev/)
+[![Latest Release](https://img.shields.io/github/v/release/zacharyfmarion/ori-studio?display_name=tag)](https://github.com/zacharyfmarion/ori-studio/releases)
 [![treemaker-core on crates.io](https://img.shields.io/crates/v/treemaker-core.svg)](https://crates.io/crates/treemaker-core)
 [![treemaker-core docs](https://docs.rs/treemaker-core/badge.svg)](https://docs.rs/treemaker-core)
 
@@ -13,6 +15,10 @@ inspect the underlying tree, run optimization passes, build crease patterns,
 export compatible files, and preview folded results. The original TreeMaker
 behavior remains the parity reference for the engine, while the shared frontend
 is evolving into a pane-based design workspace for browser and desktop use.
+
+Try the hosted app at [oristudio.pages.dev](https://oristudio.pages.dev/).
+Signed Apple Silicon DMGs are published from local notarized builds on
+[GitHub Releases](https://github.com/zacharyfmarion/ori-studio/releases).
 
 ## Applications
 

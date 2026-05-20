@@ -4,6 +4,7 @@ pub mod cp;
 pub mod dxf;
 pub mod fold;
 pub mod obj;
+pub mod ori;
 
 use crate::geometry::LineColorParseError;
 use crate::model::ModelError;

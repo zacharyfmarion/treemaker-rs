@@ -234,20 +234,20 @@ mutation.
 | `CpExporter.java` | `.cp` export and lossy-format warning. | `io::cp::export` | 4 | Unit-tested |
 | `FoldImporter.java` | `.fold` import and coordinate normalization. | `io::fold::import` | 4 | Porting |
 | `FoldExporter.java` | `.fold` export, face reconstruction, Oriedita extras. | `io::fold::export` | 4 | Porting |
-| `OriImporter.java` | `.ori` import. | `io::ori::import` | 4 | Unsupported |
-| `OriExporter.java` | `.ori` export. | `io::ori::export` | 4 | Unsupported |
+| `OriImporter.java` | `.ori` import. | `io::ori::import` | 4 | Unit-tested |
+| `OriExporter.java` | `.ori` export. | `io::ori::export` | 4 | Unit-tested |
 | `OrhImporter.java` | `.orh` import. | `io::orh::import` | 4 | Unsupported |
 | `OrhExporter.java` | `.orh` export. | `io::orh::export` | 4 | Unsupported |
 | `ObjImporter.java` | `.obj` import. | `io::obj::import` | 4 | Unit-tested |
 | `DxfExporter.java` | `.dxf` export. | `io::dxf::export` | 4 | Unit-tested |
 | `OrieditaFoldFile.java` | FOLD extension fields. | `io::fold::oriedita_extensions` | 4 | Porting |
-| `Save.java` | Main save model. | `io::save` | 4 | Unsupported |
-| `BaseSave.java` | Shared save payload. | `io::save` | 4 | Unsupported |
-| `SaveV1_0.java` | Legacy save payload. | `io::save::legacy` | 4 | Unsupported |
-| `SaveV1_1.java` | Legacy save payload. | `io::save::legacy` | 4 | Unsupported |
-| `SaveConverter.java` | Save-version conversion. | `io::save::convert` | 4 | Unsupported |
+| `Save.java` | Main save model. | `io::save` | 4 | Unit-tested |
+| `BaseSave.java` | Shared save payload. | `io::save` | 4 | Unit-tested |
+| `SaveV1_0.java` | Legacy save payload. | `io::save::legacy` | 4 | Unit-tested |
+| `SaveV1_1.java` | Legacy save payload. | `io::save::legacy` | 4 | Unit-tested |
+| `SaveConverter.java` | Save-version conversion. | `io::save::convert` | 4 | Porting |
 | `SaveProvider.java` | Save instance factory. | `io::save` | 4 | Unsupported |
-| `FileVersionTester.java` | Save-version detection. | `io::save::version` | 4 | Unsupported |
+| `FileVersionTester.java` | Save-version detection. | `io::save::version` | 4 | Porting |
 | `TextSave.java` | Text persistence. | `model::text`, `io::save` | 3-4 | Unit-tested |
 
 ## Task and Service Matrix

@@ -14,8 +14,8 @@ resolver = "3"
 version = "0.1.0"
 edition = "2024"
 license = "GPL-2.0-or-later"
-repository = "https://github.com/zacharyfmarion/treemaker-rs"
-homepage = "https://github.com/zacharyfmarion/treemaker-rs"
+repository = "https://github.com/zacharyfmarion/ori-studio"
+homepage = "https://github.com/zacharyfmarion/ori-studio"
 
 [workspace.dependencies]
 anyhow = "1.0"

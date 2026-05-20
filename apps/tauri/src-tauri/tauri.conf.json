@@ -31,8 +31,12 @@
     }
   },
   "bundle": {
-    "active": false,
+    "active": true,
     "targets": "all",
+    "macOS": {
+      "minimumSystemVersion": "10.15",
+      "entitlements": "entitlements.plist"
+    },
     "icon": [
       "icons/icon.icns",
       "icons/icon.ico",

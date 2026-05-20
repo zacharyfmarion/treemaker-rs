@@ -1,0 +1,119 @@
+name: Release Validation
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  validate:
+    name: Validate release metadata
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve version
+        id: get_version
+        run: |
+          set -euo pipefail
+
+          if [[ "${GITHUB_REF:-}" == refs/tags/v* ]]; then
+            echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+            echo "is_release_tag=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=$(sed -n 's/^version = \"\\(.*\\)\"/\\1/p' Cargo.toml | head -n 1)" >> "$GITHUB_OUTPUT"
+            echo "is_release_tag=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Fetch main
+        run: git fetch origin main
+
+      - name: Validate release version
+        env:
+          VERSION: ${{ steps.get_version.outputs.version }}
+          IS_RELEASE_TAG: ${{ steps.get_version.outputs.is_release_tag }}
+        run: |
+          set -euo pipefail
+
+          if [ "$IS_RELEASE_TAG" = "true" ] && ! git merge-base --is-ancestor "$GITHUB_SHA" "origin/main"; then
+            echo "::error::Tagged commit $GITHUB_SHA is not reachable from origin/main"
+            exit 1
+          fi
+
+          WORKSPACE_VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n 1)
+          WEB_VERSION=$(jq -r '.version' apps/web/package.json)
+          TAURI_PACKAGE_VERSION=$(jq -r '.version' apps/tauri/package.json)
+          TAURI_CONF_VERSION=$(jq -r '.version' apps/tauri/src-tauri/tauri.conf.json)
+
+          for actual in "$WORKSPACE_VERSION" "$WEB_VERSION" "$TAURI_PACKAGE_VERSION" "$TAURI_CONF_VERSION"; do
+            if [ "$actual" != "$VERSION" ]; then
+              echo "::error::Version mismatch. Expected $VERSION, found $actual"
+              exit 1
+            fi
+          done
+
+      - name: Extract release notes from CHANGELOG
+        if: steps.get_version.outputs.is_release_tag == 'true'
+        env:
+          VERSION: ${{ steps.get_version.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          awk -v version="$VERSION" '
+            BEGIN {
+              in_section = 0
+              found = 0
+            }
+            $0 ~ "^## \\[" version "\\] - " {
+              in_section = 1
+              found = 1
+              next
+            }
+            /^## \[/ && in_section {
+              exit
+            }
+            in_section {
+              print
+            }
+            END {
+              if (!found) {
+                exit 2
+              }
+            }
+          ' CHANGELOG.md > release-notes.md || {
+            status=$?
+            if [ "$status" -eq 2 ]; then
+              echo "::error::No CHANGELOG.md entry found for $VERSION"
+            fi
+            exit "$status"
+          }
+
+          if [ ! -s release-notes.md ] || [ -z "$(tr -d '[:space:]' < release-notes.md)" ]; then
+            echo "::error::CHANGELOG.md entry for $VERSION is empty"
+            exit 1
+          fi
+
+      - name: Summarize release handoff
+        env:
+          VERSION: ${{ steps.get_version.outputs.version }}
+          IS_RELEASE_TAG: ${{ steps.get_version.outputs.is_release_tag }}
+        run: |
+          {
+            echo "## Release validation"
+            echo ""
+            echo "- Version: ${VERSION}"
+            echo "- Release tag: ${IS_RELEASE_TAG}"
+            echo "- macOS DMG build: local only via \`./scripts/release.sh publish ${VERSION}\`"
+            echo ""
+            echo "This workflow intentionally does not use macOS runners or Apple signing secrets."
+          } >> "$GITHUB_STEP_SUMMARY"

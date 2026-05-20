@@ -173,7 +173,8 @@ describe('DesignPanel', () => {
   it('toggles mirror mode from the design toolbar when symmetry is already enabled', () => {
     renderPanel({ ...createSampleProject(), hasSymmetry: true });
 
-    const mirrorButton = container?.querySelector<HTMLButtonElement>('button[aria-label="Mirror"]');
+    const mirrorButton = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? [])
+      .find((button) => button.textContent?.trim() === 'Mirror Nodes');
     expect(mirrorButton).toBeTruthy();
 
     act(() => {
@@ -181,62 +182,9 @@ describe('DesignPanel', () => {
     });
 
     expect(useWorkspaceStore.getState().toolMode).toBe('symmetry');
-    expect(container?.querySelector('button[aria-label="Mirror On"]')).toBeTruthy();
-  });
-
-  it('opens a symmetry leaf preview with pair and on-axis counts', () => {
-    renderPanel({
-      ...createSampleProject(),
-      hasSymmetry: true,
-      nodes: [
-        {
-          id: 1,
-          label: 'root',
-          loc: { x: 0.5, y: 0.5 },
-          isLeaf: false,
-          isPinned: false,
-          isConditioned: false,
-        },
-        {
-          id: 2,
-          label: 'left',
-          loc: { x: 0.2, y: 0.25 },
-          isLeaf: true,
-          isPinned: false,
-          isConditioned: false,
-        },
-        {
-          id: 3,
-          label: 'right',
-          loc: { x: 0.8, y: 0.25 },
-          isLeaf: true,
-          isPinned: false,
-          isConditioned: false,
-        },
-        {
-          id: 4,
-          label: 'axis',
-          loc: { x: 0.504, y: 0.8 },
-          isLeaf: true,
-          isPinned: false,
-          isConditioned: false,
-        },
-      ],
-      edges: [],
-      paths: [],
-      conditions: [],
-    });
-
-    const pairButton = container?.querySelector<HTMLButtonElement>('button[aria-label="Pair Leaves"]');
-    expect(pairButton).toBeTruthy();
-
-    act(() => {
-      pairButton?.click();
-    });
-
-    const counts = Array.from(
-      container?.querySelectorAll('.symmetry-preview-popover__grid strong') ?? []
-    ).map((node) => node.textContent);
-    expect(counts).toEqual(['1', '1', '0', '0']);
+    const activeMirrorButton = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? [])
+      .find((button) => button.textContent?.trim() === 'Mirror Nodes');
+    expect(activeMirrorButton?.getAttribute('aria-pressed')).toBe('true');
+    expect(container?.querySelector('button[aria-label="Pair Leaves"]')).toBeNull();
   });
 });

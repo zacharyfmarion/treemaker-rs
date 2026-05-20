@@ -692,7 +692,6 @@ describe('workspace store slices', () => {
     expect(state.addCondition).toBeTypeOf('function');
     expect(state.addNodeAt).toBeTypeOf('function');
     expect(state.addNodeWithSymmetry).toBeTypeOf('function');
-    expect(state.previewSymmetryLeafPairs).toBeTypeOf('function');
     expect(state.optimizeEdges).toBeTypeOf('function');
     expect(state.buildCreasePattern).toBeTypeOf('function');
   });
@@ -999,39 +998,6 @@ describe('workspace store slices', () => {
     expect(useWorkspaceStore.getState().project.edges.map((edge) => edge.nodes)).toEqual([[1, 2]]);
     expect(useWorkspaceStore.getState().project.conditions).toEqual([]);
     expect(useWorkspaceStore.getState().projectMessage).toBe('Added axial node');
-  });
-
-  it('applies symmetry leaf pairs and skips duplicate conditions', async () => {
-    const api = resetStores(
-      makeSnapshot({
-        paper: { has_symmetry: true },
-        nodes: [
-          nodeSnapshot(1, { x: 0.5, y: 0.5 }, { label: 'root', is_leaf: false }),
-          nodeSnapshot(2, { x: 0.2, y: 0.25 }),
-          nodeSnapshot(3, { x: 0.8, y: 0.25 }),
-          nodeSnapshot(4, { x: 0.25, y: 0.75 }),
-          nodeSnapshot(5, { x: 0.75, y: 0.75 }),
-          nodeSnapshot(6, { x: 0.504, y: 0.9 }),
-        ],
-        conditions: [
-          conditionSnapshot(1, { type: 'nodes_paired', node1: 2, node2: 3 }),
-        ],
-      })
-    );
-    loadSnapshotIntoStore(api.snapshotState);
-
-    const preview = useWorkspaceStore.getState().previewSymmetryLeafPairs();
-    expect(preview.pairs).toEqual([{ node1: 4, node2: 5, distance: 0 }]);
-    expect(preview.onAxis.map((item) => item.node)).toEqual([6]);
-
-    await useWorkspaceStore.getState().applySymmetryLeafPairs();
-
-    expect(useWorkspaceStore.getState().project.conditions.map((condition) => condition.kind)).toEqual([
-      { type: 'nodes_paired', node1: 2, node2: 3 },
-      { type: 'nodes_paired', node1: 4, node2: 5 },
-      { type: 'node_symmetric', node: 6 },
-    ]);
-    expect(useWorkspaceStore.getState().historyPast.at(-1)?.label).toBe('Apply symmetry pairs');
   });
 
   it('moves paired leaf nodes together in one history entry', async () => {

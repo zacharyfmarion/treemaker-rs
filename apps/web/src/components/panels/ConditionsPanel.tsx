@@ -37,6 +37,7 @@ import { useWorkspaceStore } from '../../store/workspaceStore';
 import { Button } from '../ui/Button';
 import { IconButton } from '../ui/IconButton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/Select';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/Tooltip';
 
 export function ConditionsPanel() {
   const project = useWorkspaceStore((state) => state.project);
@@ -290,6 +291,7 @@ export function ConditionsPanel() {
             <ConditionAction
               icon={<LockKeyhole size={14} />}
               label="Fix node"
+              help="Select one leaf node. Adds a fixed-position condition at the node's current coordinates."
               disabled={!selectedNode?.isLeaf}
               onClick={() =>
                 selectedNode &&
@@ -306,24 +308,28 @@ export function ConditionsPanel() {
             <ConditionAction
               icon={<Ruler size={14} />}
               label="Node on edge"
+              help="Select one leaf node. Constrains it to lie somewhere on the paper boundary."
               disabled={!selectedNode?.isLeaf}
               onClick={() => selectedNode && add({ type: 'node_on_edge', node: selectedNode.id })}
             />
             <ConditionAction
               icon={<Ruler size={14} />}
               label="Node on corner"
+              help="Select one leaf node. Constrains it to one of the paper corners."
               disabled={!selectedNode?.isLeaf}
               onClick={() => selectedNode && add({ type: 'node_on_corner', node: selectedNode.id })}
             />
             <ConditionAction
               icon={<Link2 size={14} />}
               label="Node on symmetry"
+              help="Enable symmetry and select one leaf node. Constrains the node to the active symmetry line."
               disabled={!selectedNode?.isLeaf || !project.hasSymmetry}
               onClick={() => selectedNode && add({ type: 'node_symmetric', node: selectedNode.id })}
             />
             <ConditionAction
               icon={<Link2 size={14} />}
               label="Pair nodes"
+              help="Select two leaf nodes. Keeps the pair mirrored across the active symmetry line."
               disabled={selectedLeafNodeIds.length !== 2}
               onClick={() =>
                 add({
@@ -336,6 +342,7 @@ export function ConditionsPanel() {
             <ConditionAction
               icon={<Link2 size={14} />}
               label="Collinear nodes"
+              help="Select three leaf nodes. Constrains them to stay on a common line."
               disabled={selectedLeafNodeIds.length !== 3}
               onClick={() =>
                 add({
@@ -349,18 +356,21 @@ export function ConditionsPanel() {
             <ConditionAction
               icon={<LockKeyhole size={14} />}
               label="Fix edge length"
+              help="Select one edge. Locks that edge's current tree length during optimization."
               disabled={!selectedEdge}
               onClick={() => selectedEdge && add({ type: 'edge_length_fixed', edge: selectedEdge.id })}
             />
             <ConditionAction
               icon={<Link2 size={14} />}
               label="Same strain"
+              help="Select two edges. Constrains both edges to use the same strain value."
               disabled={edgeIds.length !== 2}
               onClick={() => add({ type: 'edges_same_strain', edge1: edgeIds[0], edge2: edgeIds[1] })}
             />
             <ConditionAction
               icon={<Plus size={14} />}
               label="Active path"
+              help="Select a leaf path. Marks that path as active for optimization and crease-pattern construction."
               disabled={!selectedPath}
               onClick={() =>
                 selectedPath &&
@@ -374,6 +384,7 @@ export function ConditionsPanel() {
               <ConditionAction
                 icon={<Plus size={14} />}
                 label="Fix angle"
+                help="Uses the selected path and Angle value to add a fixed path-angle condition."
                 onClick={() =>
                   add({
                     type: 'path_angle_fixed',
@@ -388,6 +399,7 @@ export function ConditionsPanel() {
               <ConditionAction
                 icon={<Plus size={14} />}
                 label="Quantize"
+                help="Uses the selected path plus Quant and Offset values to constrain the angle to a quantized family."
                 onClick={() =>
                   add({
                     type: 'path_angle_quant',
@@ -404,18 +416,21 @@ export function ConditionsPanel() {
             <ConditionAction
               icon={<Trash2 size={14} />}
               label="Remove node conditions"
+              help="Select one or more nodes. Removes every condition that references those nodes."
               disabled={nodeIds.length === 0}
               onClick={() => void deleteConditionsForSelectedNodes()}
             />
             <ConditionAction
               icon={<Trash2 size={14} />}
               label="Remove edge conditions"
+              help="Select one or more edges. Removes every condition that references those edges."
               disabled={edgeIds.length === 0}
               onClick={() => void deleteConditionsForSelectedEdges()}
             />
             <ConditionAction
               icon={<Trash2 size={14} />}
               label="Remove path conditions"
+              help="Select one or more paths. Removes every path condition that references those paths."
               disabled={pathIds.length === 0}
               onClick={() => void deleteConditionsForSelectedPaths()}
             />
@@ -590,19 +605,32 @@ function ConditionEditor({
 function ConditionAction({
   icon,
   label,
+  help,
   disabled,
   onClick,
 }: {
   icon: ReactNode;
   label: string;
+  help: string;
   disabled?: boolean;
   onClick: () => void;
 }) {
-  return (
+  const button = (
     <button className="condition-action" type="button" disabled={disabled} onClick={onClick}>
       {icon}
       <span>{label}</span>
     </button>
+  );
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="condition-action-tooltip-trigger" data-disabled={disabled || undefined}>
+          {button}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="top">{help}</TooltipContent>
+    </Tooltip>
   );
 }
 

@@ -1831,6 +1831,24 @@
   padding: 6px 8px;
 }
 
+.condition-action-tooltip-trigger {
+  display: block;
+  min-width: 0;
+}
+
+.condition-action-tooltip-trigger .condition-action {
+  width: 100%;
+  height: 100%;
+}
+
+.condition-action-tooltip-trigger[data-disabled] {
+  cursor: not-allowed;
+}
+
+.condition-action-tooltip-trigger .condition-action:disabled {
+  pointer-events: none;
+}
+
 .toolbar-text-button {
   min-height: 24px;
   padding: 3px 8px;

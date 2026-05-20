@@ -4,6 +4,7 @@ import type { DockviewReadyEvent, IDockviewPanelHeaderProps } from 'dockview';
 import 'dockview/dist/styles/dockview.css';
 import { Toaster } from 'sonner';
 import {
+  Download,
   FilePlus,
   FolderOpen,
   CircleHelp,
@@ -23,9 +24,11 @@ import { IconButton } from './components/ui/IconButton';
 import { Button } from './components/ui/Button';
 import { panelComponents } from './components/panels/PanelComponents';
 import { handleMenuAction } from './commands/menuActions';
+import { useMacDownloadUrl } from './hooks/useMacDownloadUrl';
 import { handleAppKeyDown } from './lib/appKeyboard';
 import { useTauriMenuListener } from './menus/tauriMenuListener';
-import { isDesktopRuntime } from './platform/runtime';
+import { isFeatureVisible } from './platform/features';
+import { getRuntimeSurface } from './platform/runtime';
 import { applyWindowTitle, formatWindowTitle } from './platform/windowTitle';
 import { requestConfirmation } from './store/commandDialogStore';
 import { applyDefaultLayout, useLayoutStore } from './store/layoutStore';
@@ -38,7 +41,10 @@ import './styles/sonner.css';
 function Toolbar() {
   const openSettings = useSettingsStore((state) => state.openSettings);
   const capabilities = useWorkspaceCapabilities();
-  const isDesktop = isDesktopRuntime();
+  const runtimeSurface = getRuntimeSurface();
+  const isDesktop = runtimeSurface === 'desktop';
+  const showDownloadCta = isFeatureVisible('macDownloadCta', runtimeSurface);
+  const downloadUrl = useMacDownloadUrl();
   const optimizeScale = capabilities['optimize.scale'];
   const buildCp = capabilities['cp.build'];
 
@@ -101,6 +107,16 @@ function Toolbar() {
           </Button>
         )}
         {(optimizeScale.visible || buildCp.visible) && <span className="toolbar__separator" />}
+        {showDownloadCta && (
+          <IconButton
+            size="sm"
+            title="Download Ori Studio for Mac"
+            tooltipSide="bottom"
+            onClick={() => window.open(downloadUrl, '_blank', 'noreferrer')}
+          >
+            <Download size={15} />
+          </IconButton>
+        )}
         <IconButton
           size="sm"
           title="Help"
@@ -156,7 +172,7 @@ export default function App() {
   useEffect(() => {
     let unlisten: (() => void) | null = null;
 
-    if (!isDesktopRuntime()) return undefined;
+    if (getRuntimeSurface() !== 'desktop') return undefined;
     import('@tauri-apps/api/window')
       .then(({ getCurrentWindow }) => {
         const appWindow = getCurrentWindow();

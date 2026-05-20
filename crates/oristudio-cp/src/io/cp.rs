@@ -1,0 +1,101 @@
+use super::{IoError, Result};
+use crate::geometry::{LineColor, LineSegment, Point};
+use crate::model::CreasePatternModel;
+
+/// Parse Oriedita `.cp` text into a crease-pattern model.
+pub fn import_cp_str(input: &str) -> Result<CreasePatternModel> {
+    let mut model = CreasePatternModel::default();
+
+    for (line_index, raw_line) in input.lines().enumerate() {
+        let line_number = line_index + 1;
+        let line = raw_line.trim();
+        if line.is_empty() {
+            continue;
+        }
+
+        let tokens = line.split_whitespace().collect::<Vec<_>>();
+        if tokens.len() != 5 {
+            return Err(IoError::InvalidLine {
+                format: "cp",
+                line: line_number,
+                message: format!("expected 5 tokens, got {}", tokens.len()),
+            });
+        }
+
+        let assignment = parse_i32(tokens[0], line_number)?;
+        let ax = parse_f64(tokens[1], line_number)?;
+        let ay = parse_f64(tokens[2], line_number)?;
+        let bx = parse_f64(tokens[3], line_number)?;
+        let by = parse_f64(tokens[4], line_number)?;
+
+        model.add_line_segment(LineSegment::with_color(
+            Point::new(ax, ay),
+            Point::new(bx, by),
+            cp_assignment_to_line_color(assignment)?,
+        ));
+    }
+
+    Ok(model)
+}
+
+/// Export an Oriedita `.cp` text representation.
+pub fn export_cp_string(model: &CreasePatternModel) -> String {
+    let mut output = String::new();
+    for segment in &model.line_segments {
+        output.push_str(&format!(
+            "{} {} {} {} {}\n",
+            line_color_to_cp_assignment(segment.color),
+            format_cp_number(segment.a.x),
+            format_cp_number(segment.a.y),
+            format_cp_number(segment.b.x),
+            format_cp_number(segment.b.y)
+        ));
+    }
+    output
+}
+
+pub fn cp_assignment_to_line_color(assignment: i32) -> Result<LineColor> {
+    match assignment {
+        1 => Ok(LineColor::Black0),
+        2 => Ok(LineColor::Blue2),
+        3 => Ok(LineColor::Red1),
+        4 => Ok(LineColor::Cyan3),
+        other => Err(IoError::InvalidField {
+            field: "cp_assignment",
+            message: format!("unknown assignment {other}"),
+        }),
+    }
+}
+
+pub fn line_color_to_cp_assignment(line_color: LineColor) -> i32 {
+    match line_color {
+        LineColor::Black0 => 1,
+        LineColor::Blue2 => 2,
+        LineColor::Red1 => 3,
+        _ => 4,
+    }
+}
+
+fn parse_i32(token: &str, line: usize) -> Result<i32> {
+    token.parse::<i32>().map_err(|error| IoError::InvalidLine {
+        format: "cp",
+        line,
+        message: error.to_string(),
+    })
+}
+
+fn parse_f64(token: &str, line: usize) -> Result<f64> {
+    token.parse::<f64>().map_err(|error| IoError::InvalidLine {
+        format: "cp",
+        line,
+        message: error.to_string(),
+    })
+}
+
+fn format_cp_number(value: f64) -> String {
+    if value.fract() == 0.0 {
+        format!("{value:.1}")
+    } else {
+        value.to_string()
+    }
+}

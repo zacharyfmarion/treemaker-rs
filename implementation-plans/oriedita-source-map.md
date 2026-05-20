@@ -230,17 +230,17 @@ mutation.
 
 | Upstream source | Behavior | Rust target | Stage | Status |
 | --- | --- | --- | --- | --- |
-| `CpImporter.java` | `.cp` import. | `io::cp::import` | 4 | Unsupported |
-| `CpExporter.java` | `.cp` export and lossy-format warning. | `io::cp::export` | 4 | Unsupported |
-| `FoldImporter.java` | `.fold` import and coordinate normalization. | `io::fold::import` | 4 | Unsupported |
-| `FoldExporter.java` | `.fold` export, face reconstruction, Oriedita extras. | `io::fold::export` | 4 | Unsupported |
+| `CpImporter.java` | `.cp` import. | `io::cp::import` | 4 | Unit-tested |
+| `CpExporter.java` | `.cp` export and lossy-format warning. | `io::cp::export` | 4 | Unit-tested |
+| `FoldImporter.java` | `.fold` import and coordinate normalization. | `io::fold::import` | 4 | Porting |
+| `FoldExporter.java` | `.fold` export, face reconstruction, Oriedita extras. | `io::fold::export` | 4 | Porting |
 | `OriImporter.java` | `.ori` import. | `io::ori::import` | 4 | Unsupported |
 | `OriExporter.java` | `.ori` export. | `io::ori::export` | 4 | Unsupported |
 | `OrhImporter.java` | `.orh` import. | `io::orh::import` | 4 | Unsupported |
 | `OrhExporter.java` | `.orh` export. | `io::orh::export` | 4 | Unsupported |
-| `ObjImporter.java` | `.obj` import. | `io::obj::import` | 4 | Unsupported |
-| `DxfExporter.java` | `.dxf` export. | `io::dxf::export` | 4 | Unsupported |
-| `OrieditaFoldFile.java` | FOLD extension fields. | `io::fold::oriedita_extensions` | 4 | Unsupported |
+| `ObjImporter.java` | `.obj` import. | `io::obj::import` | 4 | Unit-tested |
+| `DxfExporter.java` | `.dxf` export. | `io::dxf::export` | 4 | Unit-tested |
+| `OrieditaFoldFile.java` | FOLD extension fields. | `io::fold::oriedita_extensions` | 4 | Porting |
 | `Save.java` | Main save model. | `io::save` | 4 | Unsupported |
 | `BaseSave.java` | Shared save payload. | `io::save` | 4 | Unsupported |
 | `SaveV1_0.java` | Legacy save payload. | `io::save::legacy` | 4 | Unsupported |

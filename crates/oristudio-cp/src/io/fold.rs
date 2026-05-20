@@ -1,0 +1,349 @@
+use super::{IoError, Result};
+use crate::geometry::{Circle, LineColor, LineSegment, Point};
+use crate::model::{
+    CreasePatternModel, GridState, TextElement, custom_color_from_hex, custom_color_hex,
+    fold_angle_for_line_color, fold_assignment_for_line_color, line_color_for_fold_assignment,
+};
+use serde_json::{Value, json};
+use treemaker_fold::FoldDocument;
+
+const ORIEDITA_VERSION: &str = "oristudio-cp";
+
+/// Import a FOLD JSON document with Oriedita extension fields.
+pub fn import_fold_json(input: &str) -> Result<CreasePatternModel> {
+    let fold = serde_json::from_str::<FoldDocument>(input)?;
+    import_fold_document(&fold)
+}
+
+pub fn import_fold_document(fold: &FoldDocument) -> Result<CreasePatternModel> {
+    let mut model = CreasePatternModel::default();
+    let edge_colors = string_array_extra(fold, "oriedita:edges_colors")?;
+
+    for (index, edge) in fold.edges_vertices.iter().enumerate() {
+        let a = vertex_point(fold, edge[0])?;
+        let b = vertex_point(fold, edge[1])?;
+        let mut segment = LineSegment::with_color(
+            a,
+            b,
+            line_color_for_fold_assignment(fold.assignment_for_edge(index)),
+        );
+
+        if let Some(hex) = edge_colors.as_ref().and_then(|colors| colors.get(index))
+            && !hex.is_empty()
+        {
+            segment = segment.with_customized_color(custom_color_from_hex(hex)?);
+        }
+
+        model.add_line_segment(segment);
+    }
+
+    import_circles(fold, &mut model)?;
+    import_texts(fold, &mut model)?;
+    import_grid(fold, &mut model)?;
+
+    Ok(model)
+}
+
+/// Export a FOLD document with Oriedita extension fields.
+pub fn export_fold_document(model: &CreasePatternModel, title: Option<String>) -> FoldDocument {
+    let mut vertices = Vec::<Vec<f64>>::new();
+    let mut edges = Vec::<[usize; 2]>::new();
+    let mut assignments = Vec::new();
+    let mut fold_angles = Vec::new();
+    let mut edge_custom_colors = Vec::new();
+
+    for segment in &model.line_segments {
+        let a = vertex_index(&mut vertices, segment.a);
+        let b = vertex_index(&mut vertices, segment.b);
+        edges.push([a, b]);
+        assignments.push(fold_assignment_for_line_color(segment.color));
+        fold_angles.push(Some(fold_angle_for_line_color(segment.color)));
+        edge_custom_colors.push(if segment.customized == 1 {
+            custom_color_hex(segment.customized_color)
+        } else {
+            String::new()
+        });
+    }
+
+    let mut fold = FoldDocument::new(vertices, edges);
+    fold.file_creator = Some("oriedita".to_string());
+    fold.frame_title = title;
+    fold.edges_assignment = assignments;
+    fold.edges_fold_angle = fold_angles;
+
+    fold.extra.insert(
+        "oriedita:version".to_string(),
+        Value::String(ORIEDITA_VERSION.to_string()),
+    );
+    fold.extra.insert(
+        "oriedita:edges_colors".to_string(),
+        json!(edge_custom_colors),
+    );
+    export_circles(model, &mut fold);
+    export_texts(model, &mut fold);
+    fold.extra.insert(
+        "oriedita:grid_size".to_string(),
+        json!(model.grid.grid_size),
+    );
+    fold.extra.insert(
+        "oriedita:grid_style".to_string(),
+        json!(model.grid.base_state.state()),
+    );
+
+    fold
+}
+
+pub fn export_fold_json(model: &CreasePatternModel, title: Option<String>) -> Result<String> {
+    Ok(serde_json::to_string_pretty(&export_fold_document(
+        model, title,
+    ))?)
+}
+
+fn vertex_point(fold: &FoldDocument, index: usize) -> Result<Point> {
+    let coords = fold
+        .vertices_coords
+        .get(index)
+        .ok_or_else(|| IoError::InvalidField {
+            field: "vertices_coords",
+            message: format!("edge references missing vertex {index}"),
+        })?;
+    if coords.len() < 2 {
+        return Err(IoError::InvalidField {
+            field: "vertices_coords",
+            message: format!("vertex {index} has fewer than two coordinates"),
+        });
+    }
+    Ok(Point::new(coords[0], coords[1]))
+}
+
+fn vertex_index(vertices: &mut Vec<Vec<f64>>, point: Point) -> usize {
+    if let Some(index) = vertices.iter().position(|coords| {
+        coords.len() >= 2
+            && coords[0].total_cmp(&point.x).is_eq()
+            && coords[1].total_cmp(&point.y).is_eq()
+    }) {
+        return index;
+    }
+
+    vertices.push(vec![point.x, point.y]);
+    vertices.len() - 1
+}
+
+fn import_circles(fold: &FoldDocument, model: &mut CreasePatternModel) -> Result<()> {
+    let Some(coords) = point_array_extra(fold, "oriedita:circles_coords")? else {
+        return Ok(());
+    };
+    let radii = f64_array_extra(fold, "oriedita:circles_radii")?.unwrap_or_default();
+    let colors = string_array_extra(fold, "oriedita:circles_colors")?.unwrap_or_default();
+    let custom_colors =
+        string_array_extra(fold, "oriedita:circles_custom_colors")?.unwrap_or_default();
+
+    for (index, center) in coords.into_iter().enumerate() {
+        let radius = radii.get(index).copied().unwrap_or_default();
+        let color = colors
+            .get(index)
+            .and_then(|value| value.parse::<LineColor>().ok())
+            .unwrap_or(LineColor::Black0);
+        let mut circle = Circle::from_center(center, radius, color);
+
+        if let Some(hex) = custom_colors.get(index)
+            && !hex.is_empty()
+        {
+            circle = circle.with_customized_color(custom_color_from_hex(hex)?);
+        }
+
+        model.add_circle(circle);
+    }
+
+    Ok(())
+}
+
+fn import_texts(fold: &FoldDocument, model: &mut CreasePatternModel) -> Result<()> {
+    let Some(coords) = point_array_extra(fold, "oriedita:texts_coords")? else {
+        return Ok(());
+    };
+    let texts = string_array_extra(fold, "oriedita:texts_text")?.unwrap_or_default();
+
+    for (index, position) in coords.into_iter().enumerate() {
+        if let Some(text) = texts.get(index) {
+            model.add_text(TextElement::new(position.x, position.y, text.clone()));
+        }
+    }
+
+    Ok(())
+}
+
+fn import_grid(fold: &FoldDocument, model: &mut CreasePatternModel) -> Result<()> {
+    if let Some(size) = integer_extra(fold, "oriedita:grid_size")? {
+        model.grid.set_grid_size(size);
+    }
+    if let Some(style) = integer_extra(fold, "oriedita:grid_style")? {
+        model.grid.base_state = GridState::from_state(style)?;
+    }
+    Ok(())
+}
+
+fn export_circles(model: &CreasePatternModel, fold: &mut FoldDocument) {
+    fold.extra.insert(
+        "oriedita:circles_coords".to_string(),
+        json!(
+            model
+                .circles
+                .iter()
+                .map(|circle| vec![circle.x, circle.y])
+                .collect::<Vec<_>>()
+        ),
+    );
+    fold.extra.insert(
+        "oriedita:circles_radii".to_string(),
+        json!(
+            model
+                .circles
+                .iter()
+                .map(|circle| circle.r)
+                .collect::<Vec<_>>()
+        ),
+    );
+    fold.extra.insert(
+        "oriedita:circles_colors".to_string(),
+        json!(
+            model
+                .circles
+                .iter()
+                .map(|circle| circle.color.to_string())
+                .collect::<Vec<_>>()
+        ),
+    );
+    fold.extra.insert(
+        "oriedita:circles_custom_colors".to_string(),
+        json!(
+            model
+                .circles
+                .iter()
+                .map(|circle| {
+                    if circle.customized == 1 {
+                        custom_color_hex(circle.customized_color)
+                    } else {
+                        String::new()
+                    }
+                })
+                .collect::<Vec<_>>()
+        ),
+    );
+}
+
+fn export_texts(model: &CreasePatternModel, fold: &mut FoldDocument) {
+    fold.extra.insert(
+        "oriedita:texts_coords".to_string(),
+        json!(
+            model
+                .texts
+                .iter()
+                .map(|text| vec![text.x.0, text.y.0])
+                .collect::<Vec<_>>()
+        ),
+    );
+    fold.extra.insert(
+        "oriedita:texts_text".to_string(),
+        json!(
+            model
+                .texts
+                .iter()
+                .map(|text| text.text.clone())
+                .collect::<Vec<_>>()
+        ),
+    );
+}
+
+fn string_array_extra(fold: &FoldDocument, key: &'static str) -> Result<Option<Vec<String>>> {
+    let Some(value) = fold.extra.get(key) else {
+        return Ok(None);
+    };
+    let array = value.as_array().ok_or_else(|| IoError::InvalidField {
+        field: key,
+        message: "expected array".to_string(),
+    })?;
+    array
+        .iter()
+        .map(|item| {
+            item.as_str()
+                .map(ToOwned::to_owned)
+                .ok_or_else(|| IoError::InvalidField {
+                    field: key,
+                    message: "expected string array".to_string(),
+                })
+        })
+        .collect::<Result<Vec<_>>>()
+        .map(Some)
+}
+
+fn f64_array_extra(fold: &FoldDocument, key: &'static str) -> Result<Option<Vec<f64>>> {
+    let Some(value) = fold.extra.get(key) else {
+        return Ok(None);
+    };
+    let array = value.as_array().ok_or_else(|| IoError::InvalidField {
+        field: key,
+        message: "expected array".to_string(),
+    })?;
+    array
+        .iter()
+        .map(|item| {
+            item.as_f64().ok_or_else(|| IoError::InvalidField {
+                field: key,
+                message: "expected number array".to_string(),
+            })
+        })
+        .collect::<Result<Vec<_>>>()
+        .map(Some)
+}
+
+fn point_array_extra(fold: &FoldDocument, key: &'static str) -> Result<Option<Vec<Point>>> {
+    let Some(value) = fold.extra.get(key) else {
+        return Ok(None);
+    };
+    let array = value.as_array().ok_or_else(|| IoError::InvalidField {
+        field: key,
+        message: "expected array".to_string(),
+    })?;
+    array
+        .iter()
+        .map(|item| {
+            let coords = item.as_array().ok_or_else(|| IoError::InvalidField {
+                field: key,
+                message: "expected coordinate array".to_string(),
+            })?;
+            if coords.len() < 2 {
+                return Err(IoError::InvalidField {
+                    field: key,
+                    message: "coordinate array has fewer than two numbers".to_string(),
+                });
+            }
+            let x = coords[0].as_f64().ok_or_else(|| IoError::InvalidField {
+                field: key,
+                message: "x coordinate is not a number".to_string(),
+            })?;
+            let y = coords[1].as_f64().ok_or_else(|| IoError::InvalidField {
+                field: key,
+                message: "y coordinate is not a number".to_string(),
+            })?;
+            Ok(Point::new(x, y))
+        })
+        .collect::<Result<Vec<_>>>()
+        .map(Some)
+}
+
+fn integer_extra(fold: &FoldDocument, key: &'static str) -> Result<Option<i32>> {
+    let Some(value) = fold.extra.get(key) else {
+        return Ok(None);
+    };
+    let number = value.as_i64().ok_or_else(|| IoError::InvalidField {
+        field: key,
+        message: "expected integer".to_string(),
+    })?;
+    i32::try_from(number)
+        .map(Some)
+        .map_err(|error| IoError::InvalidField {
+            field: key,
+            message: error.to_string(),
+        })
+}

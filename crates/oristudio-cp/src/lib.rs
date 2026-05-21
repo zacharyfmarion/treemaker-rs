@@ -1063,7 +1063,7 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
     descriptor!(
         FoldingEstimate,
         "FoldingEstimateTask",
-        "folding::folding_estimate_from_segments",
+        "folding::FoldingEstimateSession",
         Kernel,
         10,
         Porting

@@ -325,6 +325,7 @@ public class OrieditaGeometryOracle {
             case "equivalence-candidates-summary" -> equivalenceCandidatesSummary(args);
             case "additional-estimation-summary" -> additionalEstimationSummary(args);
             case "folding-estimate-summary" -> foldingEstimateSummary(args);
+            case "folding-estimate-sequence-summary" -> foldingEstimateSequenceSummary(args);
             case "chain-permutation-summary" -> chainPermutationSummary(args);
             case "chain-permutation-temp-summary" -> chainPermutationTempSummary(args);
             case "subface-guide-permutation-summary" -> subfaceGuidePermutationSummary(args);
@@ -645,6 +646,41 @@ public class OrieditaGeometryOracle {
                 foldedFigure.foldedFigure_worker.getSubFace_valid_number(),
                 foldedFigure.foldedFigure_worker.SubFaceTotal,
                 foldedFigure.foldedFigure_worker.hierarchyList);
+    }
+
+    private static void foldingEstimateSequenceSummary(String[] args) throws Exception {
+        if (args.length < 5) {
+            usage("folding-estimate-sequence-summary expects starting face, order count, orders, count, and segment payload");
+        }
+
+        int startingFace = Integer.parseInt(args[1]);
+        int orderCount = Integer.parseInt(args[2]);
+        int offset = 3;
+        int[] orders = new int[orderCount];
+        for (int i = 0; i < orderCount; i++) {
+            orders[i] = Integer.parseInt(args[offset++]);
+        }
+        int count = Integer.parseInt(args[offset++]);
+        LineSegmentSet set = lineSegmentSet(args, offset, count);
+
+        FoldedFigure foldedFigure = new FoldedFigure(new NoopBulletinBoard());
+        for (int i = 0; i < orderCount; i++) {
+            foldedFigure.estimationOrder = FoldedFigure.EstimationOrder.valueOf("ORDER_" + orders[i]);
+            foldedFigure.folding_estimated(set, startingFace);
+
+            System.out.println("folding_estimate_action|" + orders[i]);
+            System.out.println("folding_estimate|"
+                    + foldedFigure.estimationStep.name() + "|"
+                    + foldedFigure.displayStyle.name() + "|"
+                    + foldedFigure.discovered_fold_cases + "|"
+                    + foldedFigure.findAnotherOverlapValid + "|"
+                    + foldedFigure.text_result);
+            printWorkerOverlapSearch(
+                    foldedFigure.ip2_possibleOverlap,
+                    foldedFigure.foldedFigure_worker.getSubFace_valid_number(),
+                    foldedFigure.foldedFigure_worker.SubFaceTotal,
+                    foldedFigure.foldedFigure_worker.hierarchyList);
+        }
     }
 
     private static void chainPermutationSummary(String[] args) throws Exception {
@@ -6500,6 +6536,7 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle equivalence-candidates-summary <startingFace> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle additional-estimation-summary <startingFace> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle folding-estimate-summary <startingFace> <order> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle folding-estimate-sequence-summary <startingFace> <orderCount> [order]... <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle chain-permutation-summary <digits> <guideCount> [upper lower]... <topCsv|-> <bottomCsv|-> <limit>");
         System.err.println("   or: OrieditaGeometryOracle chain-permutation-temp-summary <digits> <guideCount> [upper lower]... <topCsv|-> <bottomCsv|-> <stepsBeforeTemp> <tempUpper> <tempLower> <stepsAfterTemp> <limitAfterClear>");
         System.err.println("   or: OrieditaGeometryOracle subface-guide-permutation-summary <facesTotal> <faceCount> [faceId]... <relationCount> [upper lower]... <limit>");

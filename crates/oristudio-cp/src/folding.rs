@@ -178,6 +178,14 @@ pub enum FoldingEstimateError {
     WorkerOverlap(WorkerOverlapSearchError),
 }
 
+#[derive(Debug, Clone)]
+pub struct FoldingEstimateSession {
+    segments: Vec<LineSegment>,
+    starting_face_id: i32,
+    estimate: FoldingEstimate,
+    worker: Option<WorkerOverlapEnumerator>,
+}
+
 impl From<InitialHierarchyError> for FoldingEstimateError {
     fn from(error: InitialHierarchyError) -> Self {
         Self::InitialHierarchy(error)
@@ -476,78 +484,130 @@ pub fn additional_estimation_from_segments(
     }))
 }
 
-/// Oriedita `FoldedFigure.folding_estimated(...)` stage summary for orders
-/// 0-5/51 from a fresh folded figure. This ports the non-UI stage transitions
-/// and the first overlap solution. Lower-level stateful overlap enumeration is
-/// available through `WorkerOverlapEnumerator`; `ORDER_6` remains a separate
-/// folded-figure command-layer stage.
+impl FoldingEstimateSession {
+    pub fn new(segments: &[LineSegment], starting_face_id: i32) -> Self {
+        Self {
+            segments: segments.to_vec(),
+            starting_face_id,
+            estimate: FoldingEstimate {
+                estimation_step: EstimationStep::Step0,
+                display_style: DisplayStyle::None0,
+                discovered_fold_cases: 0,
+                find_another_overlap_valid: false,
+                text_result: String::new(),
+                overlap: None,
+            },
+            worker: None,
+        }
+    }
+
+    pub fn estimate(&self) -> &FoldingEstimate {
+        &self.estimate
+    }
+
+    /// Oriedita `FoldedFigure.folding_estimated(...)` on a reusable folded
+    /// figure. Repeated calls preserve the worker permutation state required by
+    /// `ORDER_6` and `foldAnother`.
+    pub fn folding_estimated(
+        &mut self,
+        order: EstimationOrder,
+    ) -> Result<FoldingEstimate, FoldingEstimateError> {
+        let order = order.normalized();
+        if self.segments.is_empty() {
+            return Ok(self.estimate.clone());
+        }
+
+        if self.estimate.estimation_step == EstimationStep::Step0
+            && order.is_at_least(EstimationOrder::Order1)
+        {
+            self.estimate.estimation_step = EstimationStep::Step1;
+            self.estimate.display_style = DisplayStyle::Development1;
+        }
+        if self.estimate.estimation_step == EstimationStep::Step1
+            && order.is_at_least(EstimationOrder::Order2)
+            && estimate_wireframe_from_segments(&self.segments, self.starting_face_id).is_some()
+        {
+            self.estimate.estimation_step = EstimationStep::Step2;
+            self.estimate.display_style = DisplayStyle::Wire2;
+        }
+        if self.estimate.estimation_step == EstimationStep::Step2
+            && order.is_at_least(EstimationOrder::Order3)
+            && configure_subfaces_from_segments(&self.segments, self.starting_face_id).is_some()
+        {
+            self.estimate.estimation_step = EstimationStep::Step3;
+            self.estimate.display_style = DisplayStyle::Transparent3;
+        }
+        if self.estimate.estimation_step == EstimationStep::Step3
+            && order.is_at_least(EstimationOrder::Order4)
+        {
+            self.worker = overlap_enumerator_from_segments(&self.segments, self.starting_face_id)?;
+            self.estimate.estimation_step = EstimationStep::Step4;
+            self.estimate.display_style = DisplayStyle::Development4;
+            self.estimate.find_another_overlap_valid = self.worker.is_some();
+            self.estimate.discovered_fold_cases = 0;
+        }
+        if self.estimate.estimation_step == EstimationStep::Step4
+            && order.is_at_least(EstimationOrder::Order5)
+        {
+            self.folding_estimated_05()?;
+            self.estimate.estimation_step = EstimationStep::Step5;
+            self.estimate.display_style = DisplayStyle::Paper5;
+            if self.estimate.discovered_fold_cases == 0 && !self.estimate.find_another_overlap_valid
+            {
+                self.estimate.estimation_step = EstimationStep::Step3;
+                self.estimate.display_style = DisplayStyle::Transparent3;
+            }
+        }
+        if self.estimate.estimation_step == EstimationStep::Step5
+            && order == EstimationOrder::Order6
+        {
+            self.folding_estimated_05()?;
+            self.estimate.display_style = DisplayStyle::Paper5;
+        }
+
+        Ok(self.estimate.clone())
+    }
+
+    fn folding_estimated_05(&mut self) -> Result<(), WorkerOverlapSearchError> {
+        if matches!(
+            self.estimate.estimation_step,
+            EstimationStep::Step4 | EstimationStep::Step5
+        ) && self.estimate.find_another_overlap_valid
+            && let Some(worker) = self.worker.as_mut()
+        {
+            let overlap =
+                worker.possible_overlapping_search(self.estimate.discovered_fold_cases == 0)?;
+            if overlap.found {
+                self.estimate.discovered_fold_cases += 1;
+            }
+            let next_subface = worker.next(worker.valid_count())?;
+            self.estimate.find_another_overlap_valid = overlap.found && next_subface > 0;
+            self.estimate.overlap = Some(overlap);
+        }
+
+        self.estimate.text_result = format!(
+            "Number of found solutions = {}  ",
+            self.estimate.discovered_fold_cases
+        );
+        if !self.estimate.find_another_overlap_valid {
+            self.estimate
+                .text_result
+                .push_str(" There is no other solution. ");
+        }
+        Ok(())
+    }
+}
+
+/// Oriedita `FoldedFigure.folding_estimated(...)` stage summary from a fresh
+/// folded figure. For `ORDER_6`, this follows Oriedita and asks the same worker
+/// for the next overlap after the initial order-5 solution.
 pub fn folding_estimate_from_segments(
     segments: &[LineSegment],
     starting_face_id: i32,
     order: EstimationOrder,
 ) -> Result<FoldingEstimate, FoldingEstimateError> {
-    let order = order.normalized();
-    let mut estimate = FoldingEstimate {
-        estimation_step: EstimationStep::Step0,
-        display_style: DisplayStyle::None0,
-        discovered_fold_cases: 0,
-        find_another_overlap_valid: false,
-        text_result: String::new(),
-        overlap: None,
-    };
-
-    if segments.is_empty() {
-        return Ok(estimate);
-    }
-
-    if order.is_at_least(EstimationOrder::Order1) {
-        estimate.estimation_step = EstimationStep::Step1;
-        estimate.display_style = DisplayStyle::Development1;
-    }
-    if order.is_at_least(EstimationOrder::Order2)
-        && estimate_wireframe_from_segments(segments, starting_face_id).is_some()
-    {
-        estimate.estimation_step = EstimationStep::Step2;
-        estimate.display_style = DisplayStyle::Wire2;
-    }
-    if order.is_at_least(EstimationOrder::Order3)
-        && configure_subfaces_from_segments(segments, starting_face_id).is_some()
-    {
-        estimate.estimation_step = EstimationStep::Step3;
-        estimate.display_style = DisplayStyle::Transparent3;
-    }
-    if order.is_at_least(EstimationOrder::Order4) {
-        let hierarchy = initial_hierarchy_from_segments(segments, starting_face_id)?;
-        estimate.estimation_step = EstimationStep::Step4;
-        estimate.display_style = DisplayStyle::Development4;
-        estimate.find_another_overlap_valid = hierarchy.is_some();
-    }
-    if order.is_at_least(EstimationOrder::Order5) && estimate.find_another_overlap_valid {
-        let overlap = overlap_search_from_segments_with_swap(segments, starting_face_id)?;
-        let found = overlap.as_ref().is_some_and(|search| search.found);
-        if found {
-            estimate.discovered_fold_cases = 1;
-        }
-        estimate.overlap = overlap;
-        estimate.find_another_overlap_valid = false;
-        estimate.estimation_step = EstimationStep::Step5;
-        estimate.display_style = DisplayStyle::Paper5;
-        if estimate.discovered_fold_cases == 0 {
-            estimate.estimation_step = EstimationStep::Step3;
-            estimate.display_style = DisplayStyle::Transparent3;
-        }
-        estimate.text_result = format!(
-            "Number of found solutions = {}  ",
-            estimate.discovered_fold_cases
-        );
-        if !estimate.find_another_overlap_valid {
-            estimate
-                .text_result
-                .push_str(" There is no other solution. ");
-        }
-    }
-
-    Ok(estimate)
+    let mut session = FoldingEstimateSession::new(segments, starting_face_id);
+    session.folding_estimated(order)
 }
 
 /// Oriedita `FoldedFigure_Worker.possible_overlapping_search(false)` after
@@ -576,6 +636,16 @@ fn overlap_search_from_segments_impl(
     starting_face_id: i32,
     swap: bool,
 ) -> Result<Option<WorkerOverlapSearch>, WorkerOverlapSearchError> {
+    let Some(mut enumerator) = overlap_enumerator_from_segments(segments, starting_face_id)? else {
+        return Ok(None);
+    };
+    enumerator.possible_overlapping_search(swap).map(Some)
+}
+
+fn overlap_enumerator_from_segments(
+    segments: &[LineSegment],
+    starting_face_id: i32,
+) -> Result<Option<WorkerOverlapEnumerator>, WorkerOverlapSearchError> {
     if segments.is_empty() {
         return Ok(None);
     }
@@ -592,34 +662,19 @@ fn overlap_search_from_segments_impl(
     let prepared_segments = prepare_subface_segments(&folded_segments);
     let subface_graph = FoldGraph::from_segments(&prepared_segments, true);
     if subface_graph.faces.is_empty() {
-        return Ok(Some(WorkerOverlapSearch {
-            found: true,
-            hierarchy: initial,
-            priority: SubFacePriority {
-                ordered_subface_indices: Vec::new(),
-                valid_count: 0,
-            },
-        }));
+        return WorkerOverlapEnumerator::from_ordered_subfaces(&[], &[], 0, &initial, None)
+            .map(Some);
     }
 
     let subfaces = configure_subfaces(&folded, &subface_graph);
     let conditions = equivalence_condition_candidates_from_parts(&graph, &folded, &subfaces)?;
-    let search = if swap {
-        possible_overlap_search_for_subfaces_with_swap(
-            &subfaces.subfaces,
-            &subfaces.reduced_subface_indices,
-            &initial,
-            Some(&conditions),
-        )
-    } else {
-        possible_overlap_search_for_subfaces(
-            &subfaces.subfaces,
-            &subfaces.reduced_subface_indices,
-            &initial,
-            Some(&conditions),
-        )
-    };
-    search.map(Some)
+    WorkerOverlapEnumerator::from_subfaces(
+        &subfaces.subfaces,
+        &subfaces.reduced_subface_indices,
+        &initial,
+        Some(&conditions),
+    )
+    .map(Some)
 }
 
 fn initial_hierarchy_from_graph(

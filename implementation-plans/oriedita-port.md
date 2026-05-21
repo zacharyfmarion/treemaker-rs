@@ -1238,14 +1238,16 @@ Deliverables:
   selected-range preconditions, and folded-figure state updates remain tracked
   until the command/service layer is ported.
 - Status: The first-solution folded-figure estimate state machine is ported as
-  `folding::folding_estimate_from_segments`, covering Oriedita estimation
-  order normalization, stage/display transitions, text-result updates, and the
-  first order-5 overlap solution from a fresh folded figure. The oracle command
-  `folding-estimate-summary` compares the task-level step, display style,
-  discovered-case count, text result, and worker hierarchy snapshot. Stateful
-  worker enumeration is available underneath this API, while `ORDER_6`
-  "find another" task/service wiring and `FoldingEstimateSave100Task` batch
-  export remain separate command-layer stages.
+  `folding::FoldingEstimateSession` and the fresh helper
+  `folding::folding_estimate_from_segments`, covering Oriedita estimation order
+  normalization, stage/display transitions, text-result updates, the first
+  order-5 overlap solution, and `ORDER_6` reuse of the same worker state to ask
+  for the next overlap. The oracle commands `folding-estimate-summary` and
+  `folding-estimate-sequence-summary` compare the task-level step, display
+  style, discovered-case count, text result, worker hierarchy snapshot, fresh
+  order-6 behavior, and repeated order-5/order-6 behavior. `foldAnother`
+  service wiring and `FoldingEstimateSave100Task` batch export remain separate
+  command-layer stages.
 - Status: Oriedita's `SubFaceSwappingAlgorithm` support logic is ported as
   `folding::SubFaceSwapper`, including visited-subface tracking, dead-end
   recording, repeated-prefix history detection, swap-counter-driven reverse

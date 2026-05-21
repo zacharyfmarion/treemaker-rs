@@ -1,8 +1,8 @@
 use oristudio_cp::folding::{
     AdditionalEstimation, AdditionalEstimationError, ChainPermutationGenerator,
-    EquivalenceConditionSet, HierarchyRelation, InitialHierarchy, InitialHierarchyError, SubFace,
-    SubFaceConfiguration, SubFacePermutationSearch, WorkerOverlapEnumerator,
-    additional_estimation_from_segments, configure_subfaces_from_segments,
+    EquivalenceConditionSet, FoldingEstimateSession, HierarchyRelation, InitialHierarchy,
+    InitialHierarchyError, SubFace, SubFaceConfiguration, SubFacePermutationSearch,
+    WorkerOverlapEnumerator, additional_estimation_from_segments, configure_subfaces_from_segments,
     equivalence_condition_candidates_from_segments, estimate_wireframe_from_segments,
     folding_estimate_from_segments, initial_hierarchy_from_segments, overlap_search_from_segments,
     overlap_search_from_segments_with_swap, possible_overlap_search_for_ordered_subfaces,
@@ -803,6 +803,65 @@ fn folding_estimate_first_solution_matches_oriedita_oracle() {
 }
 
 #[test]
+fn folding_estimate_sequence_matches_oriedita_order6_oracle() {
+    let Some(oracle) = folding_oracle() else {
+        eprintln!("skipping Oriedita folding oracle test: ORIEDITA_GEOMETRY_ORACLE is not set");
+        return;
+    };
+
+    let segments = square_with_diagonal();
+    let mut session = FoldingEstimateSession::new(&segments, 1);
+    let orders = [
+        oristudio_cp::folding::EstimationOrder::Order5,
+        oristudio_cp::folding::EstimationOrder::Order6,
+    ];
+    let mut args = vec![
+        "folding-estimate-sequence-summary".to_string(),
+        "1".to_string(),
+        orders.len().to_string(),
+        "5".to_string(),
+        "6".to_string(),
+        segments.len().to_string(),
+    ];
+    push_segment_args(&mut args, &segments);
+    let oracle_args = args.iter().map(String::as_str).collect::<Vec<_>>();
+
+    assert_eq!(
+        folding_estimate_sequence_summary(&mut session, &orders),
+        run_oracle(&oracle, &oracle_args)
+    );
+}
+
+#[test]
+fn folding_estimate_fresh_order6_matches_oriedita_oracle() {
+    let Some(oracle) = folding_oracle() else {
+        eprintln!("skipping Oriedita folding oracle test: ORIEDITA_GEOMETRY_ORACLE is not set");
+        return;
+    };
+
+    let segments = square_with_diagonal();
+    let estimate = folding_estimate_from_segments(
+        &segments,
+        1,
+        oristudio_cp::folding::EstimationOrder::Order6,
+    )
+    .expect("folding estimate");
+    let mut args = vec![
+        "folding-estimate-summary".to_string(),
+        "1".to_string(),
+        "6".to_string(),
+        segments.len().to_string(),
+    ];
+    push_segment_args(&mut args, &segments);
+    let oracle_args = args.iter().map(String::as_str).collect::<Vec<_>>();
+
+    assert_eq!(
+        folding_estimate_summary(&estimate),
+        run_oracle(&oracle, &oracle_args)
+    );
+}
+
+#[test]
 fn subface_swapper_matches_oriedita_oracle() {
     let Some(oracle) = folding_oracle() else {
         eprintln!("skipping Oriedita folding oracle test: ORIEDITA_GEOMETRY_ORACLE is not set");
@@ -1470,6 +1529,35 @@ fn folding_estimate_summary(estimate: &oristudio_cp::folding::FoldingEstimate) -
         output.push_str("worker_overlap|-1|0|0|0\n");
     }
     output
+}
+
+fn folding_estimate_sequence_summary(
+    session: &mut FoldingEstimateSession,
+    orders: &[oristudio_cp::folding::EstimationOrder],
+) -> String {
+    let mut output = String::new();
+    for order in orders {
+        let estimate = session.folding_estimated(*order).expect("folding estimate");
+        output.push_str(&format!(
+            "folding_estimate_action|{}\n",
+            estimation_order_value(*order)
+        ));
+        output.push_str(&folding_estimate_summary(&estimate));
+    }
+    output
+}
+
+fn estimation_order_value(order: oristudio_cp::folding::EstimationOrder) -> i32 {
+    match order {
+        oristudio_cp::folding::EstimationOrder::Order0 => 0,
+        oristudio_cp::folding::EstimationOrder::Order1 => 1,
+        oristudio_cp::folding::EstimationOrder::Order2 => 2,
+        oristudio_cp::folding::EstimationOrder::Order3 => 3,
+        oristudio_cp::folding::EstimationOrder::Order4 => 4,
+        oristudio_cp::folding::EstimationOrder::Order5 => 5,
+        oristudio_cp::folding::EstimationOrder::Order6 => 6,
+        oristudio_cp::folding::EstimationOrder::Order51 => 51,
+    }
 }
 
 fn estimation_step_name(step: oristudio_cp::folding::EstimationStep) -> &'static str {

@@ -255,7 +255,7 @@ mutation.
 | Upstream source | Behavior | Rust target | Stage | Status |
 | --- | --- | --- | --- | --- |
 | `CheckCAMVTask.java` | Combined angle and MV diagnostics. | `checks::check_camv_task` | 9 | Oracle-tested |
-| `FoldingEstimateTask.java` | Folding estimate execution. | `folding::folding_estimate_from_segments`, `folding::WorkerOverlapEnumerator` | 10 | Porting; first-solution estimate summary oracle; worker search/next/search sequence oracle |
+| `FoldingEstimateTask.java` | Folding estimate execution. | `folding::FoldingEstimateSession`, `folding::folding_estimate_from_segments`, `folding::WorkerOverlapEnumerator` | 10 | Porting; first-solution, fresh order-6, and order-5/order-6 sequence oracles |
 | `FoldingEstimateSpecificTask.java` | Refold with selected starting face/state. | `folding::estimate_specific` | 10 | Unsupported |
 | `FoldingEstimateSave100Task.java` | Batch/export folding estimates. | `folding::estimate_batch` | 10 | Unsupported |
 | `TwoColoredTask.java` | Two-colored CP generation. | `folding::two_colored_subface_segments_from_segments` | 10 | Porting; stage 02col/03 subface arrangement oracle |

@@ -3,7 +3,8 @@ use oristudio_cp::folding::{
     SubFaceSwapper, additional_estimation_from_segments, configure_subfaces_from_segments,
     equivalence_condition_candidates_from_segments, estimate_wireframe_from_segments,
     initial_hierarchy_from_segments, overlap_search_from_segments,
-    possible_overlap_search_for_subfaces, prepare_subface_segments, prioritize_subfaces,
+    overlap_search_from_segments_with_swap, possible_overlap_search_for_subfaces,
+    possible_overlap_search_for_subfaces_with_swap, prepare_subface_segments, prioritize_subfaces,
 };
 use oristudio_cp::geometry::{LineColor, LineSegment, Point};
 
@@ -295,8 +296,69 @@ fn subface_swapper_moves_recorded_dead_end_toward_front() {
 }
 
 #[test]
+fn worker_overlap_search_with_swap_runs_realtime_search_path() {
+    let hierarchy = InitialHierarchy {
+        faces_total: 7,
+        relations: Vec::new(),
+    };
+    let subfaces = vec![
+        oristudio_cp::folding::SubFace {
+            face_ids: vec![0, 1, 2, 3],
+        },
+        oristudio_cp::folding::SubFace {
+            face_ids: vec![4, 5, 6],
+        },
+    ];
+    let conditions = oristudio_cp::folding::EquivalenceConditionSet {
+        triple_conditions: vec![
+            oristudio_cp::folding::EquivalenceCondition {
+                a: 4,
+                b: 5,
+                c: 4,
+                d: 6,
+            },
+            oristudio_cp::folding::EquivalenceCondition {
+                a: 5,
+                b: 4,
+                c: 5,
+                d: 6,
+            },
+            oristudio_cp::folding::EquivalenceCondition {
+                a: 6,
+                b: 4,
+                c: 6,
+                d: 5,
+            },
+        ],
+        quadruple_conditions: Vec::new(),
+    };
+
+    let search = possible_overlap_search_for_subfaces_with_swap(
+        &subfaces,
+        &[0, 1],
+        &hierarchy,
+        Some(&conditions),
+    )
+    .expect("worker search should be supported");
+
+    assert!(!search.found);
+    assert_eq!(search.priority.valid_count, 2);
+}
+
+#[test]
 fn overlap_search_from_segments_runs_folded_worker_pipeline() {
     let search = overlap_search_from_segments(&square_with_diagonal(), 1)
+        .expect("overlap search should not fail")
+        .expect("overlap search result");
+
+    assert!(search.found);
+    assert_eq!(search.hierarchy.faces_total, 2);
+    assert!(!search.hierarchy.relations.is_empty());
+}
+
+#[test]
+fn overlap_search_from_segments_with_swap_runs_initial_worker_pipeline() {
+    let search = overlap_search_from_segments_with_swap(&square_with_diagonal(), 1)
         .expect("overlap search should not fail")
         .expect("overlap search result");
 

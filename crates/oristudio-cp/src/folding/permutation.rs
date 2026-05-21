@@ -1,7 +1,7 @@
 use super::{
     AdditionalEstimationError, EquivalenceCondition, EquivalenceConditionSet, FaceOrder,
     HierarchyTable, InitialHierarchy, InitialHierarchyError, SubFace, SubFaceConfiguration,
-    run_additional_estimation,
+    run_additional_estimation, run_additional_estimation_fast,
 };
 use std::collections::{HashMap, HashSet};
 
@@ -34,6 +34,13 @@ pub struct WorkerOverlapSearch {
     pub found: bool,
     pub hierarchy: InitialHierarchy,
     pub priority: SubFacePriority,
+}
+
+#[derive(Debug, Clone)]
+struct WorkerSearchEntry {
+    subface_index: usize,
+    search: SubFacePermutationSearch,
+    swap_counter: usize,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -73,13 +80,31 @@ impl SubFaceSwapper {
     }
 
     pub fn process(&mut self, order: &mut [usize], max: usize, swap_counters: &[usize]) {
+        self.process_with_callbacks(
+            order,
+            max,
+            |item| swap_counters.get(item).copied().unwrap_or(0),
+            |_| {},
+        );
+    }
+
+    fn process_with_callbacks<Counter, SwapOver>(
+        &mut self,
+        order: &mut [usize],
+        max: usize,
+        mut swap_counter: Counter,
+        mut on_swap_over: SwapOver,
+    ) where
+        Counter: FnMut(usize) -> usize,
+        SwapOver: FnMut(usize),
+    {
         if self.high < 2 {
             return;
         }
 
         let mut hash = order_prefix(order, self.high);
         if self.history.contains(&hash) {
-            let reverse_result = self.reverse_swap(order, 1, self.high, max, 1);
+            let reverse_result = self.reverse_swap(order, 1, self.high, max, 1, &mut on_swap_over);
             if reverse_result == self.high {
                 return;
             }
@@ -89,27 +114,30 @@ impl SubFaceSwapper {
         self.history.insert(hash);
 
         let low = self.high / 2;
-        swap_order(order, self.high, low);
+        swap_order(order, self.high, low, &mut on_swap_over);
         self.high = 0;
 
         self.last_low = low;
         let reverse_count = order
             .get(low.saturating_sub(1))
-            .and_then(|item| swap_counters.get(*item))
-            .copied()
+            .map(|item| swap_counter(*item))
             .unwrap_or(0)
             .saturating_sub(1);
-        self.reverse_swap(order, low, low, max, reverse_count);
+        self.reverse_swap(order, low, low, max, reverse_count, &mut on_swap_over);
     }
 
-    fn reverse_swap(
+    fn reverse_swap<SwapOver>(
         &mut self,
         order: &mut [usize],
         index: usize,
         mut high: usize,
         max: usize,
         mut remaining: usize,
-    ) -> usize {
+        on_swap_over: &mut SwapOver,
+    ) -> usize
+    where
+        SwapOver: FnMut(usize),
+    {
         let mut i = index + 1;
         while i <= max && remaining > 0 {
             let Some(item) = order.get(i.saturating_sub(1)).copied() else {
@@ -117,7 +145,7 @@ impl SubFaceSwapper {
             };
             if !self.visited.contains(&item) {
                 self.visited.insert(item);
-                swap_order(order, i, index);
+                swap_order(order, i, index, on_swap_over);
                 high += 1;
                 remaining -= 1;
             }
@@ -233,77 +261,144 @@ pub fn possible_overlap_search_for_subfaces(
     hierarchy: &InitialHierarchy,
     conditions: Option<&EquivalenceConditionSet>,
 ) -> Result<WorkerOverlapSearch, WorkerOverlapSearchError> {
+    possible_overlap_search_for_subfaces_impl(
+        subfaces,
+        reduced_subface_indices,
+        hierarchy,
+        conditions,
+        false,
+    )
+}
+
+pub fn possible_overlap_search_for_subfaces_with_swap(
+    subfaces: &[SubFace],
+    reduced_subface_indices: &[usize],
+    hierarchy: &InitialHierarchy,
+    conditions: Option<&EquivalenceConditionSet>,
+) -> Result<WorkerOverlapSearch, WorkerOverlapSearchError> {
+    possible_overlap_search_for_subfaces_impl(
+        subfaces,
+        reduced_subface_indices,
+        hierarchy,
+        conditions,
+        true,
+    )
+}
+
+fn possible_overlap_search_for_subfaces_impl(
+    subfaces: &[SubFace],
+    reduced_subface_indices: &[usize],
+    hierarchy: &InitialHierarchy,
+    conditions: Option<&EquivalenceConditionSet>,
+    swap: bool,
+) -> Result<WorkerOverlapSearch, WorkerOverlapSearchError> {
     let priority = prioritize_subfaces(subfaces, reduced_subface_indices, hierarchy);
-    let mut searches = Vec::with_capacity(priority.ordered_subface_indices.len());
+    let mut entries = Vec::with_capacity(priority.ordered_subface_indices.len());
     for subface_index in &priority.ordered_subface_indices {
         let Some(subface) = subfaces.get(*subface_index) else {
             continue;
         };
         let mut search = SubFacePermutationSearch::new(subface.face_ids.clone());
-        search.set_guide_map(hierarchy, conditions)?;
-        searches.push(search);
+        if entries.len() < priority.valid_count {
+            search.set_guide_map(hierarchy, conditions)?;
+        }
+        entries.push(WorkerSearchEntry {
+            subface_index: *subface_index,
+            search,
+            swap_counter: 0,
+        });
     }
 
+    let mut order = (0..entries.len()).collect::<Vec<_>>();
+    let mut swapper = SubFaceSwapper::new();
+    let mut realtime_additional_estimation = swap;
+    let mut last_table = HierarchyTable::from_initial(hierarchy);
     let mut changed_subface = 1usize;
     while changed_subface != 0 {
-        match inconsistent_subface_request(&mut searches, priority.valid_count, hierarchy)? {
+        match inconsistent_subface_request(
+            &mut entries,
+            &order,
+            priority.valid_count,
+            hierarchy,
+            conditions,
+            swap.then_some(&mut swapper),
+            &mut realtime_additional_estimation,
+        )? {
             WorkerSearchStep::Consistent(table) => {
                 let mut table = table;
-                if let Err(error) = run_final_additional_estimation(
-                    &mut table,
-                    subfaces,
-                    reduced_subface_indices,
-                    conditions,
-                ) {
-                    return if priority.valid_count < priority.ordered_subface_indices.len() {
-                        Err(
+                if run_final_additional_estimation(&mut table, &entries, &order, conditions)
+                    .is_err()
+                {
+                    if priority.valid_count < priority.ordered_subface_indices.len() {
+                        return Err(
                             WorkerOverlapSearchError::FinalAdditionalEstimationRequired {
                                 valid_count: priority.valid_count,
                                 reduced_subface_count: priority.ordered_subface_indices.len(),
                             },
-                        )
-                    } else {
-                        Err(error.into())
-                    };
+                        );
+                    }
+                    last_table = table;
+                    changed_subface = advance_subface_permutations(
+                        &mut entries,
+                        &order,
+                        priority.valid_count.saturating_sub(1),
+                    )?;
+                    if swap {
+                        let counters = entries
+                            .iter()
+                            .map(|entry| entry.swap_counter)
+                            .collect::<Vec<_>>();
+                        swapper.process_with_callbacks(
+                            &mut order,
+                            priority.valid_count,
+                            |item| counters.get(item).copied().unwrap_or(0),
+                            |item| entries[item].search.clear_temp_guide(),
+                        );
+                    }
+                    continue;
                 }
                 return Ok(WorkerOverlapSearch {
                     found: true,
                     hierarchy: table.into_initial_hierarchy(hierarchy.faces_total),
-                    priority,
+                    priority: current_priority(priority.valid_count, &entries, &order),
                 });
             }
-            WorkerSearchStep::Inconsistent(subface_id) => {
-                changed_subface = advance_subface_permutations(&mut searches, subface_id - 1)?;
+            WorkerSearchStep::Inconsistent { subface_id, table } => {
+                last_table = table;
+                changed_subface =
+                    advance_subface_permutations(&mut entries, &order, subface_id - 1)?;
+                if swap {
+                    let counters = entries
+                        .iter()
+                        .map(|entry| entry.swap_counter)
+                        .collect::<Vec<_>>();
+                    swapper.process_with_callbacks(
+                        &mut order,
+                        priority.valid_count,
+                        |item| counters.get(item).copied().unwrap_or(0),
+                        |item| entries[item].search.clear_temp_guide(),
+                    );
+                }
             }
+            WorkerSearchStep::RetryWithoutRealtimeAdditionalEstimation => {}
         }
     }
 
     Ok(WorkerOverlapSearch {
         found: false,
-        hierarchy: hierarchy.clone(),
-        priority,
+        hierarchy: last_table.into_initial_hierarchy(hierarchy.faces_total),
+        priority: current_priority(priority.valid_count, &entries, &order),
     })
 }
 
 fn run_final_additional_estimation(
     table: &mut HierarchyTable,
-    subfaces: &[SubFace],
-    reduced_subface_indices: &[usize],
+    entries: &[WorkerSearchEntry],
+    order: &[usize],
     conditions: Option<&EquivalenceConditionSet>,
 ) -> Result<(), AdditionalEstimationError> {
-    let configuration = SubFaceConfiguration {
-        subfaces: subfaces.to_vec(),
-        reduced_subface_indices: reduced_subface_indices.to_vec(),
-        face_id_count_max: subfaces
-            .iter()
-            .map(|subface| subface.face_ids.len())
-            .max()
-            .unwrap_or(0),
-    };
-    let empty_conditions = EquivalenceConditionSet {
-        triple_conditions: Vec::new(),
-        quadruple_conditions: Vec::new(),
-    };
+    let configuration = subface_configuration_from_entries(entries, order, entries.len());
+    let empty_conditions = empty_conditions();
     let conditions = conditions.unwrap_or(&empty_conditions);
     run_additional_estimation(
         table,
@@ -311,6 +406,89 @@ fn run_final_additional_estimation(
         &conditions.triple_conditions,
         &conditions.quadruple_conditions,
     )
+}
+
+fn run_realtime_additional_estimation(
+    table: &mut HierarchyTable,
+    entries: &[WorkerSearchEntry],
+    order: &[usize],
+    valid_count: usize,
+    conditions: Option<&EquivalenceConditionSet>,
+) -> Result<(), AdditionalEstimationError> {
+    let configuration = subface_configuration_from_entries(entries, order, valid_count);
+    let empty_conditions = empty_conditions();
+    let conditions = conditions.unwrap_or(&empty_conditions);
+    run_additional_estimation(
+        table,
+        &configuration,
+        &conditions.triple_conditions,
+        &conditions.quadruple_conditions,
+    )
+}
+
+fn run_fast_realtime_additional_estimation(
+    table: &mut HierarchyTable,
+    entries: &[WorkerSearchEntry],
+    order: &[usize],
+    valid_count: usize,
+    conditions: Option<&EquivalenceConditionSet>,
+) -> Result<(), AdditionalEstimationError> {
+    let configuration = subface_configuration_from_entries(entries, order, valid_count);
+    let empty_conditions = empty_conditions();
+    let conditions = conditions.unwrap_or(&empty_conditions);
+    run_additional_estimation_fast(
+        table,
+        &configuration,
+        &conditions.triple_conditions,
+        &conditions.quadruple_conditions,
+    )
+}
+
+fn subface_configuration_from_entries(
+    entries: &[WorkerSearchEntry],
+    order: &[usize],
+    count: usize,
+) -> SubFaceConfiguration {
+    let subfaces = order
+        .iter()
+        .take(count)
+        .filter_map(|entry_index| entries.get(*entry_index))
+        .map(|entry| SubFace {
+            face_ids: entry.search.face_ids.clone(),
+        })
+        .collect::<Vec<_>>();
+    let face_id_count_max = subfaces
+        .iter()
+        .map(|subface| subface.face_ids.len())
+        .max()
+        .unwrap_or(0);
+    SubFaceConfiguration {
+        reduced_subface_indices: (0..subfaces.len()).collect(),
+        subfaces,
+        face_id_count_max,
+    }
+}
+
+fn current_priority(
+    valid_count: usize,
+    entries: &[WorkerSearchEntry],
+    order: &[usize],
+) -> SubFacePriority {
+    SubFacePriority {
+        ordered_subface_indices: order
+            .iter()
+            .filter_map(|entry_index| entries.get(*entry_index))
+            .map(|entry| entry.subface_index)
+            .collect(),
+        valid_count,
+    }
+}
+
+fn empty_conditions() -> EquivalenceConditionSet {
+    EquivalenceConditionSet {
+        triple_conditions: Vec::new(),
+        quadruple_conditions: Vec::new(),
+    }
 }
 
 impl From<PermutationError> for SubFaceSearchError {
@@ -366,6 +544,10 @@ impl SubFacePermutationSearch {
 
     pub fn reset_permutation_generator(&mut self) {
         self.generator.reset();
+    }
+
+    pub fn clear_temp_guide(&mut self) {
+        self.generator.clear_temp_guide();
     }
 
     /// Oriedita `SubFace.possible_overlapping_search()` without the
@@ -614,40 +796,98 @@ impl SubFacePermutationSearch {
 
 enum WorkerSearchStep {
     Consistent(HierarchyTable),
-    Inconsistent(usize),
+    Inconsistent {
+        subface_id: usize,
+        table: HierarchyTable,
+    },
+    RetryWithoutRealtimeAdditionalEstimation,
 }
 
 fn inconsistent_subface_request(
-    searches: &mut [SubFacePermutationSearch],
+    entries: &mut [WorkerSearchEntry],
+    order: &[usize],
     valid_count: usize,
     hierarchy: &InitialHierarchy,
+    conditions: Option<&EquivalenceConditionSet>,
+    mut swapper: Option<&mut SubFaceSwapper>,
+    realtime_additional_estimation: &mut bool,
 ) -> Result<WorkerSearchStep, WorkerOverlapSearchError> {
     let mut table = HierarchyTable::from_initial(hierarchy);
     for index in 0..valid_count {
-        let Some(search) = searches.get_mut(index) else {
+        let Some(entry_index) = order.get(index).copied() else {
             continue;
         };
-        if !search.possible_overlapping_search_with_table(&table)? {
-            return Ok(WorkerSearchStep::Inconsistent(index + 1));
+        if let Some(swapper) = swapper.as_mut() {
+            swapper.visit(entry_index);
         }
-        search.enter_stacking_into(&mut table)?;
+        let Some(entry) = entries.get_mut(entry_index) else {
+            continue;
+        };
+        if !entry
+            .search
+            .possible_overlapping_search_with_table(&table)?
+        {
+            if let Some(swapper) = swapper.as_mut() {
+                swapper.record(index + 1);
+            }
+            if index + 1 > valid_count / 2 || entry.swap_counter > 0 {
+                entry.swap_counter = entry.swap_counter.saturating_add(1);
+            }
+            return Ok(WorkerSearchStep::Inconsistent {
+                subface_id: index + 1,
+                table,
+            });
+        }
+        entry.swap_counter = 0;
+        entry.search.enter_stacking_into(&mut table)?;
+        if *realtime_additional_estimation {
+            let should_estimate = swapper
+                .as_mut()
+                .is_none_or(|swapper| swapper.should_estimate(index + 1));
+            let success = if should_estimate && (index + 1) <= (valid_count as f64).sqrt() as usize
+            {
+                run_realtime_additional_estimation(
+                    &mut table,
+                    entries,
+                    order,
+                    valid_count,
+                    conditions,
+                )
+            } else if (index + 1) % (3 + (index + 1) * (index + 1) / 6400) == 0 {
+                run_fast_realtime_additional_estimation(
+                    &mut table,
+                    entries,
+                    order,
+                    valid_count,
+                    conditions,
+                )
+            } else {
+                Ok(())
+            };
+            if success.is_err() {
+                *realtime_additional_estimation = false;
+                return Ok(WorkerSearchStep::RetryWithoutRealtimeAdditionalEstimation);
+            }
+        }
     }
     Ok(WorkerSearchStep::Consistent(table))
 }
 
 fn advance_subface_permutations(
-    searches: &mut [SubFacePermutationSearch],
+    entries: &mut [WorkerSearchEntry],
+    order: &[usize],
     subface_count: usize,
 ) -> Result<usize, PermutationError> {
-    for search in searches.iter_mut().skip(subface_count) {
-        search.reset_permutation_generator();
+    for entry_index in order.iter().skip(subface_count) {
+        entries[*entry_index].search.reset_permutation_generator();
     }
 
     let mut advanced = 0usize;
     let mut subface_id = subface_count;
     for index in (0..subface_count).rev() {
-        let digit_count = searches[index].face_ids.len();
-        advanced = searches[index].next(digit_count)?;
+        let entry_index = order[index];
+        let digit_count = entries[entry_index].search.face_ids.len();
+        advanced = entries[entry_index].search.next(digit_count)?;
         subface_id = index + 1;
         if advanced != 0 {
             break;
@@ -1108,13 +1348,17 @@ fn order_prefix(order: &[usize], high: usize) -> Vec<usize> {
     order.iter().take(high).copied().collect()
 }
 
-fn swap_order(order: &mut [usize], high: usize, low: usize) {
+fn swap_order<SwapOver>(order: &mut [usize], high: usize, low: usize, on_swap_over: &mut SwapOver)
+where
+    SwapOver: FnMut(usize),
+{
     if high == 0 || low == 0 || high > order.len() || low > order.len() || high <= low {
         return;
     }
     let temp = order[high - 1];
     for index in (low..high).rev() {
         order[index] = order[index - 1];
+        on_swap_over(order[index]);
     }
     order[low - 1] = temp;
 }

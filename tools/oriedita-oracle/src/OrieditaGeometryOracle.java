@@ -327,8 +327,10 @@ public class OrieditaGeometryOracle {
             case "subface-guide-permutation-summary" -> subfaceGuidePermutationSummary(args);
             case "subface-overlap-search-summary" -> subfaceOverlapSearchSummary(args);
             case "subface-priority-summary" -> subfacePrioritySummary(args);
-            case "worker-overlap-search-summary" -> workerOverlapSearchSummary(args);
-            case "worker-overlap-from-segments-summary" -> workerOverlapFromSegmentsSummary(args);
+            case "worker-overlap-search-summary" -> workerOverlapSearchSummary(args, false);
+            case "worker-overlap-search-swap-summary" -> workerOverlapSearchSummary(args, true);
+            case "worker-overlap-from-segments-summary" -> workerOverlapFromSegmentsSummary(args, false);
+            case "worker-overlap-from-segments-swap-summary" -> workerOverlapFromSegmentsSummary(args, true);
             case "subface-swapper-summary" -> subfaceSwapperSummary(args);
             default -> usage("unknown command: " + args[0]);
         }
@@ -800,7 +802,7 @@ public class OrieditaGeometryOracle {
         }
     }
 
-    private static void workerOverlapSearchSummary(String[] args) throws Exception {
+    private static void workerOverlapSearchSummary(String[] args, boolean swap) throws Exception {
         if (args.length < 7) {
             usage("worker-overlap-search-summary expects faces total, subface count, subfaces, relation count, relation pairs, 3EC count, 3EC entries, 4EC count, and 4EC entries");
         }
@@ -809,10 +811,12 @@ public class OrieditaGeometryOracle {
         int subfaceCount = Integer.parseInt(args[2]);
         int offset = 3;
         SubFace[] subfaces = new SubFace[subfaceCount + 1];
+        java.util.IdentityHashMap<SubFace, Integer> subfaceIds = new java.util.IdentityHashMap<>();
         subfaces[0] = new SubFace(new NoopBulletinBoard());
         for (int i = 1; i <= subfaceCount; i++) {
             int faceCount = Integer.parseInt(args[offset++]);
             subfaces[i] = new SubFace(new NoopBulletinBoard());
+            subfaceIds.put(subfaces[i], i - 1);
             subfaces[i].setNumDigits(faceCount);
             for (int j = 1; j <= faceCount; j++) {
                 subfaces[i].setFaceId(j, Integer.parseInt(args[offset++]) + 1);
@@ -884,11 +888,14 @@ public class OrieditaGeometryOracle {
             worker.s[i].setGuideMap(worker.hierarchyList);
         }
 
-        int result = worker.possible_overlapping_search(false);
+        int result = worker.possible_overlapping_search(swap);
         printWorkerOverlapSearch(result, validCount, subfaceCount, worker.hierarchyList);
+        if (swap) {
+            printWorkerSubfaceOrder(worker.s, subfaceCount, subfaceIds);
+        }
     }
 
-    private static void workerOverlapFromSegmentsSummary(String[] args) throws Exception {
+    private static void workerOverlapFromSegmentsSummary(String[] args, boolean swap) throws Exception {
         if (args.length < 3) {
             usage("worker-overlap-from-segments-summary expects starting face, count, and segment payload");
         }
@@ -920,7 +927,7 @@ public class OrieditaGeometryOracle {
             return;
         }
 
-        int result = foldedWorker.possible_overlapping_search(false);
+        int result = foldedWorker.possible_overlapping_search(swap);
         SubFace[] reduced = reflectedReducedSubfaces(foldedWorker);
         printWorkerOverlapSearch(
                 result,
@@ -5326,6 +5333,21 @@ public class OrieditaGeometryOracle {
         }
     }
 
+    private static void printWorkerSubfaceOrder(
+            SubFace[] subfaces,
+            int subfaceCount,
+            java.util.IdentityHashMap<SubFace, Integer> subfaceIds) {
+        StringBuilder order = new StringBuilder();
+        for (int i = 1; i <= subfaceCount; i++) {
+            if (i > 1) {
+                order.append(",");
+            }
+            Integer id = subfaceIds.get(subfaces[i]);
+            order.append(id == null ? -1 : id);
+        }
+        System.out.println("worker_order|" + order);
+    }
+
     private static void printSubfaceSwapper(
             String label,
             SubFace[] subfaces,
@@ -6265,7 +6287,9 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle subface-overlap-search-summary <facesTotal> <faceCount> [faceId]... <relationCount> [upper lower]... <tripleCount> [a b c d]... <quadCount> [a b c d]...");
         System.err.println("   or: OrieditaGeometryOracle subface-priority-summary <facesTotal> <subfaceCount> [faceCount faceIds...]... <relationCount> [upper lower]...");
         System.err.println("   or: OrieditaGeometryOracle worker-overlap-search-summary <facesTotal> <subfaceCount> [faceCount faceIds...]... <relationCount> [upper lower]... <tripleCount> [a b c d]... <quadCount> [a b c d]...");
+        System.err.println("   or: OrieditaGeometryOracle worker-overlap-search-swap-summary <facesTotal> <subfaceCount> [faceCount faceIds...]... <relationCount> [upper lower]... <tripleCount> [a b c d]... <quadCount> [a b c d]...");
         System.err.println("   or: OrieditaGeometryOracle worker-overlap-from-segments-summary <startingFace> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle worker-overlap-from-segments-swap-summary <startingFace> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle subface-swapper-summary <subfaceCount> [swapCounter]... <actionCount> [visit|record|process|estimate value]...");
         System.exit(2);
     }

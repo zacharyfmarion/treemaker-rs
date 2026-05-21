@@ -12,7 +12,8 @@ use std::collections::HashMap;
 pub use permutation::{
     ChainPermutationGenerator, PermutationError, PermutationSnapshot, SubFacePermutationSearch,
     SubFacePriority, SubFaceSearchError, SubFaceSwapper, WorkerOverlapSearch,
-    WorkerOverlapSearchError, possible_overlap_search_for_subfaces, prioritize_subfaces,
+    WorkerOverlapSearchError, possible_overlap_search_for_subfaces,
+    possible_overlap_search_for_subfaces_with_swap, prioritize_subfaces,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -367,6 +368,24 @@ pub fn overlap_search_from_segments(
     segments: &[LineSegment],
     starting_face_id: i32,
 ) -> Result<Option<WorkerOverlapSearch>, WorkerOverlapSearchError> {
+    overlap_search_from_segments_impl(segments, starting_face_id, false)
+}
+
+/// Oriedita `FoldedFigure_Worker.possible_overlapping_search(true)` from folded
+/// line segments. This enables the subface swapping path and realtime
+/// additional-estimation checkpoints used during the initial exhaustive search.
+pub fn overlap_search_from_segments_with_swap(
+    segments: &[LineSegment],
+    starting_face_id: i32,
+) -> Result<Option<WorkerOverlapSearch>, WorkerOverlapSearchError> {
+    overlap_search_from_segments_impl(segments, starting_face_id, true)
+}
+
+fn overlap_search_from_segments_impl(
+    segments: &[LineSegment],
+    starting_face_id: i32,
+    swap: bool,
+) -> Result<Option<WorkerOverlapSearch>, WorkerOverlapSearchError> {
     if segments.is_empty() {
         return Ok(None);
     }
@@ -395,13 +414,22 @@ pub fn overlap_search_from_segments(
 
     let subfaces = configure_subfaces(&folded, &subface_graph);
     let conditions = equivalence_condition_candidates_from_parts(&graph, &folded, &subfaces)?;
-    possible_overlap_search_for_subfaces(
-        &subfaces.subfaces,
-        &subfaces.reduced_subface_indices,
-        &initial,
-        Some(&conditions),
-    )
-    .map(Some)
+    let search = if swap {
+        possible_overlap_search_for_subfaces_with_swap(
+            &subfaces.subfaces,
+            &subfaces.reduced_subface_indices,
+            &initial,
+            Some(&conditions),
+        )
+    } else {
+        possible_overlap_search_for_subfaces(
+            &subfaces.subfaces,
+            &subfaces.reduced_subface_indices,
+            &initial,
+            Some(&conditions),
+        )
+    };
+    search.map(Some)
 }
 
 fn initial_hierarchy_from_graph(
@@ -748,6 +776,22 @@ fn run_additional_estimation(
             return Ok(());
         }
     }
+}
+
+fn run_additional_estimation_fast(
+    table: &mut HierarchyTable,
+    subfaces: &SubFaceConfiguration,
+    triple_conditions: &[EquivalenceCondition],
+    quadruple_conditions: &[EquivalenceCondition],
+) -> Result<(), AdditionalEstimationError> {
+    infer_subface_transitivity(table, subfaces)?;
+    for condition in triple_conditions {
+        apply_triple_condition(table, *condition)?;
+    }
+    for condition in quadruple_conditions {
+        apply_quadruple_condition(table, *condition)?;
+    }
+    Ok(())
 }
 
 fn infer_subface_transitivity(

@@ -81,7 +81,7 @@ stage explicitly changes it.
 | `origami/crease_pattern/util/CreasePattern_Worker_Toolbox.java` | Shared CP worker helpers. | `operations::*` | kernel | 5-9 | Unsupported |
 | `origami/crease_pattern/worker/WireFrame_Worker.java` | Face/topology/folding preparation. | `io::fold::export_topology`, `fold_graph`, `folding` | kernel | 4, 10 | Porting; FOLD topology and wireframe oracle |
 | `origami/crease_pattern/worker/LineSegmentSetWorker.java` | Arrangement cleanup for folded subfaces. | `folding::prepare_subface_segments`, `operations::arrangement` | kernel | 5, 10 | Oracle-tested for split-arrangement preprocessing |
-| `origami/crease_pattern/worker/FoldedFigure_Worker.java` | Folded-model hierarchy and overlap solving. | `folding::possible_overlap_search_for_subfaces`, `folding::overlap_search_from_segments` | kernel | 10 | Porting; worker no-swap overlap-search oracle |
+| `origami/crease_pattern/worker/FoldedFigure_Worker.java` | Folded-model hierarchy and overlap solving. | `folding::possible_overlap_search_for_subfaces`, `folding::possible_overlap_search_for_subfaces_with_swap`, `folding::overlap_search_from_segments` | kernel | 10 | Porting; worker no-swap and swap overlap-search oracle |
 | `origami/crease_pattern/worker/FoldedFigure_Configurator.java` | Subface and hierarchy setup. | `folding::configure_subfaces_from_segments` | kernel | 10 | Porting; configureSubFaces oracle |
 | `origami/crease_pattern/worker/SelectMode.java` | Select/unselect mode enum. | `operations::selection` | kernel | 6 | Unsupported |
 | `origami/crease_pattern/worker/foldlineset/BranchTrim.java` | Branch trimming cleanup. | `operations::arrangement` | kernel | 5 | Oracle-tested |
@@ -108,7 +108,7 @@ stage explicitly changes it.
 | `origami/folding/element/Face.java` | Folded face data. | `folding::face` | kernel | 10 | Unsupported |
 | `origami/folding/element/SubFace.java` | Subface data and overlap relations. | `folding::SubFace`, `folding::SubFacePermutationSearch` | kernel | 10 | Porting; membership/reduction, guide-map, local overlap-search, and swapper oracle |
 | `origami/folding/constraint/CustomConstraint.java` | User folding constraints. | `folding::constraints` | kernel | 10 | Unsupported |
-| `origami/folding/algorithm/*` | Inference, priority, Italiano, swapping algorithms. | `folding::additional_estimation_from_segments`, `folding::prioritize_subfaces`, `folding::SubFaceSwapper` | kernel | 10 | Porting; fixed-point AEA, SubFacePriority, and isolated SubFaceSwappingAlgorithm oracle |
+| `origami/folding/algorithm/*` | Inference, priority, Italiano, swapping algorithms. | `folding::additional_estimation_from_segments`, `folding::prioritize_subfaces`, `folding::SubFaceSwapper` | kernel | 10 | Porting; fixed-point/realtime AEA, SubFacePriority, and integrated SubFaceSwappingAlgorithm oracle |
 | `origami/folding/permutation/*` | Permutation and constraint combinatorics. | `folding::solver` | kernel | 10 | Porting; ChainPermutationGenerator oracle |
 | `origami/folding/util/*` | Folding utility data structures. | `folding::EquivalenceCondition` | kernel | 10 | Porting; equivalence condition candidates oracle |
 | `oriedita-data/export/*` | Import/export implementations. | `io` | io | 4 | Unsupported |

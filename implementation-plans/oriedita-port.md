@@ -1170,6 +1170,12 @@ Deliverables:
   pruning as an observable API, custom constraints, overlap permutation search,
   full `FoldingEstimateTask`, full `TwoColoredTask`, and folded-model mutation
   commands remain intentionally unsupported until their stages are ported.
+- Status: Oriedita's `PairGuide` and `ChainPermutationGenerator` are ported as
+  `folding::ChainPermutationGenerator`, including persistent guides, temporary
+  guides, top/bottom constraints, lock-chain initialization, reset, and
+  next-permutation behavior. Oracle commands `chain-permutation-summary` and
+  `chain-permutation-temp-summary` compare the Rust sequence against Oriedita
+  before the overlap search is wired on top.
 
 Oracle:
 

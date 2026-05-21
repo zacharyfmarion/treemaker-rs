@@ -1,3 +1,5 @@
+mod permutation;
+
 use crate::fold_graph::{FacePositions, FoldGraph};
 use crate::geometry::{
     Epsilon, LineColor, LineSegment, Point, Polygon, PolygonIntersection,
@@ -6,6 +8,8 @@ use crate::geometry::{
 use crate::model::CreasePatternModel;
 use crate::operations::arrangement::divide_intersections;
 use std::collections::HashMap;
+
+pub use permutation::{ChainPermutationGenerator, PermutationError, PermutationSnapshot};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct FoldedWireframe {

@@ -1,7 +1,7 @@
 use oristudio_cp::folding::{
-    HierarchyRelation, additional_estimation_from_segments, configure_subfaces_from_segments,
-    equivalence_condition_candidates_from_segments, estimate_wireframe_from_segments,
-    initial_hierarchy_from_segments, prepare_subface_segments,
+    ChainPermutationGenerator, HierarchyRelation, additional_estimation_from_segments,
+    configure_subfaces_from_segments, equivalence_condition_candidates_from_segments,
+    estimate_wireframe_from_segments, initial_hierarchy_from_segments, prepare_subface_segments,
 };
 use oristudio_cp::geometry::{LineColor, LineSegment, Point};
 
@@ -128,6 +128,55 @@ fn additional_estimation_produces_hierarchy_relations() {
     assert_eq!(estimation.hierarchy.relations.len(), 1);
 }
 
+#[test]
+fn chain_permutation_generator_honors_pair_guides() {
+    let mut generator = ChainPermutationGenerator::new(4);
+    generator.add_guide(1, 2).expect("valid guide");
+    generator.add_guide(2, 3).expect("valid guide");
+    generator.initialize();
+
+    for permutation in collect_permutations(generator, 16) {
+        let one = position(&permutation, 1);
+        let two = position(&permutation, 2);
+        let three = position(&permutation, 3);
+        assert!(one < two);
+        assert!(two < three);
+    }
+}
+
+#[test]
+fn chain_permutation_generator_applies_top_and_bottom_constraints() {
+    let mut generator = ChainPermutationGenerator::new(4);
+    generator.set_top_indices([2, 3]).expect("valid top set");
+    generator
+        .set_bottom_indices([1, 4])
+        .expect("valid bottom set");
+    generator.initialize();
+
+    for permutation in collect_permutations(generator, 16) {
+        assert!([2, 3].contains(&permutation[0]));
+        assert!([1, 4].contains(&permutation[3]));
+    }
+}
+
+#[test]
+fn chain_permutation_generator_supports_temporary_guides() {
+    let mut generator = ChainPermutationGenerator::new(3);
+    generator.initialize();
+    generator.next(3).expect("advance before temp guide");
+    generator.add_guide(2, 1).expect("valid temporary guide");
+    generator.next(3).expect("advance with temp guide");
+
+    let temp_permutation = generator.current_permutation();
+    assert!(position(&temp_permutation, 2) < position(&temp_permutation, 1));
+
+    generator.clear_temp_guide();
+    generator
+        .next(3)
+        .expect("advance after clearing temp guide");
+    assert_eq!(generator.current_permutation().len(), 3);
+}
+
 fn square_with_diagonal() -> Vec<LineSegment> {
     vec![
         LineSegment::with_color(
@@ -181,4 +230,22 @@ fn quartered_square() -> Vec<LineSegment> {
         LineSegment::with_color(Point::new(0.5, 0.5), Point::new(1.0, 1.0), LineColor::Red1),
         LineSegment::with_color(Point::new(0.5, 0.5), Point::new(0.0, 1.0), LineColor::Blue2),
     ]
+}
+
+fn collect_permutations(mut generator: ChainPermutationGenerator, limit: usize) -> Vec<Vec<usize>> {
+    let mut permutations = Vec::new();
+    for step in 0..limit {
+        if step > 0 && generator.next(generator.num_digits()).expect("advance") == 0 {
+            break;
+        }
+        permutations.push(generator.current_permutation());
+    }
+    permutations
+}
+
+fn position(permutation: &[usize], value: usize) -> usize {
+    permutation
+        .iter()
+        .position(|digit| *digit == value)
+        .expect("value should be present")
 }

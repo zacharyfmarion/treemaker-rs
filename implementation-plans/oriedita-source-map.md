@@ -109,7 +109,7 @@ stage explicitly changes it.
 | `origami/folding/element/SubFace.java` | Subface data and overlap relations. | `folding::SubFace` | kernel | 10 | Porting; membership/reduction oracle |
 | `origami/folding/constraint/CustomConstraint.java` | User folding constraints. | `folding::constraints` | kernel | 10 | Unsupported |
 | `origami/folding/algorithm/*` | Inference, priority, Italiano, swapping algorithms. | `folding::additional_estimation_from_segments` | kernel | 10 | Porting; fixed-point AEA oracle |
-| `origami/folding/permutation/*` | Permutation and constraint combinatorics. | `folding::solver` | kernel | 10 | Unsupported |
+| `origami/folding/permutation/*` | Permutation and constraint combinatorics. | `folding::solver` | kernel | 10 | Porting; ChainPermutationGenerator oracle |
 | `origami/folding/util/*` | Folding utility data structures. | `folding::EquivalenceCondition` | kernel | 10 | Porting; equivalence condition candidates oracle |
 | `oriedita-data/export/*` | Import/export implementations. | `io` | io | 4 | Unsupported |
 | `oriedita-data/save/*` | Oriedita save models and version conversion. | `io::save` | io | 4 | Unsupported |

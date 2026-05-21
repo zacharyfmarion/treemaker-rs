@@ -1,8 +1,9 @@
 use oristudio_cp::folding::{
-    AdditionalEstimation, AdditionalEstimationError, EquivalenceConditionSet, InitialHierarchy,
-    InitialHierarchyError, SubFaceConfiguration, additional_estimation_from_segments,
-    configure_subfaces_from_segments, equivalence_condition_candidates_from_segments,
-    estimate_wireframe_from_segments, initial_hierarchy_from_segments, prepare_subface_segments,
+    AdditionalEstimation, AdditionalEstimationError, ChainPermutationGenerator,
+    EquivalenceConditionSet, InitialHierarchy, InitialHierarchyError, SubFaceConfiguration,
+    additional_estimation_from_segments, configure_subfaces_from_segments,
+    equivalence_condition_candidates_from_segments, estimate_wireframe_from_segments,
+    initial_hierarchy_from_segments, prepare_subface_segments,
 };
 use oristudio_cp::geometry::{LineColor, LineSegment, Point};
 use std::path::{Path, PathBuf};
@@ -180,6 +181,101 @@ fn additional_estimation_matches_oriedita_oracle() {
             run_oracle(&oracle, &oracle_args)
         );
     }
+}
+
+#[test]
+fn chain_permutation_generator_matches_oriedita_oracle() {
+    let Some(oracle) = folding_oracle() else {
+        eprintln!("skipping Oriedita folding oracle test: ORIEDITA_GEOMETRY_ORACLE is not set");
+        return;
+    };
+
+    for case in [
+        PermutationCase {
+            digits: 3,
+            guides: &[],
+            top: &[],
+            bottom: &[],
+            limit: 8,
+        },
+        PermutationCase {
+            digits: 4,
+            guides: &[(1, 2), (2, 3)],
+            top: &[],
+            bottom: &[],
+            limit: 8,
+        },
+        PermutationCase {
+            digits: 4,
+            guides: &[(1, 3)],
+            top: &[2, 4],
+            bottom: &[1, 3],
+            limit: 8,
+        },
+    ] {
+        let mut generator = ChainPermutationGenerator::new(case.digits);
+        for (upper, lower) in case.guides {
+            generator.add_guide(*upper, *lower).expect("valid guide");
+        }
+        generator
+            .set_top_indices(case.top.iter().copied())
+            .expect("valid top indices");
+        generator
+            .set_bottom_indices(case.bottom.iter().copied())
+            .expect("valid bottom indices");
+        generator.initialize();
+
+        let mut args = vec![
+            "chain-permutation-summary".to_string(),
+            case.digits.to_string(),
+            case.guides.len().to_string(),
+        ];
+        for (upper, lower) in case.guides {
+            args.push(upper.to_string());
+            args.push(lower.to_string());
+        }
+        args.push(joined_or_dash(case.top));
+        args.push(joined_or_dash(case.bottom));
+        args.push(case.limit.to_string());
+        let oracle_args = args.iter().map(String::as_str).collect::<Vec<_>>();
+
+        assert_eq!(
+            chain_permutation_summary(generator, case.limit),
+            run_oracle(&oracle, &oracle_args)
+        );
+    }
+}
+
+#[test]
+fn chain_permutation_temp_guides_match_oriedita_oracle() {
+    let Some(oracle) = folding_oracle() else {
+        eprintln!("skipping Oriedita folding oracle test: ORIEDITA_GEOMETRY_ORACLE is not set");
+        return;
+    };
+
+    let mut generator = ChainPermutationGenerator::new(4);
+    generator.add_guide(1, 3).expect("valid guide");
+    generator.initialize();
+
+    let args = [
+        "chain-permutation-temp-summary",
+        "4",
+        "1",
+        "1",
+        "3",
+        "-",
+        "-",
+        "2",
+        "2",
+        "1",
+        "2",
+        "4",
+    ];
+
+    assert_eq!(
+        chain_permutation_temp_summary(generator, 2, 2, 1, 2, 4),
+        run_oracle(&oracle, &args)
+    );
 }
 
 fn folding_oracle() -> Option<PathBuf> {
@@ -384,11 +480,114 @@ fn additional_estimation_summary(
     }
 }
 
+struct PermutationCase<'a> {
+    digits: usize,
+    guides: &'a [(usize, usize)],
+    top: &'a [usize],
+    bottom: &'a [usize],
+    limit: usize,
+}
+
+fn chain_permutation_summary(mut generator: ChainPermutationGenerator, limit: usize) -> String {
+    let mut output = String::new();
+    output.push_str(&format!("permutations|{}\n", generator.count()));
+    if limit == 0 {
+        return output;
+    }
+    push_chain_permutation(&mut output, 0, 0, &generator);
+    for step in 1..limit {
+        let changed = generator
+            .next(generator.num_digits())
+            .expect("valid generator advance");
+        if changed == 0 {
+            output.push_str(&format!("end|{}|0|{}\n", step, generator.count()));
+            return output;
+        }
+        push_chain_permutation(&mut output, step, changed, &generator);
+    }
+    output
+}
+
+fn chain_permutation_temp_summary(
+    mut generator: ChainPermutationGenerator,
+    steps_before_temp: usize,
+    temp_upper: usize,
+    temp_lower: usize,
+    steps_after_temp: usize,
+    limit_after_clear: usize,
+) -> String {
+    let mut output = String::new();
+    output.push_str(&format!("permutations|{}\n", generator.count()));
+    push_chain_permutation(&mut output, 0, 0, &generator);
+    for step in 1..=steps_before_temp {
+        let changed = generator
+            .next(generator.num_digits())
+            .expect("valid generator advance");
+        if changed == 0 {
+            output.push_str(&format!("end|{}|0|{}\n", step, generator.count()));
+            return output;
+        }
+        push_chain_permutation(&mut output, step, changed, &generator);
+    }
+
+    generator
+        .add_guide(temp_upper, temp_lower)
+        .expect("valid temp guide");
+    output.push_str(&format!("temp|{}|{}\n", temp_upper, temp_lower));
+    for step in 1..=steps_after_temp {
+        let changed = generator
+            .next(generator.num_digits())
+            .expect("valid generator advance");
+        if changed == 0 {
+            output.push_str(&format!("end_temp|{}|0|{}\n", step, generator.count()));
+            return output;
+        }
+        push_chain_permutation(&mut output, step, changed, &generator);
+    }
+
+    generator.clear_temp_guide();
+    output.push_str("clear_temp\n");
+    for step in 1..=limit_after_clear {
+        let changed = generator
+            .next(generator.num_digits())
+            .expect("valid generator advance");
+        if changed == 0 {
+            output.push_str(&format!("end_clear|{}|0|{}\n", step, generator.count()));
+            return output;
+        }
+        push_chain_permutation(&mut output, step, changed, &generator);
+    }
+    output
+}
+
+fn push_chain_permutation(
+    output: &mut String,
+    step: usize,
+    changed: usize,
+    generator: &ChainPermutationGenerator,
+) {
+    output.push_str(&format!(
+        "permutation|{}|{}|{}|{}\n",
+        step,
+        changed,
+        generator.count(),
+        joined_ids(&generator.current_permutation())
+    ));
+}
+
 fn joined_ids(ids: &[usize]) -> String {
     ids.iter()
         .map(|id| id.to_string())
         .collect::<Vec<_>>()
         .join(",")
+}
+
+fn joined_or_dash(ids: &[usize]) -> String {
+    if ids.is_empty() {
+        "-".to_string()
+    } else {
+        joined_ids(ids)
+    }
 }
 
 fn segment(ax: f64, ay: f64, bx: f64, by: f64, color: LineColor) -> LineSegment {

@@ -31,6 +31,7 @@ import origami.crease_pattern.worker.linesegmentset.IntersectDivide;
 import origami.crease_pattern.worker.SelectMode;
 import origami.folding.HierarchyList;
 import origami.folding.element.SubFace;
+import origami.folding.permutation.ChainPermutationGenerator;
 import origami.folding.util.IBulletinBoard;
 import origami.folding.util.SortingBox;
 
@@ -319,6 +320,8 @@ public class OrieditaGeometryOracle {
             case "initial-hierarchy-summary" -> initialHierarchySummary(args);
             case "equivalence-candidates-summary" -> equivalenceCandidatesSummary(args);
             case "additional-estimation-summary" -> additionalEstimationSummary(args);
+            case "chain-permutation-summary" -> chainPermutationSummary(args);
+            case "chain-permutation-temp-summary" -> chainPermutationTempSummary(args);
             default -> usage("unknown command: " + args[0]);
         }
     }
@@ -581,6 +584,83 @@ public class OrieditaGeometryOracle {
         }
 
         printHierarchyRelations(foldedWorker.hierarchyList);
+    }
+
+    private static void chainPermutationSummary(String[] args) throws Exception {
+        if (args.length < 6) {
+            usage("chain-permutation-summary expects digit count, guide count, guide pairs, top indices, bottom indices, and limit");
+        }
+
+        int numDigits = Integer.parseInt(args[1]);
+        int guideCount = Integer.parseInt(args[2]);
+        int offset = 3;
+        ChainPermutationGenerator generator = new ChainPermutationGenerator(numDigits);
+        for (int i = 0; i < guideCount; i++) {
+            generator.addGuide(Integer.parseInt(args[offset]), Integer.parseInt(args[offset + 1]));
+            offset += 2;
+        }
+        generator.setTopIndices(parseIndexList(args[offset++]));
+        generator.setBottomIndices(parseIndexList(args[offset++]));
+        int limit = Integer.parseInt(args[offset]);
+
+        generator.initialize();
+        printChainPermutationSequence(generator, numDigits, limit);
+    }
+
+    private static void chainPermutationTempSummary(String[] args) throws Exception {
+        if (args.length < 11) {
+            usage("chain-permutation-temp-summary expects digit count, guide count, guide pairs, top indices, bottom indices, steps before temp, temp guide pair, steps after temp, and limit after clear");
+        }
+
+        int numDigits = Integer.parseInt(args[1]);
+        int guideCount = Integer.parseInt(args[2]);
+        int offset = 3;
+        ChainPermutationGenerator generator = new ChainPermutationGenerator(numDigits);
+        for (int i = 0; i < guideCount; i++) {
+            generator.addGuide(Integer.parseInt(args[offset]), Integer.parseInt(args[offset + 1]));
+            offset += 2;
+        }
+        generator.setTopIndices(parseIndexList(args[offset++]));
+        generator.setBottomIndices(parseIndexList(args[offset++]));
+        int stepsBeforeTemp = Integer.parseInt(args[offset++]);
+        int tempUpper = Integer.parseInt(args[offset++]);
+        int tempLower = Integer.parseInt(args[offset++]);
+        int stepsAfterTemp = Integer.parseInt(args[offset++]);
+        int limitAfterClear = Integer.parseInt(args[offset]);
+
+        generator.initialize();
+        System.out.println("permutations|" + generator.getCount());
+        printChainPermutation(0, 0, generator, numDigits);
+        for (int i = 1; i <= stepsBeforeTemp; i++) {
+            int changed = generator.next(numDigits);
+            if (changed == 0) {
+                System.out.println("end|" + i + "|0|" + generator.getCount());
+                return;
+            }
+            printChainPermutation(i, changed, generator, numDigits);
+        }
+
+        generator.addGuide(tempUpper, tempLower);
+        System.out.println("temp|" + tempUpper + "|" + tempLower);
+        for (int i = 1; i <= stepsAfterTemp; i++) {
+            int changed = generator.next(numDigits);
+            if (changed == 0) {
+                System.out.println("end_temp|" + i + "|0|" + generator.getCount());
+                return;
+            }
+            printChainPermutation(i, changed, generator, numDigits);
+        }
+
+        generator.clearTempGuide();
+        System.out.println("clear_temp");
+        for (int i = 1; i <= limitAfterClear; i++) {
+            int changed = generator.next(numDigits);
+            if (changed == 0) {
+                System.out.println("end_clear|" + i + "|0|" + generator.getCount());
+                return;
+            }
+            printChainPermutation(i, changed, generator, numDigits);
+        }
     }
 
     private static void intersectDividePair(String[] args) throws Exception {
@@ -4810,6 +4890,44 @@ public class OrieditaGeometryOracle {
         }
     }
 
+    private static void printChainPermutationSequence(
+            ChainPermutationGenerator generator,
+            int digits,
+            int limit) throws InterruptedException {
+        System.out.println("permutations|" + generator.getCount());
+        if (limit <= 0) {
+            return;
+        }
+        printChainPermutation(0, 0, generator, digits);
+        for (int i = 1; i < limit; i++) {
+            int changed = generator.next(digits);
+            if (changed == 0) {
+                System.out.println("end|" + i + "|0|" + generator.getCount());
+                return;
+            }
+            printChainPermutation(i, changed, generator, digits);
+        }
+    }
+
+    private static void printChainPermutation(
+            int step,
+            int changed,
+            ChainPermutationGenerator generator,
+            int digits) {
+        StringBuilder permutation = new StringBuilder();
+        for (int i = 1; i <= digits; i++) {
+            if (i > 1) {
+                permutation.append(",");
+            }
+            permutation.append(generator.getPermutation(i));
+        }
+        System.out.println("permutation|"
+                + step + "|"
+                + changed + "|"
+                + generator.getCount() + "|"
+                + permutation);
+    }
+
     private static FoldedFigure_Worker configuredSubfaceWorker(PointSet folded) throws Exception {
         LineSegmentSetWorker lineWorker = new LineSegmentSetWorker();
         lineWorker.set(new LineSegmentSet(folded));
@@ -5611,6 +5729,19 @@ public class OrieditaGeometryOracle {
         return Double.parseDouble(value);
     }
 
+    private static List<Integer> parseIndexList(String value) {
+        List<Integer> result = new ArrayList<>();
+        if (value.equals("-") || value.isBlank()) {
+            return result;
+        }
+        for (String part : value.split(",")) {
+            if (!part.isBlank()) {
+                result.add(Integer.parseInt(part));
+            }
+        }
+        return result;
+    }
+
     private static void usage(String message) {
         System.err.println(message);
         System.err.println("usage: OrieditaGeometryOracle intersection <strict|sweet> <default|precision> ax ay bx by cx cy dx dy");
@@ -5715,6 +5846,8 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle initial-hierarchy-summary <startingFace> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle equivalence-candidates-summary <startingFace> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle additional-estimation-summary <startingFace> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle chain-permutation-summary <digits> <guideCount> [upper lower]... <topCsv|-> <bottomCsv|-> <limit>");
+        System.err.println("   or: OrieditaGeometryOracle chain-permutation-temp-summary <digits> <guideCount> [upper lower]... <topCsv|-> <bottomCsv|-> <stepsBeforeTemp> <tempUpper> <tempLower> <stepsAfterTemp> <limitAfterClear>");
         System.exit(2);
     }
 }

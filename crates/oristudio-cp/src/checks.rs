@@ -16,6 +16,58 @@ pub struct FlatFoldableBoundaryCheck {
     pub crossing_count: usize,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FlatFoldabilityRule {
+    NumberOfFolds,
+    Angles,
+    Maekawa,
+    LittleBigLittle,
+    None,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FlatFoldabilityColor {
+    NotEnoughMountain,
+    NotEnoughValley,
+    Equal,
+    Correct,
+    Unknown,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LittleBigLittleSegment {
+    pub segment: LineSegment,
+    pub violating: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FlatFoldabilityViolation {
+    pub point: Point,
+    pub rule: FlatFoldabilityRule,
+    pub color: FlatFoldabilityColor,
+    pub little_big_little: Vec<LittleBigLittleSegment>,
+}
+
+impl FlatFoldabilityViolation {
+    pub fn new(point: Point, rule: FlatFoldabilityRule, color: FlatFoldabilityColor) -> Self {
+        Self {
+            point,
+            rule,
+            color,
+            little_big_little: Vec::new(),
+        }
+    }
+
+    pub fn little_big_little(point: Point, little_big_little: Vec<LittleBigLittleSegment>) -> Self {
+        Self {
+            point,
+            rule: FlatFoldabilityRule::LittleBigLittle,
+            color: FlatFoldabilityColor::Correct,
+            little_big_little,
+        }
+    }
+}
+
 /// Oriedita `Check1.apply`: collect non-auxiliary overlapping/contained line pairs.
 pub fn check1(model: &CreasePatternModel) -> Vec<LineSegment> {
     let mut diagnostics = Vec::new();
@@ -97,6 +149,97 @@ pub fn check3(model: &CreasePatternModel) -> Vec<LineSegment> {
     }
 
     diagnostics
+}
+
+/// Oriedita `Check4.apply`: collect CAMV and little-big-little violations.
+pub fn check4(model: &CreasePatternModel) -> Vec<FlatFoldabilityViolation> {
+    point_line_map(model)
+        .into_iter()
+        .filter_map(|(point, lines)| find_flat_foldability_violation(point, &lines))
+        .collect()
+}
+
+/// Oriedita `Check4.findFlatfoldabilityViolation` for one point and its incident lines.
+pub fn find_flat_foldability_violation(
+    point: Point,
+    lines: &[LineSegment],
+) -> Option<FlatFoldabilityViolation> {
+    let mut red = 0usize;
+    let mut blue = 0usize;
+    let mut black = 0usize;
+    let mut nbox = SortingBox::default();
+
+    for segment in lines {
+        match segment.color {
+            LineColor::Red1 => red += 1,
+            LineColor::Blue2 => blue += 1,
+            LineColor::Black0 => black += 1,
+            _ => {}
+        }
+
+        if segment.color.is_folding_line() {
+            if point.distance(segment.a) < Epsilon::FLAT {
+                nbox.add_by_weight(segment.clone(), angle((segment.a, segment.b)));
+            } else if point.distance(segment.b) < Epsilon::FLAT {
+                nbox.add_by_weight(segment.clone(), angle((segment.b, segment.a)));
+            }
+        }
+    }
+
+    if black != 0 && black != 2 {
+        return Some(FlatFoldabilityViolation::new(
+            point,
+            FlatFoldabilityRule::NumberOfFolds,
+            FlatFoldabilityColor::Unknown,
+        ));
+    }
+
+    if black == 0 {
+        let angle_or_lbl = find_flat_foldability_violation_inside(point, nbox);
+        let mut rule = angle_or_lbl
+            .as_ref()
+            .map(|violation| violation.rule)
+            .unwrap_or(FlatFoldabilityRule::None);
+
+        if red.abs_diff(blue) != 2 {
+            if matches!(
+                rule,
+                FlatFoldabilityRule::LittleBigLittle | FlatFoldabilityRule::None
+            ) {
+                rule = FlatFoldabilityRule::Maekawa;
+            }
+            return Some(FlatFoldabilityViolation::new(
+                point,
+                rule,
+                maekawa_color(red, blue),
+            ));
+        }
+
+        if !matches!(
+            rule,
+            FlatFoldabilityRule::Maekawa | FlatFoldabilityRule::None
+        ) {
+            if blue == red {
+                return Some(FlatFoldabilityViolation::new(
+                    point,
+                    rule,
+                    FlatFoldabilityColor::Equal,
+                ));
+            }
+            if rule == FlatFoldabilityRule::LittleBigLittle {
+                return angle_or_lbl;
+            }
+            return Some(FlatFoldabilityViolation::new(
+                point,
+                rule,
+                FlatFoldabilityColor::Correct,
+            ));
+        }
+
+        return None;
+    }
+
+    find_little_big_little_violation_on_sides(point, nbox)
 }
 
 /// Oriedita `FLAT_FOLDABLE_CHECK_63` result coloring once the boundary loop is resolved.
@@ -185,6 +328,368 @@ fn check3_point(model: &CreasePatternModel, point: Point, diagnostics: &mut Vec<
 
     if tss_black == 2 && !extended_fushimi_decide_sides_model(model, point) {
         diagnostics.push(LineSegment::new(point, point));
+    }
+}
+
+fn maekawa_color(red: usize, blue: usize) -> FlatFoldabilityColor {
+    if blue == red {
+        FlatFoldabilityColor::Equal
+    } else if red.abs_diff(blue) > 2 {
+        if blue > red {
+            FlatFoldabilityColor::NotEnoughMountain
+        } else {
+            FlatFoldabilityColor::NotEnoughValley
+        }
+    } else if blue > red {
+        FlatFoldabilityColor::NotEnoughValley
+    } else {
+        FlatFoldabilityColor::NotEnoughMountain
+    }
+}
+
+fn find_flat_foldability_violation_inside(
+    point: Point,
+    mut nbox: SortingBox,
+) -> Option<FlatFoldabilityViolation> {
+    if nbox.total() % 2 == 1 {
+        return Some(FlatFoldabilityViolation::new(
+            point,
+            FlatFoldabilityRule::NumberOfFolds,
+            FlatFoldabilityColor::Unknown,
+        ));
+    }
+
+    if nbox.total() == 2 {
+        return match determine_line_segment_intersection_with_precision(
+            nbox.value(1),
+            nbox.value(2),
+            Epsilon::FLAT,
+        ) {
+            Intersection::ParallelStartOfS1IntersectsStartOfS2_323
+            | Intersection::ParallelStartOfS1IntersectsEndOfS2_333
+            | Intersection::ParallelEndOfS1IntersectsEndOfS2_353
+            | Intersection::ParallelEndOfS1IntersectsStartOfS2_343 => {
+                if nbox.value(1).color != nbox.value(2).color {
+                    Some(FlatFoldabilityViolation::new(
+                        point,
+                        FlatFoldabilityRule::Maekawa,
+                        FlatFoldabilityColor::Unknown,
+                    ))
+                } else {
+                    Some(FlatFoldabilityViolation::new(
+                        point,
+                        FlatFoldabilityRule::None,
+                        FlatFoldabilityColor::Unknown,
+                    ))
+                }
+            }
+            _ => Some(FlatFoldabilityViolation::new(
+                point,
+                FlatFoldabilityRule::Angles,
+                FlatFoldabilityColor::Unknown,
+            )),
+        };
+    }
+
+    if nbox.total() < 2 {
+        return Some(FlatFoldabilityViolation::new(
+            point,
+            FlatFoldabilityRule::Angles,
+            FlatFoldabilityColor::Unknown,
+        ));
+    }
+
+    if !angularly_flatfoldable(&nbox) {
+        return Some(FlatFoldabilityViolation::new(
+            point,
+            FlatFoldabilityRule::Angles,
+            FlatFoldabilityColor::Unknown,
+        ));
+    }
+
+    let mut max_angle = 360.0;
+    let mut little_big_little = initial_little_big_little_segments(point, &nbox);
+
+    while nbox.total() > 2 {
+        let mut result = None;
+        let mut min_angle = 10000.0;
+
+        for k in 1..=nbox.total() {
+            let next = if k + 1 > nbox.total() { 1 } else { k + 1 };
+            let temp_angle = angle_between_0_kmax(
+                angle_between_0_kmax(nbox.weight(next), max_angle)
+                    - angle_between_0_kmax(nbox.weight(k), max_angle),
+                max_angle,
+            );
+            if temp_angle < min_angle {
+                min_angle = temp_angle;
+            }
+        }
+
+        for _ in 1..=nbox.total() {
+            let temp_angle = angle_between_0_kmax(nbox.weight(2) - nbox.weight(1), max_angle);
+            if (temp_angle - min_angle).abs() < Epsilon::FLAT {
+                if nbox.value(1).color != nbox.value(2).color {
+                    let next_angle = nbox.weight(3);
+                    let mut temp = SortingBox::default();
+                    for weighted in nbox.iter() {
+                        temp.add(WeightedLine {
+                            weight: angle_between_0_kmax(weighted.weight - next_angle, max_angle),
+                            segment: weighted.segment.clone(),
+                        });
+                    }
+
+                    let mut reduced = SortingBox::default();
+                    for weighted in temp.iter().skip(2) {
+                        reduced.add(weighted.clone());
+                    }
+
+                    max_angle -= 2.0 * min_angle;
+                    result = Some(reduced);
+                    break;
+                }
+
+                mark_little_big_little(point, nbox.value(1), &mut little_big_little);
+            }
+            nbox.shift();
+        }
+
+        let next = result.unwrap_or_else(|| nbox.clone());
+        if next.total() == nbox.total() {
+            return Some(FlatFoldabilityViolation::little_big_little(
+                point,
+                little_big_little,
+            ));
+        }
+        nbox = next;
+    }
+
+    let temp_angle = angle_between_0_kmax(
+        angle_between_0_kmax(nbox.weight(1), max_angle)
+            - angle_between_0_kmax(nbox.weight(2), max_angle),
+        max_angle,
+    );
+    if (max_angle - temp_angle * 2.0).abs() < Epsilon::FLAT {
+        None
+    } else {
+        Some(FlatFoldabilityViolation::new(
+            point,
+            FlatFoldabilityRule::Angles,
+            FlatFoldabilityColor::Unknown,
+        ))
+    }
+}
+
+fn find_little_big_little_violation_on_sides(
+    point: Point,
+    mut nbox: SortingBox,
+) -> Option<FlatFoldabilityViolation> {
+    if nbox.total() < 2 {
+        return Some(FlatFoldabilityViolation::new(
+            point,
+            FlatFoldabilityRule::Maekawa,
+            FlatFoldabilityColor::Unknown,
+        ));
+    }
+
+    if nbox.total() == 2 {
+        if nbox.value(1).color != LineColor::Black0 || nbox.value(2).color != LineColor::Black0 {
+            return Some(FlatFoldabilityViolation::new(
+                point,
+                FlatFoldabilityRule::Maekawa,
+                FlatFoldabilityColor::Unknown,
+            ));
+        }
+        return None;
+    }
+
+    let mut first = None;
+    for i in 1..nbox.total() {
+        if nbox.value(i).color == LineColor::Black0 && nbox.value(i + 1).color == LineColor::Black0
+        {
+            first = Some(i + 1);
+        }
+    }
+    if nbox.value(nbox.total()).color == LineColor::Black0
+        && nbox.value(1).color == LineColor::Black0
+    {
+        first = Some(1);
+    }
+
+    let Some(first) = first else {
+        return Some(FlatFoldabilityViolation::new(
+            point,
+            FlatFoldabilityRule::Maekawa,
+            FlatFoldabilityColor::Unknown,
+        ));
+    };
+
+    for _ in 1..first {
+        nbox.shift();
+    }
+
+    let base_angle = nbox.weight(1);
+    let mut normalized = SortingBox::default();
+    for weighted in nbox.iter() {
+        normalized.add(WeightedLine {
+            weight: angle_between_0_360(weighted.weight - base_angle),
+            segment: weighted.segment.clone(),
+        });
+    }
+    nbox = normalized;
+
+    let mut little_big_little = initial_little_big_little_segments(point, &nbox);
+    while nbox.total() > 2 {
+        let next = little_big_little_single_step(&nbox, &mut little_big_little, point);
+        if next.total() == nbox.total() {
+            return Some(FlatFoldabilityViolation::little_big_little(
+                point,
+                little_big_little,
+            ));
+        }
+        nbox = next;
+    }
+
+    None
+}
+
+fn little_big_little_single_step(
+    nbox: &SortingBox,
+    little_big_little: &mut Vec<LittleBigLittleSegment>,
+    point: Point,
+) -> SortingBox {
+    let mut min_angle = 10000.0;
+    for k in 1..nbox.total() {
+        let temp_angle = nbox.weight(k + 1) - nbox.weight(k);
+        if temp_angle < min_angle {
+            min_angle = temp_angle;
+        }
+    }
+
+    let temp_angle = nbox.weight(2) - nbox.weight(1);
+    if (temp_angle - min_angle).abs() < Epsilon::FLAT {
+        let mut reduced = SortingBox::default();
+        for weighted in nbox.iter().skip(1) {
+            reduced.add(weighted.clone());
+        }
+        return reduced;
+    }
+
+    let temp_angle = nbox.weight(nbox.total()) - nbox.weight(nbox.total() - 1);
+    if (temp_angle - min_angle).abs() < Epsilon::FLAT {
+        let mut reduced = SortingBox::default();
+        for weighted in nbox.iter().take(nbox.total() - 1) {
+            reduced.add(weighted.clone());
+        }
+        return reduced;
+    }
+
+    for k in 2..=nbox.total().saturating_sub(2) {
+        let temp_angle = nbox.weight(k + 1) - nbox.weight(k);
+        if (temp_angle - min_angle).abs() < Epsilon::FLAT {
+            if nbox.value(k).color != nbox.value(k + 1).color {
+                let mut reduced = SortingBox::default();
+                for weighted in nbox.iter().take(k - 1) {
+                    reduced.add(weighted.clone());
+                }
+                for weighted in nbox.iter().skip(k + 1) {
+                    reduced.add(WeightedLine {
+                        weight: weighted.weight - 2.0 * min_angle,
+                        segment: weighted.segment.clone(),
+                    });
+                }
+                return reduced;
+            }
+
+            mark_little_big_little(point, nbox.value(k), little_big_little);
+        }
+    }
+
+    nbox.clone()
+}
+
+fn angularly_flatfoldable(lines: &SortingBox) -> bool {
+    let mut even = 0.0;
+    let mut odd = 0.0;
+    for k in 1..=lines.total() {
+        if k % 2 == 0 {
+            even += lines.weight(k) - lines.weight(k - 1);
+        } else if k == 1 {
+            odd += lines.weight(k) - (lines.weight(lines.total()) - 360.0);
+        } else {
+            odd += lines.weight(k) - lines.weight(k - 1);
+        }
+    }
+
+    (even.abs() - odd.abs()).abs() < Epsilon::FLAT
+}
+
+fn initial_little_big_little_segments(
+    point: Point,
+    nbox: &SortingBox,
+) -> Vec<LittleBigLittleSegment> {
+    nbox.iter()
+        .map(|weighted| LittleBigLittleSegment {
+            segment: orient_little_big_little_segment(point, &weighted.segment),
+            violating: false,
+        })
+        .collect()
+}
+
+fn mark_little_big_little(
+    point: Point,
+    segment: &LineSegment,
+    little_big_little: &mut Vec<LittleBigLittleSegment>,
+) {
+    let segment = orient_little_big_little_segment(point, segment);
+    if let Some(entry) = little_big_little
+        .iter_mut()
+        .find(|entry| entry.segment == segment)
+    {
+        entry.violating = true;
+    } else {
+        little_big_little.push(LittleBigLittleSegment {
+            segment,
+            violating: true,
+        });
+    }
+}
+
+fn orient_little_big_little_segment(point: Point, segment: &LineSegment) -> LineSegment {
+    if segment.a.distance(point) > Epsilon::UNKNOWN_1EN6 {
+        segment.with_swapped_coordinates()
+    } else {
+        segment.clone()
+    }
+}
+
+fn point_line_map(model: &CreasePatternModel) -> Vec<(Point, Vec<LineSegment>)> {
+    let mut map = Vec::<(Point, Vec<LineSegment>)>::new();
+    let eps_squared = Epsilon::UNKNOWN_1EN4 * Epsilon::UNKNOWN_1EN4;
+
+    for segment in &model.line_segments {
+        if segment.color != LineColor::Cyan3 {
+            point_line_map_process(&mut map, segment.a, segment, eps_squared);
+            point_line_map_process(&mut map, segment.b, segment, eps_squared);
+        }
+    }
+
+    map
+}
+
+fn point_line_map_process(
+    map: &mut Vec<(Point, Vec<LineSegment>)>,
+    point: Point,
+    segment: &LineSegment,
+    eps_squared: f64,
+) {
+    if let Some((_, lines)) = map
+        .iter_mut()
+        .find(|(candidate, _)| candidate.distance_squared(point) < eps_squared)
+    {
+        lines.push(segment.clone());
+    } else {
+        map.push((point, vec![segment.clone()]));
     }
 }
 

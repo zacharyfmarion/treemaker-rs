@@ -1,4 +1,6 @@
-use oristudio_cp::checks::{check1, check2, check3};
+use oristudio_cp::checks::{
+    FlatFoldabilityColor, FlatFoldabilityRule, check1, check2, check3, check4,
+};
 use oristudio_cp::geometry::{LineColor, LineSegment, Point};
 use oristudio_cp::model::CreasePatternModel;
 
@@ -53,6 +55,44 @@ fn check3_reports_maekawa_and_fushimi_failures_without_deduplicating_markers() {
         .count();
 
     assert!(origin_markers >= 2);
+}
+
+#[test]
+fn check4_reports_structured_maekawa_violation() {
+    let mut model = CreasePatternModel::default();
+    model.add_line_segment(segment(0.0, 0.0, 10.0, 0.0, LineColor::Red1));
+    model.add_line_segment(segment(0.0, 0.0, -10.0, 0.0, LineColor::Blue2));
+
+    let violations = check4(&model);
+
+    let origin = violations
+        .iter()
+        .find(|violation| violation.point == Point::origin())
+        .expect("shared vertex should have a structured violation");
+    assert_eq!(origin.rule, FlatFoldabilityRule::Maekawa);
+    assert_eq!(origin.color, FlatFoldabilityColor::Equal);
+    assert!(origin.little_big_little.is_empty());
+}
+
+#[test]
+fn check4_reports_little_big_little_payloads() {
+    let mut model = CreasePatternModel::default();
+    model.add_line_segment(segment(0.0, 0.0, 10.0, 0.0, LineColor::Red1));
+    model.add_line_segment(segment(0.0, 0.0, 8.660254037844386, 5.0, LineColor::Red1));
+    model.add_line_segment(segment(0.0, 0.0, 0.0, 10.0, LineColor::Blue2));
+    model.add_line_segment(segment(0.0, 0.0, -10.0, 0.0, LineColor::Blue2));
+    model.add_line_segment(segment(0.0, 0.0, -8.660254037844386, -5.0, LineColor::Red1));
+    model.add_line_segment(segment(0.0, 0.0, 0.0, -10.0, LineColor::Red1));
+
+    let violations = check4(&model);
+
+    assert!(violations.iter().any(|violation| {
+        violation.rule == FlatFoldabilityRule::LittleBigLittle
+            && violation
+                .little_big_little
+                .iter()
+                .any(|line| line.violating)
+    }));
 }
 
 fn segment(ax: f64, ay: f64, bx: f64, by: f64, color: LineColor) -> LineSegment {

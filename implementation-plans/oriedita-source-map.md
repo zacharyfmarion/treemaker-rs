@@ -74,8 +74,8 @@ stage explicitly changes it.
 | `origami/crease_pattern/LineSegmentSet.java` | Line arrangement set used for folding and export. | `fold_graph`, `operations::arrangement` | kernel | 3-5 | Porting |
 | `origami/crease_pattern/PointSet.java` | Vertex/edge/face topology for folding/export. | `fold_graph` | kernel | 3-4 | Unsupported |
 | `origami/crease_pattern/PointLineMap.java` | Point-to-line neighborhood lookup. | `model::topology` | kernel | 3 | Unsupported |
-| `origami/crease_pattern/FlatFoldabilityViolation.java` | Diagnostic payload. | `checks::diagnostic` | kernel | 9 | Unsupported |
-| `origami/crease_pattern/LittleBigLittleViolation.java` | Diagnostic payload. | `checks::diagnostic` | kernel | 9 | Unsupported |
+| `origami/crease_pattern/FlatFoldabilityViolation.java` | Diagnostic payload. | `checks::diagnostic` | kernel | 9 | Oracle-tested |
+| `origami/crease_pattern/LittleBigLittleViolation.java` | Diagnostic payload. | `checks::diagnostic` | kernel | 9 | Oracle-tested |
 | `origami/crease_pattern/LassoInteractionMode.java` | Lasso selection mode. | `operations::selection::LassoInteractionMode` | kernel | 6 | Oracle-tested |
 | `origami/crease_pattern/FoldingException.java` | Folding error surface. | `folding::error` | kernel | 10 | Unsupported |
 | `origami/crease_pattern/util/CreasePattern_Worker_Toolbox.java` | Shared CP worker helpers. | `operations::*` | kernel | 5-9 | Unsupported |
@@ -88,7 +88,7 @@ stage explicitly changes it.
 | `origami/crease_pattern/worker/foldlineset/Check1.java` | Diagnostic check. | `checks` | kernel | 9 | Oracle-tested |
 | `origami/crease_pattern/worker/foldlineset/Check2.java` | Diagnostic check. | `checks` | kernel | 9 | Oracle-tested |
 | `origami/crease_pattern/worker/foldlineset/Check3.java` | Diagnostic check. | `checks` | kernel | 9 | Oracle-tested |
-| `origami/crease_pattern/worker/foldlineset/Check4.java` | Diagnostic check. | `checks` | kernel | 9 | Unsupported |
+| `origami/crease_pattern/worker/foldlineset/Check4.java` | Diagnostic check. | `checks` | kernel | 9 | Oracle-tested |
 | `origami/crease_pattern/worker/foldlineset/Fix1.java` | Repair operation. | `checks`, `operations::arrangement` | kernel | 9 | Oracle-tested |
 | `origami/crease_pattern/worker/foldlineset/Fix2.java` | Repair operation. | `checks`, `operations::arrangement` | kernel | 9 | Oracle-tested |
 | `origami/crease_pattern/worker/foldlineset/OrganizeCircles.java` | Circle cleanup/organization. | `operations::circle` | kernel | 8 | Oracle-tested |
@@ -272,9 +272,9 @@ mutation.
 | `Check1.java` | Check1 fold-line diagnostic. | `checks::check1` | 9 | Oracle-tested |
 | `Check2.java` | Check2 fold-line diagnostic. | `checks::check2` | 9 | Oracle-tested |
 | `Check3.java` | Check3 angle/Fushimi diagnostic. | `checks::check3` | 9 | Oracle-tested |
-| `Check4.java` | Check4 CAMV/little-big-little diagnostic. | `checks::check4` | 9 | Unsupported |
-| `FlatFoldabilityViolation.java` | Flat-foldability violation payload. | `checks::diagnostic` | 9 | Unsupported |
-| `LittleBigLittleViolation.java` | Little-big-little violation payload. | `checks::diagnostic` | 9 | Unsupported |
+| `Check4.java` | Check4 CAMV/little-big-little diagnostic. | `checks::check4` | 9 | Oracle-tested |
+| `FlatFoldabilityViolation.java` | Flat-foldability violation payload. | `checks::diagnostic` | 9 | Oracle-tested |
+| `LittleBigLittleViolation.java` | Little-big-little violation payload. | `checks::diagnostic` | 9 | Oracle-tested |
 | `MouseHandlerFlatFoldableCheck.java` | User-triggered flat-foldable check. | `checks::flat_foldable` | 9 | Unsupported |
 | `MouseHandlerCreaseFixInaccurate.java` | Inaccurate line repair command. | `checks::fix_inaccurate` | 9 | Unsupported |
 | `Fix1.java` | Repair helper. | `checks::fix1` | 9 | Unsupported |

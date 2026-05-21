@@ -1113,8 +1113,14 @@ Status:
 - `Check3` is ported and oracle-tested as `checks::check3`. It returns
   Oriedita's legacy zero-length vertex marker list for boundary-count,
   Maekawa, interior extended-Fushimi, and side extended-Fushimi failures,
-  preserving repeated endpoint passes and duplicate markers. `Check4`, CAMV,
-  and little-big-little payloads remain separate Stage 9 tasks.
+  preserving repeated endpoint passes and duplicate markers.
+- `Check4` is ported and oracle-tested as `checks::check4` plus structured
+  `FlatFoldabilityViolation` and `LittleBigLittleSegment` payloads. The port
+  builds an Oriedita-style point-to-line map, evaluates number-of-folds,
+  Maekawa, angle, and little-big-little rules, and preserves LBL line ordering
+  and flags. The Rust API returns deterministic point-map order; the oracle
+  command validates against Oriedita's static per-point checker rather than the
+  UI executor queue order. CAMV task routing remains a separate Stage 9 task.
 
 ### Stage 10: Folding Estimation Parity Surface
 

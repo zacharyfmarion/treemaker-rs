@@ -1,5 +1,6 @@
 use oristudio_cp::checks::{
-    FlatFoldableBoundaryCheck, check1, check2, check3, flat_foldable_boundary_check,
+    FlatFoldabilityColor, FlatFoldabilityRule, FlatFoldabilityViolation, FlatFoldableBoundaryCheck,
+    check1, check2, check3, check4, flat_foldable_boundary_check,
 };
 use oristudio_cp::geometry::{Circle, Intersection, LineColor, LineSegment, Point, RgbColor};
 use oristudio_cp::model::{CreasePatternModel, CustomLineType, TextElement};
@@ -565,6 +566,48 @@ fn check3_matches_oriedita_foldlineset_oracle() {
         push_segment_args(&mut args, &segments);
         assert_eq!(
             line_segment_list_summary(&check3(&model)),
+            run_oracle(&oracle, &args)
+        );
+    }
+}
+
+#[test]
+fn check4_matches_oriedita_foldlineset_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    for segments in [
+        vec![
+            segment(0.0, 0.0, 10.0, 0.0, LineColor::Red1),
+            segment(0.0, 0.0, -10.0, 0.0, LineColor::Blue2),
+        ],
+        vec![
+            segment(0.0, 0.0, 10.0, 0.0, LineColor::Black0),
+            segment(0.0, 0.0, 0.0, 10.0, LineColor::Red1),
+        ],
+        vec![
+            segment(0.0, 0.0, 10.0, 0.0, LineColor::Red1),
+            segment(0.0, 0.0, 8.660254037844386, 5.0, LineColor::Red1),
+            segment(0.0, 0.0, 0.0, 10.0, LineColor::Blue2),
+            segment(0.0, 0.0, -10.0, 0.0, LineColor::Blue2),
+            segment(0.0, 0.0, -8.660254037844386, -5.0, LineColor::Red1),
+            segment(0.0, 0.0, 0.0, -10.0, LineColor::Red1),
+        ],
+        vec![
+            segment(0.0, 0.0, 10.0, 0.0, LineColor::Black0),
+            segment(0.0, 0.0, 0.0, 10.0, LineColor::Black0),
+            segment(0.0, 0.0, 7.0, 7.0, LineColor::Red1),
+        ],
+    ] {
+        let model = model_from_segments(&segments);
+        let mut args = vec!["foldline-check4".to_string(), segments.len().to_string()];
+        push_segment_args(&mut args, &segments);
+        assert_eq!(
+            flat_foldability_violation_summary(&check4(&model)),
             run_oracle(&oracle, &args)
         );
     }
@@ -3226,6 +3269,53 @@ fn point_list_summary(points: &[Point]) -> String {
         ));
     }
     output
+}
+
+fn flat_foldability_violation_summary(violations: &[FlatFoldabilityViolation]) -> String {
+    let mut output = String::new();
+    output.push_str(&format!("violations|{}\n", violations.len()));
+    for violation in violations {
+        output.push_str(&format!(
+            "violation|{}|{}|{}|{}\n",
+            java_double_string(violation.point.x),
+            java_double_string(violation.point.y),
+            flat_foldability_rule_name(violation.rule),
+            flat_foldability_color_name(violation.color)
+        ));
+        output.push_str(&format!("lbl|{}\n", violation.little_big_little.len()));
+        for line in &violation.little_big_little {
+            output.push_str(&format!(
+                "lblline|{}|{}|{}|{}|{}|{}\n",
+                java_double_string(line.segment.a.x),
+                java_double_string(line.segment.a.y),
+                java_double_string(line.segment.b.x),
+                java_double_string(line.segment.b.y),
+                line.segment.color.number(),
+                line.violating
+            ));
+        }
+    }
+    output
+}
+
+fn flat_foldability_rule_name(rule: FlatFoldabilityRule) -> &'static str {
+    match rule {
+        FlatFoldabilityRule::NumberOfFolds => "NUMBER_OF_FOLDS",
+        FlatFoldabilityRule::Angles => "ANGLES",
+        FlatFoldabilityRule::Maekawa => "MAEKAWA",
+        FlatFoldabilityRule::LittleBigLittle => "LITTLE_BIG_LITTLE",
+        FlatFoldabilityRule::None => "NONE",
+    }
+}
+
+fn flat_foldability_color_name(color: FlatFoldabilityColor) -> &'static str {
+    match color {
+        FlatFoldabilityColor::NotEnoughMountain => "NOT_ENOUGH_MOUNTAIN",
+        FlatFoldabilityColor::NotEnoughValley => "NOT_ENOUGH_VALLEY",
+        FlatFoldabilityColor::Equal => "EQUAL",
+        FlatFoldabilityColor::Correct => "CORRECT",
+        FlatFoldabilityColor::Unknown => "UNKNOWN",
+    }
 }
 
 fn line_segment_set_with_selection_summary(model: &CreasePatternModel) -> String {

@@ -7,7 +7,8 @@ use oristudio_cp::folding::{
     folding_estimate_to_case, initial_hierarchy_from_segments, overlap_search_from_segments,
     overlap_search_from_segments_with_swap, possible_overlap_search_for_ordered_subfaces,
     possible_overlap_search_for_subfaces, possible_overlap_search_for_subfaces_with_swap,
-    prepare_subface_segments, prioritize_subfaces, two_colored_subface_segments_from_segments,
+    prepare_subface_segments, prioritize_subfaces, two_colored_folding_estimate_from_segments,
+    two_colored_subface_segments_from_segments,
 };
 use oristudio_cp::geometry::{LineColor, LineSegment, Point};
 use oristudio_cp::io::cp;
@@ -562,6 +563,23 @@ fn two_colored_subface_segments_keep_development_coordinates() {
             .iter()
             .any(|segment| segment.a.x == 10.0 || segment.b.x == 10.0)
     );
+}
+
+#[test]
+fn two_colored_folding_estimate_runs_to_step10() {
+    let estimate = two_colored_folding_estimate_from_segments(&two_square_strip(), 1)
+        .expect("two-colored folding estimate");
+
+    assert_eq!(
+        estimate.estimation_step,
+        oristudio_cp::folding::EstimationStep::Step10
+    );
+    assert_eq!(
+        estimate.display_style,
+        oristudio_cp::folding::DisplayStyle::Paper5
+    );
+    assert!(estimate.discovered_fold_cases >= 1);
+    assert!(estimate.overlap.as_ref().is_some_and(|search| search.found));
 }
 
 fn square_with_diagonal() -> Vec<LineSegment> {

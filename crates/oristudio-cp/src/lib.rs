@@ -1087,10 +1087,10 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
     descriptor!(
         TwoColoredCp,
         "TwoColoredTask",
-        "folding::two_colored",
+        "folding::two_colored_folding_estimate_from_segments",
         Kernel,
         10,
-        Unsupported
+        Porting
     ),
     descriptor!(
         Fold,

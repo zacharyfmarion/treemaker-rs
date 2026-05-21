@@ -310,6 +310,47 @@ pub fn two_colored_subface_segments_from_segments(
     Some(prepare_subface_segments(&wireframe_segments))
 }
 
+/// Oriedita `FoldedFigure.createTwoColorCreasePattern(...)` without UI camera
+/// and timing side-effects.
+pub fn two_colored_folding_estimate_from_segments(
+    segments: &[LineSegment],
+    starting_face_id: i32,
+) -> Result<FoldingEstimate, FoldingEstimateError> {
+    let mut estimate = FoldingEstimate {
+        estimation_step: EstimationStep::Step0,
+        display_style: DisplayStyle::None0,
+        discovered_fold_cases: 0,
+        find_another_overlap_valid: false,
+        text_result: String::new(),
+        overlap: None,
+    };
+
+    if segments.is_empty() {
+        return Ok(estimate);
+    }
+
+    estimate.estimation_step = EstimationStep::Step1;
+    estimate.display_style = DisplayStyle::Development1;
+    if face_position_wireframe_from_segments(segments, starting_face_id).is_some() {
+        estimate.estimation_step = EstimationStep::Step2;
+        estimate.display_style = DisplayStyle::Wire2;
+    }
+    let mut worker = two_colored_overlap_enumerator_from_segments(segments, starting_face_id)?;
+    if worker.is_some() {
+        estimate.estimation_step = EstimationStep::Step3;
+        estimate.display_style = DisplayStyle::Transparent3;
+    }
+    estimate.estimation_step = EstimationStep::Step4;
+    estimate.display_style = DisplayStyle::Development4;
+    estimate.find_another_overlap_valid = worker.is_some();
+    run_folding_estimated_05(&mut estimate, worker.as_mut())?;
+    estimate.estimation_step = EstimationStep::Step5;
+    estimate.display_style = DisplayStyle::Paper5;
+    estimate.estimation_step = EstimationStep::Step10;
+
+    Ok(estimate)
+}
+
 /// Oriedita `FoldedFigure_Configurator.configureSubFaces()` for the folded
 /// wireframe and its subdivided subface arrangement, without hierarchy solving.
 pub fn configure_subfaces_from_segments(
@@ -575,33 +616,39 @@ impl FoldingEstimateSession {
     }
 
     fn folding_estimated_05(&mut self) -> Result<(), WorkerOverlapSearchError> {
-        if matches!(
-            self.estimate.estimation_step,
-            EstimationStep::Step4 | EstimationStep::Step5
-        ) && self.estimate.find_another_overlap_valid
-            && let Some(worker) = self.worker.as_mut()
-        {
-            let overlap =
-                worker.possible_overlapping_search(self.estimate.discovered_fold_cases == 0)?;
-            if overlap.found {
-                self.estimate.discovered_fold_cases += 1;
-            }
-            let next_subface = worker.next(worker.valid_count())?;
-            self.estimate.find_another_overlap_valid = overlap.found && next_subface > 0;
-            self.estimate.overlap = Some(overlap);
-        }
-
-        self.estimate.text_result = format!(
-            "Number of found solutions = {}  ",
-            self.estimate.discovered_fold_cases
-        );
-        if !self.estimate.find_another_overlap_valid {
-            self.estimate
-                .text_result
-                .push_str(" There is no other solution. ");
-        }
-        Ok(())
+        run_folding_estimated_05(&mut self.estimate, self.worker.as_mut())
     }
+}
+
+fn run_folding_estimated_05(
+    estimate: &mut FoldingEstimate,
+    worker: Option<&mut WorkerOverlapEnumerator>,
+) -> Result<(), WorkerOverlapSearchError> {
+    if matches!(
+        estimate.estimation_step,
+        EstimationStep::Step4 | EstimationStep::Step5
+    ) && estimate.find_another_overlap_valid
+        && let Some(worker) = worker
+    {
+        let overlap = worker.possible_overlapping_search(estimate.discovered_fold_cases == 0)?;
+        if overlap.found {
+            estimate.discovered_fold_cases += 1;
+        }
+        let next_subface = worker.next(worker.valid_count())?;
+        estimate.find_another_overlap_valid = overlap.found && next_subface > 0;
+        estimate.overlap = Some(overlap);
+    }
+
+    estimate.text_result = format!(
+        "Number of found solutions = {}  ",
+        estimate.discovered_fold_cases
+    );
+    if !estimate.find_another_overlap_valid {
+        estimate
+            .text_result
+            .push_str(" There is no other solution. ");
+    }
+    Ok(())
 }
 
 pub fn fold_another(
@@ -747,6 +794,49 @@ fn overlap_enumerator_from_segments(
     let positions = graph.face_positions(starting_face_id);
     let initial = initial_hierarchy_from_graph(&graph, &positions)?;
     let folded = wireframe_from_graph(&graph, &positions, graph.folded_points(&positions));
+    let folded_segments = folded_wireframe_segments(&folded);
+    let prepared_segments = prepare_subface_segments(&folded_segments);
+    let subface_graph = FoldGraph::from_segments(&prepared_segments, true);
+    if subface_graph.faces.is_empty() {
+        return WorkerOverlapEnumerator::from_ordered_subfaces(&[], &[], 0, &initial, None)
+            .map(Some);
+    }
+
+    let subfaces = configure_subfaces(&folded, &subface_graph);
+    let conditions = equivalence_condition_candidates_from_parts(&graph, &folded, &subfaces)?;
+    let mut table = HierarchyTable::from_initial(&initial);
+    run_additional_estimation(
+        &mut table,
+        &subfaces,
+        &conditions.triple_conditions,
+        &conditions.quadruple_conditions,
+    )?;
+    let configured_hierarchy = table.into_initial_hierarchy(initial.faces_total);
+    WorkerOverlapEnumerator::from_subfaces(
+        &subfaces.subfaces,
+        &subfaces.reduced_subface_indices,
+        &configured_hierarchy,
+        Some(&conditions),
+    )
+    .map(Some)
+}
+
+fn two_colored_overlap_enumerator_from_segments(
+    segments: &[LineSegment],
+    starting_face_id: i32,
+) -> Result<Option<WorkerOverlapEnumerator>, WorkerOverlapSearchError> {
+    if segments.is_empty() {
+        return Ok(None);
+    }
+
+    let graph = FoldGraph::from_segments(segments, true);
+    if graph.faces.is_empty() {
+        return Ok(None);
+    }
+
+    let positions = graph.face_positions(starting_face_id);
+    let initial = initial_hierarchy_from_graph(&graph, &positions)?;
+    let folded = wireframe_from_graph(&graph, &positions, graph.points.clone());
     let folded_segments = folded_wireframe_segments(&folded);
     let prepared_segments = prepare_subface_segments(&folded_segments);
     let subface_graph = FoldGraph::from_segments(&prepared_segments, true);

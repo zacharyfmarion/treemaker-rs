@@ -1233,10 +1233,13 @@ Deliverables:
   `folding::two_colored_subface_segments_from_segments`. This keeps the
   development-view coordinates, uses face-position topology rather than folded
   point coordinates, and then runs the same subface-arrangement cleanup as
-  Oriedita. The oracle command `two-colored-subface-arrangement` compares the
-  resulting subdivided line set. Full `TwoColoredTask` command semantics,
-  selected-range preconditions, and folded-figure state updates remain tracked
-  until the command/service layer is ported.
+  Oriedita. The full non-UI `createTwoColorCreasePattern` estimate path is
+  ported as `folding::two_colored_folding_estimate_from_segments`, including
+  hierarchy setup, overlap solving, text-result updates, and the final
+  `STEP_10` marker. Oracle commands `two-colored-subface-arrangement` and
+  `two-colored-estimate-summary` compare the subdivided line set and folded
+  estimate summary. UI selected-range preconditions, task timing text, and
+  folded-figure list creation remain out of scope for the crate API.
 - Status: The first-solution folded-figure estimate state machine is ported as
   `folding::FoldingEstimateSession` and the fresh helper
   `folding::folding_estimate_from_segments`, covering Oriedita estimation order

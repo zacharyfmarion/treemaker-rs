@@ -8,7 +8,8 @@ use oristudio_cp::folding::{
     folding_estimate_to_case, initial_hierarchy_from_segments, overlap_search_from_segments,
     overlap_search_from_segments_with_swap, possible_overlap_search_for_ordered_subfaces,
     possible_overlap_search_for_subfaces, possible_overlap_search_for_subfaces_with_swap,
-    prepare_subface_segments, prioritize_subfaces, two_colored_subface_segments_from_segments,
+    prepare_subface_segments, prioritize_subfaces, two_colored_folding_estimate_from_segments,
+    two_colored_subface_segments_from_segments,
 };
 use oristudio_cp::geometry::{LineColor, LineSegment, Point};
 use oristudio_cp::io::cp;
@@ -104,6 +105,30 @@ fn two_colored_subface_arrangement_matches_oriedita_oracle() {
             run_oracle(&oracle, &oracle_args)
         );
     }
+}
+
+#[test]
+fn two_colored_folding_estimate_matches_oriedita_oracle() {
+    let Some(oracle) = folding_oracle() else {
+        eprintln!("skipping Oriedita folding oracle test: ORIEDITA_GEOMETRY_ORACLE is not set");
+        return;
+    };
+
+    let segments = two_square_strip();
+    let estimate =
+        two_colored_folding_estimate_from_segments(&segments, 1).expect("two-colored estimate");
+    let mut args = vec![
+        "two-colored-estimate-summary".to_string(),
+        "1".to_string(),
+        segments.len().to_string(),
+    ];
+    push_segment_args(&mut args, &segments);
+    let oracle_args = args.iter().map(String::as_str).collect::<Vec<_>>();
+
+    assert_eq!(
+        folding_estimate_summary(&estimate),
+        run_oracle(&oracle, &oracle_args)
+    );
 }
 
 #[test]

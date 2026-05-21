@@ -538,10 +538,10 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
     descriptor!(
         DoubleSymmetricDraw,
         "MouseHandlerDoubleSymmetricDraw",
-        "operations::construction::double_symmetric",
+        "operations::construction::double_symmetric_draw",
         Kernel,
         7,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         CreasesAlternateMv,

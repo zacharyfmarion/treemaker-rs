@@ -153,7 +153,7 @@ stage explicitly changes it.
 | `CREASE_COPY_4P_32` | `MouseHandlerCreaseCopy4p` | `operations::transform::copy_selected_lines_by_points` | kernel | 6 | Oracle-tested |
 | `FISH_BONE_DRAW_33` | `MouseHandlerFishBoneDraw` | `operations::construction::fishbone` | kernel | 7 | Unsupported |
 | `CREASE_MAKE_MV_34` | `MouseHandlerCreaseMakeMV` | `operations::color::alternate_mountain_valley_along` | kernel | 6 | Oracle-tested |
-| `DOUBLE_SYMMETRIC_DRAW_35` | `MouseHandlerDoubleSymmetricDraw` | `operations::construction::double_symmetric` | kernel | 7 | Unsupported |
+| `DOUBLE_SYMMETRIC_DRAW_35` | `MouseHandlerDoubleSymmetricDraw` | `operations::construction::double_symmetric_draw` | kernel | 7 | Oracle-tested |
 | `CREASES_ALTERNATE_MV_36` | `MouseHandlerCreasesAlternateMV` | `operations::color::alternate_mountain_valley_crossing` | kernel | 6 | Oracle-tested |
 | `DRAW_CREASE_ANGLE_RESTRICTED_5_37` | `MouseHandlerDrawCreaseAngleRestricted5` | `operations::construction::angle_restricted_5` | kernel | 7 | Unsupported |
 | `VERTEX_MAKE_ANGULARLY_FLAT_FOLDABLE_38` | `MouseHandlerVertexMakeAngularlyFlatFoldable` | `operations::construction::make_vertex_flat_foldable` | kernel | 7, 9 | Unsupported |

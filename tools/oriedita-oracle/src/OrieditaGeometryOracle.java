@@ -91,6 +91,7 @@ public class OrieditaGeometryOracle {
             case "foldline-perpendicular-projection" -> foldLinePerpendicularProjection(args);
             case "foldline-perpendicular-indicator" -> foldLinePerpendicularIndicator(args);
             case "foldline-symmetric-draw" -> foldLineSymmetricDraw(args);
+            case "foldline-double-symmetric-draw" -> foldLineDoubleSymmetricDraw(args);
             case "foldline-draw-crease" -> foldLineDrawCrease(args);
             case "foldline-draw-symmetric" -> foldLineDrawSymmetric(args);
             case "foldline-draw-point" -> foldLineDrawPoint(args);
@@ -1200,6 +1201,66 @@ public class OrieditaGeometryOracle {
 
         System.out.println("added|" + added);
         printFoldLineSet(set);
+    }
+
+    private static void foldLineDoubleSymmetricDraw(String[] args) {
+        if (args.length < 7) {
+            usage("foldline-double-symmetric-draw expects drag segment, count, and segment payload");
+        }
+
+        LineSegment dragSegment = segment(args, 1);
+        int count = Integer.parseInt(args[6]);
+        FoldLineSet set = foldLineSet(args, 7, count);
+
+        int added = 0;
+        if (Epsilon.high.gt0(dragSegment.determineLength())) {
+            for (LineSegment segment : set.getLineSegmentsCollection()) {
+                LineSegment.Intersection intersection = OritaCalc.determineLineSegmentIntersectionSweet(
+                        segment,
+                        dragSegment,
+                        Epsilon.UNKNOWN_001,
+                        Epsilon.UNKNOWN_001);
+
+                if (!isDoubleSymmetricIntersection(intersection)) {
+                    continue;
+                }
+
+                Point sourcePoint = segment.getA();
+                if (OritaCalc.determineLineSegmentDistance(sourcePoint, dragSegment)
+                        < OritaCalc.determineLineSegmentDistance(segment.getB(), dragSegment)) {
+                    sourcePoint = segment.getB();
+                }
+
+                Point reflected = OritaCalc.findLineSymmetryPoint(
+                        dragSegment.getA(),
+                        dragSegment.getB(),
+                        sourcePoint);
+                LineSegment addSegment = OritaCalc.extendToIntersectionPoint_2(
+                        set,
+                        new LineSegment(OritaCalc.findIntersection(segment, dragSegment), reflected))
+                        .withColor(segment.getColor());
+
+                if (Epsilon.high.gt0(addSegment.determineLength())) {
+                    addLineSegmentLikeWorker(set, addSegment);
+                    added++;
+                }
+            }
+        }
+
+        System.out.println("added|" + added);
+        printFoldLineSet(set);
+    }
+
+    private static boolean isDoubleSymmetricIntersection(LineSegment.Intersection intersection) {
+        return switch (intersection) {
+            case INTERSECTS_LSHAPE_S1_START_S2_START_21,
+                 INTERSECTS_LSHAPE_S1_START_S2_END_22,
+                 INTERSECTS_LSHAPE_S1_END_S2_START_23,
+                 INTERSECTs_LSHAPE_S1_END_S2_END_24,
+                 INTERSECTS_TSHAPE_S1_VERTICAL_BAR_25,
+                 INTERSECTS_TSHAPE_S1_VERTICAL_BAR_26 -> true;
+            default -> false;
+        };
     }
 
     private static void foldLineDrawCrease(String[] args) {
@@ -2379,6 +2440,7 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle foldline-perpendicular-projection <targetX> <targetY> <base ax ay bx by color> <color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-perpendicular-indicator <targetX> <targetY> <base ax ay bx by color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-symmetric-draw <source ax ay bx by color> <mirror ax ay bx by color> <color> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-double-symmetric-draw <drag ax ay bx by color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-draw-crease <fold|aux> <segment ax ay bx by color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-draw-symmetric <axis ax ay bx by color> <preselected> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-draw-point <index> <targetX> <targetY> <selectionDistance> <count> [ax ay bx by color]...");

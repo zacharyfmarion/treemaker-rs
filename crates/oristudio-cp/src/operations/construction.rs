@@ -1,10 +1,11 @@
 //! Construction/drawing commands ported from Oriedita handlers.
 
 use crate::geometry::{
-    Epsilon, LineColor, LineSegment, ParallelJudgement, Point, StraightLine, distance,
-    find_intersection_segments, find_line_symmetry_line_segment, find_line_symmetry_point,
-    find_projection, get_segment_with_length, is_line_segment_parallel_with_precision,
-    is_point_within_line_span, move_parallel,
+    Epsilon, Intersection, LineColor, LineSegment, ParallelJudgement, Point, StraightLine,
+    determine_line_segment_distance, determine_line_segment_intersection_sweet_with_tolerances,
+    distance, find_intersection_segments, find_line_symmetry_line_segment,
+    find_line_symmetry_point, find_projection, get_segment_with_length,
+    is_line_segment_parallel_with_precision, is_point_within_line_span, move_parallel,
 };
 use crate::model::CreasePatternModel;
 use crate::operations::arrangement::{
@@ -205,6 +206,62 @@ pub fn symmetric_draw(
     }
     add_line_segment_like_worker(model, &add_segment);
     true
+}
+
+/// Oriedita `DOUBLE_SYMMETRIC_DRAW_35` final mutation after the drag axis is resolved.
+pub fn double_symmetric_draw(model: &mut CreasePatternModel, drag_segment: &LineSegment) -> usize {
+    if !Epsilon::HIGH.gt0(drag_segment.determine_length()) {
+        return 0;
+    }
+
+    let snapshot = model.line_segments.clone();
+    let mut added = 0;
+    for segment in snapshot {
+        let intersection = determine_line_segment_intersection_sweet_with_tolerances(
+            &segment,
+            drag_segment,
+            Epsilon::UNKNOWN_001,
+            Epsilon::UNKNOWN_001,
+        );
+        if !is_double_symmetric_intersection(intersection) {
+            continue;
+        }
+
+        let mut source_point = segment.a;
+        if determine_line_segment_distance(source_point, drag_segment)
+            < determine_line_segment_distance(segment.b, drag_segment)
+        {
+            source_point = segment.b;
+        }
+
+        let reflected = find_line_symmetry_point(drag_segment.a, drag_segment.b, source_point);
+        let add_segment = extend_to_intersection_point_2(
+            model,
+            &LineSegment::new(
+                find_intersection_segments(&segment, drag_segment),
+                reflected,
+            ),
+        )
+        .with_line_color(segment.color);
+
+        if Epsilon::HIGH.gt0(add_segment.determine_length()) {
+            add_line_segment_like_worker(model, &add_segment);
+            added += 1;
+        }
+    }
+    added
+}
+
+fn is_double_symmetric_intersection(intersection: Intersection) -> bool {
+    matches!(
+        intersection,
+        Intersection::IntersectsLShapeS1StartS2Start21
+            | Intersection::IntersectsLShapeS1StartS2End22
+            | Intersection::IntersectsLShapeS1EndS2Start23
+            | Intersection::IntersectsLShapeS1EndS2End24
+            | Intersection::IntersectsTShapeS1VerticalBar25
+            | Intersection::IntersectsTShapeS1VerticalBar26
+    )
 }
 
 fn additional_intersection(

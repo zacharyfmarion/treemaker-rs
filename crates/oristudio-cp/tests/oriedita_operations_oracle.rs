@@ -19,9 +19,9 @@ use oristudio_cp::operations::color::{
     make_valley, replace_line_type_for_indices, set_line_color_for_indices, toggle_mountain_valley,
 };
 use oristudio_cp::operations::construction::{
-    DrawCreaseTarget, commit_parallel_width_indicator, draw_crease_segment, mirror_selected_lines,
-    parallel_draw, parallel_width_indicators, perpendicular_indicator, perpendicular_projection,
-    symmetric_draw,
+    DrawCreaseTarget, commit_parallel_width_indicator, double_symmetric_draw, draw_crease_segment,
+    mirror_selected_lines, parallel_draw, parallel_width_indicators, perpendicular_indicator,
+    perpendicular_projection, symmetric_draw,
 };
 use oristudio_cp::operations::generators::{
     DefaultMolecule, default_molecule, regular_polygon_no_corners,
@@ -1292,6 +1292,31 @@ fn symmetric_draw_matches_oriedita_oracle() {
     args.push(LineColor::Red1.number().to_string());
     args.push(existing_segments.len().to_string());
     push_segment_args(&mut args, &existing_segments);
+    let rust_summary = format!("added|{added}\n{}", line_segment_set_summary(&model));
+    assert_eq!(rust_summary, run_oracle(&oracle, &args));
+}
+
+#[test]
+fn double_symmetric_draw_matches_oriedita_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    let segments = vec![
+        segment(0.0, 1.0, 2.0, 1.0, LineColor::Red1),
+        segment(-3.0, 0.0, -3.0, 2.0, LineColor::Black0),
+    ];
+    let drag_axis = segment(0.0, 0.0, 0.0, 2.0, LineColor::Black0);
+    let mut model = model_from_segments(&segments);
+    let added = double_symmetric_draw(&mut model, &drag_axis);
+
+    let mut args = vec!["foldline-double-symmetric-draw".to_string()];
+    push_one_segment_args(&mut args, &drag_axis);
+    args.push(segments.len().to_string());
+    push_segment_args(&mut args, &segments);
     let rust_summary = format!("added|{added}\n{}", line_segment_set_summary(&model));
     assert_eq!(rust_summary, run_oracle(&oracle, &args));
 }

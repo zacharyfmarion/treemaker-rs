@@ -987,6 +987,10 @@ Status:
 - `SYMMETRIC_DRAW_10` is ported and oracle-tested for resolved two-line
   construction inputs. Three-point UI selection maps to the same kernel path
   after Oriedita turns the three points into two construction segments.
+- `DOUBLE_SYMMETRIC_DRAW_35` is ported and oracle-tested for the resolved drag
+  axis kernel. The implementation preserves Oriedita's snapshot iteration,
+  valid endpoint/T-intersection filter, far-endpoint reflection, extension to
+  the next hit, and worker-style insertion splitting.
 
 ### Stage 8: Circle, Polygon, Base, and Generator Tools
 

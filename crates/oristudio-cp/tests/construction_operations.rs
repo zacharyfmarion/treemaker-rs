@@ -1,9 +1,9 @@
 use oristudio_cp::geometry::{LineColor, LineSegment, Point};
 use oristudio_cp::model::CreasePatternModel;
 use oristudio_cp::operations::construction::{
-    DrawCreaseTarget, commit_parallel_width_indicator, draw_crease_segment, mirror_selected_lines,
-    parallel_draw, parallel_width_indicators, perpendicular_indicator, perpendicular_projection,
-    symmetric_draw,
+    DrawCreaseTarget, commit_parallel_width_indicator, double_symmetric_draw, draw_crease_segment,
+    mirror_selected_lines, parallel_draw, parallel_width_indicators, perpendicular_indicator,
+    perpendicular_projection, symmetric_draw,
 };
 
 #[test]
@@ -186,6 +186,23 @@ fn symmetric_draw_reflects_source_ray_across_mirror_line() {
                 && (segment.b.x - 0.0).abs() < 1e-12
                 && (segment.b.y - 2.0).abs() < 1e-12)
     );
+}
+
+#[test]
+fn double_symmetric_draw_reflects_far_endpoint_across_drag_axis() {
+    let mut model = model_from_segments(&[
+        segment(0.0, 1.0, 2.0, 1.0, LineColor::Red1),
+        segment(-3.0, 0.0, -3.0, 2.0, LineColor::Black0),
+    ]);
+    let drag_axis = segment(0.0, 0.0, 0.0, 2.0, LineColor::Black0);
+
+    assert_eq!(double_symmetric_draw(&mut model, &drag_axis), 1);
+    assert!(contains_segment(
+        &model.line_segments,
+        Point::new(-2.0, 1.0),
+        Point::new(-3.0, 1.0),
+        LineColor::Red1,
+    ));
 }
 
 fn segment(ax: f64, ay: f64, bx: f64, by: f64, color: LineColor) -> LineSegment {

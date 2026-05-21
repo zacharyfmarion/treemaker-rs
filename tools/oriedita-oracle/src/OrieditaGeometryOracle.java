@@ -12,6 +12,8 @@ import origami.crease_pattern.element.Polygon;
 import origami.crease_pattern.element.StraightLine;
 import origami.crease_pattern.util.CreasePattern_Worker_Toolbox;
 import origami.crease_pattern.worker.foldlineset.BranchTrim;
+import origami.crease_pattern.worker.foldlineset.Check1;
+import origami.crease_pattern.worker.foldlineset.Check2;
 import origami.crease_pattern.worker.foldlineset.Fix1;
 import origami.crease_pattern.worker.foldlineset.Fix2;
 import origami.crease_pattern.worker.foldlineset.OrganizeCircles;
@@ -35,6 +37,7 @@ import java.awt.geom.Path2D;
 import java.io.File;
 import java.lang.reflect.Method;
 import java.nio.file.Files;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.ArrayList;
 import java.util.List;
@@ -142,6 +145,8 @@ public class OrieditaGeometryOracle {
             case "foldline-delete-line-vertex" -> foldLineDeleteLineVertex(args);
             case "foldline-delete-lines" -> foldLineDeleteLines(args);
             case "foldline-branch-trim" -> foldLineBranchTrim(args);
+            case "foldline-check1" -> foldLineCheck1(args);
+            case "foldline-check2" -> foldLineCheck2(args);
             case "foldline-del-v" -> foldLineDelV(args);
             case "foldline-del-v-cc" -> foldLineDelVCc(args);
             case "foldline-del-v-pair" -> foldLineDelVPair(args);
@@ -416,6 +421,28 @@ public class OrieditaGeometryOracle {
         FoldLineSet set = foldLineSet(args, 2, count);
         BranchTrim.apply(set);
         printFoldLineSet(set);
+    }
+
+    private static void foldLineCheck1(String[] args) {
+        if (args.length < 2) {
+            usage("foldline-check1 expects count and segment payload");
+        }
+
+        int count = Integer.parseInt(args[1]);
+        FoldLineSet set = foldLineSet(args, 2, count);
+        Check1.apply(set);
+        printLineSegmentsList(set.getCheck1LineSegment());
+    }
+
+    private static void foldLineCheck2(String[] args) {
+        if (args.length < 2) {
+            usage("foldline-check2 expects count and segment payload");
+        }
+
+        int count = Integer.parseInt(args[1]);
+        FoldLineSet set = foldLineSet(args, 2, count);
+        Check2.apply(set);
+        printLineSegmentsList(set.getCheck2LineSegment());
     }
 
     private static void foldLineDelV(String[] args) {
@@ -4484,7 +4511,7 @@ public class OrieditaGeometryOracle {
         }
     }
 
-    private static void printLineSegmentsList(List<LineSegment> segments) {
+    private static void printLineSegmentsList(Collection<LineSegment> segments) {
         System.out.println("lines|" + segments.size());
         for (LineSegment segment : segments) {
             System.out.println("line|"
@@ -4681,6 +4708,8 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle foldline-del-v-pair <i> <j> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-del-v-all <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-del-v-all-cc <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-check1 <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-check2 <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-fix1 <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-fix2 <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-set-color <color> <indices> <count> [ax ay bx by color]...");

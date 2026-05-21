@@ -1105,8 +1105,12 @@ Status:
   `checks::flat_foldable_boundary_check` for resolved boundary segments. The
   port preserves Oriedita's strict X-intersection requirement, folding-line-only
   crossing count, boundary-order sorting, repeated reflection composition, and
-  cyan/magenta/yellow line-step coloring. The broader Check1-Check4 diagnostic
-  workers remain separate Stage 9 tasks.
+  cyan/magenta/yellow line-step coloring.
+- `Check1` and `Check2` are ported and oracle-tested as `checks::check1` and
+  `checks::check2`. These return Oriedita's diagnostic segment lists for
+  non-auxiliary overlap/containment pairs and sweet-tolerance T-intersection
+  pairs, preserving duplicate reporting and pair order. `Check3`, `Check4`,
+  CAMV, and little-big-little payloads remain separate Stage 9 tasks.
 
 ### Stage 10: Folding Estimation Parity Surface
 

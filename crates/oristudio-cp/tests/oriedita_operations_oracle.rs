@@ -1,4 +1,6 @@
-use oristudio_cp::checks::{FlatFoldableBoundaryCheck, flat_foldable_boundary_check};
+use oristudio_cp::checks::{
+    FlatFoldableBoundaryCheck, check1, check2, flat_foldable_boundary_check,
+};
 use oristudio_cp::geometry::{Circle, Intersection, LineColor, LineSegment, Point, RgbColor};
 use oristudio_cp::model::{CreasePatternModel, CustomLineType, TextElement};
 use oristudio_cp::operations::arrangement::{
@@ -488,6 +490,48 @@ fn branch_trim_matches_oriedita_foldlineset_oracle() {
     push_segment_args(&mut args, &segments);
 
     assert_eq!(line_segment_set_summary(&model), run_oracle(&oracle, &args));
+}
+
+#[test]
+fn check1_and_check2_match_oriedita_foldlineset_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    let check1_segments = vec![
+        segment(0.0, 0.0, 10.0, 0.0, LineColor::Red1),
+        segment(5.0, 0.0, 15.0, 0.0, LineColor::Blue2),
+        segment(6.0, 0.0, 8.0, 0.0, LineColor::Cyan3),
+    ];
+    let check1_model = model_from_segments(&check1_segments);
+    let mut check1_args = vec![
+        "foldline-check1".to_string(),
+        check1_segments.len().to_string(),
+    ];
+    push_segment_args(&mut check1_args, &check1_segments);
+    assert_eq!(
+        line_segment_list_summary(&check1(&check1_model)),
+        run_oracle(&oracle, &check1_args)
+    );
+
+    let check2_segments = vec![
+        segment(0.0, 0.0, 10.0, 0.0, LineColor::Red1),
+        segment(5.0, 0.0, 5.0, 5.0, LineColor::Blue2),
+        segment(2.0, -1.0, 2.0, 1.0, LineColor::Black0),
+    ];
+    let check2_model = model_from_segments(&check2_segments);
+    let mut check2_args = vec![
+        "foldline-check2".to_string(),
+        check2_segments.len().to_string(),
+    ];
+    push_segment_args(&mut check2_args, &check2_segments);
+    assert_eq!(
+        line_segment_list_summary(&check2(&check2_model)),
+        run_oracle(&oracle, &check2_args)
+    );
 }
 
 #[test]

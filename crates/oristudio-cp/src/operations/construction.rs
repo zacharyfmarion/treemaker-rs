@@ -2,9 +2,9 @@
 
 use crate::geometry::{
     Epsilon, LineColor, LineSegment, ParallelJudgement, Point, StraightLine, distance,
-    find_intersection_segments, find_line_symmetry_line_segment, find_projection,
-    get_segment_with_length, is_line_segment_parallel_with_precision, is_point_within_line_span,
-    move_parallel,
+    find_intersection_segments, find_line_symmetry_line_segment, find_line_symmetry_point,
+    find_projection, get_segment_with_length, is_line_segment_parallel_with_precision,
+    is_point_within_line_span, move_parallel,
 };
 use crate::model::CreasePatternModel;
 use crate::operations::arrangement::{
@@ -182,6 +182,28 @@ pub fn perpendicular_draw_to_destination(
         return false;
     };
     add_line_segment_like_worker(model, &result);
+    true
+}
+
+/// Oriedita `SYMMETRIC_DRAW_10` final mutation after two construction lines are resolved.
+pub fn symmetric_draw(
+    model: &mut CreasePatternModel,
+    source: &LineSegment,
+    mirror: &LineSegment,
+    color: LineColor,
+) -> bool {
+    let cross = find_intersection_segments(source, mirror);
+    let reflected = find_line_symmetry_point(
+        cross,
+        mirror.determine_furthest_endpoint(cross),
+        source.determine_furthest_endpoint(cross),
+    );
+    let add_segment = extend_to_intersection_point_2(model, &LineSegment::new(cross, reflected))
+        .with_line_color(color);
+    if !Epsilon::HIGH.gt0(add_segment.determine_length()) {
+        return false;
+    }
+    add_line_segment_like_worker(model, &add_segment);
     true
 }
 

@@ -21,6 +21,7 @@ use oristudio_cp::operations::color::{
 use oristudio_cp::operations::construction::{
     DrawCreaseTarget, commit_parallel_width_indicator, draw_crease_segment, mirror_selected_lines,
     parallel_draw, parallel_width_indicators, perpendicular_indicator, perpendicular_projection,
+    symmetric_draw,
 };
 use oristudio_cp::operations::generators::{
     DefaultMolecule, default_molecule, regular_polygon_no_corners,
@@ -1268,6 +1269,31 @@ fn perpendicular_draw_modes_match_oriedita_oracle() {
         optional_segment_result_summary(indicator.as_ref()),
         run_oracle(&oracle, &args)
     );
+}
+
+#[test]
+fn symmetric_draw_matches_oriedita_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    let existing_segments = vec![segment(0.0, 2.0, 2.0, 2.0, LineColor::Black0)];
+    let source = segment(0.0, 0.0, 1.0, 0.0, LineColor::Red1);
+    let mirror = segment(0.0, 0.0, 1.0, 1.0, LineColor::Blue2);
+    let mut model = model_from_segments(&existing_segments);
+    let added = symmetric_draw(&mut model, &source, &mirror, LineColor::Red1);
+
+    let mut args = vec!["foldline-symmetric-draw".to_string()];
+    push_one_segment_args(&mut args, &source);
+    push_one_segment_args(&mut args, &mirror);
+    args.push(LineColor::Red1.number().to_string());
+    args.push(existing_segments.len().to_string());
+    push_segment_args(&mut args, &existing_segments);
+    let rust_summary = format!("added|{added}\n{}", line_segment_set_summary(&model));
+    assert_eq!(rust_summary, run_oracle(&oracle, &args));
 }
 
 #[test]

@@ -3,6 +3,7 @@ use oristudio_cp::model::CreasePatternModel;
 use oristudio_cp::operations::construction::{
     DrawCreaseTarget, commit_parallel_width_indicator, draw_crease_segment, mirror_selected_lines,
     parallel_draw, parallel_width_indicators, perpendicular_indicator, perpendicular_projection,
+    symmetric_draw,
 };
 
 #[test]
@@ -161,6 +162,30 @@ fn perpendicular_indicator_extends_across_existing_hits() {
     assert!((indicator.a.y + 2.0).abs() < 1e-12);
     assert!((indicator.b.x - 0.0).abs() < 1e-12);
     assert!((indicator.b.y - 2.0).abs() < 1e-12);
+}
+
+#[test]
+fn symmetric_draw_reflects_source_ray_across_mirror_line() {
+    let mut model = model_from_segments(&[segment(0.0, 2.0, 2.0, 2.0, LineColor::Black0)]);
+    let source = segment(0.0, 0.0, 1.0, 0.0, LineColor::Red1);
+    let mirror = segment(0.0, 0.0, 1.0, 1.0, LineColor::Blue2);
+
+    assert!(symmetric_draw(
+        &mut model,
+        &source,
+        &mirror,
+        LineColor::Red1,
+    ));
+    assert!(
+        model
+            .line_segments
+            .iter()
+            .any(|segment| segment.color == LineColor::Red1
+                && (segment.a.x - 0.0).abs() < 1e-12
+                && (segment.a.y - 1.0).abs() < 1e-12
+                && (segment.b.x - 0.0).abs() < 1e-12
+                && (segment.b.y - 2.0).abs() < 1e-12)
+    );
 }
 
 fn segment(ax: f64, ay: f64, bx: f64, by: f64, color: LineColor) -> LineSegment {

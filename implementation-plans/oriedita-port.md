@@ -984,6 +984,9 @@ Status:
   projection branch and the full-extend indicator branch after resolved
   model-space inputs. Destination selection uses the same
   `s_step_additional_intersection` helper as the parallel tool.
+- `SYMMETRIC_DRAW_10` is ported and oracle-tested for resolved two-line
+  construction inputs. Three-point UI selection maps to the same kernel path
+  after Oriedita turns the three points into two construction segments.
 
 ### Stage 8: Circle, Polygon, Base, and Generator Tools
 

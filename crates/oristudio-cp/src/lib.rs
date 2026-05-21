@@ -346,10 +346,10 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
     descriptor!(
         SymmetricDraw,
         "MouseHandlerSymmetricDraw",
-        "operations::construction::symmetric",
+        "operations::construction::symmetric_draw",
         Kernel,
         7,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         DrawCreaseRestricted,

@@ -151,7 +151,7 @@ stage explicitly changes it.
 | `CREASE_ADVANCE_TYPE_30` | `MouseHandlerCreaseAdvanceType` | `operations::color::advance_line_type` | kernel | 6 | Oracle-tested |
 | `CREASE_MOVE_4P_31` | `MouseHandlerCreaseMove4p` | `operations::transform::move_selected_lines_by_points` | kernel | 6 | Oracle-tested |
 | `CREASE_COPY_4P_32` | `MouseHandlerCreaseCopy4p` | `operations::transform::copy_selected_lines_by_points` | kernel | 6 | Oracle-tested |
-| `FISH_BONE_DRAW_33` | `MouseHandlerFishBoneDraw` | `operations::construction::fishbone` | kernel | 7 | Unsupported |
+| `FISH_BONE_DRAW_33` | `MouseHandlerFishBoneDraw` | `operations::construction::fishbone_draw` | kernel | 7 | Oracle-tested |
 | `CREASE_MAKE_MV_34` | `MouseHandlerCreaseMakeMV` | `operations::color::alternate_mountain_valley_along` | kernel | 6 | Oracle-tested |
 | `DOUBLE_SYMMETRIC_DRAW_35` | `MouseHandlerDoubleSymmetricDraw` | `operations::construction::double_symmetric_draw` | kernel | 7 | Oracle-tested |
 | `CREASES_ALTERNATE_MV_36` | `MouseHandlerCreasesAlternateMV` | `operations::color::alternate_mountain_valley_crossing` | kernel | 6 | Oracle-tested |

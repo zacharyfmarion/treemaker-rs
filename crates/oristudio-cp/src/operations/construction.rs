@@ -1,15 +1,16 @@
 //! Construction/drawing commands ported from Oriedita handlers.
 
 use crate::geometry::{
-    Epsilon, Intersection, LineColor, LineSegment, ParallelJudgement, Point, StraightLine, center,
-    determine_line_segment_distance, determine_line_segment_intersection_sweet_with_tolerances,
-    distance, find_intersection_segments, find_line_symmetry_line_segment,
+    Epsilon, Intersection, LineColor, LineSegment, ParallelJudgement, Point, StraightLine, angle,
+    center, determine_line_segment_distance,
+    determine_line_segment_intersection_sweet_with_tolerances, distance,
+    find_intersection_segments, find_intersection_straight_lines, find_line_symmetry_line_segment,
     find_line_symmetry_point, find_projection, get_segment_with_length, is_line_segment_parallel,
     is_line_segment_parallel_with_precision, is_point_within_line_span, mid_point, move_parallel,
 };
 use crate::model::CreasePatternModel;
 use crate::operations::arrangement::{
-    add_line_segment_like_worker, divide_line_segment_with_new_lines,
+    add_line_segment_like_worker, del_v_at_point, divide_line_segment_with_new_lines,
 };
 use crate::operations::selection::unselect_all;
 use crate::operations::transform::extend_to_intersection_point_2;
@@ -402,6 +403,115 @@ fn add_square_bisector_line(model: &mut CreasePatternModel, segment: &LineSegmen
     }
     add_line_segment_like_worker(model, segment);
     true
+}
+
+/// Oriedita `FISH_BONE_DRAW_33` final mutation after the drag segment is resolved.
+pub fn fishbone_draw(
+    model: &mut CreasePatternModel,
+    drag_segment: &LineSegment,
+    grid_width: f64,
+    color: LineColor,
+    selection_distance: f64,
+) -> usize {
+    if !Epsilon::HIGH.gt0(drag_segment.determine_length()) || grid_width <= 0.0 {
+        return 0;
+    }
+
+    let dx = (drag_segment.determine_ax() - drag_segment.determine_bx()) * grid_width
+        / drag_segment.determine_length();
+    let dy = (drag_segment.determine_ay() - drag_segment.determine_by()) * grid_width
+        / drag_segment.determine_length();
+    let mut current_color = color;
+    let mut added = 0;
+
+    for i in 0..=(drag_segment.determine_length() / grid_width).floor() as usize {
+        let point = Point::new(
+            drag_segment.determine_bx() + i as f64 * dx,
+            drag_segment.determine_by() + i as f64 * dy,
+        );
+
+        if closest_line_segment_distance_excluding_parallel(model, point, drag_segment)
+            <= Epsilon::UNKNOWN_0001
+        {
+            continue;
+        }
+
+        let mut station_added = 0;
+        for seed in [
+            LineSegment::new(point, Point::new(point.x - dy, point.y + dx)),
+            LineSegment::new(point, Point::new(point.x + dy, point.y - dx)),
+        ] {
+            if fishbone_has_forward_intersection(model, &seed) {
+                let result =
+                    extend_to_intersection_point_2(model, &seed).with_line_color(current_color);
+                add_line_segment_like_worker(model, &result);
+                station_added += 1;
+                added += 1;
+            }
+        }
+
+        if station_added == 2 {
+            del_v_at_point(model, point, selection_distance, Epsilon::UNKNOWN_1EN6);
+        }
+
+        current_color = next_fishbone_color(current_color);
+    }
+
+    added
+}
+
+fn closest_line_segment_distance_excluding_parallel(
+    model: &CreasePatternModel,
+    point: Point,
+    segment: &LineSegment,
+) -> f64 {
+    let mut minimum = 100_000.0;
+    for existing in &model.line_segments {
+        if is_line_segment_parallel_with_precision(
+            StraightLine::from_segment(existing),
+            StraightLine::from_segment(segment),
+            Epsilon::UNKNOWN_1EN4,
+        ) == ParallelJudgement::NotParallel
+        {
+            let distance = determine_line_segment_distance(point, existing);
+            if minimum > distance {
+                minimum = distance;
+            }
+        }
+    }
+    minimum
+}
+
+fn fishbone_has_forward_intersection(model: &CreasePatternModel, seed: &LineSegment) -> bool {
+    let straight_line = StraightLine::from_segment(seed);
+    for existing in &model.line_segments {
+        if !straight_line
+            .line_segment_intersect_reverse_detail(existing)
+            .is_intersecting()
+        {
+            continue;
+        }
+
+        let intersection =
+            find_intersection_straight_lines(straight_line, StraightLine::from_segment(existing));
+        if intersection.distance(seed.a) <= Epsilon::UNKNOWN_1EN5 {
+            continue;
+        }
+
+        let segment_angle = angle((seed.a, seed.b, seed.a, intersection));
+        if !(1.0..=359.0).contains(&segment_angle) {
+            return true;
+        }
+    }
+    false
+}
+
+fn next_fishbone_color(color: LineColor) -> LineColor {
+    match color {
+        LineColor::Red1 => LineColor::Blue2,
+        LineColor::Blue2 => LineColor::Red1,
+        other => other,
+    }
 }
 
 fn is_double_symmetric_intersection(intersection: Intersection) -> bool {

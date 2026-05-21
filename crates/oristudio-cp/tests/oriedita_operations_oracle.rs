@@ -20,8 +20,8 @@ use oristudio_cp::operations::color::{
 };
 use oristudio_cp::operations::construction::{
     DrawCreaseTarget, commit_parallel_width_indicator, commit_square_bisector_parallel_indicator,
-    double_symmetric_draw, draw_crease_segment, inward, mirror_selected_lines, parallel_draw,
-    parallel_width_indicators, perpendicular_indicator, perpendicular_projection,
+    double_symmetric_draw, draw_crease_segment, fishbone_draw, inward, mirror_selected_lines,
+    parallel_draw, parallel_width_indicators, perpendicular_indicator, perpendicular_projection,
     square_bisector_from_lines_to_destination, square_bisector_from_points_to_destination,
     square_bisector_parallel_between_destinations, square_bisector_parallel_indicator,
     symmetric_draw,
@@ -1473,6 +1473,39 @@ fn square_bisector_modes_match_oriedita_oracle() {
     push_segment_args(&mut args, &segments);
     let rust_summary = format!("added|{added}\n{}", line_segment_set_summary(&model));
     assert_eq!(rust_summary, run_oracle(&oracle, &args));
+}
+
+#[test]
+fn fishbone_draw_matches_oriedita_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    let segments = vec![
+        segment(-1.0, -2.0, 3.0, -2.0, LineColor::Black0),
+        segment(-1.0, 2.0, 3.0, 2.0, LineColor::Black0),
+    ];
+    let drag = segment(0.0, 0.0, 2.0, 0.0, LineColor::Black0);
+    let mut model = model_from_segments(&segments);
+    let added = fishbone_draw(&mut model, &drag, 1.0, LineColor::Red1, 0.5);
+
+    let mut args = vec!["foldline-fishbone".to_string()];
+    push_one_segment_args(&mut args, &drag);
+    args.push("1.0".to_string());
+    args.push(LineColor::Red1.number().to_string());
+    args.push("0.5".to_string());
+    args.push(segments.len().to_string());
+    push_segment_args(&mut args, &segments);
+    let rust_summary = format!("added|{added}\n{}", line_segment_set_summary(&model));
+    assert_line_summary_close(
+        &rust_summary,
+        &run_oracle(&oracle, &args),
+        1e-12,
+        "fishbone",
+    );
 }
 
 #[test]

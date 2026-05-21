@@ -997,6 +997,10 @@ Status:
   the three-point destination branch, the non-parallel two-line destination
   branch, the parallel-line purple indicator branch, direct indicator commit,
   and the parallel-line two-destination commit.
+- `FISH_BONE_DRAW_33` is ported and oracle-tested for resolved drag segments,
+  including grid-station stepping, parallel-excluded proximity skips, forward
+  hit detection, `extendToIntersectionPoint_2` rib placement, red/blue
+  alternation, and Oriedita's `del_V` call when both ribs are added.
 
 ### Stage 8: Circle, Polygon, Base, and Generator Tools
 

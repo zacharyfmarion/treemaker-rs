@@ -2,7 +2,7 @@ use oristudio_cp::geometry::{LineColor, LineSegment, Point};
 use oristudio_cp::model::CreasePatternModel;
 use oristudio_cp::operations::construction::{
     DrawCreaseTarget, commit_parallel_width_indicator, double_symmetric_draw, draw_crease_segment,
-    inward, mirror_selected_lines, parallel_draw, parallel_width_indicators,
+    fishbone_draw, inward, mirror_selected_lines, parallel_draw, parallel_width_indicators,
     perpendicular_indicator, perpendicular_projection, square_bisector_from_lines_to_destination,
     square_bisector_from_points_to_destination, square_bisector_parallel_between_destinations,
     square_bisector_parallel_indicator, symmetric_draw,
@@ -318,6 +318,38 @@ fn square_bisector_parallel_indicator_and_destination_commit() {
         &model.line_segments,
         Point::new(-1.0, 1.0),
         Point::new(1.0, 1.0),
+        LineColor::Red1,
+    ));
+}
+
+#[test]
+fn fishbone_draw_adds_alternating_perpendicular_ribs() {
+    let mut model = model_from_segments(&[
+        segment(-1.0, -2.0, 3.0, -2.0, LineColor::Black0),
+        segment(-1.0, 2.0, 3.0, 2.0, LineColor::Black0),
+    ]);
+    let drag = segment(0.0, 0.0, 2.0, 0.0, LineColor::Black0);
+
+    assert_eq!(
+        fishbone_draw(&mut model, &drag, 1.0, LineColor::Red1, 0.5),
+        6
+    );
+    assert!(contains_segment_close(
+        &model.line_segments,
+        Point::new(2.0, -1.0),
+        Point::new(2.0, -2.0),
+        LineColor::Red1,
+    ));
+    assert!(contains_segment_close(
+        &model.line_segments,
+        Point::new(1.0, 1.0),
+        Point::new(1.0, 2.0),
+        LineColor::Blue2,
+    ));
+    assert!(contains_segment_close(
+        &model.line_segments,
+        Point::new(0.0, -1.0),
+        Point::new(0.0, -2.0),
         LineColor::Red1,
     ));
 }

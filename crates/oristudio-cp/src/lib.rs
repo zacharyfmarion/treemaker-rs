@@ -522,10 +522,10 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
     descriptor!(
         FishBoneDraw,
         "MouseHandlerFishBoneDraw",
-        "operations::construction::fishbone",
+        "operations::construction::fishbone_draw",
         Kernel,
         7,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         CreaseMakeMv,

@@ -93,6 +93,7 @@ public class OrieditaGeometryOracle {
             case "foldline-symmetric-draw" -> foldLineSymmetricDraw(args);
             case "foldline-double-symmetric-draw" -> foldLineDoubleSymmetricDraw(args);
             case "foldline-inward" -> foldLineInward(args);
+            case "foldline-fishbone" -> foldLineFishbone(args);
             case "foldline-square-bisector-3p" -> foldLineSquareBisector3p(args);
             case "foldline-square-bisector-2l-np" -> foldLineSquareBisector2lNp(args);
             case "foldline-square-bisector-parallel-indicator" -> foldLineSquareBisectorParallelIndicator(args);
@@ -1293,6 +1294,95 @@ public class OrieditaGeometryOracle {
 
         System.out.println("added|" + added);
         printFoldLineSet(set);
+    }
+
+    private static void foldLineFishbone(String[] args) {
+        if (args.length < 10) {
+            usage("foldline-fishbone expects drag segment, grid width, color, selection distance, count, and segment payload");
+        }
+
+        LineSegment dragSegment = segment(args, 1);
+        double gridWidth = parse(args[6]);
+        LineColor color = LineColor.fromNumber(Integer.parseInt(args[7]));
+        double selectionDistance = parse(args[8]);
+        int count = Integer.parseInt(args[9]);
+        FoldLineSet set = foldLineSet(args, 10, count);
+        int added = 0;
+
+        if (Epsilon.high.gt0(dragSegment.determineLength()) && gridWidth > 0.0) {
+            double dx = (dragSegment.determineAX() - dragSegment.determineBX()) * gridWidth
+                    / dragSegment.determineLength();
+            double dy = (dragSegment.determineAY() - dragSegment.determineBY()) * gridWidth
+                    / dragSegment.determineLength();
+            LineColor currentColor = color;
+
+            for (int i = 0; i <= (int) Math.floor(dragSegment.determineLength() / gridWidth); i++) {
+                double px = dragSegment.determineBX() + (double) i * dx;
+                double py = dragSegment.determineBY() + (double) i * dy;
+                Point point = new Point(px, py);
+
+                if (set.closestLineSegmentDistanceExcludingParallel(point, dragSegment) <= Epsilon.UNKNOWN_0001) {
+                    continue;
+                }
+
+                int stationAdded = 0;
+                LineSegment first = new LineSegment(px, py, px - dy, py + dx);
+                if (fishboneHasForwardIntersection(set, first)) {
+                    LineSegment result = OritaCalc.extendToIntersectionPoint_2(set, first).withColor(currentColor);
+                    addLineSegmentLikeWorker(set, result);
+                    stationAdded++;
+                    added++;
+                }
+
+                LineSegment second = new LineSegment(px, py, px + dy, py - dx);
+                if (fishboneHasForwardIntersection(set, second)) {
+                    LineSegment result = OritaCalc.extendToIntersectionPoint_2(set, second).withColor(currentColor);
+                    addLineSegmentLikeWorker(set, result);
+                    stationAdded++;
+                    added++;
+                }
+
+                if (stationAdded == 2) {
+                    set.del_V(point, selectionDistance, Epsilon.UNKNOWN_1EN6);
+                }
+
+                currentColor = nextFishboneColor(currentColor);
+            }
+        }
+
+        System.out.println("added|" + added);
+        printFoldLineSet(set);
+    }
+
+    private static boolean fishboneHasForwardIntersection(FoldLineSet set, LineSegment seed) {
+        StraightLine straightLine = new StraightLine(seed.getA(), seed.getB());
+        for (LineSegment lineSegment : set.getLineSegmentsIterable()) {
+            StraightLine.Intersection intersectionFlag = straightLine.lineSegment_intersect_reverse_detail(lineSegment);
+            if (!intersectionFlag.isIntersecting()) {
+                continue;
+            }
+
+            Point intersectionPoint = OritaCalc.findIntersection(straightLine, lineSegment);
+            if (intersectionPoint.distance(seed.getA()) <= Epsilon.UNKNOWN_1EN5) {
+                continue;
+            }
+
+            double angle = OritaCalc.angle(seed.getA(), seed.getB(), seed.getA(), intersectionPoint);
+            if (angle < 1.0 || angle > 359.0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static LineColor nextFishboneColor(LineColor color) {
+        if (color == LineColor.RED_1) {
+            return LineColor.BLUE_2;
+        }
+        if (color == LineColor.BLUE_2) {
+            return LineColor.RED_1;
+        }
+        return color;
     }
 
     private static void foldLineSquareBisector3p(String[] args) {
@@ -2620,6 +2710,7 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle foldline-symmetric-draw <source ax ay bx by color> <mirror ax ay bx by color> <color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-double-symmetric-draw <drag ax ay bx by color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-inward <p1x> <p1y> <p2x> <p2y> <p3x> <p3y> <color> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-fishbone <drag ax ay bx by color> <gridWidth> <color> <selectionDistance> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-square-bisector-3p <p1x> <p1y> <p2x> <p2y> <p3x> <p3y> <destination ax ay bx by color> <color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-square-bisector-2l-np <first ax ay bx by color> <second ax ay bx by color> <destination ax ay bx by color> <color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-square-bisector-parallel-indicator <first ax ay bx by color> <second ax ay bx by color> <count> [ax ay bx by color]...");

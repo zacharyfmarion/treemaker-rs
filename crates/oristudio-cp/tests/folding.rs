@@ -206,6 +206,28 @@ fn subface_permutation_search_builds_transitive_reduced_guides() {
     }
 }
 
+#[test]
+fn subface_overlap_search_advances_past_hierarchy_contradictions() {
+    let hierarchy = InitialHierarchy {
+        faces_total: 3,
+        relations: vec![HierarchyRelation {
+            upper_face: 2,
+            lower_face: 0,
+        }],
+    };
+    let mut search = SubFacePermutationSearch::new(vec![0, 1, 2]);
+    search.set_guide_map(&hierarchy, None).expect("guide map");
+
+    assert!(
+        search
+            .possible_overlapping_search(&hierarchy)
+            .expect("subface search should be supported")
+    );
+
+    let ordering = search.current_ordering();
+    assert!(position(&ordering, 2) < position(&ordering, 0));
+}
+
 fn square_with_diagonal() -> Vec<LineSegment> {
     vec![
         LineSegment::with_color(

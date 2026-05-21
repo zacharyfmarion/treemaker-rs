@@ -15,6 +15,18 @@ pub struct PermutationSnapshot {
     pub permutation: Vec<usize>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SubFaceSearchError {
+    Permutation(PermutationError),
+    CombinationGeneratorRequired { permutation_count: usize },
+}
+
+impl From<PermutationError> for SubFaceSearchError {
+    fn from(error: PermutationError) -> Self {
+        Self::Permutation(error)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct SubFacePermutationSearch {
     face_ids: Vec<usize>,
@@ -58,6 +70,31 @@ impl SubFacePermutationSearch {
 
     pub fn next(&mut self, digit: usize) -> Result<usize, PermutationError> {
         self.generator.next(digit)
+    }
+
+    /// Oriedita `SubFace.possible_overlapping_search()` without the
+    /// CombinationGenerator accelerator. If that accelerator would be entered,
+    /// this returns a typed unsupported error instead of approximating it.
+    pub fn possible_overlapping_search(
+        &mut self,
+        hierarchy: &InitialHierarchy,
+    ) -> Result<bool, SubFaceSearchError> {
+        let table = HierarchyTable::from_initial(hierarchy);
+        let mut changed = 1usize;
+        while changed != 0 {
+            if self.generator.count() > 2000 {
+                return Err(SubFaceSearchError::CombinationGeneratorRequired {
+                    permutation_count: self.generator.count(),
+                });
+            }
+
+            let inconsistent_digit = self.inconsistent_digits_request(&table)?;
+            if inconsistent_digit == 1000 {
+                return Ok(true);
+            }
+            changed = self.generator.next(inconsistent_digit)?;
+        }
+        Ok(false)
     }
 
     /// Oriedita `SubFace.setGuideMap()`: derive permutation guides from the
@@ -136,6 +173,126 @@ impl SubFacePermutationSearch {
             && self.face_id_map.contains_key(&condition.b)
             && self.face_id_map.contains_key(&condition.c)
             && self.face_id_map.contains_key(&condition.d)
+    }
+
+    fn inconsistent_digits_request(
+        &mut self,
+        hierarchy: &HierarchyTable,
+    ) -> Result<usize, PermutationError> {
+        let min = self.overlapping_inconsistent_digits_request(hierarchy)?;
+        let min = self.penetration_inconsistent_digits_request(min);
+        Ok(self.u_penetration_inconsistent_digits_request(min))
+    }
+
+    fn overlapping_inconsistent_digits_request(
+        &mut self,
+        hierarchy: &HierarchyTable,
+    ) -> Result<usize, PermutationError> {
+        let face_count = self.face_ids.len();
+        for i in 1..face_count {
+            for j in ((i + 1)..=face_count).rev() {
+                let Some(first_local) = self.generator.permutation_at(i) else {
+                    continue;
+                };
+                let Some(second_local) = self.generator.permutation_at(j) else {
+                    continue;
+                };
+                let Some(first_face) = first_local
+                    .checked_sub(1)
+                    .and_then(|index| self.face_ids.get(index))
+                    .copied()
+                else {
+                    continue;
+                };
+                let Some(second_face) = second_local
+                    .checked_sub(1)
+                    .and_then(|index| self.face_ids.get(index))
+                    .copied()
+                else {
+                    continue;
+                };
+                if hierarchy.get(first_face, second_face) == Some(FaceOrder::Below) {
+                    self.generator.add_guide(second_local, first_local)?;
+                    return Ok(i);
+                }
+            }
+        }
+        Ok(1000)
+    }
+
+    fn penetration_inconsistent_digits_request(&self, min: usize) -> usize {
+        for i in 1..=self.face_ids.len() {
+            if i >= min {
+                break;
+            }
+            let Some(local) = self.generator.permutation_at(i) else {
+                continue;
+            };
+            let Some(face_id) = local
+                .checked_sub(1)
+                .and_then(|index| self.face_ids.get(index))
+            else {
+                continue;
+            };
+            let Some(conditions) = self.triple_conditions.get(face_id) else {
+                continue;
+            };
+            for condition in conditions {
+                if self.penetration_condition_digit(*condition, i) < min {
+                    return i;
+                }
+            }
+        }
+        min
+    }
+
+    fn penetration_condition_digit(&self, condition: EquivalenceCondition, digit: usize) -> usize {
+        let Some(first) = self.face_id_to_permutation_digit(condition.b) else {
+            return 1000;
+        };
+        let Some(second) = self.face_id_to_permutation_digit(condition.d) else {
+            return 1000;
+        };
+        if first < digit && digit < second {
+            digit
+        } else {
+            1000
+        }
+    }
+
+    fn u_penetration_inconsistent_digits_request(&self, mut min: usize) -> usize {
+        for condition in &self.quadruple_conditions {
+            min = self.u_penetration_condition_digit(*condition, min);
+        }
+        min
+    }
+
+    fn u_penetration_condition_digit(&self, condition: EquivalenceCondition, min: usize) -> usize {
+        let Some(a) = self.face_id_to_permutation_digit(condition.a) else {
+            return min;
+        };
+        let Some(b) = self.face_id_to_permutation_digit(condition.b) else {
+            return min;
+        };
+        let Some(c) = self.face_id_to_permutation_digit(condition.c) else {
+            return min;
+        };
+        let Some(d) = self.face_id_to_permutation_digit(condition.d) else {
+            return min;
+        };
+
+        if b < min && a < c && c < b && b < d {
+            return b;
+        }
+        if d < min && c < a && a < d && d < b {
+            return d;
+        }
+        min
+    }
+
+    fn face_id_to_permutation_digit(&self, face_id: usize) -> Option<usize> {
+        let local = self.face_id_map.get(&face_id)?;
+        self.generator.locate(*local)
     }
 }
 

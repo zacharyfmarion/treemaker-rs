@@ -323,6 +323,7 @@ public class OrieditaGeometryOracle {
             case "chain-permutation-summary" -> chainPermutationSummary(args);
             case "chain-permutation-temp-summary" -> chainPermutationTempSummary(args);
             case "subface-guide-permutation-summary" -> subfaceGuidePermutationSummary(args);
+            case "subface-overlap-search-summary" -> subfaceOverlapSearchSummary(args);
             default -> usage("unknown command: " + args[0]);
         }
     }
@@ -690,6 +691,52 @@ public class OrieditaGeometryOracle {
 
         subFace.setGuideMap(hierarchyList);
         printSubfacePermutationSequence(subFace, faceCount, limit);
+    }
+
+    private static void subfaceOverlapSearchSummary(String[] args) throws Exception {
+        if (args.length < 7) {
+            usage("subface-overlap-search-summary expects faces total, face count, face ids, relation count, relation pairs, 3EC count, 3EC entries, 4EC count, and 4EC entries");
+        }
+
+        int facesTotal = Integer.parseInt(args[1]);
+        int faceCount = Integer.parseInt(args[2]);
+        int offset = 3;
+        SubFace subFace = new SubFace(new NoopBulletinBoard());
+        subFace.setNumDigits(faceCount);
+        for (int i = 1; i <= faceCount; i++) {
+            subFace.setFaceId(i, Integer.parseInt(args[offset++]) + 1);
+        }
+
+        HierarchyList hierarchyList = new HierarchyList();
+        hierarchyList.setFacesTotal(facesTotal);
+        int relationCount = Integer.parseInt(args[offset++]);
+        for (int i = 0; i < relationCount; i++) {
+            int upper = Integer.parseInt(args[offset++]) + 1;
+            int lower = Integer.parseInt(args[offset++]) + 1;
+            hierarchyList.set(upper, lower, HierarchyList.ABOVE_1);
+        }
+
+        int tripleCount = Integer.parseInt(args[offset++]);
+        for (int i = 0; i < tripleCount; i++) {
+            hierarchyList.addEquivalenceCondition(new origami.folding.util.EquivalenceCondition(
+                    Integer.parseInt(args[offset++]) + 1,
+                    Integer.parseInt(args[offset++]) + 1,
+                    Integer.parseInt(args[offset++]) + 1,
+                    Integer.parseInt(args[offset++]) + 1));
+        }
+
+        int quadrupleCount = Integer.parseInt(args[offset++]);
+        for (int i = 0; i < quadrupleCount; i++) {
+            hierarchyList.addUEquivalenceCondition(new origami.folding.util.EquivalenceCondition(
+                    Integer.parseInt(args[offset++]) + 1,
+                    Integer.parseInt(args[offset++]) + 1,
+                    Integer.parseInt(args[offset++]) + 1,
+                    Integer.parseInt(args[offset++]) + 1));
+        }
+
+        subFace.setGuideMap(hierarchyList);
+        int result = subFace.possible_overlapping_search(hierarchyList);
+        printSubfaceOverlapSearch(result, subFace, faceCount);
     }
 
     private static void intersectDividePair(String[] args) throws Exception {
@@ -4999,6 +5046,26 @@ public class OrieditaGeometryOracle {
                 + permutation);
     }
 
+    private static void printSubfaceOverlapSearch(
+            int result,
+            SubFace subFace,
+            int faceCount) throws Exception {
+        Method getPermutation = SubFace.class.getDeclaredMethod("getPermutation", int.class);
+        getPermutation.setAccessible(true);
+        StringBuilder permutation = new StringBuilder();
+        for (int i = 1; i <= faceCount; i++) {
+            if (i > 1) {
+                permutation.append(",");
+            }
+            int localIndex = (Integer) getPermutation.invoke(subFace, i);
+            permutation.append(subFace.getFaceId(localIndex) - 1);
+        }
+        System.out.println("subface_overlap|"
+                + result + "|"
+                + subFace.getPermutationCount() + "|"
+                + permutation);
+    }
+
     private static FoldedFigure_Worker configuredSubfaceWorker(PointSet folded) throws Exception {
         LineSegmentSetWorker lineWorker = new LineSegmentSetWorker();
         lineWorker.set(new LineSegmentSet(folded));
@@ -5920,6 +5987,7 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle chain-permutation-summary <digits> <guideCount> [upper lower]... <topCsv|-> <bottomCsv|-> <limit>");
         System.err.println("   or: OrieditaGeometryOracle chain-permutation-temp-summary <digits> <guideCount> [upper lower]... <topCsv|-> <bottomCsv|-> <stepsBeforeTemp> <tempUpper> <tempLower> <stepsAfterTemp> <limitAfterClear>");
         System.err.println("   or: OrieditaGeometryOracle subface-guide-permutation-summary <facesTotal> <faceCount> [faceId]... <relationCount> [upper lower]... <limit>");
+        System.err.println("   or: OrieditaGeometryOracle subface-overlap-search-summary <facesTotal> <faceCount> [faceId]... <relationCount> [upper lower]... <tripleCount> [a b c d]... <quadCount> [a b c d]...");
         System.exit(2);
     }
 }

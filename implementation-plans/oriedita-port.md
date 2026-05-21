@@ -1181,6 +1181,13 @@ Deliverables:
   mapping, transitive reduction of hierarchy guides, retained local equivalence
   conditions, and initialized subface ordering sequences. The oracle command
   `subface-guide-permutation-summary` compares those sequences with Oriedita.
+- Status: Oriedita's per-subface `possible_overlapping_search()` consistency
+  loop is ported for hierarchy contradictions plus 3-face and 4-face
+  penetration-condition checks, including temporary guide insertion and
+  permutation advancement. The `CombinationGenerator` high-permutation
+  accelerator remains an explicit typed unsupported path until its own stage is
+  ported. The oracle command `subface-overlap-search-summary` compares the
+  resulting status, permutation count, and top-to-bottom face order.
 
 Oracle:
 

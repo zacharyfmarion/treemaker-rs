@@ -336,6 +336,103 @@ fn subface_guide_permutations_match_oriedita_oracle() {
     }
 }
 
+#[test]
+fn subface_overlap_search_matches_oriedita_oracle() {
+    let Some(oracle) = folding_oracle() else {
+        eprintln!("skipping Oriedita folding oracle test: ORIEDITA_GEOMETRY_ORACLE is not set");
+        return;
+    };
+
+    for case in [
+        SubFaceOverlapCase {
+            faces_total: 3,
+            face_ids: &[0, 1, 2],
+            relations: &[(2, 0)],
+            triple_conditions: &[],
+            quadruple_conditions: &[],
+        },
+        SubFaceOverlapCase {
+            faces_total: 3,
+            face_ids: &[0, 1, 2],
+            relations: &[(1, 0)],
+            triple_conditions: &[(0, 1, 0, 2)],
+            quadruple_conditions: &[],
+        },
+    ] {
+        let hierarchy = InitialHierarchy {
+            faces_total: case.faces_total,
+            relations: case
+                .relations
+                .iter()
+                .map(|(upper_face, lower_face)| HierarchyRelation {
+                    upper_face: *upper_face,
+                    lower_face: *lower_face,
+                })
+                .collect(),
+        };
+        let conditions = EquivalenceConditionSet {
+            triple_conditions: case
+                .triple_conditions
+                .iter()
+                .map(|(a, b, c, d)| oristudio_cp::folding::EquivalenceCondition {
+                    a: *a,
+                    b: *b,
+                    c: *c,
+                    d: *d,
+                })
+                .collect(),
+            quadruple_conditions: case
+                .quadruple_conditions
+                .iter()
+                .map(|(a, b, c, d)| oristudio_cp::folding::EquivalenceCondition {
+                    a: *a,
+                    b: *b,
+                    c: *c,
+                    d: *d,
+                })
+                .collect(),
+        };
+        let mut search = SubFacePermutationSearch::new(case.face_ids.to_vec());
+        search
+            .set_guide_map(&hierarchy, Some(&conditions))
+            .expect("guide map");
+
+        let mut args = vec![
+            "subface-overlap-search-summary".to_string(),
+            case.faces_total.to_string(),
+            case.face_ids.len().to_string(),
+        ];
+        for face_id in case.face_ids {
+            args.push(face_id.to_string());
+        }
+        args.push(case.relations.len().to_string());
+        for (upper_face, lower_face) in case.relations {
+            args.push(upper_face.to_string());
+            args.push(lower_face.to_string());
+        }
+        args.push(case.triple_conditions.len().to_string());
+        for (a, b, c, d) in case.triple_conditions {
+            args.push(a.to_string());
+            args.push(b.to_string());
+            args.push(c.to_string());
+            args.push(d.to_string());
+        }
+        args.push(case.quadruple_conditions.len().to_string());
+        for (a, b, c, d) in case.quadruple_conditions {
+            args.push(a.to_string());
+            args.push(b.to_string());
+            args.push(c.to_string());
+            args.push(d.to_string());
+        }
+        let oracle_args = args.iter().map(String::as_str).collect::<Vec<_>>();
+
+        assert_eq!(
+            subface_overlap_summary(search, &hierarchy),
+            run_oracle(&oracle, &oracle_args)
+        );
+    }
+}
+
 fn folding_oracle() -> Option<PathBuf> {
     std::env::var("ORIEDITA_GEOMETRY_ORACLE")
         .or_else(|_| std::env::var("ORIEDITA_ORACLE"))
@@ -553,6 +650,14 @@ struct SubFaceGuideCase<'a> {
     limit: usize,
 }
 
+struct SubFaceOverlapCase<'a> {
+    faces_total: usize,
+    face_ids: &'a [usize],
+    relations: &'a [(usize, usize)],
+    triple_conditions: &'a [(usize, usize, usize, usize)],
+    quadruple_conditions: &'a [(usize, usize, usize, usize)],
+}
+
 fn chain_permutation_summary(mut generator: ChainPermutationGenerator, limit: usize) -> String {
     let mut output = String::new();
     output.push_str(&format!("permutations|{}\n", generator.count()));
@@ -674,6 +779,21 @@ fn push_subface_permutation(
         search.permutation_count(),
         joined_ids(&search.current_ordering())
     ));
+}
+
+fn subface_overlap_summary(
+    mut search: SubFacePermutationSearch,
+    hierarchy: &InitialHierarchy,
+) -> String {
+    match search.possible_overlapping_search(hierarchy) {
+        Ok(found) => format!(
+            "subface_overlap|{}|{}|{}\n",
+            if found { 1000 } else { 0 },
+            search.permutation_count(),
+            joined_ids(&search.current_ordering())
+        ),
+        Err(error) => format!("subface_overlap_error|{error:?}\n"),
+    }
 }
 
 fn joined_ids(ids: &[usize]) -> String {

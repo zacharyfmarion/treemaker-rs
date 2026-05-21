@@ -1151,6 +1151,10 @@ Deliverables:
   as `folding::estimate_wireframe*`, including starting-face resolution,
   adjacent face-position propagation, and folded wireframe vertex coordinates,
   with direct oracle validation through `wireframe-folding-summary`.
+- Status: `LineSegmentSetWorker.split_arrangement_for_SubFace_generation()` is
+  ported as `folding::prepare_subface_segments`, covering the point removal,
+  endpoint-tolerant duplicate removal, intersection division, and second cleanup
+  pass that Oriedita runs before generating subdivided folded faces.
   Subface subdivision, hierarchy constraints, overlap ordering, full
   `FoldingEstimateTask`, full `TwoColoredTask`, and folded-model mutation
   commands remain intentionally unsupported until their stages are ported.
@@ -1166,6 +1170,7 @@ Validation:
 
 - `cargo test -p oristudio-cp --test folding`
 - `ORIEDITA_GEOMETRY_ORACLE=... cargo test -p oristudio-cp --test oriedita_folding_oracle`
+- `ORIEDITA_GEOMETRY_ORACLE=... cargo test -p oristudio-cp`
 - `cargo test -p treemaker-flatfold`
 - `ORIEDITA_ORACLE=... cargo test -p oracle-tests --test oriedita_oracle folding`
 

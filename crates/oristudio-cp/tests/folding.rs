@@ -1,4 +1,4 @@
-use oristudio_cp::folding::estimate_wireframe_from_segments;
+use oristudio_cp::folding::{estimate_wireframe_from_segments, prepare_subface_segments};
 use oristudio_cp::geometry::{LineColor, LineSegment, Point};
 
 #[test]
@@ -24,6 +24,43 @@ fn wireframe_fold_returns_none_without_faces() {
     )];
 
     assert!(estimate_wireframe_from_segments(&segments, 1).is_none());
+}
+
+#[test]
+fn subface_preparation_removes_points_duplicates_and_splits_crossings() {
+    let segments = vec![
+        LineSegment::with_color(Point::new(0.0, 0.0), Point::new(10.0, 0.0), LineColor::Red1),
+        LineSegment::with_color(
+            Point::new(5.0, -5.0),
+            Point::new(5.0, 5.0),
+            LineColor::Blue2,
+        ),
+        LineSegment::with_color(Point::new(0.0, 0.0), Point::new(10.0, 0.0), LineColor::Red1),
+        LineSegment::with_color(
+            Point::new(2.0, 2.0),
+            Point::new(2.0, 2.0),
+            LineColor::Black0,
+        ),
+    ];
+
+    let prepared = prepare_subface_segments(&segments);
+
+    assert_eq!(prepared.len(), 4);
+    assert!(prepared.iter().all(|segment| segment.a != segment.b));
+    assert_eq!(
+        prepared
+            .iter()
+            .filter(|segment| segment.color == LineColor::Red1)
+            .count(),
+        2
+    );
+    assert_eq!(
+        prepared
+            .iter()
+            .filter(|segment| segment.color == LineColor::Blue2)
+            .count(),
+        2
+    );
 }
 
 fn square_with_diagonal() -> Vec<LineSegment> {

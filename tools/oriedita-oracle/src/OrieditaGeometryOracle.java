@@ -23,6 +23,7 @@ import origami.crease_pattern.worker.foldlineset.Check4;
 import origami.crease_pattern.worker.foldlineset.Fix1;
 import origami.crease_pattern.worker.foldlineset.Fix2;
 import origami.crease_pattern.worker.foldlineset.OrganizeCircles;
+import origami.crease_pattern.worker.LineSegmentSetWorker;
 import origami.crease_pattern.worker.WireFrame_Worker;
 import origami.crease_pattern.worker.linesegmentset.IntersectDivide;
 import origami.crease_pattern.worker.SelectMode;
@@ -293,6 +294,7 @@ public class OrieditaGeometryOracle {
             case "dxf-export-fixture" -> dxfExportFixture(args);
             case "fold-topology-summary" -> foldTopologySummary(args);
             case "wireframe-folding-summary" -> wireframeFoldingSummary(args);
+            case "split-subface-arrangement" -> splitSubfaceArrangement(args);
             default -> usage("unknown command: " + args[0]);
         }
     }
@@ -360,6 +362,18 @@ public class OrieditaGeometryOracle {
         LineSegmentSet set = lineSegmentSet(args, 2, count);
         IntersectDivide.apply(set);
         printLineSegmentSet(set);
+    }
+
+    private static void splitSubfaceArrangement(String[] args) throws Exception {
+        if (args.length < 2) {
+            usage("split-subface-arrangement expects a segment count and segment payload");
+        }
+
+        int count = Integer.parseInt(args[1]);
+        LineSegmentSet set = lineSegmentSet(args, 2, count);
+        LineSegmentSetWorker worker = new LineSegmentSetWorker();
+        worker.set(set);
+        printLineSegmentSet(worker.split_arrangement_for_SubFace_generation());
     }
 
     private static void intersectDividePair(String[] args) throws Exception {
@@ -5364,6 +5378,7 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle dxf-export-fixture");
         System.err.println("   or: OrieditaGeometryOracle fold-topology-summary <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle wireframe-folding-summary <startingFace> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle split-subface-arrangement <count> [ax ay bx by color]...");
         System.exit(2);
     }
 }

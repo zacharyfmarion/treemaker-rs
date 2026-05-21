@@ -1,4 +1,4 @@
-use oristudio_cp::folding::estimate_wireframe_from_segments;
+use oristudio_cp::folding::{estimate_wireframe_from_segments, prepare_subface_segments};
 use oristudio_cp::geometry::{LineColor, LineSegment, Point};
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -24,6 +24,45 @@ fn wireframe_folding_matches_oriedita_oracle() {
 
         assert_eq!(
             wireframe_summary(&folded),
+            run_oracle(&oracle, &oracle_args)
+        );
+    }
+}
+
+#[test]
+fn subface_arrangement_preparation_matches_oriedita_oracle() {
+    let Some(oracle) = folding_oracle() else {
+        eprintln!("skipping Oriedita folding oracle test: ORIEDITA_GEOMETRY_ORACLE is not set");
+        return;
+    };
+
+    for segments in [
+        vec![
+            segment(0.0, 0.0, 10.0, 0.0, LineColor::Red1),
+            segment(5.0, -5.0, 5.0, 5.0, LineColor::Blue2),
+            segment(0.0, 0.0, 10.0, 0.0, LineColor::Red1),
+            segment(2.0, 2.0, 2.0, 2.0, LineColor::Black0),
+        ],
+        vec![
+            segment(0.0, 0.0, 10.0, 0.0, LineColor::Red1),
+            segment(5.0, 0.0, 5.0, 5.0, LineColor::Blue2),
+            segment(10.0, 0.0, 0.0, 0.0, LineColor::Red1),
+        ],
+        vec![
+            segment(0.0, 0.0, 1.0, 0.0, LineColor::Black0),
+            segment(0.0, 0.00005, 1.0, 0.00005, LineColor::Black0),
+        ],
+    ] {
+        let prepared = prepare_subface_segments(&segments);
+        let mut args = vec![
+            "split-subface-arrangement".to_string(),
+            segments.len().to_string(),
+        ];
+        push_segment_args(&mut args, &segments);
+        let oracle_args = args.iter().map(String::as_str).collect::<Vec<_>>();
+
+        assert_eq!(
+            line_segment_summary(&prepared),
             run_oracle(&oracle, &oracle_args)
         );
     }
@@ -112,6 +151,26 @@ fn push_segment_args(args: &mut Vec<String>, segments: &[LineSegment]) {
         args.push(segment.b.y.to_string());
         args.push(segment.color.number().to_string());
     }
+}
+
+fn line_segment_summary(segments: &[LineSegment]) -> String {
+    let mut output = String::new();
+    output.push_str(&format!("lines|{}\n", segments.len()));
+    for segment in segments {
+        output.push_str(&format!(
+            "line|{}|{}|{}|{}|{}\n",
+            java_double_string(segment.a.x),
+            java_double_string(segment.a.y),
+            java_double_string(segment.b.x),
+            java_double_string(segment.b.y),
+            segment.color.number()
+        ));
+    }
+    output
+}
+
+fn segment(ax: f64, ay: f64, bx: f64, by: f64, color: LineColor) -> LineSegment {
+    LineSegment::with_color(Point::new(ax, ay), Point::new(bx, by), color)
 }
 
 fn square_with_diagonal() -> Vec<LineSegment> {

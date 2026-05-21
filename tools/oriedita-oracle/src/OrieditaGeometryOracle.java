@@ -71,6 +71,53 @@ public class OrieditaGeometryOracle {
         MOVE_BOX_4,
     }
 
+    private static class OracleVoronoiState {
+        List<OracleVoronoiLineSegment> lineSegments = new ArrayList<>();
+        final List<OracleVoronoiLineSegment> linesAroundNewPoint = new ArrayList<>();
+        final List<Point> seedPoints = new ArrayList<>();
+
+        void reset() {
+            lineSegments.clear();
+            linesAroundNewPoint.clear();
+            seedPoints.clear();
+        }
+    }
+
+    private static class OracleVoronoiLineSegment {
+        int voronoiA;
+        int voronoiB;
+        LineSegment lineSegment;
+        int selected;
+
+        OracleVoronoiLineSegment(LineSegment lineSegment) {
+            this.lineSegment = lineSegment;
+            this.voronoiA = 0;
+            this.voronoiB = 0;
+            this.selected = 0;
+        }
+
+        OracleVoronoiLineSegment(OracleVoronoiLineSegment source) {
+            this.lineSegment = source.lineSegment;
+            this.voronoiA = source.voronoiA;
+            this.voronoiB = source.voronoiB;
+            this.selected = source.selected;
+        }
+
+        OracleVoronoiLineSegment withA(Point a) {
+            OracleVoronoiLineSegment line = new OracleVoronoiLineSegment(this.lineSegment.withA(a));
+            line.voronoiA = voronoiA;
+            line.voronoiB = voronoiB;
+            return line;
+        }
+
+        OracleVoronoiLineSegment withB(Point b) {
+            OracleVoronoiLineSegment line = new OracleVoronoiLineSegment(this.lineSegment.withB(b));
+            line.voronoiA = voronoiA;
+            line.voronoiB = voronoiB;
+            return line;
+        }
+    }
+
     public static void main(String[] args) throws Exception {
         if (args.length < 1) {
             usage("missing command");
@@ -168,6 +215,7 @@ public class OrieditaGeometryOracle {
             case "foldline-circle-tangent-point" -> foldLineCircleTangentPoint(args);
             case "foldline-circle-tangent-two" -> foldLineCircleTangentTwo(args);
             case "foldline-regular-polygon" -> foldLineRegularPolygon(args);
+            case "foldline-voronoi" -> foldLineVoronoi(args);
             case "foldline-default-molecule" -> foldLineDefaultMolecule(args);
             case "foldline-divide-count" -> foldLineDivideCount(args);
             case "foldline-divide-ratio" -> foldLineDivideRatio(args);
@@ -3342,6 +3390,317 @@ public class OrieditaGeometryOracle {
         printFoldLineSet(set);
     }
 
+    private static void foldLineVoronoi(String[] args) {
+        if (args.length < 7) {
+            usage("foldline-voronoi expects selection distance, color, apply flag, fold lines, circles, and seed points");
+        }
+
+        int cursor = 1;
+        double selectionDistance = parse(args[cursor++]);
+        LineColor color = LineColor.fromNumber(Integer.parseInt(args[cursor++]));
+        boolean apply = Boolean.parseBoolean(args[cursor++]);
+        int lineCount = Integer.parseInt(args[cursor++]);
+        FoldLineSet set = new FoldLineSet();
+        for (int index = 0; index < lineCount; index++) {
+            LineSegment segment = segment(args, cursor);
+            set.addLine(segment.getA(), segment.getB(), segment.getColor());
+            cursor += 5;
+        }
+        int circleCount = Integer.parseInt(args[cursor++]);
+        for (int index = 0; index < circleCount; index++) {
+            set.getCircles().add(circle(args, cursor));
+            cursor += 4;
+        }
+        int pointCount = Integer.parseInt(args[cursor++]);
+        OracleVoronoiState state = new OracleVoronoiState();
+        for (int index = 0; index < pointCount; index++) {
+            Point point = new Point(parse(args[cursor]), parse(args[cursor + 1]));
+            cursor += 2;
+            voronoiPress(set, state, point, selectionDistance);
+        }
+        if (cursor != args.length) {
+            usage("foldline-voronoi payload length mismatch");
+        }
+
+        if (apply) {
+            int linesAdded = 0;
+            int circlesAdded = 0;
+            for (OracleVoronoiLineSegment line : state.lineSegments) {
+                addLineSegmentLikeWorker(set, line.lineSegment.withColor(color));
+                linesAdded++;
+            }
+            for (Point seed : state.seedPoints) {
+                set.getCircles().add(new Circle(seed.getX(), seed.getY(), 5.0, LineColor.CYAN_3));
+                circlesAdded++;
+            }
+            state.reset();
+            System.out.println("applied|" + linesAdded + "|" + circlesAdded);
+            printFoldLineSet(set);
+            printCircleSet(set);
+        } else {
+            printVoronoiState(state);
+        }
+    }
+
+    private static void voronoiPress(
+            FoldLineSet set,
+            OracleVoronoiState state,
+            Point point,
+            double selectionDistance) {
+        Point closestPoint = closestOperationFramePoint(set, point);
+        Point selectedPoint = point.distance(closestPoint) < selectionDistance ? closestPoint : point;
+
+        int overlappingSeedPointIndex = -1;
+        for (int index = 0; index < state.seedPoints.size(); index++) {
+            if (OritaCalc.distance(state.seedPoints.get(index), selectedPoint) <= selectionDistance) {
+                overlappingSeedPointIndex = index;
+            }
+        }
+
+        if (overlappingSeedPointIndex == -1) {
+            state.seedPoints.add(selectedPoint);
+            voronoi02(state);
+        } else {
+            voronoiRemoveSeed(state, overlappingSeedPointIndex);
+        }
+    }
+
+    private static void voronoiRemoveSeed(OracleVoronoiState state, int overlappingSeedPointIndex) {
+        if (state.seedPoints.isEmpty()) {
+            return;
+        }
+
+        int lastIndex = state.seedPoints.size() - 1;
+        Point replacement = state.seedPoints.get(overlappingSeedPointIndex);
+        state.seedPoints.set(overlappingSeedPointIndex, state.seedPoints.get(lastIndex));
+        state.seedPoints.set(lastIndex, replacement);
+
+        for (OracleVoronoiLineSegment line : state.lineSegments) {
+            if (line.voronoiA == overlappingSeedPointIndex) {
+                line.voronoiA = lastIndex;
+            } else if (line.voronoiA == lastIndex) {
+                line.voronoiA = overlappingSeedPointIndex;
+            }
+
+            if (line.voronoiB == overlappingSeedPointIndex) {
+                line.voronoiB = lastIndex;
+            } else if (line.voronoiB == lastIndex) {
+                line.voronoiB = overlappingSeedPointIndex;
+            }
+        }
+
+        state.seedPoints.remove(lastIndex);
+        int removedIndex = state.seedPoints.size();
+        List<OracleVoronoiLineSegment> replacements = new ArrayList<>();
+
+        for (OracleVoronoiLineSegment line : state.lineSegments) {
+            line.selected = 0;
+        }
+
+        for (OracleVoronoiLineSegment line : state.lineSegments) {
+            if (line.voronoiA == removedIndex) {
+                line.selected = 2;
+                int neighbor = line.voronoiB;
+                voronoiSelectNeighborLines(state, neighbor);
+                senbBoro1pMotome(state, neighbor);
+                addUniqueVoronoiLines(replacements, state.linesAroundNewPoint);
+            } else if (line.voronoiB == removedIndex) {
+                line.selected = 2;
+                int neighbor = line.voronoiA;
+                voronoiSelectNeighborLines(state, neighbor);
+                senbBoro1pMotome(state, neighbor);
+                addUniqueVoronoiLines(replacements, state.linesAroundNewPoint);
+            }
+        }
+
+        state.lineSegments = state.lineSegments.stream()
+                .filter(line -> line.selected != 2)
+                .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
+        state.lineSegments.addAll(replacements);
+    }
+
+    private static void voronoiSelectNeighborLines(OracleVoronoiState state, int neighbor) {
+        for (OracleVoronoiLineSegment line : state.lineSegments) {
+            if (line.voronoiA == neighbor || line.voronoiB == neighbor) {
+                line.selected = 2;
+            }
+        }
+    }
+
+    private static void addUniqueVoronoiLines(
+            List<OracleVoronoiLineSegment> target,
+            List<OracleVoronoiLineSegment> source) {
+        for (OracleVoronoiLineSegment line : source) {
+            boolean add = true;
+            for (OracleVoronoiLineSegment existing : target) {
+                if (line.voronoiB == existing.voronoiB && line.voronoiA == existing.voronoiA) {
+                    add = false;
+                }
+                if (line.voronoiB == existing.voronoiA && line.voronoiA == existing.voronoiB) {
+                    add = false;
+                }
+            }
+            if (add) {
+                target.add(new OracleVoronoiLineSegment(line));
+            }
+        }
+    }
+
+    private static void voronoi02(OracleVoronoiState state) {
+        int newSeedPointIndex = state.seedPoints.size() - 1;
+        senbBoro1pMotome(state, newSeedPointIndex);
+
+        for (OracleVoronoiLineSegment line : state.lineSegments) {
+            line.selected = 0;
+        }
+
+        for (int ia = 0; ia < state.linesAroundNewPoint.size() - 1; ia++) {
+            for (int ib = ia + 1; ib < state.linesAroundNewPoint.size(); ib++) {
+                OracleVoronoiLineSegment sBegin = new OracleVoronoiLineSegment(state.linesAroundNewPoint.get(ia));
+                OracleVoronoiLineSegment sEnd = new OracleVoronoiLineSegment(state.linesAroundNewPoint.get(ib));
+                StraightLine tBegin = new StraightLine(sBegin.lineSegment);
+
+                int iBegin = sBegin.voronoiA;
+                int iEnd = sEnd.voronoiA;
+                if (iBegin > iEnd) {
+                    int temp = iBegin;
+                    iBegin = iEnd;
+                    iEnd = temp;
+                }
+
+                for (int index = 0; index < state.lineSegments.size(); index++) {
+                    OracleVoronoiLineSegment existing = state.lineSegments.get(index);
+                    int existingLow = existing.voronoiA;
+                    int existingHigh = existing.voronoiB;
+                    if (existingLow > existingHigh) {
+                        existingHigh = existing.voronoiA;
+                        existingLow = existing.voronoiB;
+                    }
+
+                    if (existingLow == iBegin && existingHigh == iEnd) {
+                        Point intersection = OritaCalc.findIntersection(sBegin.lineSegment, existing.lineSegment);
+                        Point newSeed = state.seedPoints.get(newSeedPointIndex);
+                        if (tBegin.sameSide(newSeed, existing.lineSegment.getA()) >= 0
+                                && tBegin.sameSide(newSeed, existing.lineSegment.getB()) >= 0) {
+                            existing.selected = 2;
+                        }
+
+                        if (tBegin.sameSide(newSeed, existing.lineSegment.getA()) == -1
+                                && tBegin.sameSide(newSeed, existing.lineSegment.getB()) == 1) {
+                            state.lineSegments.set(index, existing.withB(intersection));
+                        }
+
+                        if (tBegin.sameSide(newSeed, existing.lineSegment.getA()) == 1
+                                && tBegin.sameSide(newSeed, existing.lineSegment.getB()) == -1) {
+                            state.lineSegments.set(index, existing.withA(intersection));
+                        }
+                    }
+                }
+            }
+        }
+
+        state.lineSegments = state.lineSegments.stream()
+                .filter(line -> line.selected != 2)
+                .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
+        state.lineSegments.addAll(state.linesAroundNewPoint.stream()
+                .map(OracleVoronoiLineSegment::new)
+                .toList());
+    }
+
+    private static void senbBoro1pMotome(OracleVoronoiState state, int newSeedPointIndex) {
+        state.linesAroundNewPoint.clear();
+
+        for (int seedIndex = 0; seedIndex < state.seedPoints.size(); seedIndex++) {
+            if (seedIndex != newSeedPointIndex) {
+                OracleVoronoiLineSegment addLine = new OracleVoronoiLineSegment(
+                        OritaCalc.bisection(
+                                state.seedPoints.get(seedIndex),
+                                state.seedPoints.get(newSeedPointIndex),
+                                1000.0));
+
+                if (seedIndex < newSeedPointIndex) {
+                    addLine.voronoiA = seedIndex;
+                    addLine.voronoiB = newSeedPointIndex;
+                } else {
+                    addLine.voronoiA = newSeedPointIndex;
+                    addLine.voronoiB = seedIndex;
+                }
+                voronoi0201(state, newSeedPointIndex, addLine);
+            }
+        }
+    }
+
+    private static void voronoi0201(
+            OracleVoronoiState state,
+            int newSeedPointIndex,
+            OracleVoronoiLineSegment addLine) {
+        StraightLine addStraightLine = new StraightLine(addLine.lineSegment);
+
+        for (int index = state.linesAroundNewPoint.size() - 1; index >= 0; index--) {
+            OracleVoronoiLineSegment existingLine = new OracleVoronoiLineSegment(
+                    state.linesAroundNewPoint.get(index));
+            StraightLine existingStraightLine = new StraightLine(existingLine.lineSegment);
+            OritaCalc.ParallelJudgement parallel = OritaCalc.isLineSegmentParallel(
+                    addStraightLine,
+                    existingStraightLine,
+                    Epsilon.UNKNOWN_1EN4);
+
+            Point seed = state.seedPoints.get(newSeedPointIndex);
+            if (parallel == OritaCalc.ParallelJudgement.PARALLEL_EQUAL) {
+                return;
+            }
+            if (parallel == OritaCalc.ParallelJudgement.PARALLEL_NOT_EQUAL) {
+                if (addStraightLine.sameSide(seed, existingLine.lineSegment.getA()) == -1) {
+                    state.linesAroundNewPoint.remove(index);
+                } else if (existingStraightLine.sameSide(seed, addLine.lineSegment.getA()) == -1) {
+                    return;
+                }
+            } else if (parallel == OritaCalc.ParallelJudgement.NOT_PARALLEL) {
+                Point intersection = OritaCalc.findIntersection(addLine.lineSegment, existingLine.lineSegment);
+
+                if (addStraightLine.sameSide(seed, existingLine.lineSegment.getA()) <= 0
+                        && addStraightLine.sameSide(seed, existingLine.lineSegment.getB()) <= 0) {
+                    state.linesAroundNewPoint.remove(index);
+                } else if (addStraightLine.sameSide(seed, existingLine.lineSegment.getA()) == 1
+                        && addStraightLine.sameSide(seed, existingLine.lineSegment.getB()) == -1) {
+                    existingLine = existingLine.withB(intersection);
+                    if (existingLine.lineSegment.determineLength() < Epsilon.UNKNOWN_1EN7) {
+                        state.linesAroundNewPoint.remove(index);
+                    } else {
+                        state.linesAroundNewPoint.set(index, existingLine);
+                    }
+                } else if (addStraightLine.sameSide(seed, existingLine.lineSegment.getA()) == -1
+                        && addStraightLine.sameSide(seed, existingLine.lineSegment.getB()) == 1) {
+                    existingLine = existingLine.withA(intersection);
+                    if (existingLine.lineSegment.determineLength() < Epsilon.UNKNOWN_1EN7) {
+                        state.linesAroundNewPoint.remove(index);
+                    } else {
+                        state.linesAroundNewPoint.set(index, existingLine);
+                    }
+                }
+
+                if (existingStraightLine.sameSide(seed, addLine.lineSegment.getA()) <= 0
+                        && existingStraightLine.sameSide(seed, addLine.lineSegment.getB()) <= 0) {
+                    return;
+                } else if (existingStraightLine.sameSide(seed, addLine.lineSegment.getA()) == 1
+                        && existingStraightLine.sameSide(seed, addLine.lineSegment.getB()) == -1) {
+                    addLine = addLine.withB(intersection);
+                    if (addLine.lineSegment.determineLength() < Epsilon.UNKNOWN_1EN7) {
+                        return;
+                    }
+                } else if (existingStraightLine.sameSide(seed, addLine.lineSegment.getA()) == -1
+                        && existingStraightLine.sameSide(seed, addLine.lineSegment.getB()) == 1) {
+                    addLine = addLine.withA(intersection);
+                    if (addLine.lineSegment.determineLength() < Epsilon.UNKNOWN_1EN7) {
+                        return;
+                    }
+                }
+            }
+        }
+
+        state.linesAroundNewPoint.add(addLine);
+    }
+
     private static void foldLineDefaultMolecule(String[] args) throws Exception {
         if (args.length < 8) {
             usage("foldline-default-molecule expects resource path, color, points, count, and fold lines");
@@ -3752,6 +4111,24 @@ public class OrieditaGeometryOracle {
                 + lastMousePos.getY());
     }
 
+    private static void printVoronoiState(OracleVoronoiState state) {
+        System.out.println("seeds|" + state.seedPoints.size());
+        for (Point seed : state.seedPoints) {
+            System.out.println("seed|" + seed.getX() + "|" + seed.getY());
+        }
+        System.out.println("voronoi|" + state.lineSegments.size());
+        for (OracleVoronoiLineSegment line : state.lineSegments) {
+            System.out.println("vline|"
+                    + line.lineSegment.determineAX() + "|"
+                    + line.lineSegment.determineAY() + "|"
+                    + line.lineSegment.determineBX() + "|"
+                    + line.lineSegment.determineBY() + "|"
+                    + line.voronoiA + "|"
+                    + line.voronoiB + "|"
+                    + line.selected);
+        }
+    }
+
     private static Polygon polygon(String[] args, int offset, int count) {
         List<Point> points = new ArrayList<>();
         for (int index = 0; index < count; index++) {
@@ -4070,6 +4447,7 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle foldline-circle-tangent-point <pointX> <pointY> <circle x y r color> <lineCount> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-circle-tangent-two <circle1 x y r color> <circle2 x y r color>");
         System.err.println("   or: OrieditaGeometryOracle foldline-regular-polygon <corners> <color> <p1x> <p1y> <p2x> <p2y> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-voronoi <selectionDistance> <color> <apply> <lineCount> [ax ay bx by color]... <circleCount> [cx cy r color]... <pointCount> [x y]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-default-molecule <resourcePath> <color> <p1x> <p1y> <p2x> <p2y> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle measure-length <ax> <ay> <bx> <by>");
         System.err.println("   or: OrieditaGeometryOracle measure-angle <ax> <ay> <centerX> <centerY> <bx> <by>");

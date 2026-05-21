@@ -1052,7 +1052,10 @@ Deliverables:
   oracle-tested for resolved anchor points.
 - Port regular polygon creation.
 - Port Blintz, fish, dove, bird, and frog base generators.
-- Port Voronoi creation.
+- Port Voronoi creation. The stateful click/add/remove seed workflow,
+  Oriedita's fast `voronoi_02` clipping routine, apply-to-lines behavior, and
+  seed-circle creation are now ported and oracle-tested for resolved
+  model-space points.
 - Preserve generated-line colors and split behavior.
 
 Oracle:

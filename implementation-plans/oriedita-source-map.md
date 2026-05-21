@@ -180,7 +180,7 @@ stage explicitly changes it.
 | `CIRCLE_CHANGE_COLOR_59` | `MouseHandlerCircleChangeColor` | `operations::circle::change_color` | kernel | 8 | Oracle-tested |
 | `CREASE_MAKE_AUX_60` | `MouseHandlerCreaseMakeAux` | `operations::color::make_aux` | kernel | 6 | Oracle-tested |
 | `OPERATION_FRAME_CREATE_61` | `MouseHandlerOperationFrameCreate` | `operations::transform::operation_frame_press/drag/release` | kernel | 6 | Oracle-tested |
-| `VORONOI_CREATE_62` | `MouseHandlerVoronoiCreate` | `operations::generators::voronoi` | kernel | 8 | Unsupported |
+| `VORONOI_CREATE_62` | `MouseHandlerVoronoiCreate` | `operations::generators::voronoi_press/apply` | kernel | 8 | Oracle-tested |
 | `FLAT_FOLDABLE_CHECK_63` | `MouseHandlerFlatFoldableCheck` | `checks::flat_foldable` | kernel | 9 | Unsupported |
 | `CREASE_DELETE_OVERLAPPING_64` | `MouseHandlerCreaseDeleteOverlapping` | `operations::arrangement::delete_overlapping` | kernel | 5 | Oracle-tested |
 | `CREASE_DELETE_INTERSECTING_65` | `MouseHandlerCreaseDeleteIntersecting` | `operations::arrangement::delete_intersecting` | kernel | 5 | Oracle-tested |

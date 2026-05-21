@@ -754,10 +754,10 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
     descriptor!(
         VoronoiCreate,
         "MouseHandlerVoronoiCreate",
-        "operations::generators::voronoi",
+        "operations::generators::voronoi_press/apply",
         Kernel,
         8,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         FlatFoldableCheck,

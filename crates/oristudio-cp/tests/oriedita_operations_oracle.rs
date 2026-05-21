@@ -36,7 +36,8 @@ use oristudio_cp::operations::construction::{
     square_bisector_parallel_indicator, symmetric_draw,
 };
 use oristudio_cp::operations::generators::{
-    DefaultMolecule, default_molecule, regular_polygon_no_corners,
+    DefaultMolecule, VoronoiApplyResult, VoronoiState, default_molecule,
+    regular_polygon_no_corners, voronoi_apply, voronoi_press,
 };
 use oristudio_cp::operations::measure::{angle_between_three_points, length_between_points};
 use oristudio_cp::operations::point::{
@@ -2346,6 +2347,68 @@ fn regular_polygon_no_corners_matches_oriedita_oracle() {
 }
 
 #[test]
+fn voronoi_create_matches_oriedita_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    let snap_segments = vec![segment(2.0, 0.0, 3.0, 0.0, LineColor::Black0)];
+    let snap_points = vec![
+        Point::new(0.0, 0.0),
+        Point::new(2.1, 0.0),
+        Point::new(0.0, 2.0),
+        Point::new(2.05, 0.0),
+    ];
+    let model = model_from_segments(&snap_segments);
+    let mut state = VoronoiState::default();
+    for point in &snap_points {
+        voronoi_press(&model, &mut state, *point, 0.25);
+    }
+    let args = voronoi_args(
+        0.25,
+        LineColor::Red1,
+        false,
+        &snap_segments,
+        &[],
+        &snap_points,
+    );
+    assert_line_summary_close(
+        &voronoi_state_summary(&state),
+        &run_oracle(&oracle, &args),
+        1e-9,
+        "voronoi-state",
+    );
+
+    let seed_points = vec![
+        Point::new(0.0, 0.0),
+        Point::new(2.0, 0.0),
+        Point::new(0.0, 2.0),
+    ];
+    let mut model = CreasePatternModel::default();
+    let mut state = VoronoiState::default();
+    for point in &seed_points {
+        voronoi_press(&model, &mut state, *point, 0.25);
+    }
+    let result = voronoi_apply(&mut model, &mut state, LineColor::Blue2);
+    let args = voronoi_args(0.25, LineColor::Blue2, true, &[], &[], &seed_points);
+    let rust_summary = format!(
+        "{}{}{}",
+        voronoi_apply_result_summary(result),
+        line_segment_set_summary(&model),
+        circle_set_summary(&model)
+    );
+    assert_line_summary_close(
+        &rust_summary,
+        &run_oracle(&oracle, &args),
+        1e-9,
+        "voronoi-apply",
+    );
+}
+
+#[test]
 fn default_molecule_generators_match_oriedita_oracle() {
     let Some(oracle) = operations_oracle() else {
         eprintln!(
@@ -2823,6 +2886,31 @@ fn operation_frame_args(
     args
 }
 
+fn voronoi_args(
+    selection_distance: f64,
+    color: LineColor,
+    apply: bool,
+    segments: &[LineSegment],
+    circles: &[Circle],
+    points: &[Point],
+) -> Vec<String> {
+    let mut args = vec![
+        "foldline-voronoi".to_string(),
+        selection_distance.to_string(),
+        color.number().to_string(),
+        apply.to_string(),
+        segments.len().to_string(),
+    ];
+    push_segment_args(&mut args, segments);
+    args.push(circles.len().to_string());
+    for circle in circles {
+        push_circle_args(&mut args, *circle);
+    }
+    args.push(points.len().to_string());
+    push_points_args(&mut args, points);
+    args
+}
+
 fn push_points_args(args: &mut Vec<String>, points: &[Point]) {
     for point in points {
         args.push(point.x.to_string());
@@ -2943,6 +3031,36 @@ fn circle_set_summary(model: &CreasePatternModel) -> String {
     output
 }
 
+fn voronoi_state_summary(state: &VoronoiState) -> String {
+    let mut output = String::new();
+    output.push_str(&format!("seeds|{}\n", state.seed_points.len()));
+    for seed in &state.seed_points {
+        output.push_str(&format!(
+            "seed|{}|{}\n",
+            java_double_string(seed.x),
+            java_double_string(seed.y)
+        ));
+    }
+    output.push_str(&format!("voronoi|{}\n", state.line_segments.len()));
+    for line in &state.line_segments {
+        output.push_str(&format!(
+            "vline|{}|{}|{}|{}|{}|{}|{}\n",
+            java_double_string(line.line_segment.a.x),
+            java_double_string(line.line_segment.a.y),
+            java_double_string(line.line_segment.b.x),
+            java_double_string(line.line_segment.b.y),
+            line.voronoi_a,
+            line.voronoi_b,
+            line.selected
+        ));
+    }
+    output
+}
+
+fn voronoi_apply_result_summary(result: VoronoiApplyResult) -> String {
+    format!("applied|{}|{}\n", result.lines_added, result.circles_added)
+}
+
 fn optional_segment_result_summary(segment: Option<&LineSegment>) -> String {
     match segment {
         Some(segment) => format!(
@@ -3027,7 +3145,13 @@ fn assert_line_summary_close(left: &str, right: &str, tolerance: f64, context: &
     for (index, (left_line, right_line)) in left_lines.iter().zip(right_lines.iter()).enumerate() {
         if left_line.starts_with("line|") && right_line.starts_with("line|") {
             assert_line_entry_close(left_line, right_line, tolerance, context, index);
-        } else if left_line.starts_with("point|") && right_line.starts_with("point|") {
+        } else if left_line.starts_with("vline|") && right_line.starts_with("vline|") {
+            assert_voronoi_line_entry_close(left_line, right_line, tolerance, context, index);
+        } else if left_line.starts_with("circle|") && right_line.starts_with("circle|") {
+            assert_circle_entry_close(left_line, right_line, tolerance, context, index);
+        } else if (left_line.starts_with("point|") && right_line.starts_with("point|"))
+            || (left_line.starts_with("seed|") && right_line.starts_with("seed|"))
+        {
             assert_point_entry_close(left_line, right_line, tolerance, context, index);
         } else {
             assert_eq!(
@@ -3066,6 +3190,76 @@ fn assert_line_entry_close(left: &str, right: &str, tolerance: f64, context: &st
     assert_eq!(
         left_parts[5], right_parts[5],
         "{context}: line entry {index} color differs"
+    );
+}
+
+fn assert_voronoi_line_entry_close(
+    left: &str,
+    right: &str,
+    tolerance: f64,
+    context: &str,
+    index: usize,
+) {
+    let left_parts: Vec<_> = left.split('|').collect();
+    let right_parts: Vec<_> = right.split('|').collect();
+    assert_eq!(
+        left_parts.len(),
+        right_parts.len(),
+        "{context}: voronoi line entry {index} field count differs"
+    );
+    assert_eq!(
+        left_parts[0], right_parts[0],
+        "{context}: voronoi line entry prefix"
+    );
+
+    for field in 1..=4 {
+        let left_value: f64 = left_parts[field]
+            .parse()
+            .unwrap_or_else(|err| panic!("{context}: bad left float {left}: {err}"));
+        let right_value: f64 = right_parts[field]
+            .parse()
+            .unwrap_or_else(|err| panic!("{context}: bad right float {right}: {err}"));
+        assert!(
+            (left_value - right_value).abs() <= tolerance,
+            "{context}: voronoi line entry {index} field {field} differs: {left_value} vs {right_value}"
+        );
+    }
+    assert_eq!(
+        left_parts[5..],
+        right_parts[5..],
+        "{context}: voronoi line entry {index} metadata differs"
+    );
+}
+
+fn assert_circle_entry_close(left: &str, right: &str, tolerance: f64, context: &str, index: usize) {
+    let left_parts: Vec<_> = left.split('|').collect();
+    let right_parts: Vec<_> = right.split('|').collect();
+    assert_eq!(
+        left_parts.len(),
+        right_parts.len(),
+        "{context}: circle entry {index} field count differs"
+    );
+    assert_eq!(
+        left_parts[0], right_parts[0],
+        "{context}: circle entry prefix"
+    );
+
+    for field in 1..=3 {
+        let left_value: f64 = left_parts[field]
+            .parse()
+            .unwrap_or_else(|err| panic!("{context}: bad left float {left}: {err}"));
+        let right_value: f64 = right_parts[field]
+            .parse()
+            .unwrap_or_else(|err| panic!("{context}: bad right float {right}: {err}"));
+        assert!(
+            (left_value - right_value).abs() <= tolerance,
+            "{context}: circle entry {index} field {field} differs: {left_value} vs {right_value}"
+        );
+    }
+    assert_eq!(
+        left_parts[4..],
+        right_parts[4..],
+        "{context}: circle entry {index} metadata differs"
     );
 }
 

@@ -746,10 +746,10 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
     descriptor!(
         OperationFrameCreate,
         "MouseHandlerOperationFrameCreate",
-        "operations::transform::operation_frame",
+        "operations::transform::operation_frame_press/drag/release",
         Kernel,
         6,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         VoronoiCreate,

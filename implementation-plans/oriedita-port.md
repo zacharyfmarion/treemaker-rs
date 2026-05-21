@@ -925,6 +925,11 @@ Status:
   four-point move/copy against real `FoldLineSet`. Oriedita's
   `MOVE_CREASE_PATTERN_2` handler is camera panning rather than a persisted CP
   mutation, so it remains a later UI/runtime mapping rather than a kernel edit.
+- `OPERATION_FRAME_CREATE_61` is ported and oracle-tested as a transient
+  model-space frame state machine with identity-camera semantics. It preserves
+  create, corner drag, side drag, box drag, endpoint/circle-center snapping,
+  tiny-frame deactivation, and reset behavior; actual screen-camera projection
+  remains a UI integration concern.
 - The core `OritaCalc.extendToIntersectionPoint_2` helper used by lengthen and
   several construction tools is ported and oracle-tested for crossing-line and
   collinear-endpoint fixtures. The higher-level `LENGTHEN_CREASE_5` and

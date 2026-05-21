@@ -1,9 +1,9 @@
 //! Transform operations ported from Oriedita selected-line move/copy handlers.
 
 use crate::geometry::{
-    Epsilon, Intersection, LineColor, LineSegment, ParallelJudgement, Point, StraightLine,
-    StraightLineIntersection, angle, determine_line_segment_distance,
-    determine_line_segment_intersection_sweet_with_tolerances,
+    Epsilon, Intersection, LineColor, LineSegment, ParallelJudgement, Point, Polygon,
+    PolygonIntersection, StraightLine, StraightLineIntersection, angle,
+    determine_line_segment_distance, determine_line_segment_intersection_sweet_with_tolerances,
     determine_line_segment_intersection_with_precision, find_intersection_segments,
     find_intersection_straight_lines, find_projection_segment,
     is_line_segment_parallel_with_precision, point_rotate_scaled,
@@ -20,6 +20,96 @@ pub enum LengthenColorMode {
     SameAsOriginal,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OperationFrameMode {
+    None0,
+    Create1,
+    MovePoints2,
+    MoveSides3,
+    MoveBox4,
+}
+
+impl OperationFrameMode {
+    pub const fn oriedita_name(self) -> &'static str {
+        match self {
+            Self::None0 => "NONE_0",
+            Self::Create1 => "CREATE_1",
+            Self::MovePoints2 => "MOVE_POINTS_2",
+            Self::MoveSides3 => "MOVE_SIDES_3",
+            Self::MoveBox4 => "MOVE_BOX_4",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct OperationFrameDragState {
+    pub mode: OperationFrameMode,
+    pub last_mouse_pos: Point,
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct OperationFrame {
+    pub active: bool,
+    pub points: [Point; 4],
+}
+
+impl OperationFrame {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn p1(&self) -> Point {
+        self.points[0]
+    }
+
+    pub fn p2(&self) -> Point {
+        self.points[1]
+    }
+
+    pub fn p3(&self) -> Point {
+        self.points[2]
+    }
+
+    pub fn p4(&self) -> Point {
+        self.points[3]
+    }
+
+    pub fn polygon(&self) -> Polygon {
+        Polygon::new(self.points.to_vec())
+    }
+
+    pub fn set_frame_point(&mut self, index: usize, point: Point) -> bool {
+        if let Some(target) = self.points.get_mut(index) {
+            *target = point;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn set_frame_point_x(&mut self, index: usize, x: f64) -> bool {
+        if let Some(target) = self.points.get_mut(index) {
+            *target = target.with_x(x);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn set_frame_point_y(&mut self, index: usize, y: f64) -> bool {
+        if let Some(target) = self.points.get_mut(index) {
+            *target = target.with_y(y);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn reset(&mut self) {
+        self.active = false;
+    }
+}
+
 /// Oriedita `FoldLineSet.move(dx, dy)` for the editable model's FoldLineSet data.
 pub fn translate_model(model: &mut CreasePatternModel, dx: f64, dy: f64) {
     let delta = Point::new(dx, dy);
@@ -29,6 +119,166 @@ pub fn translate_model(model: &mut CreasePatternModel, dx: f64, dy: f64) {
     for circle in &mut model.circles {
         *circle = circle.with_center(circle.determine_center().move_by(delta));
     }
+}
+
+/// Oriedita `OPERATION_FRAME_CREATE_61` mouse-press state transition with an identity camera.
+pub fn operation_frame_press(
+    model: &CreasePatternModel,
+    frame: &mut OperationFrame,
+    point: Point,
+    selection_distance: f64,
+) -> OperationFrameDragState {
+    let p1 = frame.p1();
+    let p2 = frame.p2();
+    let p3 = frame.p3();
+    let p4 = frame.p4();
+    let mut mode = OperationFrameMode::None0;
+    if !frame.active {
+        mode = OperationFrameMode::Create1;
+    }
+
+    if frame.active {
+        let mut distance_min = determine_line_segment_distance(point, &LineSegment::new(p1, p2));
+        distance_min = distance_min.min(determine_line_segment_distance(
+            point,
+            &LineSegment::new(p2, p3),
+        ));
+        distance_min = distance_min.min(determine_line_segment_distance(
+            point,
+            &LineSegment::new(p3, p4),
+        ));
+        distance_min = distance_min.min(determine_line_segment_distance(
+            point,
+            &LineSegment::new(p4, p1),
+        ));
+
+        if distance_min < selection_distance {
+            mode = OperationFrameMode::MoveSides3;
+        } else if frame.polygon().inside(point) == PolygonIntersection::Outside {
+            mode = OperationFrameMode::Create1;
+        } else {
+            mode = OperationFrameMode::MoveBox4;
+        }
+
+        if point.distance(p1) < selection_distance {
+            let moved = frame.p1();
+            frame.set_frame_point(0, frame.p3());
+            frame.set_frame_point(2, moved);
+            mode = OperationFrameMode::MovePoints2;
+        }
+        if point.distance(p2) < selection_distance {
+            let moved = frame.p2();
+            frame.set_frame_point(1, frame.p1());
+            frame.set_frame_point(0, frame.p4());
+            frame.set_frame_point(3, frame.p3());
+            frame.set_frame_point(2, moved);
+            mode = OperationFrameMode::MovePoints2;
+        }
+        if point.distance(p3) < selection_distance {
+            let moved = frame.p3();
+            frame.set_frame_point(0, frame.p1());
+            frame.set_frame_point(2, moved);
+            mode = OperationFrameMode::MovePoints2;
+        }
+        if point.distance(p4) < selection_distance {
+            let moved = frame.p4();
+            frame.set_frame_point(3, frame.p1());
+            frame.set_frame_point(0, frame.p2());
+            frame.set_frame_point(1, frame.p3());
+            frame.set_frame_point(2, moved);
+            mode = OperationFrameMode::MovePoints2;
+        }
+
+        if mode == OperationFrameMode::MoveSides3 {
+            let mut p_ob1 = p1;
+            let mut p_ob2 = p2;
+            let mut p_ob3 = p3;
+            let mut p_ob4 = p4;
+            for _ in 0..4 {
+                if determine_line_segment_distance(point, &LineSegment::new(p_ob1, p_ob2))
+                    == distance_min
+                {
+                    break;
+                }
+                let moved = frame.p1();
+                frame.set_frame_point(0, frame.p2());
+                frame.set_frame_point(1, frame.p3());
+                frame.set_frame_point(2, frame.p4());
+                frame.set_frame_point(3, moved);
+
+                let previous = p_ob1;
+                p_ob1 = p_ob2;
+                p_ob2 = p_ob3;
+                p_ob3 = p_ob4;
+                p_ob4 = previous;
+            }
+        }
+    }
+
+    if mode == OperationFrameMode::Create1 {
+        frame.active = true;
+        let mut snapped = point;
+        let closest_point = closest_operation_frame_point(model, point);
+        if point.distance(closest_point) < selection_distance {
+            snapped = closest_point;
+        }
+        for index in 0..4 {
+            frame.set_frame_point(index, snapped);
+        }
+    }
+
+    OperationFrameDragState {
+        mode,
+        last_mouse_pos: point,
+    }
+}
+
+/// Oriedita `OPERATION_FRAME_CREATE_61` mouse-drag update with an identity camera.
+pub fn operation_frame_drag(
+    model: &CreasePatternModel,
+    frame: &mut OperationFrame,
+    state: &mut OperationFrameDragState,
+    point: Point,
+    selection_distance: f64,
+) {
+    if state.mode == OperationFrameMode::MovePoints2 {
+        state.mode = OperationFrameMode::Create1;
+    }
+
+    let closest_point = closest_operation_frame_point(model, point);
+    let snapped = if point.distance(closest_point) < selection_distance {
+        closest_point
+    } else {
+        point
+    };
+
+    update_operation_frame(frame, state, snapped);
+    state.last_mouse_pos = snapped;
+}
+
+/// Oriedita `OPERATION_FRAME_CREATE_61` mouse-release update with an identity camera.
+pub fn operation_frame_release(
+    model: &CreasePatternModel,
+    frame: &mut OperationFrame,
+    state: &OperationFrameDragState,
+    point: Point,
+    selection_distance: f64,
+) {
+    let closest_point = closest_operation_frame_point(model, point);
+    let snapped = if point.distance(closest_point) <= selection_distance {
+        closest_point
+    } else {
+        point
+    };
+
+    update_operation_frame(frame, state, snapped);
+    if frame.polygon().calculate_area() < 1.0 {
+        frame.active = false;
+    }
+}
+
+pub fn operation_frame_reset(frame: &mut OperationFrame) {
+    frame.reset();
 }
 
 /// Oriedita `CREASE_MOVE_21` final mutation after selected lines and delta are known.
@@ -324,6 +574,55 @@ fn closest_line_segment(model: &CreasePatternModel, point: Point) -> Option<Line
         }
     }
     closest
+}
+
+fn closest_operation_frame_point(model: &CreasePatternModel, point: Point) -> Point {
+    let mut closest = Point::new(100_000.0, 100_000.0);
+    for segment in &model.line_segments {
+        for endpoint in [segment.a, segment.b] {
+            if point.distance_squared(endpoint) < point.distance_squared(closest) {
+                closest = endpoint;
+            }
+        }
+    }
+    for circle in &model.circles {
+        let center = circle.determine_center();
+        if point.distance_squared(center) < point.distance_squared(closest) {
+            closest = center;
+        }
+    }
+    closest
+}
+
+fn update_operation_frame(
+    frame: &mut OperationFrame,
+    state: &OperationFrameDragState,
+    point: Point,
+) {
+    if state.mode == OperationFrameMode::MoveSides3 {
+        if (frame.p1().x - frame.p2().x).abs() < (frame.p1().y - frame.p2().y).abs() {
+            frame.set_frame_point_x(0, point.x);
+            frame.set_frame_point_x(1, point.x);
+        }
+
+        if (frame.p1().x - frame.p2().x).abs() > (frame.p1().y - frame.p2().y).abs() {
+            frame.set_frame_point_y(0, point.y);
+            frame.set_frame_point_y(1, point.y);
+        }
+    }
+
+    if state.mode == OperationFrameMode::MoveBox4 {
+        let delta = state.last_mouse_pos.delta(point);
+        for frame_point in &mut frame.points {
+            *frame_point = frame_point.move_by(delta);
+        }
+    }
+
+    if state.mode == OperationFrameMode::Create1 {
+        frame.set_frame_point(2, point);
+        frame.set_frame_point(1, Point::new(frame.p1().x, frame.p3().y));
+        frame.set_frame_point(3, Point::new(frame.p3().x, frame.p1().y));
+    }
 }
 
 fn selected_line_segments(model: &CreasePatternModel) -> Vec<LineSegment> {

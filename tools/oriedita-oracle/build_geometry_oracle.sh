@@ -36,6 +36,7 @@ javac \
   "$origami_source/origami/crease_pattern/element/Circle.java" \
   "$origami_source/origami/crease_pattern/element/Line.java" \
   "$origami_source/origami/crease_pattern/element/Polygon.java" \
+  "$origami_source/origami/crease_pattern/element/Rectangle.java" \
   "$origami_source/origami/crease_pattern/OritaCalc.java" \
   "$origami_source/origami/crease_pattern/LineSegmentSet.java" \
   "$origami_source/origami/crease_pattern/FoldLineSet.java" \
@@ -56,6 +57,7 @@ javac \
   "$common_source/oriedita/editor/text/Text.java" \
   "$common_source/oriedita/editor/tools/StringOp.java" \
   "$data_source/oriedita/editor/databinding/GridModel.java" \
+  "$data_source/oriedita/editor/canvas/OperationFrame.java" \
   "$data_source/oriedita/editor/save/TextSave.java" \
   "$data_source/oriedita/editor/save/Save.java" \
   "$data_source/oriedita/editor/save/BaseSave.java" \

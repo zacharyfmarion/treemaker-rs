@@ -24,6 +24,7 @@ import oriedita.editor.export.DxfExporter;
 import oriedita.editor.export.ObjImporter;
 import oriedita.editor.export.OrhExporter;
 import oriedita.editor.export.OrhImporter;
+import oriedita.editor.canvas.OperationFrame;
 import oriedita.editor.save.Save;
 import oriedita.editor.save.SaveProvider;
 
@@ -60,6 +61,14 @@ public class OrieditaGeometryOracle {
             this.first = first;
             this.second = second;
         }
+    }
+
+    private enum OperationFrameOracleMode {
+        NONE_0,
+        CREATE_1,
+        MOVE_POINTS_2,
+        MOVE_SIDES_3,
+        MOVE_BOX_4,
     }
 
     public static void main(String[] args) throws Exception {
@@ -105,6 +114,7 @@ public class OrieditaGeometryOracle {
             case "foldline-translate" -> foldLineTranslate(args);
             case "foldline-transform-selected" -> foldLineTransformSelected(args);
             case "foldline-transform-selected-4p" -> foldLineTransformSelected4p(args);
+            case "operation-frame-sequence" -> operationFrameSequence(args);
             case "foldline-extend-to-intersection" -> foldLineExtendToIntersection(args);
             case "foldline-lengthen" -> foldLineLengthen(args);
             case "foldline-parallel-draw" -> foldLineParallelDraw(args);
@@ -943,6 +953,220 @@ public class OrieditaGeometryOracle {
         set.divideLineSegmentWithNewLines(totalOld, totalNew);
         set.unselect_all();
         printFoldLineSetWithSelection(set);
+    }
+
+    private static void operationFrameSequence(String[] args) {
+        if (args.length < 14) {
+            usage("operation-frame-sequence expects selection distance, frame, lines, circles, and events");
+        }
+
+        int cursor = 1;
+        double selectionDistance = parse(args[cursor++]);
+        OperationFrame frame = new OperationFrame();
+        frame.setActive(Boolean.parseBoolean(args[cursor++]));
+        for (int index = 0; index < 4; index++) {
+            frame.setFramePoint(index, new Point(parse(args[cursor]), parse(args[cursor + 1])));
+            cursor += 2;
+        }
+
+        int lineCount = Integer.parseInt(args[cursor++]);
+        FoldLineSet set = new FoldLineSet();
+        for (int index = 0; index < lineCount; index++) {
+            LineSegment segment = segment(args, cursor);
+            set.addLine(segment.getA(), segment.getB(), segment.getColor());
+            cursor += 5;
+        }
+
+        int circleCount = Integer.parseInt(args[cursor++]);
+        for (int index = 0; index < circleCount; index++) {
+            set.getCircles().add(circle(args, cursor));
+            cursor += 4;
+        }
+
+        int eventCount = Integer.parseInt(args[cursor++]);
+        OperationFrameOracleMode mode = OperationFrameOracleMode.NONE_0;
+        Point lastMousePos = new Point();
+        for (int eventIndex = 0; eventIndex < eventCount; eventIndex++) {
+            String event = args[cursor++];
+            Point point = new Point(parse(args[cursor]), parse(args[cursor + 1]));
+            cursor += 2;
+            switch (event) {
+                case "press" -> {
+                    OperationFramePressResult result = operationFrameMousePressed(
+                            set, frame, point, selectionDistance);
+                    mode = result.mode;
+                    lastMousePos = result.lastMousePos;
+                }
+                case "drag" -> {
+                    if (mode == OperationFrameOracleMode.MOVE_POINTS_2) {
+                        mode = OperationFrameOracleMode.CREATE_1;
+                    }
+                    Point closestPoint = closestOperationFramePoint(set, point);
+                    Point snapped = point.distance(closestPoint) < selectionDistance
+                            ? closestPoint
+                            : point;
+                    operationFrameUpdate(frame, mode, lastMousePos, snapped);
+                    lastMousePos = snapped;
+                }
+                case "release" -> {
+                    Point closestPoint = closestOperationFramePoint(set, point);
+                    Point snapped = point.distance(closestPoint) <= selectionDistance
+                            ? closestPoint
+                            : point;
+                    operationFrameUpdate(frame, mode, lastMousePos, snapped);
+                    if (frame.getPolygon().calculateArea() < 1.0) {
+                        frame.setActive(false);
+                    }
+                }
+                case "reset" -> frame.setActive(false);
+                default -> usage("unknown operation-frame event: " + event);
+            }
+        }
+
+        if (cursor != args.length) {
+            usage("operation-frame-sequence payload length mismatch");
+        }
+
+        printOperationFrame(frame, mode, lastMousePos);
+    }
+
+    private record OperationFramePressResult(OperationFrameOracleMode mode, Point lastMousePos) {
+    }
+
+    private static OperationFramePressResult operationFrameMousePressed(
+            FoldLineSet set,
+            OperationFrame frame,
+            Point point,
+            double selectionDistance) {
+        Point p1 = frame.getP1();
+        Point p2 = frame.getP2();
+        Point p3 = frame.getP3();
+        Point p4 = frame.getP4();
+        OperationFrameOracleMode mode = OperationFrameOracleMode.NONE_0;
+        if (!frame.isActive()) {
+            mode = OperationFrameOracleMode.CREATE_1;
+        }
+
+        if (frame.isActive()) {
+            double distanceMin = OritaCalc.min(
+                    OritaCalc.determineLineSegmentDistance(point, p1, p2),
+                    OritaCalc.determineLineSegmentDistance(point, p2, p3),
+                    OritaCalc.determineLineSegmentDistance(point, p3, p4),
+                    OritaCalc.determineLineSegmentDistance(point, p4, p1));
+            if (distanceMin < selectionDistance) {
+                mode = OperationFrameOracleMode.MOVE_SIDES_3;
+            } else if (frame.getPolygon().inside(point) == Polygon.Intersection.OUTSIDE) {
+                mode = OperationFrameOracleMode.CREATE_1;
+            } else {
+                mode = OperationFrameOracleMode.MOVE_BOX_4;
+            }
+
+            if (point.distance(p1) < selectionDistance) {
+                Point moved = frame.getP1();
+                frame.setFramePoint(0, frame.getP3());
+                frame.setFramePoint(2, moved);
+                mode = OperationFrameOracleMode.MOVE_POINTS_2;
+            }
+            if (point.distance(p2) < selectionDistance) {
+                Point moved = frame.getP2();
+                frame.setFramePoint(1, frame.getP1());
+                frame.setFramePoint(0, frame.getP4());
+                frame.setFramePoint(3, frame.getP3());
+                frame.setFramePoint(2, moved);
+                mode = OperationFrameOracleMode.MOVE_POINTS_2;
+            }
+            if (point.distance(p3) < selectionDistance) {
+                Point moved = frame.getP3();
+                frame.setFramePoint(0, frame.getP1());
+                frame.setFramePoint(2, moved);
+                mode = OperationFrameOracleMode.MOVE_POINTS_2;
+            }
+            if (point.distance(p4) < selectionDistance) {
+                Point moved = frame.getP4();
+                frame.setFramePoint(3, frame.getP1());
+                frame.setFramePoint(0, frame.getP2());
+                frame.setFramePoint(1, frame.getP3());
+                frame.setFramePoint(2, moved);
+                mode = OperationFrameOracleMode.MOVE_POINTS_2;
+            }
+
+            if (mode == OperationFrameOracleMode.MOVE_SIDES_3) {
+                Point pOb1 = p1;
+                Point pOb2 = p2;
+                Point pOb3 = p3;
+                Point pOb4 = p4;
+                int guard = 0;
+                while (OritaCalc.determineLineSegmentDistance(point, pOb1, pOb2) != distanceMin
+                        && guard < 4) {
+                    Point moved = frame.getP1();
+                    frame.setFramePoint(0, frame.getP2());
+                    frame.setFramePoint(1, frame.getP3());
+                    frame.setFramePoint(2, frame.getP4());
+                    frame.setFramePoint(3, moved);
+                    moved = pOb1;
+                    pOb1 = pOb2;
+                    pOb2 = pOb3;
+                    pOb3 = pOb4;
+                    pOb4 = moved;
+                    guard++;
+                }
+            }
+        }
+
+        if (mode == OperationFrameOracleMode.CREATE_1) {
+            frame.setActive(true);
+            Point snapped = point;
+            Point closestPoint = closestOperationFramePoint(set, point);
+            if (point.distance(closestPoint) < selectionDistance) {
+                snapped = closestPoint;
+            }
+            for (int index = 0; index < 4; index++) {
+                frame.setFramePoint(index, snapped);
+            }
+        }
+
+        return new OperationFramePressResult(mode, point);
+    }
+
+    private static Point closestOperationFramePoint(FoldLineSet set, Point point) {
+        Point closest = set.closestPoint(point);
+        Point closestCenter = set.closestCenter(point);
+        if (point.distanceSquared(closest) > point.distanceSquared(closestCenter)) {
+            closest = closestCenter;
+        }
+        return closest;
+    }
+
+    private static void operationFrameUpdate(
+            OperationFrame frame,
+            OperationFrameOracleMode mode,
+            Point lastMousePos,
+            Point point) {
+        if (mode == OperationFrameOracleMode.MOVE_SIDES_3) {
+            if (Math.abs(frame.getP1().getX() - frame.getP2().getX())
+                    < Math.abs(frame.getP1().getY() - frame.getP2().getY())) {
+                frame.setFramePointX(0, point.getX());
+                frame.setFramePointX(1, point.getX());
+            }
+
+            if (Math.abs(frame.getP1().getX() - frame.getP2().getX())
+                    > Math.abs(frame.getP1().getY() - frame.getP2().getY())) {
+                frame.setFramePointY(0, point.getY());
+                frame.setFramePointY(1, point.getY());
+            }
+        }
+
+        if (mode == OperationFrameOracleMode.MOVE_BOX_4) {
+            for (int index = 0; index < 4; index++) {
+                frame.setFramePoint(index, frame.getFramePoint(index).move(lastMousePos.delta(point)));
+            }
+        }
+
+        if (mode == OperationFrameOracleMode.CREATE_1) {
+            frame.setFramePoint(2, point);
+            frame.setFramePoint(1, new Point(frame.getP1().getX(), frame.getP3().getY()));
+            frame.setFramePoint(3, new Point(frame.getP3().getX(), frame.getP1().getY()));
+        }
     }
 
     private static void foldLineExtendToIntersection(String[] args) {
@@ -3509,6 +3733,25 @@ public class OrieditaGeometryOracle {
                 + result.getColor().getNumber());
     }
 
+    private static void printOperationFrame(
+            OperationFrame frame,
+            OperationFrameOracleMode mode,
+            Point lastMousePos) {
+        System.out.println("frame|"
+                + frame.isActive() + "|"
+                + mode.name() + "|"
+                + frame.getP1().getX() + "|"
+                + frame.getP1().getY() + "|"
+                + frame.getP2().getX() + "|"
+                + frame.getP2().getY() + "|"
+                + frame.getP3().getX() + "|"
+                + frame.getP3().getY() + "|"
+                + frame.getP4().getX() + "|"
+                + frame.getP4().getY() + "|"
+                + lastMousePos.getX() + "|"
+                + lastMousePos.getY());
+    }
+
     private static Polygon polygon(String[] args, int offset, int count) {
         List<Point> points = new ArrayList<>();
         for (int index = 0; index < count; index++) {
@@ -3774,6 +4017,7 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle foldline-alternate-mv <startColor> <guide ax ay bx by color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-alternate-mv-crossing <startColor> <guide ax ay bx by color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-select-lasso <select|unselect> <preselected indices> <vertexCount> [x y]... <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle operation-frame-sequence <selectionDistance> <active> <p1x> <p1y> <p2x> <p2y> <p3x> <p3y> <p4x> <p4y> <lineCount> [ax ay bx by color]... <circleCount> [cx cy r color]... <eventCount> [press|drag|release|reset x y]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-lengthen <current|same> <lineColor> <selectionDistance> <selection ax ay bx by color> <extensionX> <extensionY> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-parallel-draw <targetX> <targetY> <parallel ax ay bx by color> <destination ax ay bx by color> <color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-parallel-width <selected ax ay bx by color> <width> <choice> <color> <count> [ax ay bx by color]...");

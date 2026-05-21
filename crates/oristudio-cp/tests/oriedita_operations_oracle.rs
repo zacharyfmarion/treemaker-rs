@@ -48,9 +48,10 @@ use oristudio_cp::operations::selection::{
     unselect_intersecting_line, unselect_lasso, unselect_polygon,
 };
 use oristudio_cp::operations::transform::{
-    LengthenColorMode, copy_selected_lines, copy_selected_lines_by_points,
-    extend_to_intersection_point_2, lengthen_crease, move_selected_lines,
-    move_selected_lines_by_points, translate_model,
+    LengthenColorMode, OperationFrame, OperationFrameDragState, copy_selected_lines,
+    copy_selected_lines_by_points, extend_to_intersection_point_2, lengthen_crease,
+    move_selected_lines, move_selected_lines_by_points, operation_frame_drag,
+    operation_frame_press, operation_frame_release, translate_model,
 };
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -1109,6 +1110,65 @@ fn transform_commands_match_oriedita_foldlineset_oracle() {
     push_segment_args(&mut args, &four_point_segments);
     assert_eq!(
         line_segment_set_with_selection_summary(&model),
+        run_oracle(&oracle, &args)
+    );
+}
+
+#[test]
+fn operation_frame_sequence_matches_oriedita_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    let segments = vec![segment(2.0, 2.0, 3.0, 2.0, LineColor::Black0)];
+    let circles = vec![Circle::new(9.0, 9.0, 1.0, LineColor::Cyan3)];
+    let mut model = model_from_segments(&segments);
+    for circle in &circles {
+        model.add_circle(*circle);
+    }
+    let mut frame = OperationFrame::default();
+    let mut state = operation_frame_press(&model, &mut frame, Point::new(2.1, 2.1), 0.5);
+    operation_frame_drag(&model, &mut frame, &mut state, Point::new(5.0, 4.0), 0.5);
+    operation_frame_release(&model, &mut frame, &state, Point::new(5.0, 4.0), 0.5);
+
+    let mut args = operation_frame_args(
+        0.5,
+        &OperationFrame::default(),
+        &segments,
+        &circles,
+        &[
+            ("press", Point::new(2.1, 2.1)),
+            ("drag", Point::new(5.0, 4.0)),
+            ("release", Point::new(5.0, 4.0)),
+        ],
+    );
+    assert_eq!(
+        operation_frame_summary(&frame, &state),
+        run_oracle(&oracle, &args)
+    );
+
+    let model = CreasePatternModel::default();
+    let mut frame = operation_frame_fixture();
+    let mut state = operation_frame_press(&model, &mut frame, Point::new(-0.1, 1.0), 0.5);
+    operation_frame_drag(&model, &mut frame, &mut state, Point::new(0.5, 1.0), 0.5);
+    operation_frame_release(&model, &mut frame, &state, Point::new(0.5, 1.0), 0.5);
+
+    args = operation_frame_args(
+        0.5,
+        &operation_frame_fixture(),
+        &[],
+        &[],
+        &[
+            ("press", Point::new(-0.1, 1.0)),
+            ("drag", Point::new(0.5, 1.0)),
+            ("release", Point::new(0.5, 1.0)),
+        ],
+    );
+    assert_eq!(
+        operation_frame_summary(&frame, &state),
         run_oracle(&oracle, &args)
     );
 }
@@ -2732,6 +2792,37 @@ fn push_circle_args(args: &mut Vec<String>, circle: Circle) {
     args.push(circle.color.number().to_string());
 }
 
+fn operation_frame_args(
+    selection_distance: f64,
+    frame: &OperationFrame,
+    segments: &[LineSegment],
+    circles: &[Circle],
+    events: &[(&str, Point)],
+) -> Vec<String> {
+    let mut args = vec![
+        "operation-frame-sequence".to_string(),
+        selection_distance.to_string(),
+        frame.active.to_string(),
+    ];
+    for point in frame.points {
+        args.push(point.x.to_string());
+        args.push(point.y.to_string());
+    }
+    args.push(segments.len().to_string());
+    push_segment_args(&mut args, segments);
+    args.push(circles.len().to_string());
+    for circle in circles {
+        push_circle_args(&mut args, *circle);
+    }
+    args.push(events.len().to_string());
+    for (event, point) in events {
+        args.push((*event).to_string());
+        args.push(point.x.to_string());
+        args.push(point.y.to_string());
+    }
+    args
+}
+
 fn push_points_args(args: &mut Vec<String>, points: &[Point]) {
     for point in points {
         args.push(point.x.to_string());
@@ -2863,6 +2954,36 @@ fn optional_segment_result_summary(segment: Option<&LineSegment>) -> String {
             segment.color.number()
         ),
         None => "result|null\n".to_string(),
+    }
+}
+
+fn operation_frame_summary(frame: &OperationFrame, state: &OperationFrameDragState) -> String {
+    format!(
+        "frame|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}\n",
+        frame.active,
+        state.mode.oriedita_name(),
+        java_double_string(frame.points[0].x),
+        java_double_string(frame.points[0].y),
+        java_double_string(frame.points[1].x),
+        java_double_string(frame.points[1].y),
+        java_double_string(frame.points[2].x),
+        java_double_string(frame.points[2].y),
+        java_double_string(frame.points[3].x),
+        java_double_string(frame.points[3].y),
+        java_double_string(state.last_mouse_pos.x),
+        java_double_string(state.last_mouse_pos.y)
+    )
+}
+
+fn operation_frame_fixture() -> OperationFrame {
+    OperationFrame {
+        active: true,
+        points: [
+            Point::new(0.0, 0.0),
+            Point::new(0.0, 2.0),
+            Point::new(2.0, 2.0),
+            Point::new(2.0, 0.0),
+        ],
     }
 }
 

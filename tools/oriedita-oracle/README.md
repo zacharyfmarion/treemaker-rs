@@ -19,7 +19,8 @@ separately. Measurement commands cover Oriedita's display length and
 three-point angle handlers. Point-tool coverage includes `DRAW_POINT_14`'s
 segment-splitting behavior after the target point and segment are resolved.
 Construction coverage has started with free/restricted draw-crease line
-insertion for fold-line and aux-line targets.
+insertion for fold-line and aux-line targets, plus symmetric drawing of
+selected lines across a resolved axis.
 The first selection commands cover select/unselect all, index selection, box
 selection via `lineSegmentsInside`, polygon selection via `select_Takakukei`,
 line-overlap/intersection selection via `select_lX`, and

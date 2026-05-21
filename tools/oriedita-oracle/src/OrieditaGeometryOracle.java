@@ -76,6 +76,7 @@ public class OrieditaGeometryOracle {
             case "foldline-transform-selected-4p" -> foldLineTransformSelected4p(args);
             case "foldline-extend-to-intersection" -> foldLineExtendToIntersection(args);
             case "foldline-draw-crease" -> foldLineDrawCrease(args);
+            case "foldline-draw-symmetric" -> foldLineDrawSymmetric(args);
             case "foldline-draw-point" -> foldLineDrawPoint(args);
             case "foldline-divide-count" -> foldLineDivideCount(args);
             case "foldline-divide-ratio" -> foldLineDivideRatio(args);
@@ -889,6 +890,38 @@ public class OrieditaGeometryOracle {
         printAuxLineSet(aux);
     }
 
+    private static void foldLineDrawSymmetric(String[] args) {
+        if (args.length < 8) {
+            usage("foldline-draw-symmetric expects axis segment, preselected indices, count, and segment payload");
+        }
+
+        LineSegment axis = new LineSegment(
+                new Point(parse(args[1]), parse(args[2])),
+                new Point(parse(args[3]), parse(args[4])),
+                LineColor.fromNumber(Integer.parseInt(args[5])));
+        int count = Integer.parseInt(args[7]);
+        FoldLineSet set = foldLineSet(args, 8, count);
+        applySelectedIndices(set, args[6], 2);
+
+        int oldTotal = set.getTotal();
+        int mirrored = 0;
+        for (LineSegment line : set.getLineSegmentsCollection()) {
+            if (line.getSelected() == 2) {
+                LineSegment add = OritaCalc
+                        .findLineSymmetryLineSegment(line, axis)
+                        .withColor(line.getColor());
+                set.addLine(add);
+                mirrored++;
+            }
+        }
+        int newTotal = set.getTotal();
+        set.divideLineSegmentWithNewLines(oldTotal, newTotal);
+        set.unselect_all();
+
+        System.out.println("mirrored|" + mirrored);
+        printFoldLineSetWithSelection(set);
+    }
+
     private static void foldLineDrawPoint(String[] args) {
         if (args.length < 6) {
             usage("foldline-draw-point expects index, target point, selection distance, count, and segment payload");
@@ -1313,6 +1346,7 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle foldline-alternate-mv <startColor> <guide ax ay bx by color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-alternate-mv-crossing <startColor> <guide ax ay bx by color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-draw-crease <fold|aux> <segment ax ay bx by color> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-draw-symmetric <axis ax ay bx by color> <preselected> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-draw-point <index> <targetX> <targetY> <selectionDistance> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle measure-length <ax> <ay> <bx> <by>");
         System.err.println("   or: OrieditaGeometryOracle measure-angle <ax> <ay> <centerX> <centerY> <bx> <by>");

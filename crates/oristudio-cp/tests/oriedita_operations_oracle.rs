@@ -12,7 +12,9 @@ use oristudio_cp::operations::color::{
     change_crease_type, delete_line_type_for_indices, make_aux, make_edge, make_mountain,
     make_valley, replace_line_type_for_indices, set_line_color_for_indices, toggle_mountain_valley,
 };
-use oristudio_cp::operations::construction::{DrawCreaseTarget, draw_crease_segment};
+use oristudio_cp::operations::construction::{
+    DrawCreaseTarget, draw_crease_segment, mirror_selected_lines,
+};
 use oristudio_cp::operations::measure::{angle_between_three_points, length_between_points};
 use oristudio_cp::operations::point::{
     divide_segment_by_count, divide_segment_by_ratio, draw_point_on_segment,
@@ -1197,6 +1199,36 @@ fn draw_crease_segment_matches_oriedita_oracle() {
         "changed|{changed}\n{}{}",
         line_segment_set_summary(&model),
         aux_line_segment_set_summary(&model)
+    );
+    assert_eq!(rust_summary, run_oracle(&oracle, &args));
+}
+
+#[test]
+fn draw_symmetric_matches_oriedita_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    let axis = segment(0.0, 0.0, 0.0, 1.0, LineColor::Black0);
+    let segments = vec![
+        segment(1.0, 0.0, 1.0, 1.0, LineColor::Red1),
+        segment(3.0, 0.0, 3.0, 1.0, LineColor::Blue2),
+    ];
+    let mut model = model_from_segments(&segments);
+    model.line_segments[0] = model.line_segments[0].with_selected(2);
+    let mirrored = mirror_selected_lines(&mut model, &axis);
+
+    let mut args = vec!["foldline-draw-symmetric".to_string()];
+    push_one_segment_args(&mut args, &axis);
+    args.push("0".to_string());
+    args.push(segments.len().to_string());
+    push_segment_args(&mut args, &segments);
+    let rust_summary = format!(
+        "mirrored|{mirrored}\n{}",
+        line_segment_set_with_selection_summary(&model)
     );
     assert_eq!(rust_summary, run_oracle(&oracle, &args));
 }

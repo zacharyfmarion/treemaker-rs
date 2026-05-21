@@ -131,7 +131,7 @@ stage explicitly changes it.
 | `PERPENDICULAR_DRAW_9` | `MouseHandlerPerpendicularDraw` | `operations::construction::perpendicular` | kernel | 7 | Unsupported |
 | `SYMMETRIC_DRAW_10` | `MouseHandlerSymmetricDraw` | `operations::construction::symmetric` | kernel | 7 | Unsupported |
 | `DRAW_CREASE_RESTRICTED_11` | `MouseHandlerDrawCreaseRestricted` | `operations::construction::draw_crease_segment` | kernel | 7 | Porting |
-| `DRAW_CREASE_SYMMETRIC_12` | `MouseHandlerDrawCreaseSymmetric` | `operations::construction::draw_symmetric` | kernel | 7 | Unsupported |
+| `DRAW_CREASE_SYMMETRIC_12` | `MouseHandlerDrawCreaseSymmetric` | `operations::construction::mirror_selected_lines` | kernel | 7 | Oracle-tested |
 | `DRAW_CREASE_ANGLE_RESTRICTED_13` | `MouseHandlerDrawCreaseAngleRestricted` | `operations::construction::angle_restricted` | kernel | 7 | Unsupported |
 | `DRAW_POINT_14` | `MouseHandlerDrawPoint` | `operations::point::draw_point_on_segment` | kernel | 7 | Oracle-tested |
 | `DELETE_POINT_15` | `MouseHandlerDeletePoint` | `operations::point::delete_point` | kernel | 5 | Oracle-tested |

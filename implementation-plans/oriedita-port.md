@@ -939,6 +939,10 @@ Status:
   fold-line worker insertion/splitting and separate aux-line insertion. These
   rows remain `Porting` until the surrounding snap/endpoint-state semantics and
   the worker's circle-intersection side effects are covered.
+- `DRAW_CREASE_SYMMETRIC_12` is ported as `mirror_selected_lines` once the
+  mirror axis is resolved. It snapshots selected lines, mirrors them with
+  `OritaCalc.findLineSymmetryLineSegment`, splits inserted copies, and clears
+  selection afterward like the handler.
 - Full handler parity remains open for nearest-click line selection, Java2D
   path/lasso selection, operation-frame behavior, lengthen commands, and
   construction-handler `fix2` chaining that is not part of the selected color

@@ -3,7 +3,9 @@ use oristudio_cp::model::CreasePatternModel;
 use oristudio_cp::operations::construction::{
     DrawCreaseTarget, commit_parallel_width_indicator, double_symmetric_draw, draw_crease_segment,
     inward, mirror_selected_lines, parallel_draw, parallel_width_indicators,
-    perpendicular_indicator, perpendicular_projection, symmetric_draw,
+    perpendicular_indicator, perpendicular_projection, square_bisector_from_lines_to_destination,
+    square_bisector_from_points_to_destination, square_bisector_parallel_between_destinations,
+    square_bisector_parallel_indicator, symmetric_draw,
 };
 
 #[test]
@@ -240,6 +242,86 @@ fn inward_connects_triangle_vertices_to_incenter() {
     ));
 }
 
+#[test]
+fn square_bisector_points_draws_to_destination() {
+    let destination = segment(2.0, -1.0, 2.0, 3.0, LineColor::Black0);
+    let mut model = model_from_segments(std::slice::from_ref(&destination));
+
+    assert!(square_bisector_from_points_to_destination(
+        &mut model,
+        Point::new(0.0, 0.0),
+        Point::new(4.0, 0.0),
+        Point::new(0.0, 3.0),
+        &destination,
+        LineColor::Red1,
+    ));
+
+    assert!(contains_segment_close(
+        &model.line_segments,
+        Point::new(2.0, 2.0 / 3.0),
+        Point::new(4.0, 0.0),
+        LineColor::Red1,
+    ));
+}
+
+#[test]
+fn square_bisector_nonparallel_lines_draw_to_destination() {
+    let first = segment(0.0, 0.0, 4.0, 0.0, LineColor::Black0);
+    let second = segment(0.0, 0.0, 0.0, 4.0, LineColor::Black0);
+    let destination = segment(2.0, -1.0, 2.0, 3.0, LineColor::Black0);
+    let mut model = model_from_segments(&[first.clone(), second.clone(), destination.clone()]);
+
+    assert!(square_bisector_from_lines_to_destination(
+        &mut model,
+        &first,
+        &second,
+        &destination,
+        LineColor::Blue2,
+    ));
+
+    assert!(contains_segment_close(
+        &model.line_segments,
+        Point::new(2.0, 2.0),
+        Point::new(0.0, 0.0),
+        LineColor::Blue2,
+    ));
+}
+
+#[test]
+fn square_bisector_parallel_indicator_and_destination_commit() {
+    let first = segment(-2.0, 0.0, 2.0, 0.0, LineColor::Black0);
+    let second = segment(-2.0, 2.0, 2.0, 2.0, LineColor::Black0);
+    let left = segment(-3.0, -1.0, -3.0, 3.0, LineColor::Black0);
+    let right = segment(3.0, -1.0, 3.0, 3.0, LineColor::Black0);
+    let mut model = model_from_segments(&[first.clone(), second.clone(), left, right]);
+
+    let indicator = square_bisector_parallel_indicator(&model, &first, &second)
+        .expect("parallel lines should produce indicator");
+    assert_eq!(indicator.color, LineColor::Purple8);
+    assert!(same_segment_close(
+        &indicator,
+        Point::new(-3.0, 1.0),
+        Point::new(3.0, 1.0),
+        LineColor::Purple8,
+    ));
+
+    let first_destination = segment(-1.0, -1.0, -1.0, 3.0, LineColor::Black0);
+    let second_destination = segment(1.0, -1.0, 1.0, 3.0, LineColor::Black0);
+    assert!(square_bisector_parallel_between_destinations(
+        &mut model,
+        &indicator,
+        &first_destination,
+        &second_destination,
+        LineColor::Red1,
+    ));
+    assert!(contains_segment(
+        &model.line_segments,
+        Point::new(-1.0, 1.0),
+        Point::new(1.0, 1.0),
+        LineColor::Red1,
+    ));
+}
+
 fn segment(ax: f64, ay: f64, bx: f64, by: f64, color: LineColor) -> LineSegment {
     LineSegment::with_color(Point::new(ax, ay), Point::new(bx, by), color)
 }
@@ -256,4 +338,20 @@ fn contains_segment(segments: &[LineSegment], a: Point, b: Point, color: LineCol
     segments
         .iter()
         .any(|segment| segment.a == a && segment.b == b && segment.color == color)
+}
+
+fn contains_segment_close(segments: &[LineSegment], a: Point, b: Point, color: LineColor) -> bool {
+    segments
+        .iter()
+        .any(|segment| same_segment_close(segment, a, b, color))
+}
+
+fn contains_point_close(actual: Point, expected: Point) -> bool {
+    (actual.x - expected.x).abs() < 1e-12 && (actual.y - expected.y).abs() < 1e-12
+}
+
+fn same_segment_close(segment: &LineSegment, a: Point, b: Point, color: LineColor) -> bool {
+    segment.color == color
+        && ((contains_point_close(segment.a, a) && contains_point_close(segment.b, b))
+            || (contains_point_close(segment.a, b) && contains_point_close(segment.b, a)))
 }

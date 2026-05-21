@@ -322,10 +322,10 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
     descriptor!(
         SquareBisector,
         "MouseHandlerSquareBisector",
-        "operations::construction::square_bisector",
+        "operations::construction::square_bisector_*",
         Kernel,
         7,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         Inward,

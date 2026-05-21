@@ -4,8 +4,8 @@ use crate::geometry::{
     Epsilon, Intersection, LineColor, LineSegment, ParallelJudgement, Point, StraightLine, center,
     determine_line_segment_distance, determine_line_segment_intersection_sweet_with_tolerances,
     distance, find_intersection_segments, find_line_symmetry_line_segment,
-    find_line_symmetry_point, find_projection, get_segment_with_length,
-    is_line_segment_parallel_with_precision, is_point_within_line_span, move_parallel,
+    find_line_symmetry_point, find_projection, get_segment_with_length, is_line_segment_parallel,
+    is_line_segment_parallel_with_precision, is_point_within_line_span, mid_point, move_parallel,
 };
 use crate::model::CreasePatternModel;
 use crate::operations::arrangement::{
@@ -270,6 +270,138 @@ pub fn inward(
         }
     }
     added
+}
+
+/// Oriedita `SQUARE_BISECTOR_7` three-point branch after the destination is resolved.
+pub fn square_bisector_from_points_to_destination(
+    model: &mut CreasePatternModel,
+    p1: Point,
+    p2: Point,
+    p3: Point,
+    destination: &LineSegment,
+    color: LineColor,
+) -> bool {
+    if is_point_within_line_span(p1, &LineSegment::new(p2, p3)) {
+        return false;
+    }
+
+    let incenter = center(p1, p2, p3);
+    let seed = LineSegment::new(p2, incenter);
+    if is_line_segment_parallel(
+        StraightLine::from_segment(&seed),
+        StraightLine::from_segment(destination),
+    ) != ParallelJudgement::NotParallel
+    {
+        return false;
+    }
+
+    let result = LineSegment::with_color(find_intersection_segments(&seed, destination), p2, color);
+    add_square_bisector_line(model, &result)
+}
+
+/// Oriedita `SQUARE_BISECTOR_7` non-parallel two-line branch.
+pub fn square_bisector_from_lines_to_destination(
+    model: &mut CreasePatternModel,
+    first: &LineSegment,
+    second: &LineSegment,
+    destination: &LineSegment,
+    color: LineColor,
+) -> bool {
+    let intersection = find_intersection_segments(first, second);
+    let incenter = center(
+        intersection,
+        first.determine_furthest_endpoint(intersection),
+        second.determine_furthest_endpoint(intersection),
+    );
+    let temp_bisect = full_extend_until_hit(model, &LineSegment::new(intersection, incenter));
+    if is_line_segment_parallel(
+        StraightLine::from_segment(&temp_bisect),
+        StraightLine::from_segment(destination),
+    ) != ParallelJudgement::NotParallel
+    {
+        return false;
+    }
+
+    let result = LineSegment::with_color(
+        find_intersection_segments(&temp_bisect, destination),
+        intersection,
+        color,
+    );
+    add_square_bisector_line(model, &result)
+}
+
+/// Oriedita `SQUARE_BISECTOR_7` parallel two-line purple indicator branch.
+pub fn square_bisector_parallel_indicator(
+    model: &CreasePatternModel,
+    first: &LineSegment,
+    second: &LineSegment,
+) -> Option<LineSegment> {
+    if is_line_segment_parallel_with_precision(
+        StraightLine::from_segment(first),
+        StraightLine::from_segment(second),
+        Epsilon::UNKNOWN_1EN4,
+    ) == ParallelJudgement::NotParallel
+    {
+        return None;
+    }
+
+    let projected = find_projection(StraightLine::from_segment(first), second.a);
+    let midpoint = mid_point(second.a, projected);
+    let perpendicular_seed = LineSegment::new(second.a, projected);
+    let moved = move_parallel(&perpendicular_seed, -1.0);
+    let indicator = full_extend_until_hit(
+        model,
+        &LineSegment::with_color(
+            midpoint,
+            find_projection(StraightLine::from_segment(&moved), midpoint),
+            LineColor::Purple8,
+        ),
+    );
+    Some(full_extend_until_hit(
+        model,
+        &indicator.with_coordinates(indicator.b, indicator.a),
+    ))
+}
+
+/// Add the chosen parallel square-bisector indicator itself.
+pub fn commit_square_bisector_parallel_indicator(
+    model: &mut CreasePatternModel,
+    indicator: &LineSegment,
+    color: LineColor,
+) -> bool {
+    add_square_bisector_line(model, &indicator.with_line_color(color))
+}
+
+/// Oriedita `SQUARE_BISECTOR_7` parallel two-line branch using two destinations.
+pub fn square_bisector_parallel_between_destinations(
+    model: &mut CreasePatternModel,
+    indicator: &LineSegment,
+    first_destination: &LineSegment,
+    second_destination: &LineSegment,
+    color: LineColor,
+) -> bool {
+    if is_line_segment_parallel(
+        StraightLine::from_segment(first_destination),
+        StraightLine::from_segment(second_destination),
+    ) == ParallelJudgement::ParallelEqual
+    {
+        return false;
+    }
+
+    let result = LineSegment::with_color(
+        find_intersection_segments(indicator, first_destination),
+        find_intersection_segments(indicator, second_destination),
+        color,
+    );
+    add_square_bisector_line(model, &result)
+}
+
+fn add_square_bisector_line(model: &mut CreasePatternModel, segment: &LineSegment) -> bool {
+    if !Epsilon::HIGH.gt0(segment.determine_length()) {
+        return false;
+    }
+    add_line_segment_like_worker(model, segment);
+    true
 }
 
 fn is_double_symmetric_intersection(intersection: Intersection) -> bool {

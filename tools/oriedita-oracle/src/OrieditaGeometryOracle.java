@@ -93,6 +93,11 @@ public class OrieditaGeometryOracle {
             case "foldline-symmetric-draw" -> foldLineSymmetricDraw(args);
             case "foldline-double-symmetric-draw" -> foldLineDoubleSymmetricDraw(args);
             case "foldline-inward" -> foldLineInward(args);
+            case "foldline-square-bisector-3p" -> foldLineSquareBisector3p(args);
+            case "foldline-square-bisector-2l-np" -> foldLineSquareBisector2lNp(args);
+            case "foldline-square-bisector-parallel-indicator" -> foldLineSquareBisectorParallelIndicator(args);
+            case "foldline-square-bisector-parallel-commit" -> foldLineSquareBisectorParallelCommit(args);
+            case "foldline-square-bisector-parallel-between" -> foldLineSquareBisectorParallelBetween(args);
             case "foldline-draw-crease" -> foldLineDrawCrease(args);
             case "foldline-draw-symmetric" -> foldLineDrawSymmetric(args);
             case "foldline-draw-point" -> foldLineDrawPoint(args);
@@ -1290,6 +1295,139 @@ public class OrieditaGeometryOracle {
         printFoldLineSet(set);
     }
 
+    private static void foldLineSquareBisector3p(String[] args) {
+        if (args.length < 14) {
+            usage("foldline-square-bisector-3p expects three points, destination segment, color, count, and segment payload");
+        }
+
+        Point p1 = new Point(parse(args[1]), parse(args[2]));
+        Point p2 = new Point(parse(args[3]), parse(args[4]));
+        Point p3 = new Point(parse(args[5]), parse(args[6]));
+        LineSegment destination = segment(args, 7);
+        LineColor color = LineColor.fromNumber(Integer.parseInt(args[12]));
+        int count = Integer.parseInt(args[13]);
+        FoldLineSet set = foldLineSet(args, 14, count);
+        boolean added = false;
+
+        if (!OritaCalc.isPointWithinLineSpan(p1, p2, p3)) {
+            Point incenter = OritaCalc.center(p1, p2, p3);
+            LineSegment seed = new LineSegment(p2, incenter);
+            if (OritaCalc.isLineSegmentParallel(seed, destination) == OritaCalc.ParallelJudgement.NOT_PARALLEL) {
+                LineSegment result = new LineSegment(OritaCalc.findIntersection(seed, destination), p2, color);
+                added = addSquareBisectorLine(set, result);
+            }
+        }
+
+        System.out.println("added|" + added);
+        printFoldLineSet(set);
+    }
+
+    private static void foldLineSquareBisector2lNp(String[] args) {
+        if (args.length < 18) {
+            usage("foldline-square-bisector-2l-np expects two source segments, destination segment, color, count, and segment payload");
+        }
+
+        LineSegment first = segment(args, 1);
+        LineSegment second = segment(args, 6);
+        LineSegment destination = segment(args, 11);
+        LineColor color = LineColor.fromNumber(Integer.parseInt(args[16]));
+        int count = Integer.parseInt(args[17]);
+        FoldLineSet set = foldLineSet(args, 18, count);
+
+        Point intersection = OritaCalc.findIntersection(first, second);
+        Point incenter = OritaCalc.center(
+                intersection,
+                first.determineFurthestEndpoint(intersection),
+                second.determineFurthestEndpoint(intersection));
+        LineSegment tempBisect = OritaCalc.fullExtendUntilHit(set, new LineSegment(intersection, incenter));
+        boolean added = false;
+        if (OritaCalc.isLineSegmentParallel(tempBisect, destination) == OritaCalc.ParallelJudgement.NOT_PARALLEL) {
+            LineSegment result = new LineSegment(OritaCalc.findIntersection(tempBisect, destination), intersection, color);
+            added = addSquareBisectorLine(set, result);
+        }
+
+        System.out.println("added|" + added);
+        printFoldLineSet(set);
+    }
+
+    private static void foldLineSquareBisectorParallelIndicator(String[] args) {
+        if (args.length < 12) {
+            usage("foldline-square-bisector-parallel-indicator expects two source segments, count, and segment payload");
+        }
+
+        LineSegment first = segment(args, 1);
+        LineSegment second = segment(args, 6);
+        int count = Integer.parseInt(args[11]);
+        FoldLineSet set = foldLineSet(args, 12, count);
+        LineSegment result = squareBisectorParallelIndicator(set, first, second);
+        printSegmentResult(result);
+    }
+
+    private static void foldLineSquareBisectorParallelCommit(String[] args) {
+        if (args.length < 8) {
+            usage("foldline-square-bisector-parallel-commit expects indicator segment, color, count, and segment payload");
+        }
+
+        LineSegment indicator = segment(args, 1);
+        LineColor color = LineColor.fromNumber(Integer.parseInt(args[6]));
+        int count = Integer.parseInt(args[7]);
+        FoldLineSet set = foldLineSet(args, 8, count);
+        boolean added = addSquareBisectorLine(set, indicator.withColor(color));
+
+        System.out.println("added|" + added);
+        printFoldLineSet(set);
+    }
+
+    private static void foldLineSquareBisectorParallelBetween(String[] args) {
+        if (args.length < 18) {
+            usage("foldline-square-bisector-parallel-between expects indicator, two destination segments, color, count, and segment payload");
+        }
+
+        LineSegment indicator = segment(args, 1);
+        LineSegment firstDestination = segment(args, 6);
+        LineSegment secondDestination = segment(args, 11);
+        LineColor color = LineColor.fromNumber(Integer.parseInt(args[16]));
+        int count = Integer.parseInt(args[17]);
+        FoldLineSet set = foldLineSet(args, 18, count);
+        boolean added = false;
+
+        if (OritaCalc.isLineSegmentParallel(firstDestination, secondDestination) != OritaCalc.ParallelJudgement.PARALLEL_EQUAL) {
+            LineSegment result = new LineSegment(
+                    OritaCalc.findIntersection(indicator, firstDestination),
+                    OritaCalc.findIntersection(indicator, secondDestination),
+                    color);
+            added = addSquareBisectorLine(set, result);
+        }
+
+        System.out.println("added|" + added);
+        printFoldLineSet(set);
+    }
+
+    private static LineSegment squareBisectorParallelIndicator(FoldLineSet set, LineSegment first, LineSegment second) {
+        if (OritaCalc.isLineSegmentParallel(first, second, Epsilon.UNKNOWN_1EN4) == OritaCalc.ParallelJudgement.NOT_PARALLEL) {
+            return null;
+        }
+
+        Point projectedPoint = OritaCalc.findProjection(first, second.getA());
+        Point midPoint = OritaCalc.midPoint(second.getA(), projectedPoint);
+        LineSegment tempPerpenLine = new LineSegment(second.getA(), projectedPoint);
+        LineSegment indicator = OritaCalc.fullExtendUntilHit(
+                set,
+                new LineSegment(
+                        midPoint,
+                        OritaCalc.findProjection(OritaCalc.moveParallel(tempPerpenLine, -1.0), midPoint),
+                        LineColor.PURPLE_8));
+        return OritaCalc.fullExtendUntilHit(set, indicator.withCoordinates(indicator.getB(), indicator.getA()));
+    }
+
+    private static boolean addSquareBisectorLine(FoldLineSet set, LineSegment segment) {
+        if (!Epsilon.high.gt0(segment.determineLength())) {
+            return false;
+        }
+        addLineSegmentLikeWorker(set, segment);
+        return true;
+    }
+
     private static void foldLineDrawCrease(String[] args) {
         if (args.length < 8) {
             usage("foldline-draw-crease expects target, segment, count, and segment payload");
@@ -2203,6 +2341,19 @@ public class OrieditaGeometryOracle {
         set.divideLineSegmentWithNewLines(totalOld - 1, totalOld);
     }
 
+    private static void printSegmentResult(LineSegment result) {
+        if (result == null) {
+            System.out.println("result|null");
+            return;
+        }
+        System.out.println("result|"
+                + result.determineAX() + "|"
+                + result.determineAY() + "|"
+                + result.determineBX() + "|"
+                + result.determineBY() + "|"
+                + result.getColor().getNumber());
+    }
+
     private static Polygon polygon(String[] args, int offset, int count) {
         List<Point> points = new ArrayList<>();
         for (int index = 0; index < count; index++) {
@@ -2469,6 +2620,11 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle foldline-symmetric-draw <source ax ay bx by color> <mirror ax ay bx by color> <color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-double-symmetric-draw <drag ax ay bx by color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-inward <p1x> <p1y> <p2x> <p2y> <p3x> <p3y> <color> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-square-bisector-3p <p1x> <p1y> <p2x> <p2y> <p3x> <p3y> <destination ax ay bx by color> <color> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-square-bisector-2l-np <first ax ay bx by color> <second ax ay bx by color> <destination ax ay bx by color> <color> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-square-bisector-parallel-indicator <first ax ay bx by color> <second ax ay bx by color> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-square-bisector-parallel-commit <indicator ax ay bx by color> <color> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-square-bisector-parallel-between <indicator ax ay bx by color> <firstDestination ax ay bx by color> <secondDestination ax ay bx by color> <color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-draw-crease <fold|aux> <segment ax ay bx by color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-draw-symmetric <axis ax ay bx by color> <preselected> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-draw-point <index> <targetX> <targetY> <selectionDistance> <count> [ax ay bx by color]...");

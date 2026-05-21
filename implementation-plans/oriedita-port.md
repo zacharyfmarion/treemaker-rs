@@ -993,6 +993,10 @@ Status:
   the next hit, and worker-style insertion splitting.
 - `INWARD_8` is ported and oracle-tested for the resolved three-point kernel,
   preserving Oriedita's incenter calculation and per-ray insertion behavior.
+- `SQUARE_BISECTOR_7` is ported and oracle-tested across all resolved kernels:
+  the three-point destination branch, the non-parallel two-line destination
+  branch, the parallel-line purple indicator branch, direct indicator commit,
+  and the parallel-line two-destination commit.
 
 ### Stage 8: Circle, Polygon, Base, and Generator Tools
 

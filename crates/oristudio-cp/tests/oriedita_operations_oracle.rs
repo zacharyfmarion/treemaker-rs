@@ -19,9 +19,12 @@ use oristudio_cp::operations::color::{
     make_valley, replace_line_type_for_indices, set_line_color_for_indices, toggle_mountain_valley,
 };
 use oristudio_cp::operations::construction::{
-    DrawCreaseTarget, commit_parallel_width_indicator, double_symmetric_draw, draw_crease_segment,
-    inward, mirror_selected_lines, parallel_draw, parallel_width_indicators,
-    perpendicular_indicator, perpendicular_projection, symmetric_draw,
+    DrawCreaseTarget, commit_parallel_width_indicator, commit_square_bisector_parallel_indicator,
+    double_symmetric_draw, draw_crease_segment, inward, mirror_selected_lines, parallel_draw,
+    parallel_width_indicators, perpendicular_indicator, perpendicular_projection,
+    square_bisector_from_lines_to_destination, square_bisector_from_points_to_destination,
+    square_bisector_parallel_between_destinations, square_bisector_parallel_indicator,
+    symmetric_draw,
 };
 use oristudio_cp::operations::generators::{
     DefaultMolecule, default_molecule, regular_polygon_no_corners,
@@ -1351,6 +1354,122 @@ fn inward_matches_oriedita_oracle() {
         LineColor::Blue2.number().to_string(),
         segments.len().to_string(),
     ];
+    push_segment_args(&mut args, &segments);
+    let rust_summary = format!("added|{added}\n{}", line_segment_set_summary(&model));
+    assert_eq!(rust_summary, run_oracle(&oracle, &args));
+}
+
+#[test]
+fn square_bisector_modes_match_oriedita_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    let destination = segment(2.0, -1.0, 2.0, 3.0, LineColor::Black0);
+    let segments = vec![destination.clone()];
+    let mut model = model_from_segments(&segments);
+    let added = square_bisector_from_points_to_destination(
+        &mut model,
+        Point::new(0.0, 0.0),
+        Point::new(4.0, 0.0),
+        Point::new(0.0, 3.0),
+        &destination,
+        LineColor::Red1,
+    );
+    let mut args = vec![
+        "foldline-square-bisector-3p".to_string(),
+        "0.0".to_string(),
+        "0.0".to_string(),
+        "4.0".to_string(),
+        "0.0".to_string(),
+        "0.0".to_string(),
+        "3.0".to_string(),
+    ];
+    push_one_segment_args(&mut args, &destination);
+    args.push(LineColor::Red1.number().to_string());
+    args.push(segments.len().to_string());
+    push_segment_args(&mut args, &segments);
+    let rust_summary = format!("added|{added}\n{}", line_segment_set_summary(&model));
+    assert_line_summary_close(
+        &rust_summary,
+        &run_oracle(&oracle, &args),
+        1e-12,
+        "square-bisector-3p",
+    );
+
+    let first = segment(0.0, 0.0, 4.0, 0.0, LineColor::Black0);
+    let second = segment(0.0, 0.0, 0.0, 4.0, LineColor::Black0);
+    let segments = vec![first.clone(), second.clone(), destination.clone()];
+    let mut model = model_from_segments(&segments);
+    let added = square_bisector_from_lines_to_destination(
+        &mut model,
+        &first,
+        &second,
+        &destination,
+        LineColor::Blue2,
+    );
+    let mut args = vec!["foldline-square-bisector-2l-np".to_string()];
+    push_one_segment_args(&mut args, &first);
+    push_one_segment_args(&mut args, &second);
+    push_one_segment_args(&mut args, &destination);
+    args.push(LineColor::Blue2.number().to_string());
+    args.push(segments.len().to_string());
+    push_segment_args(&mut args, &segments);
+    let rust_summary = format!("added|{added}\n{}", line_segment_set_summary(&model));
+    assert_line_summary_close(
+        &rust_summary,
+        &run_oracle(&oracle, &args),
+        1e-12,
+        "square-bisector-2l-np",
+    );
+
+    let parallel_first = segment(-2.0, 0.0, 2.0, 0.0, LineColor::Black0);
+    let parallel_second = segment(-2.0, 2.0, 2.0, 2.0, LineColor::Black0);
+    let left = segment(-3.0, -1.0, -3.0, 3.0, LineColor::Black0);
+    let right = segment(3.0, -1.0, 3.0, 3.0, LineColor::Black0);
+    let segments = vec![parallel_first.clone(), parallel_second.clone(), left, right];
+    let model = model_from_segments(&segments);
+    let indicator = square_bisector_parallel_indicator(&model, &parallel_first, &parallel_second);
+    let mut args = vec!["foldline-square-bisector-parallel-indicator".to_string()];
+    push_one_segment_args(&mut args, &parallel_first);
+    push_one_segment_args(&mut args, &parallel_second);
+    args.push(segments.len().to_string());
+    push_segment_args(&mut args, &segments);
+    assert_eq!(
+        optional_segment_result_summary(indicator.as_ref()),
+        run_oracle(&oracle, &args)
+    );
+    let indicator = indicator.expect("oracle-tested fixture should produce an indicator");
+
+    let mut model = model_from_segments(&segments);
+    let added = commit_square_bisector_parallel_indicator(&mut model, &indicator, LineColor::Red1);
+    let mut args = vec!["foldline-square-bisector-parallel-commit".to_string()];
+    push_one_segment_args(&mut args, &indicator);
+    args.push(LineColor::Red1.number().to_string());
+    args.push(segments.len().to_string());
+    push_segment_args(&mut args, &segments);
+    let rust_summary = format!("added|{added}\n{}", line_segment_set_summary(&model));
+    assert_eq!(rust_summary, run_oracle(&oracle, &args));
+
+    let first_destination = segment(-1.0, -1.0, -1.0, 3.0, LineColor::Black0);
+    let second_destination = segment(1.0, -1.0, 1.0, 3.0, LineColor::Black0);
+    let mut model = model_from_segments(&segments);
+    let added = square_bisector_parallel_between_destinations(
+        &mut model,
+        &indicator,
+        &first_destination,
+        &second_destination,
+        LineColor::Blue2,
+    );
+    let mut args = vec!["foldline-square-bisector-parallel-between".to_string()];
+    push_one_segment_args(&mut args, &indicator);
+    push_one_segment_args(&mut args, &first_destination);
+    push_one_segment_args(&mut args, &second_destination);
+    args.push(LineColor::Blue2.number().to_string());
+    args.push(segments.len().to_string());
     push_segment_args(&mut args, &segments);
     let rust_summary = format!("added|{added}\n{}", line_segment_set_summary(&model));
     assert_eq!(rust_summary, run_oracle(&oracle, &args));

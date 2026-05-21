@@ -910,10 +910,12 @@ Status:
 - The core `OritaCalc.extendToIntersectionPoint_2` helper used by lengthen and
   several construction tools is ported and oracle-tested for crossing-line and
   collinear-endpoint fixtures. The higher-level `LENGTHEN_CREASE_5` and
-  `LENGTHEN_CREASE_SAME_COLOR_70` handlers remain open because their full
-  behavior also includes candidate-line discovery, target-line mode selection,
-  color-mode handling, insertion splitting, and line-circle intersection side
-  effects.
+  `LENGTHEN_CREASE_SAME_COLOR_70` model-space mutation is now ported through
+  candidate-line discovery, target-line mode selection, current-color versus
+  same-color handling, and worker-style insertion splitting. These rows remain
+  `Porting` rather than fully oracle-tested because Oriedita's final
+  `applyLineSegmentCircleIntersection` side effect still needs circle fixtures
+  and a Rust equivalent.
 - `LINE_SEGMENT_DIVISION_27` and `LINE_SEGMENT_RATIO_SET_28` are ported as
   `operations::point` commands once the handler has resolved its drag segment
   and numeric parameters. The port preserves Oriedita's generated subsegment

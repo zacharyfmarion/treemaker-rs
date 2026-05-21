@@ -34,8 +34,9 @@ use oristudio_cp::operations::selection::{
     unselect_intersecting_line, unselect_lasso, unselect_polygon,
 };
 use oristudio_cp::operations::transform::{
-    copy_selected_lines, copy_selected_lines_by_points, extend_to_intersection_point_2,
-    move_selected_lines, move_selected_lines_by_points, translate_model,
+    LengthenColorMode, copy_selected_lines, copy_selected_lines_by_points,
+    extend_to_intersection_point_2, lengthen_crease, move_selected_lines,
+    move_selected_lines_by_points, translate_model,
 };
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -1130,6 +1131,56 @@ fn extend_to_intersection_matches_oriedita_oracle() {
             optional_segment_result_summary(Some(&result)),
             run_oracle(&oracle, &args)
         );
+    }
+}
+
+#[test]
+fn lengthen_crease_matches_oriedita_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    for (mode_name, color_mode, extension_point) in [
+        (
+            "current",
+            LengthenColorMode::Current(LineColor::Blue2),
+            Point::new(2.0, 0.25),
+        ),
+        (
+            "same",
+            LengthenColorMode::SameAsOriginal,
+            Point::new(0.25, 0.0),
+        ),
+    ] {
+        let segments = vec![
+            segment(0.0, 0.0, 1.0, 0.0, LineColor::Red1),
+            segment(2.0, -1.0, 2.0, 1.0, LineColor::Black0),
+        ];
+        let selection_line = segment(0.5, -1.0, 0.5, 1.0, LineColor::Magenta5);
+        let mut model = model_from_segments(&segments);
+        let added = lengthen_crease(
+            &mut model,
+            selection_line.clone(),
+            extension_point,
+            1.0,
+            color_mode,
+        );
+
+        let mut args = vec![
+            "foldline-lengthen".to_string(),
+            mode_name.to_string(),
+            LineColor::Blue2.number().to_string(),
+            "1.0".to_string(),
+        ];
+        push_one_segment_args(&mut args, &selection_line);
+        push_points_args(&mut args, &[extension_point]);
+        args.push(segments.len().to_string());
+        push_segment_args(&mut args, &segments);
+        let rust_summary = format!("added|{added}\n{}", line_segment_set_summary(&model));
+        assert_eq!(rust_summary, run_oracle(&oracle, &args), "{mode_name}");
     }
 }
 

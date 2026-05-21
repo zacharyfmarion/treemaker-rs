@@ -1,8 +1,9 @@
 use oristudio_cp::geometry::{Circle, LineColor, LineSegment, Point};
 use oristudio_cp::model::CreasePatternModel;
 use oristudio_cp::operations::transform::{
-    copy_selected_lines, copy_selected_lines_by_points, extend_to_intersection_point_2,
-    move_selected_lines, move_selected_lines_by_points, translate_model,
+    LengthenColorMode, copy_selected_lines, copy_selected_lines_by_points,
+    extend_to_intersection_point_2, lengthen_crease, move_selected_lines,
+    move_selected_lines_by_points, translate_model,
 };
 
 #[test]
@@ -141,6 +142,58 @@ fn extend_to_intersection_point_uses_collinear_endpoint_hits() {
         Point::new(1.0, 0.0),
         Point::new(5.0, 0.0),
         LineColor::Red1,
+    );
+}
+
+#[test]
+fn lengthen_crease_extends_selected_candidate_to_target_line() {
+    let mut model = model_from_segments(&[
+        segment(0.0, 0.0, 1.0, 0.0, LineColor::Red1),
+        segment(2.0, -1.0, 2.0, 1.0, LineColor::Black0),
+    ]);
+
+    let added = lengthen_crease(
+        &mut model,
+        segment(0.5, -1.0, 0.5, 1.0, LineColor::Magenta5),
+        Point::new(2.0, 0.25),
+        1.0,
+        LengthenColorMode::Current(LineColor::Blue2),
+    );
+
+    assert_eq!(added, 1);
+    assert!(
+        model
+            .line_segments
+            .iter()
+            .any(|segment| segment.a == Point::new(2.0, 0.0)
+                && segment.b == Point::new(1.0, 0.0)
+                && segment.color == LineColor::Blue2)
+    );
+}
+
+#[test]
+fn lengthen_crease_same_color_uses_original_color_and_same_line_mode() {
+    let mut model = model_from_segments(&[
+        segment(0.0, 0.0, 1.0, 0.0, LineColor::Red1),
+        segment(2.0, -1.0, 2.0, 1.0, LineColor::Black0),
+    ]);
+
+    let added = lengthen_crease(
+        &mut model,
+        segment(0.5, -1.0, 0.5, 1.0, LineColor::Magenta5),
+        Point::new(0.25, 0.0),
+        1.0,
+        LengthenColorMode::SameAsOriginal,
+    );
+
+    assert_eq!(added, 1);
+    assert!(
+        model
+            .line_segments
+            .iter()
+            .any(|segment| segment.a == Point::new(1.0, 0.0)
+                && segment.b == Point::new(2.0, 0.0)
+                && segment.color == LineColor::Red1)
     );
 }
 

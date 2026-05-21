@@ -85,6 +85,7 @@ public class OrieditaGeometryOracle {
             case "foldline-transform-selected" -> foldLineTransformSelected(args);
             case "foldline-transform-selected-4p" -> foldLineTransformSelected4p(args);
             case "foldline-extend-to-intersection" -> foldLineExtendToIntersection(args);
+            case "foldline-lengthen" -> foldLineLengthen(args);
             case "foldline-draw-crease" -> foldLineDrawCrease(args);
             case "foldline-draw-symmetric" -> foldLineDrawSymmetric(args);
             case "foldline-draw-point" -> foldLineDrawPoint(args);
@@ -907,6 +908,134 @@ public class OrieditaGeometryOracle {
                 + result.determineBX() + "|"
                 + result.determineBY() + "|"
                 + result.getColor().getNumber());
+    }
+
+    private static void foldLineLengthen(String[] args) {
+        if (args.length < 12) {
+            usage("foldline-lengthen expects color mode, line color, selection distance, selection segment, extension point, count, and segment payload");
+        }
+
+        String colorMode = args[1];
+        LineColor lineColor = LineColor.fromNumber(Integer.parseInt(args[2]));
+        double selectionDistance = parse(args[3]);
+        LineSegment selectionLine = segment(args, 4);
+        Point extensionPoint = new Point(parse(args[9]), parse(args[10]));
+        int count = Integer.parseInt(args[11]);
+        FoldLineSet set = foldLineSet(args, 12, count);
+        LineSegment closestLineSegment = set.getClosestLineSegment(extensionPoint);
+        LengthenCandidates candidates = lengthenCandidates(set, selectionLine, selectionDistance);
+        selectionLine = candidates.selectionLine;
+        SortingBox<LineSegment> linesToExtend = candidates.lines;
+        int added = 0;
+
+        if (linesToExtend.getTotal() > 0
+                && OritaCalc.determineLineSegmentDistance(extensionPoint, closestLineSegment) < selectionDistance) {
+            boolean sameLineMode = false;
+            for (int index = 1; index <= linesToExtend.getTotal(); index++) {
+                if (OritaCalc.determineLineSegmentIntersection(
+                        linesToExtend.getValue(index),
+                        closestLineSegment,
+                        Epsilon.UNKNOWN_1EN6) == LineSegment.Intersection.PARALLEL_EQUAL_31) {
+                    sameLineMode = true;
+                }
+            }
+
+            if (!sameLineMode) {
+                for (int index = 1; index <= linesToExtend.getTotal(); index++) {
+                    LineSegment original = linesToExtend.getValue(index);
+                    if (OritaCalc.isLineSegmentParallel(
+                            original,
+                            closestLineSegment,
+                            Epsilon.UNKNOWN_1EN6) == OritaCalc.ParallelJudgement.NOT_PARALLEL) {
+                        Point intersection = OritaCalc.findIntersection(original, closestLineSegment);
+                        LineSegment addLineSegment = new LineSegment(
+                                intersection,
+                                original.determineClosestEndpoint(intersection));
+                        if (addExtendedLengthenLine(set, addLineSegment, original, colorMode, lineColor)) {
+                            added++;
+                        }
+                    }
+                }
+            } else {
+                for (int index = 1; index <= linesToExtend.getTotal(); index++) {
+                    LineSegment lineToExtend = new LineSegment(linesToExtend.getValue(index));
+                    Point intersection = OritaCalc.findIntersection(lineToExtend, selectionLine);
+                    if (intersection.distance(lineToExtend.getA()) < intersection.distance(lineToExtend.getB())) {
+                        lineToExtend = lineToExtend.withSwappedCoordinates();
+                    }
+                    LineSegment addLineSegment = OritaCalc.extendToIntersectionPoint_2(set, lineToExtend);
+                    if (addExtendedLengthenLine(set, addLineSegment, lineToExtend, colorMode, lineColor)) {
+                        added++;
+                    }
+                }
+            }
+        }
+
+        System.out.println("added|" + added);
+        printFoldLineSet(set);
+    }
+
+    private static LengthenCandidates lengthenCandidates(
+            FoldLineSet set,
+            LineSegment selectionLine,
+            double selectionDistance) {
+        SortingBox<LineSegment> linesToExtend = new SortingBox<>();
+        linesToExtend.reset();
+        for (LineSegment line : set.getLineSegmentsIterable()) {
+            LineSegment.Intersection intersection = OritaCalc.determineLineSegmentIntersection(
+                    line,
+                    selectionLine,
+                    Epsilon.UNKNOWN_1EN4);
+            if (intersection == LineSegment.Intersection.INTERSECTS_1) {
+                linesToExtend.addByWeight(
+                        line,
+                        OritaCalc.distance(selectionLine.getA(), OritaCalc.findIntersection(line, selectionLine)));
+            }
+        }
+
+        if (linesToExtend.getTotal() == 0 && selectionLine.determineLength() <= Epsilon.UNKNOWN_1EN6) {
+            LineSegment closestLine = set.closestLineSegmentSearch(selectionLine.getB());
+            if (closestLine != null
+                    && OritaCalc.determineLineSegmentDistance(selectionLine.getB(), closestLine) < selectionDistance) {
+                linesToExtend.addByWeight(closestLine, 1.0);
+                Point newPoint = OritaCalc.findProjection(closestLine, selectionLine.getB());
+                if (OritaCalc.determineLineSegmentDistance(newPoint, closestLine) > Epsilon.UNKNOWN_1EN6) {
+                    newPoint = closestLine.determineClosestEndpoint(newPoint);
+                }
+                selectionLine = selectionLine.withCoordinates(newPoint, newPoint);
+            }
+        }
+
+        return new LengthenCandidates(selectionLine, linesToExtend);
+    }
+
+    private static class LengthenCandidates {
+        final LineSegment selectionLine;
+        final SortingBox<LineSegment> lines;
+
+        LengthenCandidates(LineSegment selectionLine, SortingBox<LineSegment> lines) {
+            this.selectionLine = selectionLine;
+            this.lines = lines;
+        }
+    }
+
+    private static boolean addExtendedLengthenLine(
+            FoldLineSet set,
+            LineSegment addLineSegment,
+            LineSegment original,
+            String colorMode,
+            LineColor lineColor) {
+        if (!Epsilon.high.gt0(addLineSegment.determineLength())) {
+            return false;
+        }
+        switch (colorMode) {
+            case "current" -> addLineSegment = addLineSegment.withColor(lineColor);
+            case "same" -> addLineSegment = addLineSegment.withColor(original.getColor());
+            default -> usage("unknown lengthen color mode: " + colorMode);
+        }
+        set.addLine(addLineSegment);
+        set.divideLineSegmentWithNewLines(set.getTotal() - 1, set.getTotal());
+        return true;
     }
 
     private static void foldLineDrawCrease(String[] args) {
@@ -2080,6 +2209,7 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle foldline-alternate-mv <startColor> <guide ax ay bx by color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-alternate-mv-crossing <startColor> <guide ax ay bx by color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-select-lasso <select|unselect> <preselected indices> <vertexCount> [x y]... <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-lengthen <current|same> <lineColor> <selectionDistance> <selection ax ay bx by color> <extensionX> <extensionY> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-draw-crease <fold|aux> <segment ax ay bx by color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-draw-symmetric <axis ax ay bx by color> <preselected> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-draw-point <index> <targetX> <targetY> <selectionDistance> <count> [ax ay bx by color]...");

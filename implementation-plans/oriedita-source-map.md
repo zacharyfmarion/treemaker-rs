@@ -125,7 +125,7 @@ stage explicitly changes it.
 | `MOVE_CREASE_PATTERN_2` | `MouseHandlerMoveCreasePattern` | runtime camera pan, no persisted CP mutation | ui-preview-only | later UI | Out-of-scope-ui |
 | `LINE_SEGMENT_DELETE_3` | `MouseHandlerLineSegmentDelete` | `operations::arrangement::delete_line_segment_vertex_for_index`, `operations::arrangement::delete_line_segments_for_indices` | kernel | 5 | Porting |
 | `CHANGE_CREASE_TYPE_4` | `MouseHandlerChangeCreaseType` | `operations::color::change_crease_type` | kernel | 6 | Oracle-tested |
-| `LENGTHEN_CREASE_5` | `MouseHandlerLengthenCrease` | `operations::transform::lengthen` | kernel | 6 | Unsupported |
+| `LENGTHEN_CREASE_5` | `MouseHandlerLengthenCrease` | `operations::transform::lengthen_crease` | kernel | 6 | Porting |
 | `SQUARE_BISECTOR_7` | `MouseHandlerSquareBisector` | `operations::construction::square_bisector` | kernel | 7 | Unsupported |
 | `INWARD_8` | `MouseHandlerInward` | `operations::construction::inward` | kernel | 7 | Unsupported |
 | `PERPENDICULAR_DRAW_9` | `MouseHandlerPerpendicularDraw` | `operations::construction::perpendicular` | kernel | 7 | Unsupported |
@@ -188,7 +188,7 @@ stage explicitly changes it.
 | `UNSELECT_POLYGON_67` | `MouseHandlerUnselectPolygon` | `operations::selection::unselect_polygon` | kernel | 6 | Oracle-tested |
 | `SELECT_LINE_INTERSECTING_68` | `MouseHandlerSelectLineIntersecting` | `operations::selection::select_intersecting_line` | kernel | 6 | Oracle-tested |
 | `UNSELECT_LINE_INTERSECTING_69` | `MouseHandlerUnselectLineIntersecting` | `operations::selection::unselect_intersecting_line` | kernel | 6 | Oracle-tested |
-| `LENGTHEN_CREASE_SAME_COLOR_70` | `MouseHandlerLengthenCreaseSameColor` | `operations::transform::lengthen_same_color` | kernel | 6 | Unsupported |
+| `LENGTHEN_CREASE_SAME_COLOR_70` | `MouseHandlerLengthenCreaseSameColor` | `operations::transform::lengthen_crease` | kernel | 6 | Porting |
 | `FOLDABLE_LINE_DRAW_71` | `MouseHandlerFoldableLineDraw` | `operations::construction::foldable_line_draw` | kernel | 7 | Unsupported |
 | `REPLACE_LINE_TYPE_SELECT_72` | `MouseHandlerReplaceTypeSelect` | `operations::color::replace_line_type_for_indices` | kernel | 6 | Oracle-tested |
 | `DELETE_LINE_TYPE_SELECT_73` | `MouseHandlerDeleteTypeSelect` | `operations::color::delete_line_type_for_indices` | kernel | 6 | Oracle-tested |

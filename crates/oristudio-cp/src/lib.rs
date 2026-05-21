@@ -314,10 +314,10 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
     descriptor!(
         LengthenCrease,
         "MouseHandlerLengthenCrease",
-        "operations::transform::lengthen",
+        "operations::transform::lengthen_crease",
         Kernel,
         6,
-        Unsupported
+        Porting
     ),
     descriptor!(
         SquareBisector,
@@ -818,10 +818,10 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
     descriptor!(
         LengthenCreaseSameColor,
         "MouseHandlerLengthenCreaseSameColor",
-        "operations::transform::lengthen_same_color",
+        "operations::transform::lengthen_crease",
         Kernel,
         6,
-        Unsupported
+        Porting
     ),
     descriptor!(
         FoldableLineDraw,

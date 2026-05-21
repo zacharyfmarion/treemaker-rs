@@ -19,11 +19,13 @@ use oristudio_cp::operations::color::{
     make_valley, replace_line_type_for_indices, set_line_color_for_indices, toggle_mountain_valley,
 };
 use oristudio_cp::operations::construction::{
-    DrawCreaseTarget, angle_system_candidates, angle_system_draw_to_destination,
-    axiom7_draw_to_destination, axiom7_indicator, commit_axiom7_indicator,
-    commit_parallel_width_indicator, commit_square_bisector_parallel_indicator,
-    double_symmetric_draw, draw_crease_angle_restricted_5, draw_crease_segment, fishbone_draw,
-    inward, mirror_selected_lines, parallel_draw, parallel_width_indicators,
+    AngleRestrictedConvergingCandidates, DrawCreaseTarget, angle_restricted_converging_candidates,
+    angle_system_candidates, angle_system_draw_to_destination, axiom7_draw_to_destination,
+    axiom7_indicator, commit_axiom7_indicator, commit_parallel_width_indicator,
+    commit_square_bisector_parallel_indicator, double_symmetric_draw,
+    draw_crease_angle_restricted_3_candidates, draw_crease_angle_restricted_3_to_point,
+    draw_crease_angle_restricted_5, draw_crease_angle_restricted_converging, draw_crease_segment,
+    fishbone_draw, inward, mirror_selected_lines, parallel_draw, parallel_width_indicators,
     perpendicular_indicator, perpendicular_projection, square_bisector_from_lines_to_destination,
     square_bisector_from_points_to_destination, square_bisector_parallel_between_destinations,
     square_bisector_parallel_indicator, symmetric_draw,
@@ -2193,6 +2195,121 @@ fn angle_system_modes_match_oriedita_oracle() {
 }
 
 #[test]
+fn angle_restricted_3_matches_oriedita_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    let angles = [40.0, 60.0, 80.0, 30.0, 50.0, 100.0];
+    let candidates = draw_crease_angle_restricted_3_candidates(
+        Point::new(1.0, 0.0),
+        Point::new(0.0, 0.0),
+        4,
+        angles,
+    );
+    let mut args = vec![
+        "foldline-angle-restricted3-candidates".to_string(),
+        "1.0".to_string(),
+        "0.0".to_string(),
+        "0.0".to_string(),
+        "0.0".to_string(),
+        "4".to_string(),
+    ];
+    for angle in angles {
+        args.push(angle.to_string());
+    }
+    assert_line_summary_close(
+        &line_segment_list_summary(&candidates),
+        &run_oracle(&oracle, &args),
+        1e-9,
+        "angle-restricted3-candidates",
+    );
+
+    let target_line = segment(0.0, 1.0, 3.0, 1.0, LineColor::Black0);
+    let segments = vec![target_line];
+    let mut model = model_from_segments(&segments);
+    let added = draw_crease_angle_restricted_3_to_point(
+        &mut model,
+        Point::new(1.2, 0.95),
+        Point::new(0.0, 0.0),
+        &candidates[0],
+        0.5,
+        LineColor::Blue2,
+    );
+    let mut args = vec![
+        "foldline-angle-restricted3-draw".to_string(),
+        "1.2".to_string(),
+        "0.95".to_string(),
+        "0.0".to_string(),
+        "0.0".to_string(),
+    ];
+    push_one_segment_args(&mut args, &candidates[0]);
+    args.push("0.5".to_string());
+    args.push(LineColor::Blue2.number().to_string());
+    args.push(segments.len().to_string());
+    push_segment_args(&mut args, &segments);
+    let rust_summary = format!("added|{added}\n{}", line_segment_set_summary(&model));
+    assert_line_summary_close(
+        &rust_summary,
+        &run_oracle(&oracle, &args),
+        1e-9,
+        "angle-restricted3-draw",
+    );
+}
+
+#[test]
+fn angle_restricted_converging_matches_oriedita_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    let base = segment(0.0, 0.0, 1.0, 0.0, LineColor::Purple8);
+    let angles = [40.0, 60.0, 80.0, 30.0, 50.0, 100.0];
+    let candidates = angle_restricted_converging_candidates(&base, 4, angles);
+    let mut args = vec!["foldline-angle-restricted-converging-candidates".to_string()];
+    push_one_segment_args(&mut args, &base);
+    args.push("4".to_string());
+    for angle in angles {
+        args.push(angle.to_string());
+    }
+    assert_line_summary_close(
+        &angle_restricted_converging_summary(&candidates),
+        &run_oracle(&oracle, &args),
+        1e-9,
+        "angle-restricted-converging-candidates",
+    );
+
+    let converge_point = candidates
+        .intersections
+        .iter()
+        .copied()
+        .find(|point| points_close(*point, Point::new(0.5, 0.5), 1e-9))
+        .expect("divider fan should contain the midpoint convergence");
+    let mut model = CreasePatternModel::default();
+    let added =
+        draw_crease_angle_restricted_converging(&mut model, &base, converge_point, LineColor::Red1);
+    let mut args = vec!["foldline-angle-restricted-converging-draw".to_string()];
+    push_one_segment_args(&mut args, &base);
+    args.push(converge_point.x.to_string());
+    args.push(converge_point.y.to_string());
+    args.push(LineColor::Red1.number().to_string());
+    args.push("0".to_string());
+    let rust_summary = format!("added|{added}\n{}", line_segment_set_summary(&model));
+    assert_line_summary_close(
+        &rust_summary,
+        &run_oracle(&oracle, &args),
+        1e-9,
+        "angle-restricted-converging-draw",
+    );
+}
+
+#[test]
 fn draw_symmetric_matches_oriedita_oracle() {
     let Some(oracle) = operations_oracle() else {
         eprintln!(
@@ -2331,6 +2448,14 @@ fn line_segment_set_summary(model: &CreasePatternModel) -> String {
     line_segment_list_summary(&model.line_segments)
 }
 
+fn angle_restricted_converging_summary(candidates: &AngleRestrictedConvergingCandidates) -> String {
+    format!(
+        "{}{}",
+        line_segment_list_summary(&candidates.indicators),
+        point_list_summary(&candidates.intersections)
+    )
+}
+
 fn line_segment_list_summary(segments: &[LineSegment]) -> String {
     let mut output = String::new();
     output.push_str(&format!("lines|{}\n", segments.len()));
@@ -2342,6 +2467,19 @@ fn line_segment_list_summary(segments: &[LineSegment]) -> String {
             java_double_string(segment.b.x),
             java_double_string(segment.b.y),
             segment.color.number()
+        ));
+    }
+    output
+}
+
+fn point_list_summary(points: &[Point]) -> String {
+    let mut output = String::new();
+    output.push_str(&format!("points|{}\n", points.len()));
+    for point in points {
+        output.push_str(&format!(
+            "point|{}|{}\n",
+            java_double_string(point.x),
+            java_double_string(point.y)
         ));
     }
     output
@@ -2466,6 +2604,8 @@ fn assert_line_summary_close(left: &str, right: &str, tolerance: f64, context: &
     for (index, (left_line, right_line)) in left_lines.iter().zip(right_lines.iter()).enumerate() {
         if left_line.starts_with("line|") && right_line.starts_with("line|") {
             assert_line_entry_close(left_line, right_line, tolerance, context, index);
+        } else if left_line.starts_with("point|") && right_line.starts_with("point|") {
+            assert_point_entry_close(left_line, right_line, tolerance, context, index);
         } else {
             assert_eq!(
                 left_line, right_line,
@@ -2504,6 +2644,37 @@ fn assert_line_entry_close(left: &str, right: &str, tolerance: f64, context: &st
         left_parts[5], right_parts[5],
         "{context}: line entry {index} color differs"
     );
+}
+
+fn assert_point_entry_close(left: &str, right: &str, tolerance: f64, context: &str, index: usize) {
+    let left_parts: Vec<_> = left.split('|').collect();
+    let right_parts: Vec<_> = right.split('|').collect();
+    assert_eq!(
+        left_parts.len(),
+        right_parts.len(),
+        "{context}: point entry {index} field count differs"
+    );
+    assert_eq!(
+        left_parts[0], right_parts[0],
+        "{context}: point entry prefix"
+    );
+
+    for field in 1..=2 {
+        let left_value: f64 = left_parts[field]
+            .parse()
+            .unwrap_or_else(|err| panic!("{context}: bad left float {left}: {err}"));
+        let right_value: f64 = right_parts[field]
+            .parse()
+            .unwrap_or_else(|err| panic!("{context}: bad right float {right}: {err}"));
+        assert!(
+            (left_value - right_value).abs() <= tolerance,
+            "{context}: point entry {index} field {field} differs: {left_value} vs {right_value}"
+        );
+    }
+}
+
+fn points_close(left: Point, right: Point, tolerance: f64) -> bool {
+    (left.x - right.x).abs() <= tolerance && (left.y - right.y).abs() <= tolerance
 }
 
 fn java_double_string(value: f64) -> String {

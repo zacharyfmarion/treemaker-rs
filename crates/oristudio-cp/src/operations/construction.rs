@@ -3,11 +3,12 @@
 use crate::geometry::{
     Epsilon, Intersection, LineColor, LineSegment, ParallelJudgement, Point, StraightLine, angle,
     angle_between_0_360, center, determine_line_segment_distance,
-    determine_line_segment_intersection_sweet_with_tolerances, distance,
-    find_intersection_segments, find_intersection_straight_lines, find_line_symmetry_line_segment,
-    find_line_symmetry_point, find_projection, get_segment_with_length, is_line_segment_parallel,
-    is_line_segment_parallel_with_precision, is_point_within_line_span, line_segment_rotate,
-    mid_point, move_parallel,
+    determine_line_segment_intersection, determine_line_segment_intersection_sweet_with_tolerances,
+    distance, find_intersection_segments, find_intersection_straight_lines,
+    find_line_symmetry_line_segment, find_line_symmetry_point, find_projection,
+    get_segment_with_length, is_line_segment_parallel, is_line_segment_parallel_with_precision,
+    is_point_within_line_span, line_segment_rotate, line_segment_rotate_scaled, mid_point,
+    move_parallel,
 };
 use crate::model::CreasePatternModel;
 use crate::operations::arrangement::{
@@ -20,6 +21,12 @@ use crate::operations::transform::extend_to_intersection_point_2;
 pub enum DrawCreaseTarget {
     FoldLine,
     AuxLine,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct AngleRestrictedConvergingCandidates {
+    pub indicators: Vec<LineSegment>,
+    pub intersections: Vec<Point>,
 }
 
 /// Oriedita free/restricted draw-crease insertion after endpoints are resolved.
@@ -62,6 +69,143 @@ pub fn draw_crease_angle_restricted_5(
         &LineSegment::with_color(anchor, release, color),
         DrawCreaseTarget::FoldLine,
     )
+}
+
+/// Oriedita `DRAW_CREASE_ANGLE_RESTRICTED_3_18` fan candidates after two points are resolved.
+pub fn draw_crease_angle_restricted_3_candidates(
+    start: Point,
+    end: Point,
+    angle_system_divider: i32,
+    angles: [f64; 6],
+) -> Vec<LineSegment> {
+    let mut candidates = Vec::new();
+    let count = if angle_system_divider != 0 {
+        angle_system_divider * 2 - 1
+    } else {
+        6
+    };
+    let starting_segment = LineSegment::new(end, start);
+
+    if angle_system_divider != 0 {
+        let mut angle = 0.0;
+        let angle_step = 180.0 / angle_system_divider as f64;
+        for i in 0..count {
+            angle += angle_step;
+            let color = if i % 2 == 0 {
+                LineColor::Orange4
+            } else {
+                LineColor::Green6
+            };
+            candidates.push(
+                line_segment_rotate_scaled(&starting_segment, angle, 100.0).with_line_color(color),
+            );
+        }
+    } else {
+        for (index, angle) in angles.into_iter().enumerate() {
+            let color = match index % 3 {
+                0 => LineColor::Orange4,
+                1 => LineColor::Green6,
+                _ => LineColor::Purple8,
+            };
+            candidates.push(
+                line_segment_rotate_scaled(&starting_segment, angle, 100.0).with_line_color(color),
+            );
+        }
+    }
+
+    candidates
+}
+
+/// Oriedita `DRAW_CREASE_ANGLE_RESTRICTED_3_18` final add after a fan line is chosen.
+pub fn draw_crease_angle_restricted_3_to_point(
+    model: &mut CreasePatternModel,
+    pointer: Point,
+    endpoint: Point,
+    selected_candidate: &LineSegment,
+    selection_distance: f64,
+    color: LineColor,
+) -> bool {
+    if determine_line_segment_distance(pointer, selected_candidate) >= selection_distance {
+        return false;
+    }
+
+    let mut target_point = find_projection(StraightLine::from_segment(selected_candidate), pointer);
+    let closest_line = closest_line_segment_or_sentinel(model, pointer);
+    if determine_line_segment_distance(pointer, &closest_line) < selection_distance
+        && is_line_segment_parallel_with_precision(
+            StraightLine::from_segment(selected_candidate),
+            StraightLine::from_segment(&closest_line),
+            Epsilon::UNKNOWN_1EN6,
+        ) == ParallelJudgement::NotParallel
+    {
+        let intersection = find_intersection_segments(selected_candidate, &closest_line);
+        if pointer.distance(target_point) * 2.0 > pointer.distance(intersection) {
+            target_point = intersection;
+        }
+    }
+
+    add_line_segment_like_worker(
+        model,
+        &LineSegment::with_color(target_point, endpoint, color),
+    );
+    true
+}
+
+/// Oriedita `DRAW_CREASE_ANGLE_RESTRICTED_13` indicator and convergence candidates.
+pub fn angle_restricted_converging_candidates(
+    segment: &LineSegment,
+    angle_system_divider: i32,
+    angles: [f64; 6],
+) -> AngleRestrictedConvergingCandidates {
+    let mut indicators = Vec::new();
+    let count = if angle_system_divider != 0 {
+        angle_system_divider * 2 - 1
+    } else {
+        6
+    };
+
+    if angle_system_divider != 0 {
+        let angle_step = 180.0 / angle_system_divider as f64;
+        push_angle_restricted_converging_divider_indicators(
+            &mut indicators,
+            segment,
+            angle_step,
+            count,
+        );
+        push_angle_restricted_converging_divider_indicators(
+            &mut indicators,
+            &segment.with_swapped_coordinates(),
+            angle_step,
+            count,
+        );
+    } else {
+        push_angle_restricted_converging_custom_indicators(&mut indicators, segment, angles);
+        push_angle_restricted_converging_custom_indicators(
+            &mut indicators,
+            &segment.with_swapped_coordinates(),
+            angles,
+        );
+    }
+
+    let intersections = angle_restricted_converging_intersections(segment, &indicators);
+    AngleRestrictedConvergingCandidates {
+        indicators,
+        intersections,
+    }
+}
+
+/// Oriedita `DRAW_CREASE_ANGLE_RESTRICTED_13` final add after a convergence point is chosen.
+pub fn draw_crease_angle_restricted_converging(
+    model: &mut CreasePatternModel,
+    segment: &LineSegment,
+    converge_point: Point,
+    color: LineColor,
+) -> usize {
+    let first = LineSegment::with_color(segment.a, converge_point, color);
+    let second = LineSegment::with_color(segment.b, converge_point, color);
+    add_line_segment_like_worker(model, &first);
+    add_line_segment_like_worker(model, &second);
+    2
 }
 
 /// Oriedita `SnappingUtil.snapToActiveAngleSystem` without UI grid candidates.
@@ -742,6 +886,69 @@ fn next_fishbone_color(color: LineColor) -> LineColor {
         LineColor::Blue2 => LineColor::Red1,
         other => other,
     }
+}
+
+fn push_angle_restricted_converging_divider_indicators(
+    indicators: &mut Vec<LineSegment>,
+    segment: &LineSegment,
+    angle_step: f64,
+    count: i32,
+) {
+    let mut angle = 0.0;
+    for i in 0..count {
+        angle += angle_step;
+        let color = if i % 2 == 0 {
+            LineColor::Orange4
+        } else {
+            LineColor::Green6
+        };
+        indicators.push(line_segment_rotate_scaled(segment, angle, 10.0).with_line_color(color));
+    }
+}
+
+fn push_angle_restricted_converging_custom_indicators(
+    indicators: &mut Vec<LineSegment>,
+    segment: &LineSegment,
+    angles: [f64; 6],
+) {
+    for (index, angle) in angles.into_iter().enumerate() {
+        // The Java handler's custom branch uses a 1-based loop against a six-value array.
+        // Preserve its intended color order while keeping the Rust kernel non-panicking.
+        let color = match index {
+            0 | 4 => LineColor::Green6,
+            1 | 5 => LineColor::Purple8,
+            _ => LineColor::Orange4,
+        };
+        indicators.push(line_segment_rotate_scaled(segment, angle, 10.0).with_line_color(color));
+    }
+}
+
+fn angle_restricted_converging_intersections(
+    segment: &LineSegment,
+    indicators: &[LineSegment],
+) -> Vec<Point> {
+    let mut intersections = Vec::new();
+    for i in 0..indicators.len() {
+        for j in (i + 1)..indicators.len() {
+            let first = &indicators[i];
+            let second = &indicators[j];
+            let intersection = determine_line_segment_intersection(first, second);
+            if !intersection.is_intersection() || intersection.is_overlapping() {
+                continue;
+            }
+
+            let point = find_intersection_segments(first, second);
+            if point == segment.a || point == segment.b {
+                continue;
+            }
+            if intersections.contains(&point) {
+                continue;
+            }
+
+            intersections.push(point);
+        }
+    }
+    intersections
 }
 
 fn closest_line_segment_or_sentinel(model: &CreasePatternModel, point: Point) -> LineSegment {

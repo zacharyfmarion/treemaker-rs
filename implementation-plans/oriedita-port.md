@@ -399,6 +399,12 @@ Port all command behavior for:
 - Symmetric line drawing.
 - Angle-restricted line drawing.
 - 3-angle and 5-angle restricted variants.
+- `DRAW_CREASE_ANGLE_RESTRICTED_13` and
+  `DRAW_CREASE_ANGLE_RESTRICTED_3_18` are ported and oracle-tested for divider
+  angle systems, including deterministic fan candidates, selected fan-line
+  commits, convergence intersections, and worker-style fold-line insertion.
+  The Rust converging custom-angle branch stays non-panicking for six angles;
+  Oriedita's source indexes that branch as if the angle array were 1-based.
 - `ANGLE_SYSTEM_16` is ported and oracle-tested for resolved two-point
   candidate generation and destination commit. It preserves divider/custom
   angle preview candidates, alternating indicator colors, and worker-style

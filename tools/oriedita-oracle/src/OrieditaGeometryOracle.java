@@ -41,6 +41,16 @@ import java.util.regex.Pattern;
 public class OrieditaGeometryOracle {
     private static final String JSON_NUMBER = "[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:[Ee][+-]?\\d+)?";
 
+    private static class AngleRestrictedConvergingCandidates {
+        final List<LineSegment> indicators;
+        final List<Point> intersections;
+
+        AngleRestrictedConvergingCandidates(List<LineSegment> indicators, List<Point> intersections) {
+            this.indicators = indicators;
+            this.intersections = intersections;
+        }
+    }
+
     public static void main(String[] args) throws Exception {
         if (args.length < 1) {
             usage("missing command");
@@ -98,6 +108,10 @@ public class OrieditaGeometryOracle {
             case "foldline-inward" -> foldLineInward(args);
             case "foldline-fishbone" -> foldLineFishbone(args);
             case "foldline-angle-restricted5" -> foldLineAngleRestricted5(args);
+            case "foldline-angle-restricted3-candidates" -> foldLineAngleRestricted3Candidates(args);
+            case "foldline-angle-restricted3-draw" -> foldLineAngleRestricted3Draw(args);
+            case "foldline-angle-restricted-converging-candidates" -> foldLineAngleRestrictedConvergingCandidates(args);
+            case "foldline-angle-restricted-converging-draw" -> foldLineAngleRestrictedConvergingDraw(args);
             case "foldline-angle-system-candidates" -> foldLineAngleSystemCandidates(args);
             case "foldline-angle-system-draw" -> foldLineAngleSystemDraw(args);
             case "foldline-square-bisector-3p" -> foldLineSquareBisector3p(args);
@@ -1495,6 +1509,217 @@ public class OrieditaGeometryOracle {
         printFoldLineSet(set);
     }
 
+    private static void foldLineAngleRestricted3Candidates(String[] args) {
+        if (args.length != 12) {
+            usage("foldline-angle-restricted3-candidates expects start, end, divider, and six angles");
+        }
+
+        Point start = new Point(parse(args[1]), parse(args[2]));
+        Point end = new Point(parse(args[3]), parse(args[4]));
+        int divider = Integer.parseInt(args[5]);
+        double[] angles = new double[] {
+                parse(args[6]),
+                parse(args[7]),
+                parse(args[8]),
+                parse(args[9]),
+                parse(args[10]),
+                parse(args[11]),
+        };
+        printLineSegmentsList(angleRestricted3Candidates(start, end, divider, angles));
+    }
+
+    private static void foldLineAngleRestricted3Draw(String[] args) {
+        if (args.length < 13) {
+            usage("foldline-angle-restricted3-draw expects pointer, endpoint, selected candidate, selection distance, color, count, and segment payload");
+        }
+
+        Point pointer = new Point(parse(args[1]), parse(args[2]));
+        Point endpoint = new Point(parse(args[3]), parse(args[4]));
+        LineSegment selected = segment(args, 5);
+        double selectionDistance = parse(args[10]);
+        LineColor color = LineColor.fromNumber(Integer.parseInt(args[11]));
+        int count = Integer.parseInt(args[12]);
+        FoldLineSet set = foldLineSet(args, 13, count);
+        boolean added = false;
+
+        if (OritaCalc.determineLineSegmentDistance(pointer, selected) < selectionDistance) {
+            Point targetPoint = OritaCalc.findProjection(selected, pointer);
+            LineSegment closestLineSegment = new LineSegment(set.getClosestLineSegment(pointer));
+            if (OritaCalc.determineLineSegmentDistance(pointer, closestLineSegment) < selectionDistance) {
+                if (OritaCalc.isLineSegmentParallel(selected, closestLineSegment, Epsilon.UNKNOWN_1EN6)
+                        == OritaCalc.ParallelJudgement.NOT_PARALLEL) {
+                    Point intersection = OritaCalc.findIntersection(selected, closestLineSegment);
+                    if (pointer.distance(targetPoint) * 2.0 > pointer.distance(intersection)) {
+                        targetPoint = intersection;
+                    }
+                }
+            }
+
+            addLineSegmentLikeWorker(set, new LineSegment(targetPoint, endpoint, color));
+            added = true;
+        }
+
+        System.out.println("added|" + added);
+        printFoldLineSet(set);
+    }
+
+    private static void foldLineAngleRestrictedConvergingCandidates(String[] args) {
+        if (args.length != 13) {
+            usage("foldline-angle-restricted-converging-candidates expects segment, divider, and six angles");
+        }
+
+        LineSegment segment = segment(args, 1);
+        int divider = Integer.parseInt(args[6]);
+        double[] angles = new double[] {
+                parse(args[7]),
+                parse(args[8]),
+                parse(args[9]),
+                parse(args[10]),
+                parse(args[11]),
+                parse(args[12]),
+        };
+        AngleRestrictedConvergingCandidates candidates =
+                angleRestrictedConvergingCandidates(segment, divider, angles);
+        printLineSegmentsList(candidates.indicators);
+        printPointsList(candidates.intersections);
+    }
+
+    private static void foldLineAngleRestrictedConvergingDraw(String[] args) {
+        if (args.length < 10) {
+            usage("foldline-angle-restricted-converging-draw expects base segment, converge point, color, count, and segment payload");
+        }
+
+        LineSegment segment = segment(args, 1);
+        Point converge = new Point(parse(args[6]), parse(args[7]));
+        LineColor color = LineColor.fromNumber(Integer.parseInt(args[8]));
+        int count = Integer.parseInt(args[9]);
+        FoldLineSet set = foldLineSet(args, 10, count);
+
+        addLineSegmentLikeWorker(set, new LineSegment(segment.getA(), converge, color));
+        addLineSegmentLikeWorker(set, new LineSegment(segment.getB(), converge, color));
+
+        System.out.println("added|2");
+        printFoldLineSet(set);
+    }
+
+    private static List<LineSegment> angleRestricted3Candidates(
+            Point start,
+            Point end,
+            int divider,
+            double[] angles) {
+        List<LineSegment> candidates = new ArrayList<>();
+        int count = divider != 0 ? divider * 2 - 1 : 6;
+        LineSegment startingSegment = new LineSegment(end, start);
+
+        if (divider != 0) {
+            double angle = 0.0;
+            double angleStep = 180.0 / (double) divider;
+            for (int i = 0; i < count; i++) {
+                angle += angleStep;
+                LineSegment candidate = OritaCalc.lineSegment_rotate(startingSegment, angle, 100.0);
+                if (i % 2 == 0) {
+                    candidate = candidate.withColor(LineColor.ORANGE_4);
+                } else {
+                    candidate = candidate.withColor(LineColor.GREEN_6);
+                }
+                candidates.add(candidate);
+            }
+        } else {
+            LineColor[] colors = new LineColor[] {
+                    LineColor.ORANGE_4,
+                    LineColor.GREEN_6,
+                    LineColor.PURPLE_8
+            };
+            for (int i = 0; i < 6; i++) {
+                candidates.add(OritaCalc.lineSegment_rotate(startingSegment, angles[i], 100.0).withColor(colors[i % 3]));
+            }
+        }
+        return candidates;
+    }
+
+    private static AngleRestrictedConvergingCandidates angleRestrictedConvergingCandidates(
+            LineSegment segment,
+            int divider,
+            double[] angles) {
+        List<LineSegment> indicators = new ArrayList<>();
+        int count = divider != 0 ? divider * 2 - 1 : 6;
+
+        if (divider != 0) {
+            double angleStep = 180.0 / (double) divider;
+            addAngleRestrictedConvergingDividerIndicators(indicators, segment, angleStep, count);
+            addAngleRestrictedConvergingDividerIndicators(indicators, segment.withSwappedCoordinates(), angleStep, count);
+        } else {
+            addAngleRestrictedConvergingCustomIndicators(indicators, segment, angles);
+            addAngleRestrictedConvergingCustomIndicators(indicators, segment.withSwappedCoordinates(), angles);
+        }
+
+        return new AngleRestrictedConvergingCandidates(
+                indicators,
+                angleRestrictedConvergingIntersections(segment, indicators));
+    }
+
+    private static void addAngleRestrictedConvergingDividerIndicators(
+            List<LineSegment> indicators,
+            LineSegment segment,
+            double angleStep,
+            int count) {
+        double angle = 0.0;
+        for (int i = 0; i < count; i++) {
+            angle += angleStep;
+            LineSegment indicator = OritaCalc.lineSegment_rotate(segment, angle, 10.0);
+            if (i % 2 == 0) {
+                indicator = indicator.withColor(LineColor.ORANGE_4);
+            } else {
+                indicator = indicator.withColor(LineColor.GREEN_6);
+            }
+            indicators.add(indicator);
+        }
+    }
+
+    private static void addAngleRestrictedConvergingCustomIndicators(
+            List<LineSegment> indicators,
+            LineSegment segment,
+            double[] angles) {
+        LineColor[] colors = new LineColor[] {
+                LineColor.GREEN_6,
+                LineColor.PURPLE_8,
+                LineColor.ORANGE_4,
+                LineColor.ORANGE_4,
+                LineColor.GREEN_6,
+                LineColor.PURPLE_8,
+        };
+        for (int i = 0; i < 6; i++) {
+            indicators.add(OritaCalc.lineSegment_rotate(segment, angles[i], 10.0).withColor(colors[i]));
+        }
+    }
+
+    private static List<Point> angleRestrictedConvergingIntersections(
+            LineSegment segment,
+            List<LineSegment> indicators) {
+        List<Point> intersections = new ArrayList<>();
+        for (int i = 0; i < indicators.size(); i++) {
+            for (int j = i + 1; j < indicators.size(); j++) {
+                LineSegment first = indicators.get(i);
+                LineSegment second = indicators.get(j);
+                LineSegment.Intersection intersection =
+                        OritaCalc.determineLineSegmentIntersection(first, second);
+                if (!intersection.isIntersection() || intersection.isOverlapping()) {
+                    continue;
+                }
+
+                Point point = OritaCalc.findIntersection(first, second);
+                if (point.equals(segment.getA()) || point.equals(segment.getB())) {
+                    continue;
+                }
+                if (intersections.stream().anyMatch(existing -> existing.equals(point))) {
+                    continue;
+                }
+                intersections.add(point);
+            }
+        }
+        return intersections;
+    }
+
     private static Point snapToActiveAngleSystem(
             FoldLineSet set,
             Point start,
@@ -2756,6 +2981,13 @@ public class OrieditaGeometryOracle {
         }
     }
 
+    private static void printPointsList(List<Point> points) {
+        System.out.println("points|" + points.size());
+        for (Point point : points) {
+            System.out.println("point|" + point.getX() + "|" + point.getY());
+        }
+    }
+
     private static void printFoldLineSet(FoldLineSet set) {
         System.out.println("lines|" + set.getTotal());
         for (int index = 1; index <= set.getTotal(); index++) {
@@ -2958,6 +3190,10 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle foldline-inward <p1x> <p1y> <p2x> <p2y> <p3x> <p3y> <color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-fishbone <drag ax ay bx by color> <gridWidth> <color> <selectionDistance> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-angle-restricted5 <anchorX> <anchorY> <pointerX> <pointerY> <divider> <angle1> <angle2> <angle3> <angle4> <angle5> <angle6> <selectionDistance> <color> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-angle-restricted3-candidates <startX> <startY> <endX> <endY> <divider> <angle1> <angle2> <angle3> <angle4> <angle5> <angle6>");
+        System.err.println("   or: OrieditaGeometryOracle foldline-angle-restricted3-draw <pointerX> <pointerY> <endpointX> <endpointY> <selected ax ay bx by color> <selectionDistance> <color> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-angle-restricted-converging-candidates <segment ax ay bx by color> <divider> <angle1> <angle2> <angle3> <angle4> <angle5> <angle6>");
+        System.err.println("   or: OrieditaGeometryOracle foldline-angle-restricted-converging-draw <segment ax ay bx by color> <convergeX> <convergeY> <color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-angle-system-candidates <startX> <startY> <endX> <endY> <divider> <angle1> <angle2> <angle3> <angle4> <angle5> <angle6>");
         System.err.println("   or: OrieditaGeometryOracle foldline-angle-system-draw <releaseX> <releaseY> <selected ax ay bx by color> <destination ax ay bx by color> <color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-square-bisector-3p <p1x> <p1y> <p2x> <p2y> <p3x> <p3y> <destination ax ay bx by color> <color> <count> [ax ay bx by color]...");

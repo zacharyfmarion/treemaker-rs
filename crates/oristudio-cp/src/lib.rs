@@ -370,10 +370,10 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
     descriptor!(
         DrawCreaseAngleRestricted,
         "MouseHandlerDrawCreaseAngleRestricted",
-        "operations::construction::angle_restricted",
+        "operations::construction::angle_restricted_converging_candidates",
         Kernel,
         7,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         DrawPoint,
@@ -402,10 +402,10 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
     descriptor!(
         DrawCreaseAngleRestricted3,
         "MouseHandlerDrawCreaseAngleRestricted3_2",
-        "operations::construction::angle_restricted_3",
+        "operations::construction::draw_crease_angle_restricted_3_candidates",
         Kernel,
         7,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         CreaseSelect,

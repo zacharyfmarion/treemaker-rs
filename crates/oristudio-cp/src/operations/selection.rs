@@ -96,6 +96,15 @@ pub fn select_connected_from_point(model: &mut CreasePatternModel, point: Point)
     set_indices(model, &connected_indices, SELECTED)
 }
 
+/// Oriedita `FoldLineSet.delSelectedLineSegmentFast`.
+pub fn delete_selected_lines(model: &mut CreasePatternModel) -> usize {
+    let original_total = model.line_segments.len();
+    model
+        .line_segments
+        .retain(|segment| segment.selected != SELECTED);
+    original_total - model.line_segments.len()
+}
+
 fn set_all(model: &mut CreasePatternModel, selected: i32) -> usize {
     let mut changed = 0;
     for segment in &mut model.line_segments {

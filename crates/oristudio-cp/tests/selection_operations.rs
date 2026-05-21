@@ -1,9 +1,9 @@
 use oristudio_cp::geometry::{LineColor, LineSegment, Point, Polygon};
 use oristudio_cp::model::CreasePatternModel;
 use oristudio_cp::operations::selection::{
-    select_all, select_box, select_connected_from_point, select_indices, select_intersecting_line,
-    select_polygon, unselect_all, unselect_box, unselect_indices, unselect_intersecting_line,
-    unselect_polygon,
+    delete_selected_lines, select_all, select_box, select_connected_from_point, select_indices,
+    select_intersecting_line, select_polygon, unselect_all, unselect_box, unselect_indices,
+    unselect_intersecting_line, unselect_polygon,
 };
 
 #[test]
@@ -94,6 +94,23 @@ fn connected_selection_walks_exact_oriedita_equal_endpoints() {
         3
     );
     assert_eq!(selected_flags(&model), vec![2, 2, 2, 0]);
+}
+
+#[test]
+fn delete_selected_lines_removes_selected_segments_and_preserves_order() {
+    let mut model = model_from_segments(&[
+        segment(0.0, 0.0, 1.0, 0.0, LineColor::Red1),
+        segment(0.0, 1.0, 1.0, 1.0, LineColor::Blue2),
+        segment(0.0, 2.0, 1.0, 2.0, LineColor::Black0),
+    ]);
+    model.line_segments[0] = model.line_segments[0].with_selected(2);
+    model.line_segments[2] = model.line_segments[2].with_selected(2);
+
+    let deleted = delete_selected_lines(&mut model);
+
+    assert_eq!(deleted, 2);
+    assert_eq!(model.line_segments.len(), 1);
+    assert_eq!(model.line_segments[0].color, LineColor::Blue2);
 }
 
 fn model_from_segments(segments: &[LineSegment]) -> CreasePatternModel {

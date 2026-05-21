@@ -1,15 +1,19 @@
 use oristudio_cp::geometry::{Intersection, LineColor, LineSegment, Point};
-use oristudio_cp::model::CreasePatternModel;
+use oristudio_cp::model::{CreasePatternModel, CustomLineType};
 use oristudio_cp::operations::arrangement::{
     branch_trim, del_v_all, del_v_all_color_change, del_v_at_point, del_v_at_point_color_change,
     del_v_pair, delete_intersecting_or_overlapping_lines_along, delete_overlapping_lines_along,
     divide_intersections, divide_intersections_fast, divide_line_segment_with_new_lines, fix1,
     fix2, intersect_divide_pair,
 };
-use oristudio_cp::operations::color::{set_line_color_for_indices, toggle_mountain_valley};
+use oristudio_cp::operations::color::{
+    delete_line_type_for_indices, replace_line_type_for_indices, set_line_color_for_indices,
+    toggle_mountain_valley,
+};
 use oristudio_cp::operations::selection::{
-    select_all, select_box, select_connected_from_point, select_indices, select_intersecting_line,
-    select_polygon, unselect_all, unselect_indices, unselect_intersecting_line, unselect_polygon,
+    delete_selected_lines, select_all, select_box, select_connected_from_point, select_indices,
+    select_intersecting_line, select_polygon, unselect_all, unselect_indices,
+    unselect_intersecting_line, unselect_polygon,
 };
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -483,6 +487,76 @@ fn color_operations_match_oriedita_foldlineset_oracle() {
     ];
     push_segment_args(&mut args, &mv_segments);
     assert_eq!(line_segment_set_summary(&model), run_oracle(&oracle, &args));
+}
+
+#[test]
+fn selected_type_commands_match_oriedita_foldlineset_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    let duplicate_segments = vec![
+        segment(0.0, 0.0, 10.0, 0.0, LineColor::Red1),
+        segment(0.0, 0.0, 10.0, 0.0, LineColor::Red1),
+        segment(0.0, 1.0, 10.0, 1.0, LineColor::Blue2),
+    ];
+    let mut model = model_from_segments(&duplicate_segments);
+    let changed = replace_line_type_for_indices(
+        &mut model,
+        &[1],
+        CustomLineType::Mountain,
+        CustomLineType::Valley,
+    );
+    let mut args = vec![
+        "foldline-replace-type".to_string(),
+        CustomLineType::Mountain.number().to_string(),
+        CustomLineType::Valley.number().to_string(),
+        "1".to_string(),
+        duplicate_segments.len().to_string(),
+    ];
+    push_segment_args(&mut args, &duplicate_segments);
+    let rust_summary = format!(
+        "changed|{changed}\n{}",
+        line_segment_set_with_selection_summary(&model)
+    );
+    assert_eq!(rust_summary, run_oracle(&oracle, &args));
+
+    let delete_segments = vec![
+        segment(0.0, 0.0, 1.0, 0.0, LineColor::Red1),
+        segment(0.0, 1.0, 1.0, 1.0, LineColor::Blue2),
+        segment(0.0, 2.0, 1.0, 2.0, LineColor::Black0),
+    ];
+    let mut model = model_from_segments(&delete_segments);
+    delete_line_type_for_indices(&mut model, &[0, 1, 2], CustomLineType::MountainAndValley);
+    let mut args = vec![
+        "foldline-delete-type".to_string(),
+        CustomLineType::MountainAndValley.number().to_string(),
+        "0,1,2".to_string(),
+        delete_segments.len().to_string(),
+    ];
+    push_segment_args(&mut args, &delete_segments);
+    assert_eq!(
+        line_segment_set_with_selection_summary(&model),
+        run_oracle(&oracle, &args)
+    );
+
+    let mut model = model_from_segments(&delete_segments);
+    model.line_segments[0] = model.line_segments[0].with_selected(2);
+    model.line_segments[2] = model.line_segments[2].with_selected(2);
+    delete_selected_lines(&mut model);
+    let mut args = vec![
+        "foldline-delete-selected".to_string(),
+        "0,2".to_string(),
+        delete_segments.len().to_string(),
+    ];
+    push_segment_args(&mut args, &delete_segments);
+    assert_eq!(
+        line_segment_set_with_selection_summary(&model),
+        run_oracle(&oracle, &args)
+    );
 }
 
 #[test]

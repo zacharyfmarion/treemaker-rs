@@ -3,7 +3,7 @@
 use crate::geometry::{
     LineColor, LineSegment, determine_line_segment_distance, is_line_segment_overlapping,
 };
-use crate::model::CreasePatternModel;
+use crate::model::{CreasePatternModel, CustomLineType};
 use crate::operations::arrangement::divide_line_segment_with_new_lines;
 
 /// Oriedita `FoldLineSet.setColor(Collection<LineSegment>, LineColor)`.
@@ -15,14 +15,10 @@ pub fn set_line_color_for_segments(
     let mut changed = 0;
     let mut aux = Vec::new();
 
-    for target in lines {
-        let Some(index) = model
-            .line_segments
-            .iter()
-            .position(|segment| segment == target)
-        else {
+    for index in 0..model.line_segments.len() {
+        if !lines.contains(&model.line_segments[index]) {
             continue;
-        };
+        }
 
         if model.line_segments[index].color == color {
             continue;
@@ -72,6 +68,46 @@ pub fn make_edge(model: &mut CreasePatternModel, indices: &[usize]) -> usize {
 /// Oriedita `CREASE_MAKE_AUX_60` selected-line mutation.
 pub fn make_aux(model: &mut CreasePatternModel, indices: &[usize]) -> usize {
     set_line_color_for_indices(model, indices, LineColor::Cyan3)
+}
+
+/// Oriedita `REPLACE_LINE_TYPE_SELECT_72` mutation over explicit line indices.
+pub fn replace_line_type_for_indices(
+    model: &mut CreasePatternModel,
+    indices: &[usize],
+    from: CustomLineType,
+    to: CustomLineType,
+) -> usize {
+    let lines = lines_matching_type_for_indices(model, indices, from);
+    set_line_color_for_segments(model, &lines, to.line_color())
+}
+
+/// Replace currently selected lines matching one Oriedita custom line type.
+pub fn replace_selected_line_type(
+    model: &mut CreasePatternModel,
+    from: CustomLineType,
+    to: CustomLineType,
+) -> usize {
+    let indices = selected_indices(model);
+    replace_line_type_for_indices(model, &indices, from, to)
+}
+
+/// Oriedita `DELETE_LINE_TYPE_SELECT_73` mutation over explicit line indices.
+pub fn delete_line_type_for_indices(
+    model: &mut CreasePatternModel,
+    indices: &[usize],
+    line_type: CustomLineType,
+) -> usize {
+    let lines = lines_matching_type_for_indices(model, indices, line_type);
+    delete_lines_by_value(model, &lines)
+}
+
+/// Delete currently selected lines matching one Oriedita custom line type.
+pub fn delete_selected_line_type(
+    model: &mut CreasePatternModel,
+    line_type: CustomLineType,
+) -> usize {
+    let indices = selected_indices(model);
+    delete_line_type_for_indices(model, &indices, line_type)
 }
 
 /// Oriedita `CREASE_TOGGLE_MV_58` selected-line mutation.
@@ -160,4 +196,42 @@ fn replace_aux_lines(model: &mut CreasePatternModel, color: LineColor, aux: &[Li
         model.add_line_segment(replacement);
         divide_line_segment_with_new_lines(model, original_end, original_end + 1);
     }
+}
+
+fn selected_indices(model: &CreasePatternModel) -> Vec<usize> {
+    model
+        .line_segments
+        .iter()
+        .enumerate()
+        .filter(|(_, segment)| segment.selected == 2)
+        .map(|(index, _)| index)
+        .collect()
+}
+
+fn lines_matching_type_for_indices(
+    model: &CreasePatternModel,
+    indices: &[usize],
+    line_type: CustomLineType,
+) -> Vec<LineSegment> {
+    indices
+        .iter()
+        .filter_map(|index| model.line_segments.get(*index))
+        .filter(|segment| line_type.matches(segment.color))
+        .cloned()
+        .collect()
+}
+
+fn delete_lines_by_value(model: &mut CreasePatternModel, lines: &[LineSegment]) -> usize {
+    let mut deleted = 0;
+    for line in lines {
+        if let Some(index) = model
+            .line_segments
+            .iter()
+            .position(|candidate| candidate == line)
+        {
+            model.line_segments.remove(index);
+            deleted += 1;
+        }
+    }
+    deleted
 }

@@ -58,6 +58,9 @@ public class OrieditaGeometryOracle {
             case "foldline-select-polygon" -> foldLineSelectPolygon(args);
             case "foldline-select-lx" -> foldLineSelectLx(args);
             case "foldline-select-connected" -> foldLineSelectConnected(args);
+            case "foldline-delete-selected" -> foldLineDeleteSelected(args);
+            case "foldline-replace-type" -> foldLineReplaceType(args);
+            case "foldline-delete-type" -> foldLineDeleteType(args);
             case "custom-line-type" -> customLineType(args);
             case "orh-import-summary" -> orhImportSummary(args);
             case "orh-export-fixture" -> orhExportFixture(args);
@@ -454,6 +457,54 @@ public class OrieditaGeometryOracle {
         FoldLineSet set = foldLineSet(args, 5, count);
         applySelectedIndices(set, args[3], 2);
         set.selectProbablyConnected(point);
+        printFoldLineSetWithSelection(set);
+    }
+
+    private static void foldLineDeleteSelected(String[] args) {
+        if (args.length < 3) {
+            usage("foldline-delete-selected expects preselected indices, count, and segment payload");
+        }
+
+        int count = Integer.parseInt(args[2]);
+        FoldLineSet set = foldLineSet(args, 3, count);
+        applySelectedIndices(set, args[1], 2);
+        set.delSelectedLineSegmentFast();
+        printFoldLineSetWithSelection(set);
+    }
+
+    private static void foldLineReplaceType(String[] args) {
+        if (args.length < 5) {
+            usage("foldline-replace-type expects from type, to type, indices, count, and segment payload");
+        }
+
+        CustomLineTypes from = CustomLineTypes.from(Integer.parseInt(args[1]));
+        CustomLineTypes to = CustomLineTypes.from(Integer.parseInt(args[2]));
+        int count = Integer.parseInt(args[4]);
+        FoldLineSet set = foldLineSet(args, 5, count);
+        List<LineSegment> lines = selectedFoldLines(set, args[3])
+                .stream()
+                .filter(line -> from.matches(line.getColor()))
+                .toList();
+        int changed = set.setColor(lines, to.getLineColor());
+        System.out.println("changed|" + changed);
+        printFoldLineSetWithSelection(set);
+    }
+
+    private static void foldLineDeleteType(String[] args) {
+        if (args.length < 4) {
+            usage("foldline-delete-type expects line type, indices, count, and segment payload");
+        }
+
+        CustomLineTypes lineType = CustomLineTypes.from(Integer.parseInt(args[1]));
+        int count = Integer.parseInt(args[3]);
+        FoldLineSet set = foldLineSet(args, 4, count);
+        List<LineSegment> lines = selectedFoldLines(set, args[2])
+                .stream()
+                .filter(line -> lineType.matches(line.getColor()))
+                .toList();
+        for (LineSegment line : lines) {
+            set.deleteLine(line);
+        }
         printFoldLineSetWithSelection(set);
     }
 

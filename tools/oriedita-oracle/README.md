@@ -13,7 +13,8 @@ the legacy `Fix1`/`Fix2` workers. The first color commands cover
 The first selection commands cover select/unselect all, index selection, box
 selection via `lineSegmentsInside`, polygon selection via `select_Takakukei`,
 line-overlap/intersection selection via `select_lX`, and
-`selectProbablyConnected`.
+`selectProbablyConnected`. Selection-dependent type commands cover selected
+line deletion, line-type replacement, and line-type deletion.
 
 The oracle intentionally compiles against a pinned Oriedita source checkout
 instead of reimplementing the behavior in Rust.

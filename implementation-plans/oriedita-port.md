@@ -887,10 +887,15 @@ Status:
   through the polygon.
 - Rust unit coverage also exists for selected-line make mountain/valley/edge/aux
   wrappers, the `CREASE_ADVANCE_TYPE_30` click cycle, and the overlapping-line
-  alternation used by `CREASE_MAKE_MV_34`. Full handler parity remains open for
-  nearest-click line selection, Java2D path/lasso selection, selection-dependent
-  delete/replace type handlers, transform commands, operation-frame behavior,
-  lengthen commands, and handler-level `fix2` chaining.
+  alternation used by `CREASE_MAKE_MV_34`.
+- `REPLACE_LINE_TYPE_SELECT_72`, `DELETE_LINE_TYPE_SELECT_73`, and
+  `FoldLineSet.delSelectedLineSegmentFast` now have Rust helpers and Oriedita
+  oracle coverage. This slice also fixed `FoldLineSet.setColor(Collection,
+  LineColor)` duplicate handling so a selected line value changes every equal
+  duplicate, matching Oriedita's `HashSet` membership pass.
+- Full handler parity remains open for nearest-click line selection, Java2D
+  path/lasso selection, transform commands, operation-frame behavior, lengthen
+  commands, and handler-level `fix2` chaining.
 
 ### Stage 7: Construction Tools
 

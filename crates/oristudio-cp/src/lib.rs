@@ -283,34 +283,34 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
     descriptor!(
         DrawCreaseFree,
         "MouseHandlerDrawCreaseFree",
-        "operations::construction::draw_free",
+        "operations::construction::draw_crease_segment",
         Kernel,
         7,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         MoveCreasePattern,
         "MouseHandlerMoveCreasePattern",
-        "operations::transform::move_document",
-        Kernel,
-        6,
-        Unsupported
+        "runtime camera pan, no persisted CP mutation",
+        UiPreviewOnly,
+        0,
+        OutOfScopeUi
     ),
     descriptor!(
         LineSegmentDelete,
         "MouseHandlerLineSegmentDelete",
-        "operations::arrangement::delete_line",
+        "operations::arrangement::delete_line_segments_for_indices",
         Kernel,
         5,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         ChangeCreaseType,
         "MouseHandlerChangeCreaseType",
-        "operations::color::change_type",
+        "operations::color::change_crease_type",
         Kernel,
         6,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         LengthenCrease,
@@ -318,7 +318,7 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
         "operations::transform::lengthen_crease",
         Kernel,
         6,
-        Porting
+        OracleTested
     ),
     descriptor!(
         SquareBisector,
@@ -355,18 +355,18 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
     descriptor!(
         DrawCreaseRestricted,
         "MouseHandlerDrawCreaseRestricted",
-        "operations::construction::draw_restricted",
+        "operations::construction::draw_crease_segment",
         Kernel,
         7,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         DrawCreaseSymmetric,
         "MouseHandlerDrawCreaseSymmetric",
-        "operations::construction::draw_symmetric",
+        "operations::construction::mirror_selected_lines",
         Kernel,
         7,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         DrawCreaseAngleRestricted,
@@ -379,10 +379,10 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
     descriptor!(
         DrawPoint,
         "MouseHandlerDrawPoint",
-        "operations::point::draw_point",
+        "operations::point::draw_point_on_segment",
         Kernel,
         7,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         DeletePoint,
@@ -390,7 +390,7 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
         "operations::point::delete_point",
         Kernel,
         5,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         AngleSystem,
@@ -411,34 +411,34 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
     descriptor!(
         CreaseSelect,
         "MouseHandlerCreaseSelect",
-        "operations::selection::select_line",
+        "operations::selection::select_indices/select_box",
         Kernel,
         6,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         CreaseUnselect,
         "MouseHandlerCreaseUnselect",
-        "operations::selection::unselect_line",
+        "operations::selection::unselect_indices/unselect_box",
         Kernel,
         6,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         CreaseMove,
         "MouseHandlerCreaseMove",
-        "operations::transform::move_selection",
+        "operations::transform::move_selected_lines",
         Kernel,
         6,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         CreaseCopy,
         "MouseHandlerCreaseCopy",
-        "operations::transform::copy_selection",
+        "operations::transform::copy_selected_lines",
         Kernel,
         6,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         CreaseMakeMountain,
@@ -446,7 +446,7 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
         "operations::color::make_mountain",
         Kernel,
         6,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         CreaseMakeValley,
@@ -454,7 +454,7 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
         "operations::color::make_valley",
         Kernel,
         6,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         CreaseMakeEdge,
@@ -462,7 +462,7 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
         "operations::color::make_edge",
         Kernel,
         6,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         BackgroundChangePosition,
@@ -475,18 +475,18 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
     descriptor!(
         LineSegmentDivision,
         "MouseHandlerLineSegmentDivision",
-        "operations::point::divide_segment",
+        "operations::point::divide_segment_by_count",
         Kernel,
         7,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         LineSegmentRatioSet,
         "MouseHandlerLineSegmentRatioSet",
-        "operations::point::ratio_divide_segment",
+        "operations::point::divide_segment_by_ratio",
         Kernel,
         7,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         PolygonSetNoCorners,
@@ -499,26 +499,26 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
     descriptor!(
         CreaseAdvanceType,
         "MouseHandlerCreaseAdvanceType",
-        "operations::color::advance_type",
+        "operations::color::advance_line_type",
         Kernel,
         6,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         CreaseMove4p,
         "MouseHandlerCreaseMove4p",
-        "operations::transform::move_4p",
+        "operations::transform::move_selected_lines_by_points",
         Kernel,
         6,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         CreaseCopy4p,
         "MouseHandlerCreaseCopy4p",
-        "operations::transform::copy_4p",
+        "operations::transform::copy_selected_lines_by_points",
         Kernel,
         6,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         FishBoneDraw,
@@ -531,10 +531,10 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
     descriptor!(
         CreaseMakeMv,
         "MouseHandlerCreaseMakeMV",
-        "operations::color::make_mountain_valley",
+        "operations::color::alternate_mountain_valley_along",
         Kernel,
         6,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         DoubleSymmetricDraw,
@@ -547,10 +547,10 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
     descriptor!(
         CreasesAlternateMv,
         "MouseHandlerCreasesAlternateMV",
-        "operations::color::alternate_mountain_valley",
+        "operations::color::alternate_mountain_valley_crossing",
         Kernel,
         6,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         DrawCreaseAngleRestricted5,
@@ -590,7 +590,7 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
         "operations::point::delete_vertex_on_crease",
         Kernel,
         5,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         CircleDraw,
@@ -622,7 +622,7 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
         "operations::circle::tangent_line",
         Kernel,
         8,
-        Porting
+        OracleTested
     ),
     descriptor!(
         CircleDrawInverted,
@@ -686,7 +686,7 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
         "operations::measure::length_between_points",
         KernelPreview,
         7,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         DisplayLengthBetweenPoints2,
@@ -694,31 +694,31 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
         "operations::measure::length_between_points",
         KernelPreview,
         7,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         DisplayAngleBetweenThreePoints1,
         "MouseHandlerDisplayAngleBetweenThreePoints",
-        "operations::measure::angle_between_points",
+        "operations::measure::angle_between_three_points",
         KernelPreview,
         7,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         DisplayAngleBetweenThreePoints2,
         "MouseHandlerDisplayAngleBetweenThreePoints",
-        "operations::measure::angle_between_points",
+        "operations::measure::angle_between_three_points",
         KernelPreview,
         7,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         DisplayAngleBetweenThreePoints3,
         "MouseHandlerDisplayAngleBetweenThreePoints",
-        "operations::measure::angle_between_points",
+        "operations::measure::angle_between_three_points",
         KernelPreview,
         7,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         CreaseToggleMv,
@@ -726,7 +726,7 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
         "operations::color::toggle_mountain_valley",
         Kernel,
         6,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         CircleChangeColor,
@@ -742,7 +742,7 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
         "operations::color::make_aux",
         Kernel,
         6,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         OperationFrameCreate,
@@ -774,7 +774,7 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
         "operations::arrangement::delete_overlapping",
         Kernel,
         5,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         CreaseDeleteIntersecting,
@@ -782,7 +782,7 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
         "operations::arrangement::delete_intersecting",
         Kernel,
         5,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         SelectPolygon,
@@ -790,7 +790,7 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
         "operations::selection::select_polygon",
         Kernel,
         6,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         UnselectPolygon,
@@ -798,7 +798,7 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
         "operations::selection::unselect_polygon",
         Kernel,
         6,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         SelectLineIntersecting,
@@ -806,7 +806,7 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
         "operations::selection::select_intersecting_line",
         Kernel,
         6,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         UnselectLineIntersecting,
@@ -814,7 +814,7 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
         "operations::selection::unselect_intersecting_line",
         Kernel,
         6,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         LengthenCreaseSameColor,
@@ -822,7 +822,7 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
         "operations::transform::lengthen_crease",
         Kernel,
         6,
-        Porting
+        OracleTested
     ),
     descriptor!(
         FoldableLineDraw,
@@ -835,18 +835,18 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
     descriptor!(
         ReplaceLineTypeSelect,
         "MouseHandlerReplaceTypeSelect",
-        "operations::color::replace_selected_type",
+        "operations::color::replace_line_type_for_indices",
         Kernel,
         6,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         DeleteLineTypeSelect,
         "MouseHandlerDeleteTypeSelect",
-        "operations::color::delete_selected_type",
+        "operations::color::delete_line_type_for_indices",
         Kernel,
         6,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         SelectLasso,
@@ -1209,7 +1209,7 @@ mod tests {
     fn registry_includes_representative_source_mapped_operations() {
         assert_eq!(
             operation_descriptor(OperationId::DrawCreaseFree).map(|descriptor| descriptor.target),
-            Some("operations::construction::draw_free")
+            Some("operations::construction::draw_crease_segment")
         );
         assert_eq!(
             operation_descriptor(OperationId::ImportFold).map(|descriptor| descriptor.category),

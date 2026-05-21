@@ -2,9 +2,11 @@ use oristudio_cp::geometry::{LineColor, LineSegment, Point};
 use oristudio_cp::model::CreasePatternModel;
 use oristudio_cp::operations::arrangement::{
     branch_trim, del_v_all, del_v_all_color_change, del_v_at_point, del_v_at_point_color_change,
-    del_v_pair, delete_intersecting_or_overlapping_lines_along, delete_overlapping_lines_along,
-    divide_intersections, divide_intersections_fast, divide_line_segment_with_new_lines, fix1,
-    fix2, intersect_divide_pair, remove_overlapping_lines, remove_overlapping_lines_with_precision,
+    del_v_pair, delete_intersecting_or_overlapping_lines_along,
+    delete_line_segment_vertex_for_index, delete_line_segments_for_indices,
+    delete_overlapping_lines_along, divide_intersections, divide_intersections_fast,
+    divide_line_segment_with_new_lines, fix1, fix2, intersect_divide_pair,
+    remove_overlapping_lines, remove_overlapping_lines_with_precision,
 };
 use std::collections::BTreeSet;
 
@@ -320,6 +322,55 @@ fn divide_line_segment_with_new_lines_deletes_existing_exact_duplicate() {
         &model.line_segments[0],
         Point::new(10.0, 0.0),
         Point::new(0.0, 0.0),
+        LineColor::Blue2,
+    );
+}
+
+#[test]
+fn delete_line_segment_vertex_for_index_removes_line_and_cleans_straight_vertex() {
+    let mut model = CreasePatternModel::default();
+    model.add_line(Point::new(0.0, 0.0), Point::new(10.0, 0.0), LineColor::Red1);
+    model.add_line(
+        Point::new(10.0, 0.0),
+        Point::new(20.0, 0.0),
+        LineColor::Red1,
+    );
+    model.add_line(
+        Point::new(10.0, 0.0),
+        Point::new(10.0, 5.0),
+        LineColor::Blue2,
+    );
+
+    assert!(delete_line_segment_vertex_for_index(&mut model, 2));
+
+    assert_eq!(model.line_segments.len(), 1);
+    assert_segment(
+        &model.line_segments[0],
+        Point::new(0.0, 0.0),
+        Point::new(20.0, 0.0),
+        LineColor::Red1,
+    );
+}
+
+#[test]
+fn delete_line_segments_for_indices_removes_resolved_lines_without_vertex_cleanup() {
+    let mut model = CreasePatternModel::default();
+    model.add_line(Point::new(0.0, 0.0), Point::new(1.0, 0.0), LineColor::Red1);
+    model.add_line(Point::new(0.0, 1.0), Point::new(1.0, 1.0), LineColor::Blue2);
+    model.add_line(
+        Point::new(0.0, 2.0),
+        Point::new(1.0, 2.0),
+        LineColor::Black0,
+    );
+
+    let deleted = delete_line_segments_for_indices(&mut model, &[0, 2]);
+
+    assert_eq!(deleted, 2);
+    assert_eq!(model.line_segments.len(), 1);
+    assert_segment(
+        &model.line_segments[0],
+        Point::new(0.0, 1.0),
+        Point::new(1.0, 1.0),
         LineColor::Blue2,
     );
 }

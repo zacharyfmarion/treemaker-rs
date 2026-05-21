@@ -919,6 +919,11 @@ Status:
   splitting against existing lines. The committed oracle fixtures are line-only;
   the `CreasePattern_Worker.addLineSegment` circle-intersection side effect
   remains tracked with the Stage 8 circle tool work.
+- `CHANGE_CREASE_TYPE_4` is ported and oracle-tested for resolved line targets.
+  The line-segment portions of `LINE_SEGMENT_DELETE_3` are ported for
+  single-line delete-with-vertex-cleanup and box-resolved line deletion, but the
+  handler remains `Porting` until circle deletion and separate aux-line storage
+  deletion modes are covered.
 - Full handler parity remains open for nearest-click line selection, Java2D
   path/lasso selection, operation-frame behavior, lengthen commands, and
   construction-handler `fix2` chaining that is not part of the selected color

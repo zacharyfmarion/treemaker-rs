@@ -593,6 +593,47 @@ pub fn delete_line_segment_vertex(model: &mut CreasePatternModel, index: usize) 
     );
 }
 
+/// Oriedita line-delete click mutation after the target line has been resolved.
+pub fn delete_line_segment_vertex_for_index(model: &mut CreasePatternModel, index: usize) -> bool {
+    let Some(segment) = model.line_segments.get(index).cloned() else {
+        return false;
+    };
+    let Some(delete_index) = model
+        .line_segments
+        .iter()
+        .position(|candidate| candidate == &segment)
+    else {
+        return false;
+    };
+
+    delete_line_segment_vertex(model, delete_index);
+    true
+}
+
+/// Oriedita box line-delete mutation after the target lines have been resolved.
+pub fn delete_line_segments_for_indices(
+    model: &mut CreasePatternModel,
+    indices: &[usize],
+) -> usize {
+    let lines: Vec<_> = indices
+        .iter()
+        .filter_map(|index| model.line_segments.get(*index).cloned())
+        .collect();
+    let mut deleted = 0;
+    for line in lines {
+        let Some(index) = model
+            .line_segments
+            .iter()
+            .position(|candidate| candidate == &line)
+        else {
+            continue;
+        };
+        model.line_segments.remove(index);
+        deleted += 1;
+    }
+    deleted
+}
+
 /// Oriedita `FoldLineSet.del_V(Point, hikiyose, r)`.
 ///
 /// The Java method returns `false` even after a successful merge; this function

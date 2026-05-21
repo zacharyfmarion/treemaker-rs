@@ -2,14 +2,15 @@ use oristudio_cp::geometry::{Intersection, LineColor, LineSegment, Point};
 use oristudio_cp::model::{CreasePatternModel, CustomLineType};
 use oristudio_cp::operations::arrangement::{
     branch_trim, del_v_all, del_v_all_color_change, del_v_at_point, del_v_at_point_color_change,
-    del_v_pair, delete_intersecting_or_overlapping_lines_along, delete_overlapping_lines_along,
-    divide_intersections, divide_intersections_fast, divide_line_segment_with_new_lines, fix1,
-    fix2, intersect_divide_pair,
+    del_v_pair, delete_intersecting_or_overlapping_lines_along,
+    delete_line_segment_vertex_for_index, delete_line_segments_for_indices,
+    delete_overlapping_lines_along, divide_intersections, divide_intersections_fast,
+    divide_line_segment_with_new_lines, fix1, fix2, intersect_divide_pair,
 };
 use oristudio_cp::operations::color::{
     advance_line_type, alternate_mountain_valley_along, alternate_mountain_valley_crossing,
-    delete_line_type_for_indices, make_aux, make_edge, make_mountain, make_valley,
-    replace_line_type_for_indices, set_line_color_for_indices, toggle_mountain_valley,
+    change_crease_type, delete_line_type_for_indices, make_aux, make_edge, make_mountain,
+    make_valley, replace_line_type_for_indices, set_line_color_for_indices, toggle_mountain_valley,
 };
 use oristudio_cp::operations::point::{divide_segment_by_count, divide_segment_by_ratio};
 use oristudio_cp::operations::selection::{
@@ -245,6 +246,48 @@ fn delete_inside_line_matches_oriedita_foldlineset_oracle() {
         let rust_summary = format!("deleted|{deleted}\n{}", line_segment_set_summary(&model));
         assert_eq!(rust_summary, run_oracle(&oracle, &args));
     }
+}
+
+#[test]
+fn line_delete_commands_match_oriedita_foldlineset_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    let vertex_segments = vec![
+        segment(0.0, 0.0, 10.0, 0.0, LineColor::Red1),
+        segment(10.0, 0.0, 20.0, 0.0, LineColor::Red1),
+        segment(10.0, 0.0, 10.0, 5.0, LineColor::Blue2),
+    ];
+    let mut model = model_from_segments(&vertex_segments);
+    let deleted = delete_line_segment_vertex_for_index(&mut model, 2);
+    let mut args = vec![
+        "foldline-delete-line-vertex".to_string(),
+        "2".to_string(),
+        vertex_segments.len().to_string(),
+    ];
+    push_segment_args(&mut args, &vertex_segments);
+    let rust_summary = format!("deleted|{deleted}\n{}", line_segment_set_summary(&model));
+    assert_eq!(rust_summary, run_oracle(&oracle, &args));
+
+    let box_segments = vec![
+        segment(0.0, 0.0, 1.0, 0.0, LineColor::Red1),
+        segment(0.0, 1.0, 1.0, 1.0, LineColor::Blue2),
+        segment(0.0, 2.0, 1.0, 2.0, LineColor::Black0),
+    ];
+    let mut model = model_from_segments(&box_segments);
+    let deleted = delete_line_segments_for_indices(&mut model, &[0, 2]);
+    let mut args = vec![
+        "foldline-delete-lines".to_string(),
+        "0,2".to_string(),
+        box_segments.len().to_string(),
+    ];
+    push_segment_args(&mut args, &box_segments);
+    let rust_summary = format!("deleted|{deleted}\n{}", line_segment_set_summary(&model));
+    assert_eq!(rust_summary, run_oracle(&oracle, &args));
 }
 
 #[test]
@@ -493,6 +536,21 @@ fn color_operations_match_oriedita_foldlineset_oracle() {
     ];
     push_segment_args(&mut args, &mv_segments);
     assert_eq!(line_segment_set_summary(&model), run_oracle(&oracle, &args));
+
+    let change_type_segments = vec![
+        segment(0.0, 0.0, 1.0, 0.0, LineColor::Black0),
+        segment(0.0, 1.0, 1.0, 1.0, LineColor::Cyan3),
+    ];
+    let mut model = model_from_segments(&change_type_segments);
+    let changed = change_crease_type(&mut model, 0);
+    let mut args = vec![
+        "foldline-change-type".to_string(),
+        "0".to_string(),
+        change_type_segments.len().to_string(),
+    ];
+    push_segment_args(&mut args, &change_type_segments);
+    let rust_summary = format!("changed|{changed}\n{}", line_segment_set_summary(&model));
+    assert_eq!(rust_summary, run_oracle(&oracle, &args));
 
     for (color, apply) in [
         (

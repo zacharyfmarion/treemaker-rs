@@ -2,9 +2,9 @@ use oristudio_cp::geometry::{LineColor, LineSegment, Point};
 use oristudio_cp::model::{CreasePatternModel, CustomLineType};
 use oristudio_cp::operations::color::{
     advance_line_type, alternate_mountain_valley_along, alternate_mountain_valley_crossing,
-    delete_line_type_for_indices, delete_selected_line_type, make_aux, make_mountain,
-    replace_line_type_for_indices, replace_selected_line_type, set_line_color_for_indices,
-    toggle_mountain_valley,
+    change_crease_type, delete_line_type_for_indices, delete_selected_line_type, make_aux,
+    make_mountain, replace_line_type_for_indices, replace_selected_line_type,
+    set_line_color_for_indices, toggle_mountain_valley,
 };
 
 #[test]
@@ -173,6 +173,22 @@ fn toggle_mountain_valley_changes_only_red_and_blue() {
     assert_eq!(model.line_segments[0].color, LineColor::Blue2);
     assert_eq!(model.line_segments[1].color, LineColor::Red1);
     assert_eq!(model.line_segments[2].color, LineColor::Black0);
+}
+
+#[test]
+fn change_crease_type_advances_folding_lines_only() {
+    let mut model = CreasePatternModel::default();
+    model.add_line(
+        Point::new(0.0, 0.0),
+        Point::new(1.0, 0.0),
+        LineColor::Black0,
+    );
+    model.add_line(Point::new(0.0, 1.0), Point::new(1.0, 1.0), LineColor::Cyan3);
+
+    assert!(change_crease_type(&mut model, 0));
+    assert_eq!(model.line_segments[0].color, LineColor::Red1);
+    assert!(!change_crease_type(&mut model, 1));
+    assert_eq!(model.line_segments[1].color, LineColor::Cyan3);
 }
 
 #[test]

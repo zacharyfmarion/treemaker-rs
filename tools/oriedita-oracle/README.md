@@ -13,7 +13,9 @@ the legacy `Fix1`/`Fix2` workers. Color commands cover
 advance type, mountain/valley toggling, and overlapping-line MV alternation.
 The crossing-line MV alternation handler is covered separately from the
 overlapping-line variant because it uses intersection sorting from the drag
-endpoint.
+endpoint. Line-click coverage includes change-crease-type and the line-segment
+portion of delete-line; circle and separate aux-line delete modes remain staged
+separately.
 The first selection commands cover select/unselect all, index selection, box
 selection via `lineSegmentsInside`, polygon selection via `select_Takakukei`,
 line-overlap/intersection selection via `select_lX`, and

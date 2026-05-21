@@ -44,6 +44,8 @@ public class OrieditaGeometryOracle {
             case "foldline-divide-new-lines" -> foldLineDivideNewLines(args);
             case "foldline-divide-fast" -> foldLineDivideFast(args);
             case "foldline-delete-inside" -> foldLineDeleteInside(args);
+            case "foldline-delete-line-vertex" -> foldLineDeleteLineVertex(args);
+            case "foldline-delete-lines" -> foldLineDeleteLines(args);
             case "foldline-branch-trim" -> foldLineBranchTrim(args);
             case "foldline-del-v" -> foldLineDelV(args);
             case "foldline-del-v-cc" -> foldLineDelVCc(args);
@@ -53,6 +55,7 @@ public class OrieditaGeometryOracle {
             case "foldline-fix1" -> foldLineFix1(args);
             case "foldline-fix2" -> foldLineFix2(args);
             case "foldline-set-color" -> foldLineSetColor(args);
+            case "foldline-change-type" -> foldLineChangeType(args);
             case "foldline-make-color" -> foldLineMakeColor(args);
             case "foldline-make-aux" -> foldLineMakeAux(args);
             case "foldline-change-mv" -> foldLineChangeMv(args);
@@ -215,6 +218,40 @@ public class OrieditaGeometryOracle {
         printFoldLineSet(set);
     }
 
+    private static void foldLineDeleteLineVertex(String[] args) {
+        if (args.length < 3) {
+            usage("foldline-delete-line-vertex expects index, count, and segment payload");
+        }
+
+        int index = Integer.parseInt(args[1]);
+        int count = Integer.parseInt(args[2]);
+        FoldLineSet set = foldLineSet(args, 3, count);
+        boolean deleted = false;
+        if (index >= 0 && index < set.getTotal()) {
+            set.deleteLineSegment_vertex(set.get(index + 1));
+            deleted = true;
+        }
+        System.out.println("deleted|" + deleted);
+        printFoldLineSet(set);
+    }
+
+    private static void foldLineDeleteLines(String[] args) {
+        if (args.length < 4) {
+            usage("foldline-delete-lines expects comma-separated indices, count, and segment payload");
+        }
+
+        int count = Integer.parseInt(args[2]);
+        FoldLineSet set = foldLineSet(args, 3, count);
+        List<LineSegment> lines = selectedFoldLines(set, args[1]);
+        int deleted = 0;
+        for (LineSegment line : lines) {
+            set.deleteLine(line);
+            deleted++;
+        }
+        System.out.println("deleted|" + deleted);
+        printFoldLineSet(set);
+    }
+
     private static void foldLineBranchTrim(String[] args) {
         if (args.length < 2) {
             usage("foldline-branch-trim expects a segment count and segment payload");
@@ -334,6 +371,27 @@ public class OrieditaGeometryOracle {
         FoldLineSet set = foldLineSet(args, 4, count);
         List<LineSegment> lines = selectedFoldLines(set, args[2]);
         int changed = set.setColor(lines, color);
+        System.out.println("changed|" + changed);
+        printFoldLineSet(set);
+    }
+
+    private static void foldLineChangeType(String[] args) {
+        if (args.length < 3) {
+            usage("foldline-change-type expects index, count, and segment payload");
+        }
+
+        int index = Integer.parseInt(args[1]);
+        int count = Integer.parseInt(args[2]);
+        FoldLineSet set = foldLineSet(args, 3, count);
+        boolean changed = false;
+        if (index >= 0 && index < set.getTotal()) {
+            LineSegment segment = new LineSegment(set.get(index + 1));
+            LineColor color = segment.getColor();
+            if (color.isFoldingLine()) {
+                set.setColor(segment, color.advanceFolding());
+                changed = true;
+            }
+        }
         System.out.println("changed|" + changed);
         printFoldLineSet(set);
     }
@@ -1144,6 +1202,8 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle foldline-divide-new-lines <originalEnd> <addedEnd> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-divide-fast <i> <j> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-delete-inside <l|lX> <selection ax ay bx by color> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-delete-line-vertex <index> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-delete-lines <indices> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-branch-trim <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-del-v <px> <py> <snapRadius> <vertexRadius> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-del-v-cc <px> <py> <snapRadius> <vertexRadius> <count> [ax ay bx by color]...");
@@ -1153,6 +1213,7 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle foldline-fix1 <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-fix2 <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-set-color <color> <indices> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-change-type <index> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-make-color <color> <indices> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-make-aux <indices> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-change-mv <indices> <count> [ax ay bx by color]...");

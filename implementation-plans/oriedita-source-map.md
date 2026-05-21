@@ -123,8 +123,8 @@ stage explicitly changes it.
 | --- | --- | --- | --- | --- | --- |
 | `DRAW_CREASE_FREE_1` | `MouseHandlerDrawCreaseFree` | `operations::construction::draw_free` | kernel | 7 | Unsupported |
 | `MOVE_CREASE_PATTERN_2` | `MouseHandlerMoveCreasePattern` | runtime camera pan, no persisted CP mutation | ui-preview-only | later UI | Out-of-scope-ui |
-| `LINE_SEGMENT_DELETE_3` | `MouseHandlerLineSegmentDelete` | `operations::arrangement::delete_line` | kernel | 5 | Unsupported |
-| `CHANGE_CREASE_TYPE_4` | `MouseHandlerChangeCreaseType` | `operations::color::change_type` | kernel | 6 | Unsupported |
+| `LINE_SEGMENT_DELETE_3` | `MouseHandlerLineSegmentDelete` | `operations::arrangement::delete_line_segment_vertex_for_index`, `operations::arrangement::delete_line_segments_for_indices` | kernel | 5 | Porting |
+| `CHANGE_CREASE_TYPE_4` | `MouseHandlerChangeCreaseType` | `operations::color::change_crease_type` | kernel | 6 | Oracle-tested |
 | `LENGTHEN_CREASE_5` | `MouseHandlerLengthenCrease` | `operations::transform::lengthen` | kernel | 6 | Unsupported |
 | `SQUARE_BISECTOR_7` | `MouseHandlerSquareBisector` | `operations::construction::square_bisector` | kernel | 7 | Unsupported |
 | `INWARD_8` | `MouseHandlerInward` | `operations::construction::inward` | kernel | 7 | Unsupported |

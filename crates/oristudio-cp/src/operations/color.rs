@@ -157,6 +157,21 @@ pub fn toggle_mountain_valley(model: &mut CreasePatternModel, indices: &[usize])
     changed
 }
 
+/// Oriedita `CHANGE_CREASE_TYPE_4` mutation after the target line is known.
+pub fn change_crease_type(model: &mut CreasePatternModel, index: usize) -> bool {
+    let Some(segment) = model.line_segments.get(index).cloned() else {
+        return false;
+    };
+    if !segment.color.is_folding_line() {
+        return false;
+    }
+
+    let Ok(color) = segment.color.advance_folding() else {
+        return false;
+    };
+    set_line_color_by_value(model, &segment, color)
+}
+
 /// Oriedita `CREASE_ADVANCE_TYPE_30` persisted mutation for one line.
 pub fn advance_line_type(model: &mut CreasePatternModel, index: usize) -> bool {
     if index >= model.line_segments.len() {

@@ -1,10 +1,10 @@
 use oristudio_cp::geometry::{LineColor, LineSegment, Point};
 use oristudio_cp::model::CreasePatternModel;
 use oristudio_cp::operations::arrangement::{
-    branch_trim, del_v_at_point, delete_intersecting_or_overlapping_lines_along,
-    delete_overlapping_lines_along, divide_intersections, divide_intersections_fast,
-    divide_line_segment_with_new_lines, intersect_divide_pair, remove_overlapping_lines,
-    remove_overlapping_lines_with_precision,
+    branch_trim, del_v_all, del_v_all_color_change, del_v_at_point, del_v_at_point_color_change,
+    del_v_pair, delete_intersecting_or_overlapping_lines_along, delete_overlapping_lines_along,
+    divide_intersections, divide_intersections_fast, divide_line_segment_with_new_lines,
+    intersect_divide_pair, remove_overlapping_lines, remove_overlapping_lines_with_precision,
 };
 use std::collections::BTreeSet;
 
@@ -413,6 +413,98 @@ fn del_v_at_point_merges_straight_same_color_pair_and_preserves_false_return() {
         Point::new(0.0, 0.0),
         Point::new(20.0, 0.0),
         LineColor::Red1,
+    );
+}
+
+#[test]
+fn del_v_at_point_color_change_uses_first_original_color_like_oriedita() {
+    let mut model = CreasePatternModel::default();
+    model.add_line(
+        Point::new(0.0, 0.0),
+        Point::new(10.0, 0.0),
+        LineColor::Black0,
+    );
+    model.add_line(
+        Point::new(10.0, 0.0),
+        Point::new(20.0, 0.0),
+        LineColor::Red1,
+    );
+
+    let result = del_v_at_point_color_change(&mut model, Point::new(10.0, 0.0), 0.000001, 0.000001);
+
+    assert!(!result);
+    assert_eq!(model.line_segments.len(), 1);
+    assert_segment(
+        &model.line_segments[0],
+        Point::new(0.0, 0.0),
+        Point::new(20.0, 0.0),
+        LineColor::Black0,
+    );
+}
+
+#[test]
+fn del_v_pair_uses_oriedita_color_matrix() {
+    let mut model = CreasePatternModel::default();
+    let first =
+        LineSegment::with_color(Point::new(0.0, 0.0), Point::new(10.0, 0.0), LineColor::Red1);
+    let second = LineSegment::with_color(
+        Point::new(10.0, 0.0),
+        Point::new(20.0, 0.0),
+        LineColor::Blue2,
+    );
+    model.add_line_segment(first.clone());
+    model.add_line_segment(second.clone());
+
+    let new_line = del_v_pair(&mut model, &first, &second).expect("merge should happen");
+
+    assert_segment(
+        &new_line,
+        Point::new(0.0, 0.0),
+        Point::new(20.0, 0.0),
+        LineColor::Black0,
+    );
+    assert_eq!(model.line_segments, vec![new_line]);
+}
+
+#[test]
+fn del_v_all_merges_same_color_non_cyan_vertex_pairs() {
+    let mut model = CreasePatternModel::default();
+    model.add_line(Point::new(0.0, 0.0), Point::new(10.0, 0.0), LineColor::Red1);
+    model.add_line(
+        Point::new(10.0, 0.0),
+        Point::new(20.0, 0.0),
+        LineColor::Red1,
+    );
+
+    del_v_all(&mut model);
+
+    assert_eq!(model.line_segments.len(), 1);
+    assert_segment(
+        &model.line_segments[0],
+        Point::new(0.0, 0.0),
+        Point::new(20.0, 0.0),
+        LineColor::Red1,
+    );
+}
+
+#[test]
+fn del_v_all_color_change_uses_pair_color_matrix() {
+    let mut model = CreasePatternModel::default();
+    model.add_line(Point::new(0.0, 0.0), Point::new(10.0, 0.0), LineColor::Red1);
+    model.add_line(
+        Point::new(10.0, 0.0),
+        Point::new(20.0, 0.0),
+        LineColor::Blue2,
+    );
+
+    del_v_all_color_change(&mut model);
+
+    assert_eq!(model.line_segments.len(), 1);
+    assert_segment(
+        &model.line_segments[0],
+        Point::new(0.0, 0.0),
+        Point::new(20.0, 0.0),
+        LineColor::Black0,
     );
 }
 

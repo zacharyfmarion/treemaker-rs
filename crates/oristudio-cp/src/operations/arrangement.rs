@@ -601,6 +601,58 @@ pub fn del_v_at_point(
     snap_radius: f64,
     vertex_radius: f64,
 ) -> bool {
+    del_v_at_point_impl(model, point, snap_radius, vertex_radius, false)
+}
+
+/// Oriedita `FoldLineSet.del_V_cc(Point, hikiyose, r)`.
+///
+/// This keeps the Java quirk where the merged line receives the first line's
+/// original color, even for mixed mountain/valley/edge pairs.
+pub fn del_v_at_point_color_change(
+    model: &mut CreasePatternModel,
+    point: Point,
+    snap_radius: f64,
+    vertex_radius: f64,
+) -> bool {
+    del_v_at_point_impl(model, point, snap_radius, vertex_radius, true)
+}
+
+/// Oriedita `FoldLineSet.del_V_all()`.
+pub fn del_v_all(model: &mut CreasePatternModel) {
+    del_v_all_impl(model, false);
+}
+
+/// Oriedita `FoldLineSet.del_V_all_cc()`.
+pub fn del_v_all_color_change(model: &mut CreasePatternModel) {
+    del_v_all_impl(model, true);
+}
+
+/// Oriedita `FoldLineSet.del_V(LineSegment, LineSegment)`.
+pub fn del_v_pair(
+    model: &mut CreasePatternModel,
+    first: &LineSegment,
+    second: &LineSegment,
+) -> Option<LineSegment> {
+    let intersection =
+        determine_line_segment_intersection_with_precision(first, second, Epsilon::UNKNOWN_1EN5);
+    let (a, b) = del_v_merge_endpoints(first, second, intersection)?;
+    let color = del_v_pair_color(first.color, second.color)?;
+
+    remove_line_by_value(model, first)?;
+    remove_line_by_value(model, second)?;
+
+    let new_line = LineSegment::with_color(a, b, color);
+    model.add_line_segment(new_line.clone());
+    Some(new_line)
+}
+
+fn del_v_at_point_impl(
+    model: &mut CreasePatternModel,
+    point: Point,
+    snap_radius: f64,
+    vertex_radius: f64,
+    allow_color_change: bool,
+) -> bool {
     let q = closest_endpoint(model, point);
     if q.distance_squared(point) > snap_radius * snap_radius {
         return false;
@@ -622,7 +674,11 @@ pub fn del_v_at_point(
         return false;
     };
 
-    if lix.color != liy.color {
+    if allow_color_change {
+        if !del_v_cc_allows_colors(lix.color, liy.color) {
+            return false;
+        }
+    } else if lix.color != liy.color {
         return false;
     }
 
@@ -632,6 +688,103 @@ pub fn del_v_at_point(
     model.add_line_segment(LineSegment::with_color(a, b, lix.color));
 
     false
+}
+
+fn del_v_all_impl(model: &mut CreasePatternModel, allow_color_change: bool) {
+    let mut groups = point_line_groups(model);
+
+    for group_index in 0..groups.len() {
+        let lines = groups[group_index].clone();
+        if lines.len() == 2
+            && (allow_color_change
+                || (lines[0].color == lines[1].color && lines[0].color != LineColor::Cyan3))
+            && let Some(new_line) = del_v_pair(model, &lines[0], &lines[1])
+        {
+            replace_line_in_groups(&mut groups, &lines[0], &new_line);
+            replace_line_in_groups(&mut groups, &lines[1], &new_line);
+        }
+    }
+}
+
+fn point_line_groups(model: &CreasePatternModel) -> Vec<Vec<LineSegment>> {
+    let epsilon_squared = Epsilon::UNKNOWN_1EN4 * Epsilon::UNKNOWN_1EN4;
+    let mut points: Vec<Point> = Vec::new();
+    let mut groups: Vec<Vec<LineSegment>> = Vec::new();
+
+    for segment in &model.line_segments {
+        if segment.color == LineColor::Cyan3 {
+            continue;
+        }
+
+        process_point_line_group(
+            segment.a,
+            segment,
+            epsilon_squared,
+            &mut points,
+            &mut groups,
+        );
+        process_point_line_group(
+            segment.b,
+            segment,
+            epsilon_squared,
+            &mut points,
+            &mut groups,
+        );
+    }
+
+    groups
+}
+
+fn process_point_line_group(
+    point: Point,
+    line: &LineSegment,
+    epsilon_squared: f64,
+    points: &mut Vec<Point>,
+    groups: &mut Vec<Vec<LineSegment>>,
+) {
+    if let Some(index) = points
+        .iter()
+        .position(|candidate| candidate.distance_squared(point) < epsilon_squared)
+    {
+        groups[index].push(line.clone());
+    } else {
+        points.push(point);
+        groups.push(vec![line.clone()]);
+    }
+}
+
+fn replace_line_in_groups(
+    groups: &mut [Vec<LineSegment>],
+    old_line: &LineSegment,
+    new_line: &LineSegment,
+) {
+    for group in groups {
+        for line in group {
+            if line == old_line {
+                *line = new_line.clone();
+            }
+        }
+    }
+}
+
+fn remove_line_by_value(model: &mut CreasePatternModel, line: &LineSegment) -> Option<LineSegment> {
+    let index = model
+        .line_segments
+        .iter()
+        .position(|candidate| candidate == line)?;
+    Some(model.line_segments.remove(index))
+}
+
+fn del_v_pair_color(first: LineColor, second: LineColor) -> Option<LineColor> {
+    match (first, second) {
+        (LineColor::Black0, LineColor::Black0 | LineColor::Red1 | LineColor::Blue2) => Some(second),
+        (LineColor::Red1, LineColor::Black0 | LineColor::Red1) => Some(LineColor::Red1),
+        (LineColor::Red1, LineColor::Blue2) => Some(LineColor::Black0),
+        (LineColor::Blue2, LineColor::Black0 | LineColor::Blue2) => Some(LineColor::Blue2),
+        (LineColor::Blue2, LineColor::Red1) => Some(LineColor::Black0),
+        (LineColor::Cyan3, LineColor::Cyan3) => Some(LineColor::Cyan3),
+        _ => None,
+    }
 }
 
 fn delete_inside_line(
@@ -693,6 +846,11 @@ fn del_v_merge_endpoints(
         Intersection::ParallelEndOfS1IntersectsEndOfS2_353 => Some((first.a, second.a)),
         _ => None,
     }
+}
+
+fn del_v_cc_allows_colors(first: LineColor, second: LineColor) -> bool {
+    !((first == LineColor::Cyan3 && second != LineColor::Cyan3)
+        || (first != LineColor::Cyan3 && second == LineColor::Cyan3))
 }
 
 fn flag_at(flags: &[u8], index: usize) -> u8 {

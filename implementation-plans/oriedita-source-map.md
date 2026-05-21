@@ -134,7 +134,7 @@ stage explicitly changes it.
 | `DRAW_CREASE_SYMMETRIC_12` | `MouseHandlerDrawCreaseSymmetric` | `operations::construction::draw_symmetric` | kernel | 7 | Unsupported |
 | `DRAW_CREASE_ANGLE_RESTRICTED_13` | `MouseHandlerDrawCreaseAngleRestricted` | `operations::construction::angle_restricted` | kernel | 7 | Unsupported |
 | `DRAW_POINT_14` | `MouseHandlerDrawPoint` | `operations::point::draw_point` | kernel | 7 | Unsupported |
-| `DELETE_POINT_15` | `MouseHandlerDeletePoint` | `operations::point::delete_point` | kernel | 5 | Unsupported |
+| `DELETE_POINT_15` | `MouseHandlerDeletePoint` | `operations::point::delete_point` | kernel | 5 | Oracle-tested |
 | `ANGLE_SYSTEM_16` | `MouseHandlerAngleSystem` | `operations::construction::angle_system` | kernel | 7 | Unsupported |
 | `DRAW_CREASE_ANGLE_RESTRICTED_3_18` | `MouseHandlerDrawCreaseAngleRestricted3_2` | `operations::construction::angle_restricted_3` | kernel | 7 | Unsupported |
 | `CREASE_SELECT_19` | `MouseHandlerCreaseSelect` | `operations::selection::select_line` | kernel | 6 | Unsupported |
@@ -159,7 +159,7 @@ stage explicitly changes it.
 | `VERTEX_MAKE_ANGULARLY_FLAT_FOLDABLE_38` | `MouseHandlerVertexMakeAngularlyFlatFoldable` | `operations::construction::make_vertex_flat_foldable` | kernel | 7, 9 | Unsupported |
 | `FOLDABLE_LINE_INPUT_39` | `MouseHandlerFoldableLineInput` | `operations::construction::foldable_line_input` | kernel | 7 | Unsupported |
 | `PARALLEL_DRAW_40` | `MouseHandlerParallelDraw` | `operations::construction::parallel` | kernel | 7 | Unsupported |
-| `VERTEX_DELETE_ON_CREASE_41` | `MouseHandlerVertexDeleteOnCrease` | `operations::point::delete_vertex_on_crease` | kernel | 5 | Unsupported |
+| `VERTEX_DELETE_ON_CREASE_41` | `MouseHandlerVertexDeleteOnCrease` | `operations::point::delete_vertex_on_crease` | kernel | 5 | Oracle-tested |
 | `CIRCLE_DRAW_42` | `MouseHandlerCircleDraw` | `operations::circle::draw` | kernel | 8 | Unsupported |
 | `CIRCLE_DRAW_THREE_POINT_43` | `MouseHandlerCircleDrawThreePoint` | `operations::circle::through_three_points` | kernel | 8 | Unsupported |
 | `CIRCLE_DRAW_SEPARATE_44` | `MouseHandlerCircleDrawSeparate` | `operations::circle::separate` | kernel | 8 | Unsupported |

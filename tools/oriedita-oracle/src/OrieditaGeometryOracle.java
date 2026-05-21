@@ -39,6 +39,10 @@ public class OrieditaGeometryOracle {
             case "foldline-delete-inside" -> foldLineDeleteInside(args);
             case "foldline-branch-trim" -> foldLineBranchTrim(args);
             case "foldline-del-v" -> foldLineDelV(args);
+            case "foldline-del-v-cc" -> foldLineDelVCc(args);
+            case "foldline-del-v-pair" -> foldLineDelVPair(args);
+            case "foldline-del-v-all" -> foldLineDelVAll(args);
+            case "foldline-del-v-all-cc" -> foldLineDelVAllCc(args);
             case "custom-line-type" -> customLineType(args);
             case "orh-import-summary" -> orhImportSummary(args);
             case "orh-export-fixture" -> orhExportFixture(args);
@@ -203,6 +207,66 @@ public class OrieditaGeometryOracle {
         FoldLineSet set = foldLineSet(args, 6, count);
         boolean result = set.del_V(point, snapRadius, vertexRadius);
         System.out.println("result|" + result);
+        printFoldLineSet(set);
+    }
+
+    private static void foldLineDelVCc(String[] args) {
+        if (args.length < 6) {
+            usage("foldline-del-v-cc expects point, snap radius, vertex radius, count, and segment payload");
+        }
+
+        Point point = new Point(parse(args[1]), parse(args[2]));
+        double snapRadius = parse(args[3]);
+        double vertexRadius = parse(args[4]);
+        int count = Integer.parseInt(args[5]);
+        FoldLineSet set = foldLineSet(args, 6, count);
+        boolean result = set.del_V_cc(point, snapRadius, vertexRadius);
+        System.out.println("result|" + result);
+        printFoldLineSet(set);
+    }
+
+    private static void foldLineDelVPair(String[] args) {
+        if (args.length < 4) {
+            usage("foldline-del-v-pair expects i, j, count, and segment payload");
+        }
+
+        int i = Integer.parseInt(args[1]);
+        int j = Integer.parseInt(args[2]);
+        int count = Integer.parseInt(args[3]);
+        FoldLineSet set = foldLineSet(args, 4, count);
+        LineSegment result = set.del_V(set.get(i + 1), set.get(j + 1));
+        if (result == null) {
+            System.out.println("result|null");
+        } else {
+            System.out.println("result|"
+                    + result.determineAX() + "|"
+                    + result.determineAY() + "|"
+                    + result.determineBX() + "|"
+                    + result.determineBY() + "|"
+                    + result.getColor().getNumber());
+        }
+        printFoldLineSet(set);
+    }
+
+    private static void foldLineDelVAll(String[] args) throws Exception {
+        if (args.length < 2) {
+            usage("foldline-del-v-all expects count and segment payload");
+        }
+
+        int count = Integer.parseInt(args[1]);
+        FoldLineSet set = foldLineSet(args, 2, count);
+        set.del_V_all();
+        printFoldLineSet(set);
+    }
+
+    private static void foldLineDelVAllCc(String[] args) throws Exception {
+        if (args.length < 2) {
+            usage("foldline-del-v-all-cc expects count and segment payload");
+        }
+
+        int count = Integer.parseInt(args[1]);
+        FoldLineSet set = foldLineSet(args, 2, count);
+        set.del_V_all_cc();
         printFoldLineSet(set);
     }
 
@@ -420,6 +484,10 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle foldline-delete-inside <l|lX> <selection ax ay bx by color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-branch-trim <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-del-v <px> <py> <snapRadius> <vertexRadius> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-del-v-cc <px> <py> <snapRadius> <vertexRadius> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-del-v-pair <i> <j> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-del-v-all <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-del-v-all-cc <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle custom-line-type <customType> <lineColor>");
         System.err.println("   or: OrieditaGeometryOracle orh-import-summary <path>");
         System.err.println("   or: OrieditaGeometryOracle orh-export-fixture");

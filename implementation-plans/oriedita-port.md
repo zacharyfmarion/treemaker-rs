@@ -832,6 +832,11 @@ Status:
   `del_V(Point, ...)` vertex merge path are ported with oracle coverage,
   including Oriedita's branch-trim loop restart quirk and `del_V`'s always-false
   return value.
+- The color-changing `del_V_cc(Point, ...)`, direct `del_V(LineSegment,
+  LineSegment)`, `del_V_all`, and `del_V_all_cc` variants are ported and
+  oracle-tested. The point-based color-changing path preserves Oriedita's
+  immutable-line stale-color quirk, while the direct pair/all variants use
+  Oriedita's explicit color-combination matrix.
 - The current arrangement worker intentionally uses simple scans instead of
   Oriedita's quadtree acceleration. That keeps mutation parity visible first;
   spatial acceleration remains deferred until broader split/merge behavior is

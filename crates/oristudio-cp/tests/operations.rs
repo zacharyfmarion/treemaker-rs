@@ -1,9 +1,10 @@
 use oristudio_cp::geometry::{LineColor, LineSegment, Point};
 use oristudio_cp::model::CreasePatternModel;
 use oristudio_cp::operations::arrangement::{
-    delete_intersecting_or_overlapping_lines_along, delete_overlapping_lines_along,
-    divide_intersections, divide_intersections_fast, divide_line_segment_with_new_lines,
-    intersect_divide_pair, remove_overlapping_lines, remove_overlapping_lines_with_precision,
+    branch_trim, del_v_at_point, delete_intersecting_or_overlapping_lines_along,
+    delete_overlapping_lines_along, divide_intersections, divide_intersections_fast,
+    divide_line_segment_with_new_lines, intersect_divide_pair, remove_overlapping_lines,
+    remove_overlapping_lines_with_precision,
 };
 use std::collections::BTreeSet;
 
@@ -390,6 +391,54 @@ fn delete_intersecting_or_overlapping_lines_along_removes_crossing_segments_too(
         Point::new(0.0, 1.0),
         Point::new(10.0, 1.0),
         LineColor::Cyan3,
+    );
+}
+
+#[test]
+fn del_v_at_point_merges_straight_same_color_pair_and_preserves_false_return() {
+    let mut model = CreasePatternModel::default();
+    model.add_line(Point::new(0.0, 0.0), Point::new(10.0, 0.0), LineColor::Red1);
+    model.add_line(
+        Point::new(10.0, 0.0),
+        Point::new(20.0, 0.0),
+        LineColor::Red1,
+    );
+
+    let result = del_v_at_point(&mut model, Point::new(10.0, 0.0), 0.000001, 0.000001);
+
+    assert!(!result);
+    assert_eq!(model.line_segments.len(), 1);
+    assert_segment(
+        &model.line_segments[0],
+        Point::new(0.0, 0.0),
+        Point::new(20.0, 0.0),
+        LineColor::Red1,
+    );
+}
+
+#[test]
+fn branch_trim_matches_oriedita_restart_quirk_for_dangling_chain() {
+    let mut model = CreasePatternModel::default();
+    model.add_line(Point::new(0.0, 0.0), Point::new(10.0, 0.0), LineColor::Red1);
+    model.add_line(
+        Point::new(10.0, 0.0),
+        Point::new(20.0, 0.0),
+        LineColor::Red1,
+    );
+    model.add_line(
+        Point::new(20.0, 0.0),
+        Point::new(30.0, 0.0),
+        LineColor::Red1,
+    );
+
+    branch_trim(&mut model);
+
+    assert_eq!(model.line_segments.len(), 1);
+    assert_segment(
+        &model.line_segments[0],
+        Point::new(10.0, 0.0),
+        Point::new(20.0, 0.0),
+        LineColor::Red1,
     );
 }
 

@@ -535,6 +535,105 @@ pub fn delete_intersecting_or_overlapping_lines_along(
     delete_inside_line(model, selection, true)
 }
 
+/// Remove dangling branch lines and merge straight same-color vertices.
+pub fn branch_trim(model: &mut CreasePatternModel) {
+    let radius = Epsilon::UNKNOWN_1EN6;
+    let mut i_one_based = 1;
+
+    while i_one_based <= model.line_segments.len() {
+        let index = i_one_based - 1;
+        let segment = model.line_segments[index].clone();
+        let mut has_a_connection = false;
+        let mut has_b_connection = false;
+
+        for (other_index, other) in model.line_segments.iter().enumerate() {
+            if index == other_index {
+                continue;
+            }
+
+            if segment.a.distance(other.a) < radius || segment.a.distance(other.b) < radius {
+                has_a_connection = true;
+            }
+            if segment.b.distance(other.a) < radius || segment.b.distance(other.b) < radius {
+                has_b_connection = true;
+            }
+        }
+
+        if !has_a_connection || !has_b_connection {
+            delete_line_segment_vertex(model, index);
+            i_one_based = 2;
+        } else {
+            i_one_based += 1;
+        }
+    }
+}
+
+/// Delete a line and apply Oriedita's same-color straight vertex cleanup.
+pub fn delete_line_segment_vertex(model: &mut CreasePatternModel, index: usize) {
+    if index >= model.line_segments.len() {
+        return;
+    }
+
+    let segment = model.line_segments[index].clone();
+    model.line_segments.remove(index);
+
+    let _ = del_v_at_point(
+        model,
+        segment.a,
+        Epsilon::UNKNOWN_1EN6,
+        Epsilon::UNKNOWN_1EN6,
+    );
+    let _ = del_v_at_point(
+        model,
+        segment.b,
+        Epsilon::UNKNOWN_1EN6,
+        Epsilon::UNKNOWN_1EN6,
+    );
+}
+
+/// Oriedita `FoldLineSet.del_V(Point, hikiyose, r)`.
+///
+/// The Java method returns `false` even after a successful merge; this function
+/// preserves that observable return value.
+pub fn del_v_at_point(
+    model: &mut CreasePatternModel,
+    point: Point,
+    snap_radius: f64,
+    vertex_radius: f64,
+) -> bool {
+    let q = closest_endpoint(model, point);
+    if q.distance_squared(point) > snap_radius * snap_radius {
+        return false;
+    }
+
+    let adjacent = vertex_surrounding_line_indices(model, q, vertex_radius);
+    if adjacent.len() != 2 {
+        return false;
+    }
+
+    let ix = adjacent[0];
+    let iy = adjacent[1];
+    let lix = model.line_segments[ix].clone();
+    let liy = model.line_segments[iy].clone();
+    let intersection =
+        determine_line_segment_intersection_with_precision(&lix, &liy, Epsilon::UNKNOWN_1EN6);
+
+    let Some((a, b)) = del_v_merge_endpoints(&lix, &liy, intersection) else {
+        return false;
+    };
+
+    if lix.color != liy.color {
+        return false;
+    }
+
+    let (first_delete, second_delete) = if ix > iy { (ix, iy) } else { (iy, ix) };
+    model.line_segments.remove(first_delete);
+    model.line_segments.remove(second_delete);
+    model.add_line_segment(LineSegment::with_color(a, b, lix.color));
+
+    false
+}
+
 fn delete_inside_line(
     model: &mut CreasePatternModel,
     selection: &LineSegment,
@@ -547,6 +646,53 @@ fn delete_inside_line(
         !should_delete
     });
     model.line_segments.len() != original_len
+}
+
+fn closest_endpoint(model: &CreasePatternModel, point: Point) -> Point {
+    let mut closest = Point::new(100000.0, 100000.0);
+    for segment in &model.line_segments {
+        if point.distance_squared(segment.a) < point.distance_squared(closest) {
+            closest = segment.a;
+        }
+        if point.distance_squared(segment.b) < point.distance_squared(closest) {
+            closest = segment.b;
+        }
+    }
+    closest
+}
+
+fn vertex_surrounding_line_indices(
+    model: &CreasePatternModel,
+    point: Point,
+    radius: f64,
+) -> Vec<usize> {
+    let q = closest_endpoint(model, point);
+    let mut indices = Vec::new();
+    for (index, segment) in model.line_segments.iter().enumerate() {
+        let closest = if q.distance_squared(segment.b) < q.distance_squared(segment.a) {
+            segment.b
+        } else {
+            segment.a
+        };
+        if q.distance_squared(closest) < radius * radius {
+            indices.push(index);
+        }
+    }
+    indices
+}
+
+fn del_v_merge_endpoints(
+    first: &LineSegment,
+    second: &LineSegment,
+    intersection: Intersection,
+) -> Option<(Point, Point)> {
+    match intersection {
+        Intersection::ParallelStartOfS1IntersectsStartOfS2_323 => Some((first.b, second.b)),
+        Intersection::ParallelStartOfS1IntersectsEndOfS2_333 => Some((first.b, second.a)),
+        Intersection::ParallelEndOfS1IntersectsStartOfS2_343 => Some((first.a, second.b)),
+        Intersection::ParallelEndOfS1IntersectsEndOfS2_353 => Some((first.a, second.a)),
+        _ => None,
+    }
 }
 
 fn flag_at(flags: &[u8], index: usize) -> u8 {

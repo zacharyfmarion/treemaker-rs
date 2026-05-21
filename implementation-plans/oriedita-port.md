@@ -828,6 +828,10 @@ Status:
   overlap-or-X-intersection deletion, matching the tools behind
   `CREASE_DELETE_OVERLAPPING_64` and `CREASE_DELETE_INTERSECTING_65`. Both
   modes are covered by the real `FoldLineSet` Java oracle.
+- `BranchTrim.apply`, `deleteLineSegment_vertex`, and the same-color
+  `del_V(Point, ...)` vertex merge path are ported with oracle coverage,
+  including Oriedita's branch-trim loop restart quirk and `del_V`'s always-false
+  return value.
 - The current arrangement worker intentionally uses simple scans instead of
   Oriedita's quadtree acceleration. That keeps mutation parity visible first;
   spatial acceleration remains deferred until broader split/merge behavior is

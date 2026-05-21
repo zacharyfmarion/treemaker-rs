@@ -4,8 +4,9 @@ This directory contains the staged headless oracle harness for the Oriedita
 port. It currently exposes geometry/model primitive commands, Stage 4
 import/export commands for Oriedita's ORH, OBJ, and DXF paths, and Stage 5
 arrangement commands for `IntersectDivide`, `FoldLineSet` insertion splitting,
-and delete-inside-line modes. Later stages should extend the same pattern for
-documents, operations, checks, and folding snapshots.
+delete-inside-line modes, and `BranchTrim`/`del_V` cleanup. Later stages should
+extend the same pattern for documents, operations, checks, and folding
+snapshots.
 
 The oracle intentionally compiles against a pinned Oriedita source checkout
 instead of reimplementing the behavior in Rust.

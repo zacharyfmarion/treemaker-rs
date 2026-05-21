@@ -1,9 +1,9 @@
 use oristudio_cp::geometry::{Intersection, LineColor, LineSegment, Point};
 use oristudio_cp::model::CreasePatternModel;
 use oristudio_cp::operations::arrangement::{
-    delete_intersecting_or_overlapping_lines_along, delete_overlapping_lines_along,
-    divide_intersections, divide_intersections_fast, divide_line_segment_with_new_lines,
-    intersect_divide_pair,
+    branch_trim, del_v_at_point, delete_intersecting_or_overlapping_lines_along,
+    delete_overlapping_lines_along, divide_intersections, divide_intersections_fast,
+    divide_line_segment_with_new_lines, intersect_divide_pair,
 };
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -229,6 +229,69 @@ fn delete_inside_line_matches_oriedita_foldlineset_oracle() {
         let rust_summary = format!("deleted|{deleted}\n{}", line_segment_set_summary(&model));
         assert_eq!(rust_summary, run_oracle(&oracle, &args));
     }
+}
+
+#[test]
+fn del_v_at_point_matches_oriedita_foldlineset_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    for segments in [
+        vec![
+            segment(0.0, 0.0, 10.0, 0.0, LineColor::Red1),
+            segment(10.0, 0.0, 20.0, 0.0, LineColor::Red1),
+        ],
+        vec![
+            segment(0.0, 0.0, 10.0, 0.0, LineColor::Red1),
+            segment(10.0, 0.0, 20.0, 0.0, LineColor::Blue2),
+        ],
+    ] {
+        let mut model = model_from_segments(&segments);
+        let result = del_v_at_point(&mut model, Point::new(10.0, 0.0), 0.000001, 0.000001);
+
+        let mut args = vec![
+            "foldline-del-v".to_string(),
+            "10".to_string(),
+            "0".to_string(),
+            "0.000001".to_string(),
+            "0.000001".to_string(),
+            segments.len().to_string(),
+        ];
+        push_segment_args(&mut args, &segments);
+
+        let rust_summary = format!("result|{result}\n{}", line_segment_set_summary(&model));
+        assert_eq!(rust_summary, run_oracle(&oracle, &args));
+    }
+}
+
+#[test]
+fn branch_trim_matches_oriedita_foldlineset_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    let segments = vec![
+        segment(0.0, 0.0, 10.0, 0.0, LineColor::Red1),
+        segment(10.0, 0.0, 20.0, 0.0, LineColor::Red1),
+        segment(20.0, 0.0, 30.0, 0.0, LineColor::Red1),
+    ];
+    let mut model = model_from_segments(&segments);
+    branch_trim(&mut model);
+
+    let mut args = vec![
+        "foldline-branch-trim".to_string(),
+        segments.len().to_string(),
+    ];
+    push_segment_args(&mut args, &segments);
+
+    assert_eq!(line_segment_set_summary(&model), run_oracle(&oracle, &args));
 }
 
 fn operations_oracle() -> Option<PathBuf> {

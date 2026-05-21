@@ -6,6 +6,7 @@ import origami.crease_pattern.element.Circle;
 import origami.crease_pattern.element.LineColor;
 import origami.crease_pattern.element.LineSegment;
 import origami.crease_pattern.element.Point;
+import origami.crease_pattern.worker.foldlineset.BranchTrim;
 import origami.crease_pattern.worker.linesegmentset.IntersectDivide;
 
 import oriedita.editor.databinding.GridModel;
@@ -36,6 +37,8 @@ public class OrieditaGeometryOracle {
             case "foldline-divide-new-lines" -> foldLineDivideNewLines(args);
             case "foldline-divide-fast" -> foldLineDivideFast(args);
             case "foldline-delete-inside" -> foldLineDeleteInside(args);
+            case "foldline-branch-trim" -> foldLineBranchTrim(args);
+            case "foldline-del-v" -> foldLineDelV(args);
             case "custom-line-type" -> customLineType(args);
             case "orh-import-summary" -> orhImportSummary(args);
             case "orh-export-fixture" -> orhExportFixture(args);
@@ -174,6 +177,32 @@ public class OrieditaGeometryOracle {
         FoldLineSet set = foldLineSet(args, 8, count);
         boolean deleted = set.deleteInsideLine(selection, mode);
         System.out.println("deleted|" + deleted);
+        printFoldLineSet(set);
+    }
+
+    private static void foldLineBranchTrim(String[] args) {
+        if (args.length < 2) {
+            usage("foldline-branch-trim expects a segment count and segment payload");
+        }
+
+        int count = Integer.parseInt(args[1]);
+        FoldLineSet set = foldLineSet(args, 2, count);
+        BranchTrim.apply(set);
+        printFoldLineSet(set);
+    }
+
+    private static void foldLineDelV(String[] args) {
+        if (args.length < 6) {
+            usage("foldline-del-v expects point, snap radius, vertex radius, count, and segment payload");
+        }
+
+        Point point = new Point(parse(args[1]), parse(args[2]));
+        double snapRadius = parse(args[3]);
+        double vertexRadius = parse(args[4]);
+        int count = Integer.parseInt(args[5]);
+        FoldLineSet set = foldLineSet(args, 6, count);
+        boolean result = set.del_V(point, snapRadius, vertexRadius);
+        System.out.println("result|" + result);
         printFoldLineSet(set);
     }
 
@@ -389,6 +418,8 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle foldline-divide-new-lines <originalEnd> <addedEnd> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-divide-fast <i> <j> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-delete-inside <l|lX> <selection ax ay bx by color> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-branch-trim <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-del-v <px> <py> <snapRadius> <vertexRadius> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle custom-line-type <customType> <lineColor>");
         System.err.println("   or: OrieditaGeometryOracle orh-import-summary <path>");
         System.err.println("   or: OrieditaGeometryOracle orh-export-fixture");

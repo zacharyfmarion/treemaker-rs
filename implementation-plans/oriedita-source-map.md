@@ -84,7 +84,7 @@ stage explicitly changes it.
 | `origami/crease_pattern/worker/FoldedFigure_Worker.java` | Folded-model hierarchy and overlap solving. | `folding` | kernel | 10 | Unsupported |
 | `origami/crease_pattern/worker/FoldedFigure_Configurator.java` | Subface and hierarchy setup. | `folding` | kernel | 10 | Unsupported |
 | `origami/crease_pattern/worker/SelectMode.java` | Select/unselect mode enum. | `operations::selection` | kernel | 6 | Unsupported |
-| `origami/crease_pattern/worker/foldlineset/BranchTrim.java` | Branch trimming cleanup. | `operations::arrangement` | kernel | 5 | Unsupported |
+| `origami/crease_pattern/worker/foldlineset/BranchTrim.java` | Branch trimming cleanup. | `operations::arrangement` | kernel | 5 | Oracle-tested |
 | `origami/crease_pattern/worker/foldlineset/Check1.java` | Diagnostic check. | `checks` | kernel | 9 | Unsupported |
 | `origami/crease_pattern/worker/foldlineset/Check2.java` | Diagnostic check. | `checks` | kernel | 9 | Unsupported |
 | `origami/crease_pattern/worker/foldlineset/Check3.java` | Diagnostic check. | `checks` | kernel | 9 | Unsupported |

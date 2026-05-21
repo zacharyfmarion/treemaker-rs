@@ -256,13 +256,13 @@ mutation.
 | --- | --- | --- | --- | --- |
 | `CheckCAMVTask.java` | Combined angle and MV diagnostics. | `checks::check_camv_task` | 9 | Oracle-tested |
 | `FoldingEstimateTask.java` | Folding estimate execution. | `folding::FoldingEstimateSession`, `folding::folding_estimate_from_segments`, `folding::WorkerOverlapEnumerator` | 10 | Porting; first-solution, fresh order-6, and order-5/order-6 sequence oracles |
-| `FoldingEstimateSpecificTask.java` | Refold with selected starting face/state. | `folding::estimate_specific` | 10 | Unsupported |
-| `FoldingEstimateSave100Task.java` | Batch/export folding estimates. | `folding::estimate_batch` | 10 | Unsupported |
+| `FoldingEstimateSpecificTask.java` | Refold with selected starting face/state. | `folding::folding_estimate_to_case` | 10 | Porting; pure enumeration loop oracle, UI timing/dirty-state out of scope |
+| `FoldingEstimateSave100Task.java` | Batch/export folding estimates. | `folding::folding_estimate_save_batch`, `folding::folding_estimate_case_filename` | 10 | Porting; batch case-number and filename oracle, image writing out of scope |
 | `TwoColoredTask.java` | Two-colored CP generation. | `folding::two_colored_subface_segments_from_segments` | 10 | Porting; stage 02col/03 subface arrangement oracle |
 | `FoldingServiceImpl.fold` | Determine fold scope and start folding. | `folding::commands::fold` | 10 | Unsupported |
 | `FoldingServiceImpl.folding_estimated` | Reuse existing fold input for selected figure. | `folding::commands::estimate` | 10 | Unsupported |
 | `FoldingServiceImpl.createTwoColoredCp` | Generate two-colored CP from selected lines. | `folding::commands::two_colored` | 10 | Unsupported |
-| `FoldingServiceImpl.foldAnother` | Request another overlap solution. | `folding::commands::fold_another`, `folding::WorkerOverlapEnumerator` | 10 | Unsupported command; underlying stateful worker enumeration ported |
+| `FoldingServiceImpl.foldAnother` | Request another overlap solution. | `folding::fold_another`, `folding::WorkerOverlapEnumerator` | 10 | Porting; pure session action ported, command wiring unsupported |
 | `FoldingServiceImpl.duplicate` | Duplicate folded model and replay estimate order. | `folding::commands::duplicate` | 10 | Unsupported |
 
 ## Diagnostic Matrix

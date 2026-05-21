@@ -172,6 +172,12 @@ pub struct FoldingEstimate {
     pub overlap: Option<WorkerOverlapSearch>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FoldingEstimateBatch {
+    pub estimates: Vec<FoldingEstimate>,
+    pub discovered_case_numbers: Vec<usize>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FoldingEstimateError {
     InitialHierarchy(InitialHierarchyError),
@@ -598,6 +604,89 @@ impl FoldingEstimateSession {
     }
 }
 
+pub fn fold_another(
+    session: &mut FoldingEstimateSession,
+) -> Result<FoldingEstimate, FoldingEstimateError> {
+    session.folding_estimated(EstimationOrder::Order6)
+}
+
+/// Oriedita `FoldingEstimateSpecificTask` without UI timing/dirty-state
+/// side-effects: run a reusable folded figure until the requested discovered
+/// case count is reached or no later overlap exists.
+pub fn folding_estimate_to_case(
+    session: &mut FoldingEstimateSession,
+    objective: usize,
+    initial_order: EstimationOrder,
+) -> Result<FoldingEstimateBatch, FoldingEstimateError> {
+    if objective == session.estimate.discovered_fold_cases {
+        session.estimate.text_result = format!(
+            "Number of found solutions = {}  ",
+            session.estimate.discovered_fold_cases
+        );
+    }
+
+    let mut estimates = Vec::new();
+    let mut discovered_case_numbers = Vec::new();
+    let mut order = initial_order;
+    while objective > session.estimate.discovered_fold_cases {
+        let estimate = session.folding_estimated(order)?;
+        discovered_case_numbers.push(estimate.discovered_fold_cases);
+        let can_continue = estimate.find_another_overlap_valid;
+        estimates.push(estimate);
+        order = EstimationOrder::Order6;
+        if !can_continue {
+            break;
+        }
+    }
+
+    Ok(FoldingEstimateBatch {
+        estimates,
+        discovered_case_numbers,
+    })
+}
+
+/// Oriedita `FoldingEstimateSave100Task` enumeration loop without selecting an
+/// export file or writing images. Each returned case number corresponds to the
+/// suffix Oriedita would use for that image write.
+pub fn folding_estimate_save_batch(
+    session: &mut FoldingEstimateSession,
+    limit: usize,
+) -> Result<FoldingEstimateBatch, FoldingEstimateError> {
+    let mut estimates = Vec::new();
+    let mut discovered_case_numbers = Vec::new();
+    let mut objective = limit;
+    let mut index = 1usize;
+    while index <= objective {
+        let estimate = session.folding_estimated(EstimationOrder::Order6)?;
+        discovered_case_numbers.push(estimate.discovered_fold_cases);
+        if !estimate.find_another_overlap_valid {
+            objective = estimate.discovered_fold_cases;
+        }
+        estimates.push(estimate);
+        index += 1;
+    }
+
+    Ok(FoldingEstimateBatch {
+        estimates,
+        discovered_case_numbers,
+    })
+}
+
+/// Oriedita `FoldingEstimateSave100Task` filename rule: if the selected path
+/// string contains a dot, insert `_<case>` before the final extension.
+pub fn folding_estimate_case_filename(filename: &str, discovered_case: usize) -> String {
+    if let Some(index) = filename.rfind('.') {
+        format!(
+            "{}_{}{}",
+            &filename[..index],
+            discovered_case,
+            &filename[index..]
+        )
+    } else {
+        filename.to_string()
+    }
+}
+
 /// Oriedita `FoldedFigure.folding_estimated(...)` stage summary from a fresh
 /// folded figure. For `ORDER_6`, this follows Oriedita and asks the same worker
 /// for the next overlap after the initial order-5 solution.
@@ -668,10 +757,18 @@ fn overlap_enumerator_from_segments(
 
     let subfaces = configure_subfaces(&folded, &subface_graph);
     let conditions = equivalence_condition_candidates_from_parts(&graph, &folded, &subfaces)?;
+    let mut table = HierarchyTable::from_initial(&initial);
+    run_additional_estimation(
+        &mut table,
+        &subfaces,
+        &conditions.triple_conditions,
+        &conditions.quadruple_conditions,
+    )?;
+    let configured_hierarchy = table.into_initial_hierarchy(initial.faces_total);
     WorkerOverlapEnumerator::from_subfaces(
         &subfaces.subfaces,
         &subfaces.reduced_subface_indices,
-        &initial,
+        &configured_hierarchy,
         Some(&conditions),
     )
     .map(Some)

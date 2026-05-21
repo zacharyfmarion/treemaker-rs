@@ -1245,9 +1245,20 @@ Deliverables:
   for the next overlap. The oracle commands `folding-estimate-summary` and
   `folding-estimate-sequence-summary` compare the task-level step, display
   style, discovered-case count, text result, worker hierarchy snapshot, fresh
-  order-6 behavior, and repeated order-5/order-6 behavior. `foldAnother`
-  service wiring and `FoldingEstimateSave100Task` batch export remain separate
-  command-layer stages.
+  order-6 behavior, and repeated order-5/order-6 behavior.
+- Status: The non-UI orchestration behind `FoldingServiceImpl.foldAnother`,
+  `FoldingEstimateSpecificTask`, and `FoldingEstimateSave100Task` is ported as
+  `folding::fold_another`, `folding::folding_estimate_to_case`,
+  `folding::folding_estimate_save_batch`, and
+  `folding::folding_estimate_case_filename`. These APIs preserve the Oriedita
+  case-count loops, stop conditions, order-6 handoff, and selected filename
+  suffix rule without performing UI dirty-state updates, timing text, file
+  chooser work, or image writing. Oracle commands
+  `folding-estimate-specific-summary`,
+  `folding-estimate-save-batch-summary`, and
+  `folding-estimate-case-filename` compare the pure behavior, including
+  Oriedita's upstream `solution_sample_1.cp` fixture with 16 discovered
+  solutions.
 - Status: Oriedita's `SubFaceSwappingAlgorithm` support logic is ported as
   `folding::SubFaceSwapper`, including visited-subface tracking, dead-end
   recording, repeated-prefix history detection, swap-counter-driven reverse

@@ -35,6 +35,7 @@ pub struct WorkerOverlapSearch {
     pub found: bool,
     pub hierarchy: InitialHierarchy,
     pub priority: SubFacePriority,
+    pub subface_total: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -334,6 +335,7 @@ pub struct WorkerOverlapEnumerator {
     entries: Vec<WorkerSearchEntry>,
     order: Vec<usize>,
     valid_count: usize,
+    subface_total: usize,
     hierarchy: InitialHierarchy,
     conditions: Option<EquivalenceConditionSet>,
 }
@@ -346,13 +348,15 @@ impl WorkerOverlapEnumerator {
         conditions: Option<&EquivalenceConditionSet>,
     ) -> Result<Self, WorkerOverlapSearchError> {
         let priority = prioritize_subfaces(subfaces, reduced_subface_indices, hierarchy);
-        Self::from_ordered_subfaces(
+        let mut enumerator = Self::from_ordered_subfaces(
             subfaces,
             &priority.ordered_subface_indices,
             priority.valid_count,
             hierarchy,
             conditions,
-        )
+        )?;
+        enumerator.subface_total = subfaces.len();
+        Ok(enumerator)
     }
 
     pub fn from_ordered_subfaces(
@@ -383,6 +387,7 @@ impl WorkerOverlapEnumerator {
             order: (0..entries.len()).collect(),
             entries,
             valid_count,
+            subface_total: ordered_subface_indices.len(),
             hierarchy: hierarchy.clone(),
             conditions: conditions.cloned(),
         })
@@ -468,6 +473,7 @@ impl WorkerOverlapEnumerator {
                         found: true,
                         hierarchy: table.into_initial_hierarchy(self.hierarchy.faces_total),
                         priority: self.priority(),
+                        subface_total: self.subface_total,
                     });
                 }
                 WorkerSearchStep::Inconsistent { subface_id, table } => {
@@ -485,6 +491,7 @@ impl WorkerOverlapEnumerator {
             found: false,
             hierarchy: last_table.into_initial_hierarchy(self.hierarchy.faces_total),
             priority: self.priority(),
+            subface_total: self.subface_total,
         })
     }
 

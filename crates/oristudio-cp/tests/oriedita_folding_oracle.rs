@@ -4,12 +4,14 @@ use oristudio_cp::folding::{
     InitialHierarchyError, SubFace, SubFaceConfiguration, SubFacePermutationSearch,
     WorkerOverlapEnumerator, additional_estimation_from_segments, configure_subfaces_from_segments,
     equivalence_condition_candidates_from_segments, estimate_wireframe_from_segments,
-    folding_estimate_from_segments, initial_hierarchy_from_segments, overlap_search_from_segments,
+    folding_estimate_case_filename, folding_estimate_from_segments, folding_estimate_save_batch,
+    folding_estimate_to_case, initial_hierarchy_from_segments, overlap_search_from_segments,
     overlap_search_from_segments_with_swap, possible_overlap_search_for_ordered_subfaces,
     possible_overlap_search_for_subfaces, possible_overlap_search_for_subfaces_with_swap,
     prepare_subface_segments, prioritize_subfaces, two_colored_subface_segments_from_segments,
 };
 use oristudio_cp::geometry::{LineColor, LineSegment, Point};
+use oristudio_cp::io::cp;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -862,6 +864,113 @@ fn folding_estimate_fresh_order6_matches_oriedita_oracle() {
 }
 
 #[test]
+fn folding_estimate_specific_matches_oriedita_oracle() {
+    let Some(oracle) = folding_oracle() else {
+        eprintln!("skipping Oriedita folding oracle test: ORIEDITA_GEOMETRY_ORACLE is not set");
+        return;
+    };
+
+    let segments = square_with_diagonal();
+    let mut session = FoldingEstimateSession::new(&segments, 1);
+    let batch = folding_estimate_to_case(
+        &mut session,
+        3,
+        oristudio_cp::folding::EstimationOrder::Order5,
+    )
+    .expect("specific folding estimate");
+    let mut args = vec![
+        "folding-estimate-specific-summary".to_string(),
+        "1".to_string(),
+        "3".to_string(),
+        "5".to_string(),
+        segments.len().to_string(),
+    ];
+    push_segment_args(&mut args, &segments);
+    let oracle_args = args.iter().map(String::as_str).collect::<Vec<_>>();
+
+    assert_eq!(
+        folding_estimate_batch_summary("specific_case", &batch, session.estimate()),
+        run_oracle(&oracle, &oracle_args)
+    );
+}
+
+#[test]
+fn folding_estimate_specific_solution_sample_matches_oriedita_oracle() {
+    let Some(oracle) = folding_oracle() else {
+        eprintln!("skipping Oriedita folding oracle test: ORIEDITA_GEOMETRY_ORACLE is not set");
+        return;
+    };
+
+    let segments = solution_sample_segments();
+    let mut session = FoldingEstimateSession::new(&segments, 1);
+    let batch = folding_estimate_to_case(
+        &mut session,
+        17,
+        oristudio_cp::folding::EstimationOrder::Order5,
+    )
+    .expect("specific folding estimate");
+    let mut args = vec![
+        "folding-estimate-specific-summary".to_string(),
+        "1".to_string(),
+        "17".to_string(),
+        "5".to_string(),
+        segments.len().to_string(),
+    ];
+    push_segment_args(&mut args, &segments);
+    let oracle_args = args.iter().map(String::as_str).collect::<Vec<_>>();
+
+    assert_eq!(session.estimate().discovered_fold_cases, 16);
+    assert_eq!(
+        folding_estimate_batch_summary("specific_case", &batch, session.estimate()),
+        run_oracle(&oracle, &oracle_args)
+    );
+}
+
+#[test]
+fn folding_estimate_save_batch_matches_oriedita_oracle() {
+    let Some(oracle) = folding_oracle() else {
+        eprintln!("skipping Oriedita folding oracle test: ORIEDITA_GEOMETRY_ORACLE is not set");
+        return;
+    };
+
+    let segments = square_with_diagonal();
+    let mut session = FoldingEstimateSession::new(&segments, 1);
+    let batch = folding_estimate_save_batch(&mut session, 100).expect("save batch estimate");
+    let mut args = vec![
+        "folding-estimate-save-batch-summary".to_string(),
+        "1".to_string(),
+        "100".to_string(),
+        segments.len().to_string(),
+    ];
+    push_segment_args(&mut args, &segments);
+    let oracle_args = args.iter().map(String::as_str).collect::<Vec<_>>();
+
+    assert_eq!(
+        folding_estimate_batch_summary("batch_case", &batch, session.estimate()),
+        run_oracle(&oracle, &oracle_args)
+    );
+}
+
+#[test]
+fn folding_estimate_case_filename_matches_oriedita_oracle() {
+    let Some(oracle) = folding_oracle() else {
+        eprintln!("skipping Oriedita folding oracle test: ORIEDITA_GEOMETRY_ORACLE is not set");
+        return;
+    };
+
+    for filename in ["/tmp/folded.image.png", "/tmp/folded-image"] {
+        let args = ["folding-estimate-case-filename", filename, "12"];
+        assert_eq!(
+            format!(
+                "case_filename|{}\n",
+                folding_estimate_case_filename(filename, 12)
+            ),
+            run_oracle(&oracle, &args)
+        );
+    }
+}
+
+#[test]
 fn subface_swapper_matches_oriedita_oracle() {
     let Some(oracle) = folding_oracle() else {
         eprintln!("skipping Oriedita folding oracle test: ORIEDITA_GEOMETRY_ORACLE is not set");
@@ -1458,7 +1567,7 @@ fn worker_overlap_summary(search: &oristudio_cp::folding::WorkerOverlapSearch) -
         "worker_overlap|{}|{}|{}|{}\n",
         if search.found { 1000 } else { 0 },
         search.priority.valid_count,
-        search.priority.ordered_subface_indices.len(),
+        search.subface_total,
         search.hierarchy.relations.len()
     ));
     for relation in &search.hierarchy.relations {
@@ -1544,6 +1653,19 @@ fn folding_estimate_sequence_summary(
         ));
         output.push_str(&folding_estimate_summary(&estimate));
     }
+    output
+}
+
+fn folding_estimate_batch_summary(
+    prefix: &str,
+    batch: &oristudio_cp::folding::FoldingEstimateBatch,
+    final_estimate: &oristudio_cp::folding::FoldingEstimate,
+) -> String {
+    let mut output = String::new();
+    for discovered_case in &batch.discovered_case_numbers {
+        output.push_str(&format!("{prefix}|{discovered_case}\n"));
+    }
+    output.push_str(&folding_estimate_summary(final_estimate));
     output
 }
 
@@ -1709,6 +1831,14 @@ fn quartered_square() -> Vec<LineSegment> {
         segment(0.5, 0.5, 1.0, 1.0, LineColor::Red1),
         segment(0.5, 0.5, 0.0, 1.0, LineColor::Blue2),
     ]
+}
+
+fn solution_sample_segments() -> Vec<LineSegment> {
+    cp::import_cp_str(include_str!(
+        "../../../tests/fixtures/oriedita/solution_sample_1.cp"
+    ))
+    .expect("solution sample cp")
+    .line_segments
 }
 
 fn java_double_string(value: f64) -> String {

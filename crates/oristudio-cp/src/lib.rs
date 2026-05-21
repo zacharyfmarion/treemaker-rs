@@ -1071,18 +1071,18 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
     descriptor!(
         FoldingEstimateSpecific,
         "FoldingEstimateSpecificTask",
-        "folding::estimate_specific",
+        "folding::folding_estimate_to_case",
         Kernel,
         10,
-        Unsupported
+        Porting
     ),
     descriptor!(
         FoldingEstimateSave100,
         "FoldingEstimateSave100Task",
-        "folding::estimate_batch",
+        "folding::folding_estimate_save_batch",
         Kernel,
         10,
-        Unsupported
+        Porting
     ),
     descriptor!(
         TwoColoredCp,
@@ -1255,16 +1255,13 @@ mod tests {
         };
         let original = document.clone();
 
-        let error = execute_command(
-            &mut document,
-            CreasePatternCommand::new(OperationId::FoldingEstimateSpecific),
-        )
-        .expect_err("stage one operations should be unsupported");
+        let error = execute_command(&mut document, CreasePatternCommand::new(OperationId::Fold))
+            .expect_err("stage one operations should be unsupported");
 
         assert_eq!(
             error,
             CommandError::UnsupportedOperation {
-                operation: OperationId::FoldingEstimateSpecific,
+                operation: OperationId::Fold,
             }
         );
         assert_eq!(document, original);

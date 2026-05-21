@@ -2,13 +2,15 @@ use oristudio_cp::folding::{
     ChainPermutationGenerator, FoldingEstimateSession, HierarchyRelation, InitialHierarchy,
     SubFacePermutationSearch, SubFaceSwapper, WorkerOverlapEnumerator,
     additional_estimation_from_segments, configure_subfaces_from_segments,
-    equivalence_condition_candidates_from_segments, estimate_wireframe_from_segments,
-    folding_estimate_from_segments, initial_hierarchy_from_segments, overlap_search_from_segments,
+    equivalence_condition_candidates_from_segments, estimate_wireframe_from_segments, fold_another,
+    folding_estimate_case_filename, folding_estimate_from_segments, folding_estimate_save_batch,
+    folding_estimate_to_case, initial_hierarchy_from_segments, overlap_search_from_segments,
     overlap_search_from_segments_with_swap, possible_overlap_search_for_ordered_subfaces,
     possible_overlap_search_for_subfaces, possible_overlap_search_for_subfaces_with_swap,
     prepare_subface_segments, prioritize_subfaces, two_colored_subface_segments_from_segments,
 };
 use oristudio_cp::geometry::{LineColor, LineSegment, Point};
+use oristudio_cp::io::cp;
 
 #[test]
 fn wireframe_fold_builds_faces_and_face_positions() {
@@ -484,6 +486,72 @@ fn folding_estimate_session_reuses_worker_for_order6() {
 }
 
 #[test]
+fn fold_another_runs_order6_on_existing_session() {
+    let mut session = FoldingEstimateSession::new(&square_with_diagonal(), 1);
+    session
+        .folding_estimated(oristudio_cp::folding::EstimationOrder::Order5)
+        .expect("first folding estimate");
+
+    let estimate = fold_another(&mut session).expect("another folding estimate");
+
+    assert_eq!(estimate.discovered_fold_cases, 1);
+    assert!(!estimate.find_another_overlap_valid);
+}
+
+#[test]
+fn folding_estimate_to_case_stops_when_no_more_solutions() {
+    let mut session = FoldingEstimateSession::new(&square_with_diagonal(), 1);
+
+    let batch = folding_estimate_to_case(
+        &mut session,
+        3,
+        oristudio_cp::folding::EstimationOrder::Order5,
+    )
+    .expect("specific folding estimate");
+
+    assert_eq!(batch.discovered_case_numbers, vec![1]);
+    assert_eq!(session.estimate().discovered_fold_cases, 1);
+    assert!(!session.estimate().find_another_overlap_valid);
+}
+
+#[test]
+fn folding_estimate_to_case_finds_solution_sample_cases() {
+    let segments = solution_sample_segments();
+    let mut session = FoldingEstimateSession::new(&segments, 1);
+
+    let batch = folding_estimate_to_case(
+        &mut session,
+        17,
+        oristudio_cp::folding::EstimationOrder::Order5,
+    )
+    .expect("specific folding estimate");
+
+    assert_eq!(session.estimate().discovered_fold_cases, 16);
+    assert_eq!(
+        batch.discovered_case_numbers,
+        (1usize..=16).collect::<Vec<_>>()
+    );
+    assert!(!session.estimate().find_another_overlap_valid);
+}
+
+#[test]
+fn folding_estimate_save_batch_records_case_numbers_and_filename_suffixes() {
+    let mut session = FoldingEstimateSession::new(&square_with_diagonal(), 1);
+
+    let batch = folding_estimate_save_batch(&mut session, 100).expect("save batch estimate");
+
+    assert_eq!(batch.discovered_case_numbers, vec![1]);
+    assert_eq!(
+        folding_estimate_case_filename("/tmp/folded.image.png", 12),
+        "/tmp/folded.image_12.png"
+    );
+    assert_eq!(
+        folding_estimate_case_filename("/tmp/folded-image", 12),
+        "/tmp/folded-image"
+    );
+}
+
+#[test]
 fn two_colored_subface_segments_keep_development_coordinates() {
     let prepared = two_colored_subface_segments_from_segments(&two_square_strip(), 1)
         .expect("two-colored subface preparation");
@@ -561,6 +629,14 @@ fn quartered_square() -> Vec<LineSegment> {
         LineSegment::with_color(Point::new(0.5, 0.5), Point::new(1.0, 1.0), LineColor::Red1),
         LineSegment::with_color(Point::new(0.5, 0.5), Point::new(0.0, 1.0), LineColor::Blue2),
     ]
+}
+
+fn solution_sample_segments() -> Vec<LineSegment> {
+    cp::import_cp_str(include_str!(
+        "../../../tests/fixtures/oriedita/solution_sample_1.cp"
+    ))
+    .expect("solution sample cp")
+    .line_segments
 }
 
 fn collect_permutations(mut generator: ChainPermutationGenerator, limit: usize) -> Vec<Vec<usize>> {

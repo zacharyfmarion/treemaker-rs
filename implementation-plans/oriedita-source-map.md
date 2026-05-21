@@ -195,11 +195,11 @@ stage explicitly changes it.
 | `SELECT_LASSO_74` | `MouseHandlerSelectLasso` | `operations::selection::select_lasso` | kernel | 6 | Unsupported |
 | `UNSELECT_LASSO_75` | `MouseHandlerUnselectLasso` | `operations::selection::unselect_lasso` | kernel | 6 | Unsupported |
 | `TEXT` | `MouseHandlerText` | `model::text`, `operations::text` | kernel | 3, 4 | Unsupported |
-| `DRAW_BLINTZ` | `MouseHandlerDrawBlintz` | `operations::generators::blintz` | kernel | 8 | Unsupported |
-| `DRAW_FISH_BASE` | `MouseHandlerDrawFishBase` | `operations::generators::fish_base` | kernel | 8 | Unsupported |
-| `DRAW_DOVE_BASE` | `MouseHandlerDrawDoveBase` | `operations::generators::dove_base` | kernel | 8 | Unsupported |
-| `DRAW_BIRD_BASE` | `MouseHandlerDrawBirdBase` | `operations::generators::bird_base` | kernel | 8 | Unsupported |
-| `DRAW_FROG_BASE` | `MouseHandlerDrawFrogBase` | `operations::generators::frog_base` | kernel | 8 | Unsupported |
+| `DRAW_BLINTZ` | `MouseHandlerDrawBlintz` | `operations::generators::default_molecule` | kernel | 8 | Oracle-tested |
+| `DRAW_FISH_BASE` | `MouseHandlerDrawFishBase` | `operations::generators::default_molecule` | kernel | 8 | Oracle-tested |
+| `DRAW_DOVE_BASE` | `MouseHandlerDrawDoveBase` | `operations::generators::default_molecule` | kernel | 8 | Oracle-tested |
+| `DRAW_BIRD_BASE` | `MouseHandlerDrawBirdBase` | `operations::generators::default_molecule` | kernel | 8 | Oracle-tested |
+| `DRAW_FROG_BASE` | `MouseHandlerDrawFrogBase` | `operations::generators::default_molecule` | kernel | 8 | Oracle-tested |
 | `MODIFY_CALCULATED_SHAPE_101` | `MouseHandlerModifyCalculatedShape` | `folding::modify_calculated_shape` | kernel | 10 | Unsupported |
 | `MOVE_CALCULATED_SHAPE_102` | `MouseHandlerMoveCalculatedShape` | `folding::move_calculated_shape` | kernel | 10 | Unsupported |
 | `CHANGE_STANDARD_FACE_103` | `MouseHandlerChangeStandardFace` | `folding::change_standard_face` | kernel | 10 | Unsupported |

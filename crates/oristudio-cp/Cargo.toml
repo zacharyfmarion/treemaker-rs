@@ -9,7 +9,7 @@ homepage.workspace = true
 readme = "README.md"
 keywords = ["origami", "crease-pattern", "fold", "oriedita"]
 categories = ["algorithms", "data-structures", "mathematics"]
-include = ["Cargo.toml", "README.md", "src/**", "tests/**"]
+include = ["Cargo.toml", "README.md", "resources/**", "src/**", "tests/**"]
 
 [dependencies]
 encoding_rs.workspace = true

@@ -21,7 +21,9 @@ use oristudio_cp::operations::color::{
 use oristudio_cp::operations::construction::{
     DrawCreaseTarget, draw_crease_segment, mirror_selected_lines,
 };
-use oristudio_cp::operations::generators::regular_polygon_no_corners;
+use oristudio_cp::operations::generators::{
+    DefaultMolecule, default_molecule, regular_polygon_no_corners,
+};
 use oristudio_cp::operations::measure::{angle_between_three_points, length_between_points};
 use oristudio_cp::operations::point::{
     divide_segment_by_count, divide_segment_by_ratio, draw_point_on_segment,
@@ -1508,6 +1510,68 @@ fn regular_polygon_no_corners_matches_oriedita_oracle() {
 }
 
 #[test]
+fn default_molecule_generators_match_oriedita_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    for (molecule, resource, p1, p2) in [
+        (
+            DefaultMolecule::Blintz,
+            "blintz.fold",
+            Point::new(-199.99999999999997, -200.0),
+            Point::new(200.0, 200.0),
+        ),
+        (
+            DefaultMolecule::FishBase,
+            "fish_base.fold",
+            Point::new(-199.99999999999997, -200.0),
+            Point::new(-186.73241451857626, -167.96921519080254),
+        ),
+        (
+            DefaultMolecule::DoveBase,
+            "dove_base.fold",
+            Point::new(-199.99999999999997, -200.0),
+            Point::new(-169.0726658116157, -169.07266581161576),
+        ),
+        (
+            DefaultMolecule::BirdBase,
+            "bird_base.fold",
+            Point::new(-199.99999999999997, -200.0),
+            Point::new(-185.21831060958067, -164.31384499886317),
+        ),
+        (
+            DefaultMolecule::FrogBase,
+            "frog_base.fold",
+            Point::new(-199.99999999999997, -200.0),
+            Point::new(-185.53375636724545, -165.07539842521055),
+        ),
+    ] {
+        let mut model = CreasePatternModel::default();
+        let added = default_molecule(&mut model, molecule, p1, p2, LineColor::Blue2)
+            .expect("bundled default molecule should import");
+        let resource_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("resources/default-molecules")
+            .join(resource);
+
+        let mut args = vec![
+            "foldline-default-molecule".to_string(),
+            resource_path.to_string_lossy().into_owned(),
+            LineColor::Blue2.number().to_string(),
+        ];
+        push_points_args(&mut args, &[p1, p2]);
+        args.push("0".to_string());
+
+        let rust_summary = format!("added|{added}\n{}", line_segment_set_summary(&model));
+        let oracle_summary = run_oracle(&oracle, &args);
+        assert_line_summary_close(&rust_summary, &oracle_summary, 1e-9, resource);
+    }
+}
+
+#[test]
 fn draw_crease_segment_matches_oriedita_oracle() {
     let Some(oracle) = operations_oracle() else {
         eprintln!(
@@ -1805,6 +1869,58 @@ fn circle_inversion_output(output: CircleInversionOutput) -> &'static str {
         CircleInversionOutput::Circle => "circle",
         CircleInversionOutput::LineSegment => "line",
     }
+}
+
+fn assert_line_summary_close(left: &str, right: &str, tolerance: f64, context: &str) {
+    let left_lines: Vec<_> = left.lines().collect();
+    let right_lines: Vec<_> = right.lines().collect();
+    assert_eq!(
+        left_lines.len(),
+        right_lines.len(),
+        "{context}: summary line count differs\nleft:\n{left}\nright:\n{right}"
+    );
+
+    for (index, (left_line, right_line)) in left_lines.iter().zip(right_lines.iter()).enumerate() {
+        if left_line.starts_with("line|") && right_line.starts_with("line|") {
+            assert_line_entry_close(left_line, right_line, tolerance, context, index);
+        } else {
+            assert_eq!(
+                left_line, right_line,
+                "{context}: summary line {index} differs"
+            );
+        }
+    }
+}
+
+fn assert_line_entry_close(left: &str, right: &str, tolerance: f64, context: &str, index: usize) {
+    let left_parts: Vec<_> = left.split('|').collect();
+    let right_parts: Vec<_> = right.split('|').collect();
+    assert_eq!(
+        left_parts.len(),
+        right_parts.len(),
+        "{context}: line entry {index} field count differs"
+    );
+    assert_eq!(
+        left_parts[0], right_parts[0],
+        "{context}: line entry prefix"
+    );
+
+    for field in 1..=4 {
+        let left_value: f64 = left_parts[field]
+            .parse()
+            .unwrap_or_else(|err| panic!("{context}: bad left float {left}: {err}"));
+        let right_value: f64 = right_parts[field]
+            .parse()
+            .unwrap_or_else(|err| panic!("{context}: bad right float {right}: {err}"));
+        assert!(
+            (left_value - right_value).abs() <= tolerance,
+            "{context}: line entry {index} field {field} differs: {left_value} vs {right_value}"
+        );
+    }
+    assert_eq!(
+        left_parts[5], right_parts[5],
+        "{context}: line entry {index} color differs"
+    );
 }
 
 fn java_double_string(value: f64) -> String {

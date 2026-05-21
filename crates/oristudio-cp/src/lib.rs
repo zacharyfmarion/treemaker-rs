@@ -874,42 +874,42 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
     descriptor!(
         DrawBlintz,
         "MouseHandlerDrawBlintz",
-        "operations::generators::blintz",
+        "operations::generators::default_molecule",
         Kernel,
         8,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         DrawFishBase,
         "MouseHandlerDrawFishBase",
-        "operations::generators::fish_base",
+        "operations::generators::default_molecule",
         Kernel,
         8,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         DrawDoveBase,
         "MouseHandlerDrawDoveBase",
-        "operations::generators::dove_base",
+        "operations::generators::default_molecule",
         Kernel,
         8,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         DrawBirdBase,
         "MouseHandlerDrawBirdBase",
-        "operations::generators::bird_base",
+        "operations::generators::default_molecule",
         Kernel,
         8,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         DrawFrogBase,
         "MouseHandlerDrawFrogBase",
-        "operations::generators::frog_base",
+        "operations::generators::default_molecule",
         Kernel,
         8,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         ModifyCalculatedShape,

@@ -32,8 +32,12 @@ import java.util.HashSet;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class OrieditaGeometryOracle {
+    private static final String JSON_NUMBER = "[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:[Ee][+-]?\\d+)?";
+
     public static void main(String[] args) throws Exception {
         if (args.length < 1) {
             usage("missing command");
@@ -94,6 +98,7 @@ public class OrieditaGeometryOracle {
             case "foldline-circle-tangent-point" -> foldLineCircleTangentPoint(args);
             case "foldline-circle-tangent-two" -> foldLineCircleTangentTwo(args);
             case "foldline-regular-polygon" -> foldLineRegularPolygon(args);
+            case "foldline-default-molecule" -> foldLineDefaultMolecule(args);
             case "foldline-divide-count" -> foldLineDivideCount(args);
             case "foldline-divide-ratio" -> foldLineDivideRatio(args);
             case "measure-length" -> measureLength(args);
@@ -1413,6 +1418,170 @@ public class OrieditaGeometryOracle {
         printFoldLineSet(set);
     }
 
+    private static void foldLineDefaultMolecule(String[] args) throws Exception {
+        if (args.length < 8) {
+            usage("foldline-default-molecule expects resource path, color, points, count, and fold lines");
+        }
+
+        Save originalSave = defaultMoleculeSave(args[1]);
+        LineColor color = LineColor.fromNumber(Integer.parseInt(args[2]));
+        Point p1 = new Point(parse(args[3]), parse(args[4]));
+        Point p2 = new Point(parse(args[5]), parse(args[6]));
+        int count = Integer.parseInt(args[7]);
+        FoldLineSet set = foldLineSet(args, 8, count);
+        int added = 0;
+
+        if (p2.distance(p1) >= Epsilon.UNKNOWN_1EN6) {
+            List<Circle> startingCircles = originalSave.getCircles().stream()
+                    .filter(circle -> circle.getR() > Epsilon.UNKNOWN_1EN6)
+                    .toList();
+            if (startingCircles.size() >= 2) {
+                FoldLineSet templateSet = new FoldLineSet();
+                templateSet.setSave(originalSave);
+                templateSet.move(
+                        startingCircles.get(0).determineCenter(),
+                        startingCircles.get(1).determineCenter(),
+                        p1,
+                        p2);
+                for (LineSegment segment : templateSet.getLineSegments()) {
+                    if (segment.determineLength() > Epsilon.UNKNOWN_1EN6) {
+                        addLineSegmentLikeWorker(set, segment.withColor(color));
+                        added++;
+                    }
+                }
+            }
+        }
+
+        System.out.println("added|" + added);
+        printFoldLineSet(set);
+    }
+
+    private static Save defaultMoleculeSave(String path) throws Exception {
+        String json = Files.readString(new File(path).toPath());
+        List<Point> vertices = parsePointPairs(extractJsonArray(json, "vertices_coords"));
+        List<int[]> edges = parseIntPairs(extractJsonArray(json, "edges_vertices"));
+        List<String> assignments = parseStringArray(extractJsonArray(json, "edges_assignment"));
+
+        Save save = SaveProvider.createInstance();
+        double minX = Double.MAX_VALUE;
+        double minY = Double.MAX_VALUE;
+        double maxY = Double.MIN_VALUE;
+
+        for (int index = 0; index < edges.size(); index++) {
+            int[] edge = edges.get(index);
+            Point a = vertices.get(edge[0]);
+            Point b = vertices.get(edge[1]);
+            minX = Math.min(Math.min(minX, a.getX()), b.getX());
+            minY = Math.min(Math.min(minY, a.getY()), b.getY());
+            maxY = Math.max(Math.max(maxY, a.getY()), b.getY());
+            save.addLineSegment(new LineSegment(a, b, foldAssignmentColor(assignments, index)));
+        }
+        save.setCircles(parseCircles(json));
+
+        FoldLineSet normalized = new FoldLineSet();
+        normalized.setSave(save);
+        normalized.move(
+                new Point(minX, minY),
+                new Point(minX, maxY),
+                new Point(-200.0, -200.0),
+                new Point(-200.0, 200.0));
+        Save normalizedSave = SaveProvider.createInstance();
+        normalized.getSave(normalizedSave);
+        return normalizedSave;
+    }
+
+    private static LineColor foldAssignmentColor(List<String> assignments, int index) {
+        if (index >= assignments.size()) {
+            return LineColor.BLACK_0;
+        }
+        return switch (assignments.get(index)) {
+            case "M" -> LineColor.RED_1;
+            case "V" -> LineColor.BLUE_2;
+            case "F" -> LineColor.CYAN_3;
+            default -> LineColor.BLACK_0;
+        };
+    }
+
+    private static List<Circle> parseCircles(String json) {
+        List<Point> centers = parsePointPairs(extractJsonArray(json, "oriedita:circles_coords"));
+        List<Double> radii = parseDoubleArray(extractJsonArray(json, "oriedita:circles_radii"));
+        List<String> colors = parseStringArray(extractJsonArray(json, "oriedita:circles_colors"));
+        List<Circle> circles = new ArrayList<>();
+        for (int index = 0; index < centers.size(); index++) {
+            Point center = centers.get(index);
+            double radius = index < radii.size() ? radii.get(index) : 0.0;
+            LineColor color = index < colors.size()
+                    ? LineColor.fromNumber(Integer.parseInt(colors.get(index)))
+                    : LineColor.BLACK_0;
+            circles.add(new Circle(center.getX(), center.getY(), radius, color));
+        }
+        return circles;
+    }
+
+    private static String extractJsonArray(String json, String key) {
+        int keyIndex = json.indexOf("\"" + key + "\"");
+        if (keyIndex < 0) {
+            return "[]";
+        }
+        int start = json.indexOf('[', keyIndex);
+        if (start < 0) {
+            throw new IllegalArgumentException("missing JSON array for key " + key);
+        }
+        int depth = 0;
+        for (int index = start; index < json.length(); index++) {
+            char current = json.charAt(index);
+            if (current == '[') {
+                depth++;
+            } else if (current == ']') {
+                depth--;
+                if (depth == 0) {
+                    return json.substring(start, index + 1);
+                }
+            }
+        }
+        throw new IllegalArgumentException("unterminated JSON array for key " + key);
+    }
+
+    private static List<Point> parsePointPairs(String array) {
+        Pattern pattern = Pattern.compile("\\[\\s*(" + JSON_NUMBER + ")\\s*,\\s*(" + JSON_NUMBER + ")\\s*\\]");
+        Matcher matcher = pattern.matcher(array);
+        List<Point> points = new ArrayList<>();
+        while (matcher.find()) {
+            points.add(new Point(parse(matcher.group(1)), parse(matcher.group(2))));
+        }
+        return points;
+    }
+
+    private static List<int[]> parseIntPairs(String array) {
+        Pattern pattern = Pattern.compile("\\[\\s*(-?\\d+)\\s*,\\s*(-?\\d+)\\s*\\]");
+        Matcher matcher = pattern.matcher(array);
+        List<int[]> pairs = new ArrayList<>();
+        while (matcher.find()) {
+            pairs.add(new int[]{Integer.parseInt(matcher.group(1)), Integer.parseInt(matcher.group(2))});
+        }
+        return pairs;
+    }
+
+    private static List<Double> parseDoubleArray(String array) {
+        Pattern pattern = Pattern.compile(JSON_NUMBER);
+        Matcher matcher = pattern.matcher(array);
+        List<Double> values = new ArrayList<>();
+        while (matcher.find()) {
+            values.add(parse(matcher.group()));
+        }
+        return values;
+    }
+
+    private static List<String> parseStringArray(String array) {
+        Pattern pattern = Pattern.compile("\"([^\"]*)\"");
+        Matcher matcher = pattern.matcher(array);
+        List<String> values = new ArrayList<>();
+        while (matcher.find()) {
+            values.add(matcher.group(1));
+        }
+        return values;
+    }
+
     private static void foldLineDivideCount(String[] args) {
         if (args.length < 8) {
             usage("foldline-divide-count expects division count, segment, count, and segment payload");
@@ -1886,6 +2055,7 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle foldline-circle-tangent-point <pointX> <pointY> <circle x y r color> <lineCount> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-circle-tangent-two <circle1 x y r color> <circle2 x y r color>");
         System.err.println("   or: OrieditaGeometryOracle foldline-regular-polygon <corners> <color> <p1x> <p1y> <p2x> <p2y> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-default-molecule <resourcePath> <color> <p1x> <p1y> <p2x> <p2y> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle measure-length <ax> <ay> <bx> <by>");
         System.err.println("   or: OrieditaGeometryOracle measure-angle <ax> <ay> <centerX> <centerY> <bx> <by>");
         System.err.println("   or: OrieditaGeometryOracle custom-line-type <customType> <lineColor>");

@@ -979,7 +979,8 @@ Deliverables:
   and cyan auxiliary-line color changes are also oracle-tested for resolved
   targets. Tangent-line candidate generation is in progress with point-circle
   and common two-circle candidate fixtures covered. Regular polygon generation
-  is oracle-tested for resolved point pairs.
+  and the bundled Blintz, fish, dove, bird, and frog base generators are
+  oracle-tested for resolved anchor points.
 - Port regular polygon creation.
 - Port Blintz, fish, dove, bird, and frog base generators.
 - Port Voronoi creation.
@@ -988,7 +989,10 @@ Deliverables:
 Oracle:
 
 - Fixture per circle mode.
-- Fixture per base generator.
+- Fixture per base generator; the five default molecule FOLD resources are
+  vendored in `crates/oristudio-cp/resources/default-molecules/` and compared
+  against an Oriedita oracle command that imports, transforms, filters,
+  recolors, and inserts the same pattern lines.
 - Voronoi fixtures with stable canonical comparison.
 
 Validation:

@@ -1167,9 +1167,9 @@ Deliverables:
   `AdditionalEstimationAlgorithm` now derives the same final hierarchy relation
   table for covered fixtures as `folding::additional_estimation_from_segments`.
   The optimized Italiano/reactive data structures, remove-mode condition
-  pruning as an observable API, custom constraints, overlap permutation search,
-  full `FoldingEstimateTask`, full `TwoColoredTask`, and folded-model mutation
-  commands remain intentionally unsupported until their stages are ported.
+  pruning as an observable API, custom constraints, and the high-permutation
+  `CombinationGenerator` accelerator remain tracked separately. Folded-figure
+  UI/list/camera wiring remains out of scope for the non-UI crate API.
 - Status: Oriedita's `PairGuide` and `ChainPermutationGenerator` are ported as
   `folding::ChainPermutationGenerator`, including persistent guides, temporary
   guides, top/bottom constraints, lock-chain initialization, reset, and

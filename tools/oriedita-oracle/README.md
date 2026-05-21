@@ -24,6 +24,8 @@ selected lines across a resolved axis. Circle coverage has started with
 restricted, free, and three-point circle creation, separate circles, concentric
 circle variants, inversion of circles/segments through circles, and
 `OrganizeCircles` pruning after inputs have been resolved to model coordinates.
+Circle custom-color coverage includes resolved circle targets and cyan
+auxiliary-line targets, including Oriedita's value-based duplicate lookup.
 The first selection commands cover select/unselect all, index selection, box
 selection via `lineSegmentsInside`, polygon selection via `select_Takakukei`,
 line-overlap/intersection selection via `select_lX`, and

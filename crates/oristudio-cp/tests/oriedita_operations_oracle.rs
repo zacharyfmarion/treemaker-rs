@@ -1,4 +1,4 @@
-use oristudio_cp::geometry::{Circle, Intersection, LineColor, LineSegment, Point};
+use oristudio_cp::geometry::{Circle, Intersection, LineColor, LineSegment, Point, RgbColor};
 use oristudio_cp::model::{CreasePatternModel, CustomLineType};
 use oristudio_cp::operations::arrangement::{
     branch_trim, del_v_all, del_v_all_color_change, del_v_at_point, del_v_at_point_color_change,
@@ -8,9 +8,9 @@ use oristudio_cp::operations::arrangement::{
     divide_line_segment_with_new_lines, fix1, fix2, intersect_divide_pair,
 };
 use oristudio_cp::operations::circle::{
-    CircleInversionOutput, concentric, concentric_select, concentric_two_circle_select,
-    draw as draw_circle, free as draw_circle_free, invert_circle, invert_line_segment, organize,
-    separate, through_three_points,
+    CircleInversionOutput, change_custom_color_for_indices, concentric, concentric_select,
+    concentric_two_circle_select, draw as draw_circle, free as draw_circle_free, invert_circle,
+    invert_line_segment, organize, separate, through_three_points,
 };
 use oristudio_cp::operations::color::{
     advance_line_type, alternate_mountain_valley_along, alternate_mountain_valley_crossing,
@@ -1396,6 +1396,55 @@ fn organize_circles_matches_oriedita_oracle() {
 }
 
 #[test]
+fn circle_change_color_matches_oriedita_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    let circles = vec![
+        Circle::new(0.0, 0.0, 1.0, LineColor::Cyan3),
+        Circle::new(3.0, 0.0, 1.0, LineColor::Cyan3),
+    ];
+    let duplicate = segment(0.0, 0.0, 1.0, 0.0, LineColor::Cyan3);
+    let segments = vec![
+        duplicate.clone(),
+        duplicate,
+        segment(0.0, 1.0, 1.0, 1.0, LineColor::Red1),
+    ];
+    let color = RgbColor::new(10, 20, 30);
+
+    let mut model = model_from_segments(&segments);
+    for circle in &circles {
+        model.add_circle(*circle);
+    }
+    let changed = change_custom_color_for_indices(&mut model, &[1], &[1, 2], color);
+
+    let mut args = vec![
+        "foldline-circle-change-color".to_string(),
+        "1".to_string(),
+        "1,2".to_string(),
+        color.red.to_string(),
+        color.green.to_string(),
+        color.blue.to_string(),
+        circles.len().to_string(),
+    ];
+    for circle in &circles {
+        push_circle_args(&mut args, *circle);
+    }
+    args.push(segments.len().to_string());
+    push_segment_args(&mut args, &segments);
+    let rust_summary = format!(
+        "changed|{changed}\n{}{}",
+        circle_set_summary(&model),
+        line_segment_customization_summary(&model)
+    );
+    assert_eq!(rust_summary, run_oracle(&oracle, &args));
+}
+
+#[test]
 fn draw_crease_segment_matches_oriedita_oracle() {
     let Some(oracle) = operations_oracle() else {
         eprintln!(
@@ -1596,6 +1645,26 @@ fn line_segment_set_with_selection_summary(model: &CreasePatternModel) -> String
             java_double_string(segment.b.y),
             segment.color.number(),
             segment.selected
+        ));
+    }
+    output
+}
+
+fn line_segment_customization_summary(model: &CreasePatternModel) -> String {
+    let mut output = String::new();
+    output.push_str(&format!("lines|{}\n", model.line_segments.len()));
+    for segment in &model.line_segments {
+        output.push_str(&format!(
+            "line|{}|{}|{}|{}|{}|{}|{}|{}|{}\n",
+            java_double_string(segment.a.x),
+            java_double_string(segment.a.y),
+            java_double_string(segment.b.x),
+            java_double_string(segment.b.y),
+            segment.color.number(),
+            segment.customized,
+            segment.customized_color.red,
+            segment.customized_color.green,
+            segment.customized_color.blue
         ));
     }
     output

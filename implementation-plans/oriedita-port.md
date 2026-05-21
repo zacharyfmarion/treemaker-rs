@@ -975,7 +975,9 @@ Deliverables:
 
 - Port all circle tools. Basic restricted/free/three-point circle creation,
   separate circles, concentric variants, inversion, and circle organization are
-  now ported and oracle-tested for resolved model-space inputs.
+  now ported and oracle-tested for resolved model-space inputs. Custom circle
+  and cyan auxiliary-line color changes are also oracle-tested for resolved
+  targets.
 - Port regular polygon creation.
 - Port Blintz, fish, dove, bird, and frog base generators.
 - Port Voronoi creation.

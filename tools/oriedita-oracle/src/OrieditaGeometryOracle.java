@@ -90,6 +90,7 @@ public class OrieditaGeometryOracle {
             case "foldline-circle-invert-circle" -> foldLineCircleInvertCircle(args);
             case "foldline-circle-invert-line" -> foldLineCircleInvertLine(args);
             case "foldline-circle-organize" -> foldLineCircleOrganize(args);
+            case "foldline-circle-change-color" -> foldLineCircleChangeColor(args);
             case "foldline-divide-count" -> foldLineDivideCount(args);
             case "foldline-divide-ratio" -> foldLineDivideRatio(args);
             case "measure-length" -> measureLength(args);
@@ -1203,6 +1204,58 @@ public class OrieditaGeometryOracle {
         printCircleSet(set);
     }
 
+    private static void foldLineCircleChangeColor(String[] args) {
+        if (args.length < 8) {
+            usage("foldline-circle-change-color expects index sets, rgb color, circles, and fold lines");
+        }
+
+        List<Integer> circleIndices = parseIndices(args[1]);
+        List<Integer> auxLineIndices = parseIndices(args[2]);
+        Color color = new Color(
+                Integer.parseInt(args[3]),
+                Integer.parseInt(args[4]),
+                Integer.parseInt(args[5]));
+        int circleCount = Integer.parseInt(args[6]);
+        int lineCountOffset = 7 + circleCount * 4;
+        if (args.length < lineCountOffset + 1) {
+            usage("foldline-circle-change-color missing line count");
+        }
+        int lineCount = Integer.parseInt(args[lineCountOffset]);
+        int expectedLength = lineCountOffset + 1 + lineCount * 5;
+        if (args.length != expectedLength) {
+            usage("foldline-circle-change-color payload length mismatch");
+        }
+
+        FoldLineSet set = new FoldLineSet();
+        for (int i = 0; i < circleCount; i++) {
+            set.getCircles().add(circle(args, 7 + i * 4));
+        }
+        for (int i = 0; i < lineCount; i++) {
+            set.addLine(segment(args, lineCountOffset + 1 + i * 5));
+        }
+
+        int changed = 0;
+        for (int index : circleIndices) {
+            if (index >= 0 && index < set.getCircles().size()) {
+                set.setCircleCustomizedColor(set.getCircles().get(index), color);
+                changed++;
+            }
+        }
+        for (int index : auxLineIndices) {
+            if (index >= 0 && index < set.getTotal()) {
+                LineSegment line = set.get(index + 1);
+                if (line.getColor() == LineColor.CYAN_3) {
+                    set.setCustomized(line, color);
+                    changed++;
+                }
+            }
+        }
+
+        System.out.println("changed|" + changed);
+        printCircleSet(set);
+        printFoldLineSetWithCustomization(set);
+    }
+
     private static void foldLineDivideCount(String[] args) {
         if (args.length < 8) {
             usage("foldline-divide-count expects division count, segment, count, and segment payload");
@@ -1500,6 +1553,23 @@ public class OrieditaGeometryOracle {
         }
     }
 
+    private static void printFoldLineSetWithCustomization(FoldLineSet set) {
+        System.out.println("lines|" + set.getTotal());
+        for (int index = 1; index <= set.getTotal(); index++) {
+            LineSegment segment = set.get(index);
+            System.out.println("line|"
+                    + segment.determineAX() + "|"
+                    + segment.determineAY() + "|"
+                    + segment.determineBX() + "|"
+                    + segment.determineBY() + "|"
+                    + segment.getColor().getNumber() + "|"
+                    + segment.getCustomized() + "|"
+                    + segment.getCustomizedColor().getRed() + "|"
+                    + segment.getCustomizedColor().getGreen() + "|"
+                    + segment.getCustomizedColor().getBlue());
+        }
+    }
+
     private static void printFoldLineSetWithSelection(FoldLineSet set) {
         System.out.println("lines|" + set.getTotal());
         for (int index = 1; index <= set.getTotal(); index++) {
@@ -1643,6 +1713,7 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle foldline-circle-invert-circle <subject x y r color> <inversion x y r color>");
         System.err.println("   or: OrieditaGeometryOracle foldline-circle-invert-line <segment ax ay bx by color> <inversion x y r color>");
         System.err.println("   or: OrieditaGeometryOracle foldline-circle-organize <circleCount> [x y r color]... <lineCount> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-circle-change-color <circleIndices> <auxLineIndices> <r> <g> <b> <circleCount> [x y r color]... <lineCount> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle measure-length <ax> <ay> <bx> <by>");
         System.err.println("   or: OrieditaGeometryOracle measure-angle <ax> <ay> <centerX> <centerY> <bx> <by>");
         System.err.println("   or: OrieditaGeometryOracle custom-line-type <customType> <lineColor>");

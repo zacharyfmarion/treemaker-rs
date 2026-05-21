@@ -1,9 +1,9 @@
-use oristudio_cp::geometry::{Circle, LineColor, LineSegment, Point};
+use oristudio_cp::geometry::{Circle, LineColor, LineSegment, Point, RgbColor};
 use oristudio_cp::model::CreasePatternModel;
 use oristudio_cp::operations::circle::{
-    CircleInversionOutput, concentric, concentric_select, concentric_select_candidates,
-    concentric_two_circle_select, draw, free, invert_circle, invert_line_segment, organize,
-    separate, through_three_points,
+    CircleInversionOutput, change_custom_color_for_indices, concentric, concentric_select,
+    concentric_select_candidates, concentric_two_circle_select, draw, free, invert_circle,
+    invert_line_segment, organize, separate, through_three_points,
 };
 
 #[test]
@@ -222,4 +222,31 @@ fn organize_prunes_zero_radius_circles_like_oriedita_worker() {
     assert_eq!(model.circles.len(), 2);
     assert_eq!(model.circles[0].r, 2.0);
     assert_eq!(model.circles[1].determine_center(), Point::new(2.0, 0.0));
+}
+
+#[test]
+fn change_custom_color_updates_circles_and_cyan_lines_with_oriedita_value_lookup() {
+    let mut model = CreasePatternModel::default();
+    model.add_circle(Circle::new(0.0, 0.0, 1.0, LineColor::Cyan3));
+    model.add_circle(Circle::new(3.0, 0.0, 1.0, LineColor::Cyan3));
+    let duplicate =
+        LineSegment::with_color(Point::new(0.0, 0.0), Point::new(1.0, 0.0), LineColor::Cyan3);
+    model.add_line_segment(duplicate.clone());
+    model.add_line_segment(duplicate);
+    model.add_line_segment(LineSegment::with_color(
+        Point::new(0.0, 1.0),
+        Point::new(1.0, 1.0),
+        LineColor::Red1,
+    ));
+
+    let changed =
+        change_custom_color_for_indices(&mut model, &[1], &[1, 2], RgbColor::new(10, 20, 30));
+
+    assert_eq!(changed, 2);
+    assert_eq!(model.circles[0].customized, 0);
+    assert_eq!(model.circles[1].customized, 1);
+    assert_eq!(model.circles[1].customized_color, RgbColor::new(10, 20, 30));
+    assert_eq!(model.line_segments[0].customized, 1);
+    assert_eq!(model.line_segments[1].customized, 0);
+    assert_eq!(model.line_segments[2].customized, 0);
 }

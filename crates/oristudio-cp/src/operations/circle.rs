@@ -1,6 +1,6 @@
 use crate::geometry::{
-    Circle, CircleIntersection, Epsilon, LineColor, LineSegment, Point, StraightLine, angle,
-    circle_to_circle_intersection, determine_line_segment_distance, distance,
+    Circle, CircleIntersection, Epsilon, LineColor, LineSegment, Point, RgbColor, StraightLine,
+    angle, circle_to_circle_intersection, determine_line_segment_distance, distance,
     internal_division_ratio,
 };
 use crate::model::CreasePatternModel;
@@ -10,6 +10,50 @@ pub enum CircleInversionOutput {
     None,
     Circle,
     LineSegment,
+}
+
+pub fn change_custom_color_for_indices(
+    model: &mut CreasePatternModel,
+    circle_indices: &[usize],
+    aux_line_indices: &[usize],
+    color: RgbColor,
+) -> usize {
+    let mut changed = 0;
+    for &index in circle_indices {
+        if let Some(circle) = model.circles.get_mut(index) {
+            *circle = circle.with_customized_color(color);
+            changed += 1;
+        }
+    }
+
+    let selected_aux_lines: Vec<LineSegment> = aux_line_indices
+        .iter()
+        .filter_map(|&index| model.line_segments.get(index).cloned())
+        .collect();
+    for selected in selected_aux_lines {
+        if selected.color != LineColor::Cyan3 {
+            continue;
+        }
+        if let Some(line) = model
+            .line_segments
+            .iter_mut()
+            .find(|line| **line == selected)
+        {
+            *line = line.with_customized_color(color);
+            changed += 1;
+        }
+    }
+
+    changed
+}
+
+pub fn change_color(
+    model: &mut CreasePatternModel,
+    circle_indices: &[usize],
+    aux_line_indices: &[usize],
+    color: RgbColor,
+) -> usize {
+    change_custom_color_for_indices(model, circle_indices, aux_line_indices, color)
 }
 
 /// Add the circle produced by Oriedita's restricted circle draw after the UI has

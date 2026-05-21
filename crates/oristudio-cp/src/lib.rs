@@ -733,7 +733,7 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
         "operations::circle::change_color",
         Kernel,
         8,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         CreaseMakeAux,

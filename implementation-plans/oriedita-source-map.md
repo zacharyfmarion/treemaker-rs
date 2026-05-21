@@ -177,7 +177,7 @@ stage explicitly changes it.
 | `DISPLAY_ANGLE_BETWEEN_THREE_POINTS_2_56` | `MouseHandlerDisplayAngleBetweenThreePoints` variant | `operations::measure::angle_between_three_points` | kernel | 7 | Oracle-tested |
 | `DISPLAY_ANGLE_BETWEEN_THREE_POINTS_3_57` | `MouseHandlerDisplayAngleBetweenThreePoints` variant | `operations::measure::angle_between_three_points` | kernel | 7 | Oracle-tested |
 | `CREASE_TOGGLE_MV_58` | `MouseHandlerCreaseToggleMV` | `operations::color::toggle_mountain_valley` | kernel | 6 | Oracle-tested |
-| `CIRCLE_CHANGE_COLOR_59` | `MouseHandlerCircleChangeColor` | `operations::circle::change_color` | kernel | 8 | Unsupported |
+| `CIRCLE_CHANGE_COLOR_59` | `MouseHandlerCircleChangeColor` | `operations::circle::change_color` | kernel | 8 | Oracle-tested |
 | `CREASE_MAKE_AUX_60` | `MouseHandlerCreaseMakeAux` | `operations::color::make_aux` | kernel | 6 | Oracle-tested |
 | `OPERATION_FRAME_CREATE_61` | `MouseHandlerOperationFrameCreate` | `operations::transform::operation_frame` | kernel | 6 | Unsupported |
 | `VORONOI_CREATE_62` | `MouseHandlerVoronoiCreate` | `operations::generators::voronoi` | kernel | 8 | Unsupported |

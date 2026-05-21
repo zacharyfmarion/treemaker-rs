@@ -2,8 +2,8 @@ use oristudio_cp::geometry::{LineColor, LineSegment, Point};
 use oristudio_cp::model::CreasePatternModel;
 use oristudio_cp::operations::construction::{
     DrawCreaseTarget, commit_parallel_width_indicator, double_symmetric_draw, draw_crease_segment,
-    mirror_selected_lines, parallel_draw, parallel_width_indicators, perpendicular_indicator,
-    perpendicular_projection, symmetric_draw,
+    inward, mirror_selected_lines, parallel_draw, parallel_width_indicators,
+    perpendicular_indicator, perpendicular_projection, symmetric_draw,
 };
 
 #[test]
@@ -202,6 +202,41 @@ fn double_symmetric_draw_reflects_far_endpoint_across_drag_axis() {
         Point::new(-2.0, 1.0),
         Point::new(-3.0, 1.0),
         LineColor::Red1,
+    ));
+}
+
+#[test]
+fn inward_connects_triangle_vertices_to_incenter() {
+    let mut model = CreasePatternModel::default();
+
+    assert_eq!(
+        inward(
+            &mut model,
+            Point::new(0.0, 0.0),
+            Point::new(4.0, 0.0),
+            Point::new(0.0, 3.0),
+            LineColor::Blue2,
+        ),
+        3
+    );
+
+    assert!(contains_segment(
+        &model.line_segments,
+        Point::new(0.0, 0.0),
+        Point::new(1.0, 1.0),
+        LineColor::Blue2,
+    ));
+    assert!(contains_segment(
+        &model.line_segments,
+        Point::new(4.0, 0.0),
+        Point::new(1.0, 1.0),
+        LineColor::Blue2,
+    ));
+    assert!(contains_segment(
+        &model.line_segments,
+        Point::new(0.0, 3.0),
+        Point::new(1.0, 1.0),
+        LineColor::Blue2,
     ));
 }
 

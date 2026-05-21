@@ -1,7 +1,7 @@
 //! Construction/drawing commands ported from Oriedita handlers.
 
 use crate::geometry::{
-    Epsilon, Intersection, LineColor, LineSegment, ParallelJudgement, Point, StraightLine,
+    Epsilon, Intersection, LineColor, LineSegment, ParallelJudgement, Point, StraightLine, center,
     determine_line_segment_distance, determine_line_segment_intersection_sweet_with_tolerances,
     distance, find_intersection_segments, find_line_symmetry_line_segment,
     find_line_symmetry_point, find_projection, get_segment_with_length,
@@ -246,6 +246,26 @@ pub fn double_symmetric_draw(model: &mut CreasePatternModel, drag_segment: &Line
 
         if Epsilon::HIGH.gt0(add_segment.determine_length()) {
             add_line_segment_like_worker(model, &add_segment);
+            added += 1;
+        }
+    }
+    added
+}
+
+/// Oriedita `INWARD_8` final mutation after three distinct points are resolved.
+pub fn inward(
+    model: &mut CreasePatternModel,
+    p1: Point,
+    p2: Point,
+    p3: Point,
+    color: LineColor,
+) -> usize {
+    let center = center(p1, p2, p3);
+    let mut added = 0;
+    for point in [p1, p2, p3] {
+        let segment = LineSegment::with_color(point, center, color);
+        if Epsilon::HIGH.gt0(segment.determine_length()) {
+            add_line_segment_like_worker(model, &segment);
             added += 1;
         }
     }

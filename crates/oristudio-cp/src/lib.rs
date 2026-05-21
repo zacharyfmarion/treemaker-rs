@@ -333,7 +333,7 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
         "operations::construction::inward",
         Kernel,
         7,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         PerpendicularDraw,

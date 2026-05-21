@@ -20,8 +20,8 @@ use oristudio_cp::operations::color::{
 };
 use oristudio_cp::operations::construction::{
     DrawCreaseTarget, commit_parallel_width_indicator, double_symmetric_draw, draw_crease_segment,
-    mirror_selected_lines, parallel_draw, parallel_width_indicators, perpendicular_indicator,
-    perpendicular_projection, symmetric_draw,
+    inward, mirror_selected_lines, parallel_draw, parallel_width_indicators,
+    perpendicular_indicator, perpendicular_projection, symmetric_draw,
 };
 use oristudio_cp::operations::generators::{
     DefaultMolecule, default_molecule, regular_polygon_no_corners,
@@ -1316,6 +1316,41 @@ fn double_symmetric_draw_matches_oriedita_oracle() {
     let mut args = vec!["foldline-double-symmetric-draw".to_string()];
     push_one_segment_args(&mut args, &drag_axis);
     args.push(segments.len().to_string());
+    push_segment_args(&mut args, &segments);
+    let rust_summary = format!("added|{added}\n{}", line_segment_set_summary(&model));
+    assert_eq!(rust_summary, run_oracle(&oracle, &args));
+}
+
+#[test]
+fn inward_matches_oriedita_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    let segments = vec![segment(1.0, -1.0, 1.0, 4.0, LineColor::Black0)];
+    let mut model = model_from_segments(&segments);
+    let added = inward(
+        &mut model,
+        Point::new(0.0, 0.0),
+        Point::new(4.0, 0.0),
+        Point::new(0.0, 3.0),
+        LineColor::Blue2,
+    );
+
+    let mut args = vec![
+        "foldline-inward".to_string(),
+        "0.0".to_string(),
+        "0.0".to_string(),
+        "4.0".to_string(),
+        "0.0".to_string(),
+        "0.0".to_string(),
+        "3.0".to_string(),
+        LineColor::Blue2.number().to_string(),
+        segments.len().to_string(),
+    ];
     push_segment_args(&mut args, &segments);
     let rust_summary = format!("added|{added}\n{}", line_segment_set_summary(&model));
     assert_eq!(rust_summary, run_oracle(&oracle, &args));

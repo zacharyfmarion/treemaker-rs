@@ -991,6 +991,8 @@ Status:
   axis kernel. The implementation preserves Oriedita's snapshot iteration,
   valid endpoint/T-intersection filter, far-endpoint reflection, extension to
   the next hit, and worker-style insertion splitting.
+- `INWARD_8` is ported and oracle-tested for the resolved three-point kernel,
+  preserving Oriedita's incenter calculation and per-ray insertion behavior.
 
 ### Stage 8: Circle, Polygon, Base, and Generator Tools
 

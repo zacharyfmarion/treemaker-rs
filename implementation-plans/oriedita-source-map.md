@@ -127,7 +127,7 @@ stage explicitly changes it.
 | `CHANGE_CREASE_TYPE_4` | `MouseHandlerChangeCreaseType` | `operations::color::change_crease_type` | kernel | 6 | Oracle-tested |
 | `LENGTHEN_CREASE_5` | `MouseHandlerLengthenCrease` | `operations::transform::lengthen_crease` | kernel | 6 | Porting |
 | `SQUARE_BISECTOR_7` | `MouseHandlerSquareBisector` | `operations::construction::square_bisector` | kernel | 7 | Unsupported |
-| `INWARD_8` | `MouseHandlerInward` | `operations::construction::inward` | kernel | 7 | Unsupported |
+| `INWARD_8` | `MouseHandlerInward` | `operations::construction::inward` | kernel | 7 | Oracle-tested |
 | `PERPENDICULAR_DRAW_9` | `MouseHandlerPerpendicularDraw` | `operations::construction::perpendicular_projection`, `operations::construction::perpendicular_indicator` | kernel | 7 | Oracle-tested |
 | `SYMMETRIC_DRAW_10` | `MouseHandlerSymmetricDraw` | `operations::construction::symmetric_draw` | kernel | 7 | Oracle-tested |
 | `DRAW_CREASE_RESTRICTED_11` | `MouseHandlerDrawCreaseRestricted` | `operations::construction::draw_crease_segment` | kernel | 7 | Porting |

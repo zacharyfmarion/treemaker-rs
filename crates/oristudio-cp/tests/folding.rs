@@ -2,7 +2,7 @@ use oristudio_cp::folding::{
     ChainPermutationGenerator, HierarchyRelation, InitialHierarchy, SubFacePermutationSearch,
     SubFaceSwapper, additional_estimation_from_segments, configure_subfaces_from_segments,
     equivalence_condition_candidates_from_segments, estimate_wireframe_from_segments,
-    initial_hierarchy_from_segments, overlap_search_from_segments,
+    folding_estimate_from_segments, initial_hierarchy_from_segments, overlap_search_from_segments,
     overlap_search_from_segments_with_swap, possible_overlap_search_for_ordered_subfaces,
     possible_overlap_search_for_subfaces, possible_overlap_search_for_subfaces_with_swap,
     prepare_subface_segments, prioritize_subfaces, two_colored_subface_segments_from_segments,
@@ -395,6 +395,28 @@ fn overlap_search_from_segments_with_swap_runs_initial_worker_pipeline() {
     assert!(search.found);
     assert_eq!(search.hierarchy.faces_total, 2);
     assert!(!search.hierarchy.relations.is_empty());
+}
+
+#[test]
+fn folding_estimate_runs_ordered_stages_to_first_solution() {
+    let estimate = folding_estimate_from_segments(
+        &square_with_diagonal(),
+        1,
+        oristudio_cp::folding::EstimationOrder::Order5,
+    )
+    .expect("folding estimate");
+
+    assert_eq!(
+        estimate.estimation_step,
+        oristudio_cp::folding::EstimationStep::Step5
+    );
+    assert_eq!(
+        estimate.display_style,
+        oristudio_cp::folding::DisplayStyle::Paper5
+    );
+    assert_eq!(estimate.discovered_fold_cases, 1);
+    assert!(!estimate.find_another_overlap_valid);
+    assert!(estimate.overlap.as_ref().is_some_and(|search| search.found));
 }
 
 #[test]

@@ -3,11 +3,11 @@ use oristudio_cp::folding::{
     EquivalenceConditionSet, HierarchyRelation, InitialHierarchy, InitialHierarchyError, SubFace,
     SubFaceConfiguration, SubFacePermutationSearch, additional_estimation_from_segments,
     configure_subfaces_from_segments, equivalence_condition_candidates_from_segments,
-    estimate_wireframe_from_segments, initial_hierarchy_from_segments,
-    overlap_search_from_segments, overlap_search_from_segments_with_swap,
-    possible_overlap_search_for_ordered_subfaces, possible_overlap_search_for_subfaces,
-    possible_overlap_search_for_subfaces_with_swap, prepare_subface_segments, prioritize_subfaces,
-    two_colored_subface_segments_from_segments,
+    estimate_wireframe_from_segments, folding_estimate_from_segments,
+    initial_hierarchy_from_segments, overlap_search_from_segments,
+    overlap_search_from_segments_with_swap, possible_overlap_search_for_ordered_subfaces,
+    possible_overlap_search_for_subfaces, possible_overlap_search_for_subfaces_with_swap,
+    prepare_subface_segments, prioritize_subfaces, two_colored_subface_segments_from_segments,
 };
 use oristudio_cp::geometry::{LineColor, LineSegment, Point};
 use std::path::{Path, PathBuf};
@@ -729,6 +729,35 @@ fn worker_overlap_from_segments_with_swap_matches_oriedita_oracle() {
 }
 
 #[test]
+fn folding_estimate_first_solution_matches_oriedita_oracle() {
+    let Some(oracle) = folding_oracle() else {
+        eprintln!("skipping Oriedita folding oracle test: ORIEDITA_GEOMETRY_ORACLE is not set");
+        return;
+    };
+
+    let segments = square_with_diagonal();
+    let estimate = folding_estimate_from_segments(
+        &segments,
+        1,
+        oristudio_cp::folding::EstimationOrder::Order5,
+    )
+    .expect("folding estimate");
+    let mut args = vec![
+        "folding-estimate-summary".to_string(),
+        "1".to_string(),
+        "5".to_string(),
+        segments.len().to_string(),
+    ];
+    push_segment_args(&mut args, &segments);
+    let oracle_args = args.iter().map(String::as_str).collect::<Vec<_>>();
+
+    assert_eq!(
+        folding_estimate_summary(&estimate),
+        run_oracle(&oracle, &oracle_args)
+    );
+}
+
+#[test]
 fn subface_swapper_matches_oriedita_oracle() {
     let Some(oracle) = folding_oracle() else {
         eprintln!("skipping Oriedita folding oracle test: ORIEDITA_GEOMETRY_ORACLE is not set");
@@ -1288,6 +1317,47 @@ fn worker_overlap_summary_with_order(
         joined_ids(&search.priority.ordered_subface_indices)
     ));
     output
+}
+
+fn folding_estimate_summary(estimate: &oristudio_cp::folding::FoldingEstimate) -> String {
+    let mut output = String::new();
+    output.push_str(&format!(
+        "folding_estimate|{}|{}|{}|{}|{}\n",
+        estimation_step_name(estimate.estimation_step),
+        display_style_name(estimate.display_style),
+        estimate.discovered_fold_cases,
+        estimate.find_another_overlap_valid,
+        estimate.text_result
+    ));
+    if let Some(search) = &estimate.overlap {
+        output.push_str(&worker_overlap_summary(search));
+    } else {
+        output.push_str("worker_overlap|-1|0|0|0\n");
+    }
+    output
+}
+
+fn estimation_step_name(step: oristudio_cp::folding::EstimationStep) -> &'static str {
+    match step {
+        oristudio_cp::folding::EstimationStep::Step0 => "STEP_0",
+        oristudio_cp::folding::EstimationStep::Step1 => "STEP_1",
+        oristudio_cp::folding::EstimationStep::Step2 => "STEP_2",
+        oristudio_cp::folding::EstimationStep::Step3 => "STEP_3",
+        oristudio_cp::folding::EstimationStep::Step4 => "STEP_4",
+        oristudio_cp::folding::EstimationStep::Step5 => "STEP_5",
+        oristudio_cp::folding::EstimationStep::Step10 => "STEP_10",
+    }
+}
+
+fn display_style_name(style: oristudio_cp::folding::DisplayStyle) -> &'static str {
+    match style {
+        oristudio_cp::folding::DisplayStyle::None0 => "NONE_0",
+        oristudio_cp::folding::DisplayStyle::Development1 => "DEVELOPMENT_1",
+        oristudio_cp::folding::DisplayStyle::Wire2 => "WIRE_2",
+        oristudio_cp::folding::DisplayStyle::Transparent3 => "TRANSPARENT_3",
+        oristudio_cp::folding::DisplayStyle::Development4 => "DEVELOPMENT_4",
+        oristudio_cp::folding::DisplayStyle::Paper5 => "PAPER_5",
+    }
 }
 
 fn subface_swapper_summary(counters: &[usize], actions: &[SwapperAction]) -> String {

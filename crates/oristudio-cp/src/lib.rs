@@ -1063,10 +1063,10 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
     descriptor!(
         FoldingEstimate,
         "FoldingEstimateTask",
-        "folding::estimate",
+        "folding::folding_estimate_from_segments",
         Kernel,
         10,
-        Unsupported
+        Porting
     ),
     descriptor!(
         FoldingEstimateSpecific,
@@ -1257,14 +1257,14 @@ mod tests {
 
         let error = execute_command(
             &mut document,
-            CreasePatternCommand::new(OperationId::FoldingEstimate),
+            CreasePatternCommand::new(OperationId::FoldingEstimateSpecific),
         )
         .expect_err("stage one operations should be unsupported");
 
         assert_eq!(
             error,
             CommandError::UnsupportedOperation {
-                operation: OperationId::FoldingEstimate,
+                operation: OperationId::FoldingEstimateSpecific,
             }
         );
         assert_eq!(document, original);

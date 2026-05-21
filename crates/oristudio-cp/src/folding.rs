@@ -90,6 +90,107 @@ pub struct AdditionalEstimation {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EstimationOrder {
+    Order0,
+    Order1,
+    Order2,
+    Order3,
+    Order4,
+    Order5,
+    Order6,
+    Order51,
+}
+
+impl EstimationOrder {
+    pub fn from_oriedita_value(value: i32) -> Self {
+        match value {
+            1 => Self::Order1,
+            2 => Self::Order2,
+            3 => Self::Order3,
+            4 => Self::Order4,
+            5 => Self::Order5,
+            6 => Self::Order6,
+            51 => Self::Order51,
+            _ => Self::Order0,
+        }
+    }
+
+    fn normalized(self) -> Self {
+        if self == Self::Order51 {
+            Self::Order5
+        } else {
+            self
+        }
+    }
+
+    fn value(self) -> i32 {
+        match self.normalized() {
+            Self::Order0 => 0,
+            Self::Order1 => 1,
+            Self::Order2 => 2,
+            Self::Order3 => 3,
+            Self::Order4 => 4,
+            Self::Order5 => 5,
+            Self::Order6 => 6,
+            Self::Order51 => 5,
+        }
+    }
+
+    fn is_at_least(self, other: Self) -> bool {
+        self.value() >= other.value()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EstimationStep {
+    Step0,
+    Step1,
+    Step2,
+    Step3,
+    Step4,
+    Step5,
+    Step10,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DisplayStyle {
+    None0,
+    Development1,
+    Wire2,
+    Transparent3,
+    Development4,
+    Paper5,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FoldingEstimate {
+    pub estimation_step: EstimationStep,
+    pub display_style: DisplayStyle,
+    pub discovered_fold_cases: usize,
+    pub find_another_overlap_valid: bool,
+    pub text_result: String,
+    pub overlap: Option<WorkerOverlapSearch>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FoldingEstimateError {
+    InitialHierarchy(InitialHierarchyError),
+    WorkerOverlap(WorkerOverlapSearchError),
+}
+
+impl From<InitialHierarchyError> for FoldingEstimateError {
+    fn from(error: InitialHierarchyError) -> Self {
+        Self::InitialHierarchy(error)
+    }
+}
+
+impl From<WorkerOverlapSearchError> for FoldingEstimateError {
+    fn from(error: WorkerOverlapSearchError) -> Self {
+        Self::WorkerOverlap(error)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AdditionalEstimationError {
     InitialHierarchy(InitialHierarchyError),
     Contradiction {
@@ -373,6 +474,79 @@ pub fn additional_estimation_from_segments(
         triple_conditions: conditions.triple_conditions,
         quadruple_conditions: conditions.quadruple_conditions,
     }))
+}
+
+/// Oriedita `FoldedFigure.folding_estimated(...)` stage summary for orders
+/// 0-5/51 from a fresh folded figure. This ports the non-UI stage transitions
+/// and the first overlap solution. Stateful "find another" enumeration for
+/// `ORDER_6` remains a separate command-layer stage.
+pub fn folding_estimate_from_segments(
+    segments: &[LineSegment],
+    starting_face_id: i32,
+    order: EstimationOrder,
+) -> Result<FoldingEstimate, FoldingEstimateError> {
+    let order = order.normalized();
+    let mut estimate = FoldingEstimate {
+        estimation_step: EstimationStep::Step0,
+        display_style: DisplayStyle::None0,
+        discovered_fold_cases: 0,
+        find_another_overlap_valid: false,
+        text_result: String::new(),
+        overlap: None,
+    };
+
+    if segments.is_empty() {
+        return Ok(estimate);
+    }
+
+    if order.is_at_least(EstimationOrder::Order1) {
+        estimate.estimation_step = EstimationStep::Step1;
+        estimate.display_style = DisplayStyle::Development1;
+    }
+    if order.is_at_least(EstimationOrder::Order2)
+        && estimate_wireframe_from_segments(segments, starting_face_id).is_some()
+    {
+        estimate.estimation_step = EstimationStep::Step2;
+        estimate.display_style = DisplayStyle::Wire2;
+    }
+    if order.is_at_least(EstimationOrder::Order3)
+        && configure_subfaces_from_segments(segments, starting_face_id).is_some()
+    {
+        estimate.estimation_step = EstimationStep::Step3;
+        estimate.display_style = DisplayStyle::Transparent3;
+    }
+    if order.is_at_least(EstimationOrder::Order4) {
+        let hierarchy = initial_hierarchy_from_segments(segments, starting_face_id)?;
+        estimate.estimation_step = EstimationStep::Step4;
+        estimate.display_style = DisplayStyle::Development4;
+        estimate.find_another_overlap_valid = hierarchy.is_some();
+    }
+    if order.is_at_least(EstimationOrder::Order5) && estimate.find_another_overlap_valid {
+        let overlap = overlap_search_from_segments_with_swap(segments, starting_face_id)?;
+        let found = overlap.as_ref().is_some_and(|search| search.found);
+        if found {
+            estimate.discovered_fold_cases = 1;
+        }
+        estimate.overlap = overlap;
+        estimate.find_another_overlap_valid = false;
+        estimate.estimation_step = EstimationStep::Step5;
+        estimate.display_style = DisplayStyle::Paper5;
+        if estimate.discovered_fold_cases == 0 {
+            estimate.estimation_step = EstimationStep::Step3;
+            estimate.display_style = DisplayStyle::Transparent3;
+        }
+        estimate.text_result = format!(
+            "Number of found solutions = {}  ",
+            estimate.discovered_fold_cases
+        );
+        if !estimate.find_another_overlap_valid {
+            estimate
+                .text_result
+                .push_str(" There is no other solution. ");
+        }
+    }
+
+    Ok(estimate)
 }
 
 /// Oriedita `FoldedFigure_Worker.possible_overlapping_search(false)` after

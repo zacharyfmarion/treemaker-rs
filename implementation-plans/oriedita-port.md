@@ -1228,6 +1228,14 @@ Deliverables:
   resulting subdivided line set. Full `TwoColoredTask` command semantics,
   selected-range preconditions, and folded-figure state updates remain tracked
   until the command/service layer is ported.
+- Status: The first-solution folded-figure estimate state machine is ported as
+  `folding::folding_estimate_from_segments`, covering Oriedita estimation
+  order normalization, stage/display transitions, text-result updates, and the
+  first order-5 overlap solution from a fresh folded figure. The oracle command
+  `folding-estimate-summary` compares the task-level step, display style,
+  discovered-case count, text result, and worker hierarchy snapshot. Stateful
+  `ORDER_6` "find another" enumeration and `FoldingEstimateSave100Task` batch
+  export remain separate command-layer stages.
 - Status: Oriedita's `SubFaceSwappingAlgorithm` support logic is ported as
   `folding::SubFaceSwapper`, including visited-subface tracking, dead-end
   recording, repeated-prefix history detection, swap-counter-driven reverse

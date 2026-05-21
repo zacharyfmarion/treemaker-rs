@@ -1,10 +1,12 @@
 //! Line color/type operations ported from Oriedita handlers and `FoldLineSet`.
 
 use crate::geometry::{
-    LineColor, LineSegment, determine_line_segment_distance, is_line_segment_overlapping,
+    Epsilon, Intersection, LineColor, LineSegment, determine_line_segment_distance,
+    determine_line_segment_intersection_with_precision, distance, find_intersection_segments,
+    is_line_segment_overlapping,
 };
 use crate::model::{CreasePatternModel, CustomLineType};
-use crate::operations::arrangement::divide_line_segment_with_new_lines;
+use crate::operations::arrangement::{divide_line_segment_with_new_lines, fix2};
 
 /// Oriedita `FoldLineSet.setColor(Collection<LineSegment>, LineColor)`.
 pub fn set_line_color_for_segments(
@@ -52,22 +54,48 @@ pub fn set_line_color_for_indices(
 
 /// Oriedita selected-line mountain command without the UI box-selection step.
 pub fn make_mountain(model: &mut CreasePatternModel, indices: &[usize]) -> usize {
-    set_line_color_for_indices(model, indices, LineColor::Red1)
+    make_fold_color(model, indices, LineColor::Red1)
 }
 
 /// Oriedita selected-line valley command without the UI box-selection step.
 pub fn make_valley(model: &mut CreasePatternModel, indices: &[usize]) -> usize {
-    set_line_color_for_indices(model, indices, LineColor::Blue2)
+    make_fold_color(model, indices, LineColor::Blue2)
 }
 
 /// Oriedita selected-line edge command without the UI box-selection step.
 pub fn make_edge(model: &mut CreasePatternModel, indices: &[usize]) -> usize {
-    set_line_color_for_indices(model, indices, LineColor::Black0)
+    make_fold_color(model, indices, LineColor::Black0)
 }
 
 /// Oriedita `CREASE_MAKE_AUX_60` selected-line mutation.
 pub fn make_aux(model: &mut CreasePatternModel, indices: &[usize]) -> usize {
-    set_line_color_for_indices(model, indices, LineColor::Cyan3)
+    let lines: Vec<_> = indices
+        .iter()
+        .filter_map(|index| model.line_segments.get(*index))
+        .filter(|segment| segment.color.is_folding_line())
+        .cloned()
+        .collect();
+
+    let mut changed = 0;
+    for segment in lines {
+        let Some(index) = model
+            .line_segments
+            .iter()
+            .position(|candidate| candidate == &segment)
+        else {
+            continue;
+        };
+        model.line_segments.remove(index);
+        model.add_line_segment(segment.with_line_color(LineColor::Cyan3));
+        changed += 1;
+    }
+
+    if changed > 0 {
+        let end = model.line_segments.len();
+        divide_line_segment_with_new_lines(model, end - changed, end);
+    }
+
+    changed
 }
 
 /// Oriedita `REPLACE_LINE_TYPE_SELECT_72` mutation over explicit line indices.
@@ -129,12 +157,13 @@ pub fn toggle_mountain_valley(model: &mut CreasePatternModel, indices: &[usize])
     changed
 }
 
-/// Oriedita `CREASE_ADVANCE_TYPE_30` release behavior for one line.
+/// Oriedita `CREASE_ADVANCE_TYPE_30` persisted mutation for one line.
 pub fn advance_line_type(model: &mut CreasePatternModel, index: usize) -> bool {
-    let Some(segment) = model.line_segments.get(index).cloned() else {
+    if index >= model.line_segments.len() {
         return false;
     };
 
+    let segment = model.line_segments.remove(index);
     let next = match (segment.color, segment.selected) {
         (LineColor::Black0, 0) => segment.with_selected(2),
         (LineColor::Black0, 2) => segment.with_line_color(LineColor::Red1).with_selected(0),
@@ -142,7 +171,7 @@ pub fn advance_line_type(model: &mut CreasePatternModel, index: usize) -> bool {
         (LineColor::Blue2, 0) => segment.with_line_color(LineColor::Black0),
         _ => segment,
     };
-    model.line_segments[index] = next;
+    model.add_line_segment(next);
     true
 }
 
@@ -155,9 +184,13 @@ pub fn alternate_mountain_valley_along(
     let mut overlapping: Vec<_> = model
         .line_segments
         .iter()
-        .enumerate()
-        .filter(|(_, segment)| is_line_segment_overlapping(segment, guide))
-        .map(|(index, segment)| (index, determine_line_segment_distance(guide.a, segment)))
+        .filter(|segment| is_line_segment_overlapping(segment, guide))
+        .map(|segment| {
+            (
+                segment.clone(),
+                determine_line_segment_distance(guide.a, segment),
+            )
+        })
         .collect();
     overlapping.sort_by(|left, right| {
         left.1
@@ -167,10 +200,10 @@ pub fn alternate_mountain_valley_along(
 
     let mut color = start_color;
     let mut changed = 0;
-    for (index, _) in overlapping {
-        let segment = model.line_segments[index].clone();
-        model.line_segments[index] = segment.with_line_color(color);
-        changed += 1;
+    for (segment, _) in overlapping {
+        if set_line_color_by_value(model, &segment, color) {
+            changed += 1;
+        }
         color = match color {
             LineColor::Red1 => LineColor::Blue2,
             LineColor::Blue2 => LineColor::Red1,
@@ -178,6 +211,87 @@ pub fn alternate_mountain_valley_along(
         };
     }
     changed
+}
+
+/// Oriedita `CREASES_ALTERNATE_MV_36` mutation for lines crossing a guide.
+pub fn alternate_mountain_valley_crossing(
+    model: &mut CreasePatternModel,
+    guide: &LineSegment,
+    start_color: LineColor,
+) -> usize {
+    if !Epsilon::HIGH.gt0(guide.determine_length()) {
+        return 0;
+    }
+
+    let mut crossing: Vec<_> = model
+        .line_segments
+        .iter()
+        .filter_map(|segment| {
+            let intersection = determine_line_segment_intersection_with_precision(
+                segment,
+                guide,
+                Epsilon::UNKNOWN_1EN4,
+            );
+            if !matches!(
+                intersection,
+                Intersection::Intersects1
+                    | Intersection::IntersectsTShapeS2VerticalBar27
+                    | Intersection::IntersectsTShapeS2VerticalBar28
+            ) {
+                return None;
+            }
+
+            Some((
+                segment.clone(),
+                distance(guide.b, find_intersection_segments(segment, guide)),
+            ))
+        })
+        .collect();
+    crossing.sort_by(|left, right| {
+        left.1
+            .partial_cmp(&right.1)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    let mut color = start_color;
+    let mut changed = 0;
+    for (segment, _) in crossing {
+        if set_line_color_by_value(model, &segment, color) {
+            changed += 1;
+        }
+        color = match color {
+            LineColor::Red1 => LineColor::Blue2,
+            LineColor::Blue2 => LineColor::Red1,
+            other => other,
+        };
+    }
+    changed
+}
+
+fn make_fold_color(model: &mut CreasePatternModel, indices: &[usize], color: LineColor) -> usize {
+    let changed = set_line_color_for_indices(model, indices, color);
+    if changed > 0 {
+        fix2(model);
+    }
+    changed
+}
+
+fn set_line_color_by_value(
+    model: &mut CreasePatternModel,
+    segment: &LineSegment,
+    color: LineColor,
+) -> bool {
+    let Some(index) = model
+        .line_segments
+        .iter()
+        .position(|candidate| candidate == segment)
+    else {
+        return false;
+    };
+
+    let segment = model.line_segments[index].clone();
+    model.line_segments[index] = segment.with_line_color(color);
+    true
 }
 
 fn replace_aux_lines(model: &mut CreasePatternModel, color: LineColor, aux: &[LineSegment]) {

@@ -8,8 +8,12 @@ delete-inside-line modes, and `BranchTrim`/`del_V` cleanup. Later stages should
 extend the same pattern for documents, operations, checks, and folding
 snapshots. The vertex cleanup commands include the same-color, color-changing,
 single-pair, and all-vertex variants. The arrangement repair commands include
-the legacy `Fix1`/`Fix2` workers. The first color commands cover
-`FoldLineSet.setColor(Collection, LineColor)` and mountain/valley toggling.
+the legacy `Fix1`/`Fix2` workers. Color commands cover
+`FoldLineSet.setColor(Collection, LineColor)`, make mountain/valley/edge/aux,
+advance type, mountain/valley toggling, and overlapping-line MV alternation.
+The crossing-line MV alternation handler is covered separately from the
+overlapping-line variant because it uses intersection sorting from the drag
+endpoint.
 The first selection commands cover select/unselect all, index selection, box
 selection via `lineSegmentsInside`, polygon selection via `select_Takakukei`,
 line-overlap/intersection selection via `select_lX`, and

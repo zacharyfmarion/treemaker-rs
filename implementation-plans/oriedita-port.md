@@ -885,9 +885,13 @@ Status:
   selection, which selects any line touching a box boundary or interior, and
   polygon selection, which ignores outside-to-outside lines that merely pass
   through the polygon.
-- Rust unit coverage also exists for selected-line make mountain/valley/edge/aux
-  wrappers, the `CREASE_ADVANCE_TYPE_30` click cycle, and the overlapping-line
-  alternation used by `CREASE_MAKE_MV_34`.
+- Selected-line make mountain/valley/edge/aux, `CREASE_ADVANCE_TYPE_30`, the
+  overlapping-line alternation used by `CREASE_MAKE_MV_34`, and the
+  crossing-line alternation used by `CREASES_ALTERNATE_MV_36` now have Rust
+  unit coverage and Oriedita oracle coverage. The make-fold-color commands
+  include the handler-level `fix2` pass, `make_aux` uses Oriedita's delete/add
+  replacement path rather than generic `setColor`, and advance-type preserves
+  the delete-then-append ordering side effect.
 - `REPLACE_LINE_TYPE_SELECT_72`, `DELETE_LINE_TYPE_SELECT_73`, and
   `FoldLineSet.delSelectedLineSegmentFast` now have Rust helpers and Oriedita
   oracle coverage. This slice also fixed `FoldLineSet.setColor(Collection,
@@ -917,7 +921,8 @@ Status:
   remains tracked with the Stage 8 circle tool work.
 - Full handler parity remains open for nearest-click line selection, Java2D
   path/lasso selection, operation-frame behavior, lengthen commands, and
-  handler-level `fix2` chaining.
+  construction-handler `fix2` chaining that is not part of the selected color
+  commands above.
 
 ### Stage 7: Construction Tools
 

@@ -141,20 +141,20 @@ stage explicitly changes it.
 | `CREASE_UNSELECT_20` | `MouseHandlerCreaseUnselect` | `operations::selection::unselect_indices`, `operations::selection::unselect_box` | kernel | 6 | Porting |
 | `CREASE_MOVE_21` | `MouseHandlerCreaseMove` | `operations::transform::move_selected_lines` | kernel | 6 | Oracle-tested |
 | `CREASE_COPY_22` | `MouseHandlerCreaseCopy` | `operations::transform::copy_selected_lines` | kernel | 6 | Oracle-tested |
-| `CREASE_MAKE_MOUNTAIN_23` | `MouseHandlerCreaseMakeMountain` | `operations::color::make_mountain` | kernel | 6 | Unsupported |
-| `CREASE_MAKE_VALLEY_24` | `MouseHandlerCreaseMakeValley` | `operations::color::make_valley` | kernel | 6 | Unsupported |
-| `CREASE_MAKE_EDGE_25` | `MouseHandlerCreaseMakeEdge` | `operations::color::make_edge` | kernel | 6 | Unsupported |
+| `CREASE_MAKE_MOUNTAIN_23` | `MouseHandlerCreaseMakeMountain` | `operations::color::make_mountain` | kernel | 6 | Oracle-tested |
+| `CREASE_MAKE_VALLEY_24` | `MouseHandlerCreaseMakeValley` | `operations::color::make_valley` | kernel | 6 | Oracle-tested |
+| `CREASE_MAKE_EDGE_25` | `MouseHandlerCreaseMakeEdge` | `operations::color::make_edge` | kernel | 6 | Oracle-tested |
 | `BACKGROUND_CHANGE_POSITION_26` | `MouseHandlerBackgroundChangePosition` | none | ui-preview-only | later UI | Out-of-scope-ui |
 | `LINE_SEGMENT_DIVISION_27` | `MouseHandlerLineSegmentDivision` | `operations::point::divide_segment_by_count` | kernel | 7 | Oracle-tested |
 | `LINE_SEGMENT_RATIO_SET_28` | `MouseHandlerLineSegmentRatioSet` | `operations::point::divide_segment_by_ratio` | kernel | 7 | Oracle-tested |
 | `POLYGON_SET_NO_CORNERS_29` | `MouseHandlerPolygonSetNoCorners` | `operations::generators::regular_polygon` | kernel | 8 | Unsupported |
-| `CREASE_ADVANCE_TYPE_30` | `MouseHandlerCreaseAdvanceType` | `operations::color::advance_type` | kernel | 6 | Unsupported |
+| `CREASE_ADVANCE_TYPE_30` | `MouseHandlerCreaseAdvanceType` | `operations::color::advance_line_type` | kernel | 6 | Oracle-tested |
 | `CREASE_MOVE_4P_31` | `MouseHandlerCreaseMove4p` | `operations::transform::move_selected_lines_by_points` | kernel | 6 | Oracle-tested |
 | `CREASE_COPY_4P_32` | `MouseHandlerCreaseCopy4p` | `operations::transform::copy_selected_lines_by_points` | kernel | 6 | Oracle-tested |
 | `FISH_BONE_DRAW_33` | `MouseHandlerFishBoneDraw` | `operations::construction::fishbone` | kernel | 7 | Unsupported |
-| `CREASE_MAKE_MV_34` | `MouseHandlerCreaseMakeMV` | `operations::color::make_mountain_valley` | kernel | 6 | Unsupported |
+| `CREASE_MAKE_MV_34` | `MouseHandlerCreaseMakeMV` | `operations::color::alternate_mountain_valley_along` | kernel | 6 | Oracle-tested |
 | `DOUBLE_SYMMETRIC_DRAW_35` | `MouseHandlerDoubleSymmetricDraw` | `operations::construction::double_symmetric` | kernel | 7 | Unsupported |
-| `CREASES_ALTERNATE_MV_36` | `MouseHandlerCreasesAlternateMV` | `operations::color::alternate_mountain_valley` | kernel | 6 | Unsupported |
+| `CREASES_ALTERNATE_MV_36` | `MouseHandlerCreasesAlternateMV` | `operations::color::alternate_mountain_valley_crossing` | kernel | 6 | Oracle-tested |
 | `DRAW_CREASE_ANGLE_RESTRICTED_5_37` | `MouseHandlerDrawCreaseAngleRestricted5` | `operations::construction::angle_restricted_5` | kernel | 7 | Unsupported |
 | `VERTEX_MAKE_ANGULARLY_FLAT_FOLDABLE_38` | `MouseHandlerVertexMakeAngularlyFlatFoldable` | `operations::construction::make_vertex_flat_foldable` | kernel | 7, 9 | Unsupported |
 | `FOLDABLE_LINE_INPUT_39` | `MouseHandlerFoldableLineInput` | `operations::construction::foldable_line_input` | kernel | 7 | Unsupported |
@@ -176,9 +176,9 @@ stage explicitly changes it.
 | `DISPLAY_ANGLE_BETWEEN_THREE_POINTS_1_55` | `MouseHandlerDisplayAngleBetweenThreePoints` variant | `operations::measure::angle_between_points` | kernel | 7 | Unsupported |
 | `DISPLAY_ANGLE_BETWEEN_THREE_POINTS_2_56` | `MouseHandlerDisplayAngleBetweenThreePoints` variant | `operations::measure::angle_between_points` | kernel | 7 | Unsupported |
 | `DISPLAY_ANGLE_BETWEEN_THREE_POINTS_3_57` | `MouseHandlerDisplayAngleBetweenThreePoints` variant | `operations::measure::angle_between_points` | kernel | 7 | Unsupported |
-| `CREASE_TOGGLE_MV_58` | `MouseHandlerCreaseToggleMV` | `operations::color::toggle_mountain_valley` | kernel | 6 | Unsupported |
+| `CREASE_TOGGLE_MV_58` | `MouseHandlerCreaseToggleMV` | `operations::color::toggle_mountain_valley` | kernel | 6 | Oracle-tested |
 | `CIRCLE_CHANGE_COLOR_59` | `MouseHandlerCircleChangeColor` | `operations::circle::change_color` | kernel | 8 | Unsupported |
-| `CREASE_MAKE_AUX_60` | `MouseHandlerCreaseMakeAux` | `operations::color::make_aux` | kernel | 6 | Unsupported |
+| `CREASE_MAKE_AUX_60` | `MouseHandlerCreaseMakeAux` | `operations::color::make_aux` | kernel | 6 | Oracle-tested |
 | `OPERATION_FRAME_CREATE_61` | `MouseHandlerOperationFrameCreate` | `operations::transform::operation_frame` | kernel | 6 | Unsupported |
 | `VORONOI_CREATE_62` | `MouseHandlerVoronoiCreate` | `operations::generators::voronoi` | kernel | 8 | Unsupported |
 | `FLAT_FOLDABLE_CHECK_63` | `MouseHandlerFlatFoldableCheck` | `checks::flat_foldable` | kernel | 9 | Unsupported |

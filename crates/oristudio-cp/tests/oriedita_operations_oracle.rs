@@ -7,8 +7,9 @@ use oristudio_cp::operations::arrangement::{
     fix2, intersect_divide_pair,
 };
 use oristudio_cp::operations::color::{
-    delete_line_type_for_indices, replace_line_type_for_indices, set_line_color_for_indices,
-    toggle_mountain_valley,
+    advance_line_type, alternate_mountain_valley_along, alternate_mountain_valley_crossing,
+    delete_line_type_for_indices, make_aux, make_edge, make_mountain, make_valley,
+    replace_line_type_for_indices, set_line_color_for_indices, toggle_mountain_valley,
 };
 use oristudio_cp::operations::point::{divide_segment_by_count, divide_segment_by_ratio};
 use oristudio_cp::operations::selection::{
@@ -492,6 +493,99 @@ fn color_operations_match_oriedita_foldlineset_oracle() {
     ];
     push_segment_args(&mut args, &mv_segments);
     assert_eq!(line_segment_set_summary(&model), run_oracle(&oracle, &args));
+
+    for (color, apply) in [
+        (
+            LineColor::Red1,
+            make_mountain as fn(&mut CreasePatternModel, &[usize]) -> usize,
+        ),
+        (LineColor::Blue2, make_valley),
+        (LineColor::Black0, make_edge),
+    ] {
+        let make_segments = vec![
+            segment(0.0, 0.0, 10.0, 0.0, LineColor::Cyan3),
+            segment(5.0, 0.0, 5.0, 5.0, LineColor::Black0),
+        ];
+        let mut model = model_from_segments(&make_segments);
+        let changed = apply(&mut model, &[0, 1]);
+        let mut args = vec![
+            "foldline-make-color".to_string(),
+            color.number().to_string(),
+            "0,1".to_string(),
+            make_segments.len().to_string(),
+        ];
+        push_segment_args(&mut args, &make_segments);
+        let rust_summary = format!("changed|{changed}\n{}", line_segment_set_summary(&model));
+        assert_eq!(rust_summary, run_oracle(&oracle, &args));
+    }
+
+    let make_aux_segments = vec![
+        segment(0.0, 0.0, 1.0, 0.0, LineColor::Red1),
+        segment(0.0, 1.0, 1.0, 1.0, LineColor::Blue2),
+        segment(0.0, 2.0, 1.0, 2.0, LineColor::Cyan3),
+    ];
+    let mut model = model_from_segments(&make_aux_segments);
+    let changed = make_aux(&mut model, &[0, 1, 2]);
+    let mut args = vec![
+        "foldline-make-aux".to_string(),
+        "0,1,2".to_string(),
+        make_aux_segments.len().to_string(),
+    ];
+    push_segment_args(&mut args, &make_aux_segments);
+    let rust_summary = format!("changed|{changed}\n{}", line_segment_set_summary(&model));
+    assert_eq!(rust_summary, run_oracle(&oracle, &args));
+
+    let advance_segments = vec![
+        segment(0.0, 0.0, 1.0, 0.0, LineColor::Black0),
+        segment(0.0, 1.0, 1.0, 1.0, LineColor::Blue2),
+    ];
+    let mut model = model_from_segments(&advance_segments);
+    let result = advance_line_type(&mut model, 0);
+    let mut args = vec![
+        "foldline-advance-type".to_string(),
+        "0".to_string(),
+        advance_segments.len().to_string(),
+    ];
+    push_segment_args(&mut args, &advance_segments);
+    let rust_summary = format!(
+        "result|{result}\n{}",
+        line_segment_set_with_selection_summary(&model)
+    );
+    assert_eq!(rust_summary, run_oracle(&oracle, &args));
+
+    let alternate_segments = vec![
+        segment(10.0, 0.0, 20.0, 0.0, LineColor::Black0),
+        segment(0.0, 0.0, 5.0, 0.0, LineColor::Black0),
+    ];
+    let guide = segment(0.0, 0.0, 20.0, 0.0, LineColor::Red1);
+    let mut model = model_from_segments(&alternate_segments);
+    let changed = alternate_mountain_valley_along(&mut model, &guide, LineColor::Red1);
+    let mut args = vec![
+        "foldline-alternate-mv".to_string(),
+        LineColor::Red1.number().to_string(),
+    ];
+    push_one_segment_args(&mut args, &guide);
+    args.push(alternate_segments.len().to_string());
+    push_segment_args(&mut args, &alternate_segments);
+    let rust_summary = format!("changed|{changed}\n{}", line_segment_set_summary(&model));
+    assert_eq!(rust_summary, run_oracle(&oracle, &args));
+
+    let crossing_segments = vec![
+        segment(5.0, -1.0, 5.0, 1.0, LineColor::Black0),
+        segment(15.0, -1.0, 15.0, 1.0, LineColor::Black0),
+    ];
+    let guide = segment(0.0, 0.0, 20.0, 0.0, LineColor::Blue2);
+    let mut model = model_from_segments(&crossing_segments);
+    let changed = alternate_mountain_valley_crossing(&mut model, &guide, LineColor::Red1);
+    let mut args = vec![
+        "foldline-alternate-mv-crossing".to_string(),
+        LineColor::Red1.number().to_string(),
+    ];
+    push_one_segment_args(&mut args, &guide);
+    args.push(crossing_segments.len().to_string());
+    push_segment_args(&mut args, &crossing_segments);
+    let rust_summary = format!("changed|{changed}\n{}", line_segment_set_summary(&model));
+    assert_eq!(rust_summary, run_oracle(&oracle, &args));
 }
 
 #[test]

@@ -12,6 +12,7 @@ import origami.crease_pattern.worker.foldlineset.BranchTrim;
 import origami.crease_pattern.worker.foldlineset.Fix1;
 import origami.crease_pattern.worker.foldlineset.Fix2;
 import origami.crease_pattern.worker.linesegmentset.IntersectDivide;
+import origami.folding.util.SortingBox;
 
 import oriedita.editor.databinding.GridModel;
 import oriedita.editor.export.DxfExporter;
@@ -52,7 +53,12 @@ public class OrieditaGeometryOracle {
             case "foldline-fix1" -> foldLineFix1(args);
             case "foldline-fix2" -> foldLineFix2(args);
             case "foldline-set-color" -> foldLineSetColor(args);
+            case "foldline-make-color" -> foldLineMakeColor(args);
+            case "foldline-make-aux" -> foldLineMakeAux(args);
             case "foldline-change-mv" -> foldLineChangeMv(args);
+            case "foldline-advance-type" -> foldLineAdvanceType(args);
+            case "foldline-alternate-mv" -> foldLineAlternateMv(args);
+            case "foldline-alternate-mv-crossing" -> foldLineAlternateMvCrossing(args);
             case "foldline-select-all" -> foldLineSelectAll(args);
             case "foldline-select-indices" -> foldLineSelectIndices(args);
             case "foldline-select-box" -> foldLineSelectBox(args);
@@ -332,6 +338,52 @@ public class OrieditaGeometryOracle {
         printFoldLineSet(set);
     }
 
+    private static void foldLineMakeColor(String[] args) {
+        if (args.length < 4) {
+            usage("foldline-make-color expects color, comma-separated indices, count, and segment payload");
+        }
+
+        LineColor color = LineColor.fromNumber(Integer.parseInt(args[1]));
+        int count = Integer.parseInt(args[3]);
+        FoldLineSet set = foldLineSet(args, 4, count);
+        List<LineSegment> lines = selectedFoldLines(set, args[2])
+                .stream()
+                .filter(line -> line.getColor() != color)
+                .toList();
+        int changed = 0;
+        if (!lines.isEmpty()) {
+            changed = set.setColor(lines, color);
+            Fix2.apply(set);
+        }
+        System.out.println("changed|" + changed);
+        printFoldLineSet(set);
+    }
+
+    private static void foldLineMakeAux(String[] args) {
+        if (args.length < 3) {
+            usage("foldline-make-aux expects comma-separated indices, count, and segment payload");
+        }
+
+        int count = Integer.parseInt(args[2]);
+        FoldLineSet set = foldLineSet(args, 3, count);
+        List<LineSegment> lines = selectedFoldLines(set, args[1])
+                .stream()
+                .filter(line -> line.getColor().isFoldingLine())
+                .toList();
+
+        for (LineSegment line : lines) {
+            LineSegment addSen = line.withColor(LineColor.CYAN_3);
+            set.deleteLine(line);
+            set.addLine(addSen);
+        }
+        if (!lines.isEmpty()) {
+            set.divideLineSegmentWithNewLines(set.getTotal() - lines.size(), set.getTotal());
+        }
+
+        System.out.println("changed|" + lines.size());
+        printFoldLineSet(set);
+    }
+
     private static void foldLineChangeMv(String[] args) {
         if (args.length < 3) {
             usage("foldline-change-mv expects comma-separated indices, count, and segment payload");
@@ -342,6 +394,124 @@ public class OrieditaGeometryOracle {
         for (LineSegment line : selectedFoldLines(set, args[1])) {
             set.setColor(line, line.getColor().changeMV());
         }
+        printFoldLineSet(set);
+    }
+
+    private static void foldLineAdvanceType(String[] args) {
+        if (args.length < 3) {
+            usage("foldline-advance-type expects index, count, and segment payload");
+        }
+
+        int index = Integer.parseInt(args[1]);
+        int count = Integer.parseInt(args[2]);
+        FoldLineSet set = foldLineSet(args, 3, count);
+        boolean result = false;
+        if (index >= 0 && index < set.getTotal()) {
+            LineSegment lineSegment = set.get(index + 1);
+            set.deleteLine(lineSegment);
+
+            LineColor color = lineSegment.getColor();
+            int selected = lineSegment.getSelected();
+            if ((color == LineColor.BLACK_0) && (selected == 0)) {
+                lineSegment.setSelected(2);
+            } else if ((color == LineColor.BLACK_0) && (selected == 2)) {
+                lineSegment = lineSegment.withColor(LineColor.RED_1);
+                lineSegment.setSelected(0);
+            } else if ((color == LineColor.RED_1) && (selected == 0)) {
+                lineSegment = lineSegment.withColor(LineColor.BLUE_2);
+            } else if ((color == LineColor.BLUE_2) && (selected == 0)) {
+                lineSegment = lineSegment.withColor(LineColor.BLACK_0);
+            }
+
+            set.addLine(lineSegment);
+            result = true;
+        }
+        System.out.println("result|" + result);
+        printFoldLineSetWithSelection(set);
+    }
+
+    private static void foldLineAlternateMv(String[] args) {
+        if (args.length < 8) {
+            usage("foldline-alternate-mv expects start color, guide segment, count, and segment payload");
+        }
+
+        LineColor startColor = LineColor.fromNumber(Integer.parseInt(args[1]));
+        LineSegment guide = new LineSegment(
+                new Point(parse(args[2]), parse(args[3])),
+                new Point(parse(args[4]), parse(args[5])),
+                LineColor.fromNumber(Integer.parseInt(args[6])));
+        int count = Integer.parseInt(args[7]);
+        FoldLineSet set = foldLineSet(args, 8, count);
+        int changed = 0;
+
+        if (Epsilon.high.gt0(guide.determineLength())) {
+            SortingBox<LineSegment> sorted = new SortingBox<>();
+            for (LineSegment line : set.getLineSegmentsIterable()) {
+                if (OritaCalc.isLineSegmentOverlapping(line, guide)) {
+                    sorted.addByWeight(line, OritaCalc.determineLineSegmentDistance(guide.getA(), line));
+                }
+            }
+
+            LineColor color = startColor;
+            for (int i = 1; i <= sorted.getTotal(); i++) {
+                set.setColor(sorted.getValue(i), color);
+                changed++;
+                if (color == LineColor.RED_1) {
+                    color = LineColor.BLUE_2;
+                } else if (color == LineColor.BLUE_2) {
+                    color = LineColor.RED_1;
+                }
+            }
+        }
+
+        System.out.println("changed|" + changed);
+        printFoldLineSet(set);
+    }
+
+    private static void foldLineAlternateMvCrossing(String[] args) {
+        if (args.length < 8) {
+            usage("foldline-alternate-mv-crossing expects start color, guide segment, count, and segment payload");
+        }
+
+        LineColor startColor = LineColor.fromNumber(Integer.parseInt(args[1]));
+        LineSegment guide = new LineSegment(
+                new Point(parse(args[2]), parse(args[3])),
+                new Point(parse(args[4]), parse(args[5])),
+                LineColor.fromNumber(Integer.parseInt(args[6])));
+        int count = Integer.parseInt(args[7]);
+        FoldLineSet set = foldLineSet(args, 8, count);
+        int changed = 0;
+
+        if (Epsilon.high.gt0(guide.determineLength())) {
+            SortingBox<LineSegment> sorted = new SortingBox<>();
+            for (LineSegment line : set.getLineSegmentsIterable()) {
+                LineSegment.Intersection intersection = OritaCalc.determineLineSegmentIntersection(
+                        line,
+                        guide,
+                        Epsilon.UNKNOWN_1EN4);
+                if (!(intersection == LineSegment.Intersection.INTERSECTS_1
+                        || intersection == LineSegment.Intersection.INTERSECTS_TSHAPE_S2_VERTICAL_BAR_27
+                        || intersection == LineSegment.Intersection.INTERSECTS_TSHAPE_S2_VERTICAL_BAR_28)) {
+                    continue;
+                }
+                sorted.addByWeight(
+                        line,
+                        OritaCalc.distance(guide.getB(), OritaCalc.findIntersection(line, guide)));
+            }
+
+            LineColor color = startColor;
+            for (int i = 1; i <= sorted.getTotal(); i++) {
+                set.setColor(sorted.getValue(i), color);
+                changed++;
+                if (color == LineColor.RED_1) {
+                    color = LineColor.BLUE_2;
+                } else if (color == LineColor.BLUE_2) {
+                    color = LineColor.RED_1;
+                }
+            }
+        }
+
+        System.out.println("changed|" + changed);
         printFoldLineSet(set);
     }
 
@@ -983,7 +1153,12 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle foldline-fix1 <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-fix2 <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-set-color <color> <indices> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-make-color <color> <indices> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-make-aux <indices> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-change-mv <indices> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-advance-type <index> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-alternate-mv <startColor> <guide ax ay bx by color> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-alternate-mv-crossing <startColor> <guide ax ay bx by color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle custom-line-type <customType> <lineColor>");
         System.err.println("   or: OrieditaGeometryOracle orh-import-summary <path>");
         System.err.println("   or: OrieditaGeometryOracle orh-export-fixture");

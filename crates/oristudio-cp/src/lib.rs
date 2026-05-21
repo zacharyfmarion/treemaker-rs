@@ -1053,10 +1053,10 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
     descriptor!(
         CheckCamv,
         "CheckCAMVTask",
-        "checks::camv",
+        "checks::check_camv_task",
         Kernel,
         9,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         FoldingEstimate,

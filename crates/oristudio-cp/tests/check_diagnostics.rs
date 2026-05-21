@@ -1,5 +1,5 @@
 use oristudio_cp::checks::{
-    FlatFoldabilityColor, FlatFoldabilityRule, check1, check2, check3, check4,
+    FlatFoldabilityColor, FlatFoldabilityRule, check_camv_task, check1, check2, check3, check4,
 };
 use oristudio_cp::geometry::{LineColor, LineSegment, Point};
 use oristudio_cp::model::CreasePatternModel;
@@ -93,6 +93,18 @@ fn check4_reports_little_big_little_payloads() {
                 .iter()
                 .any(|line| line.violating)
     }));
+}
+
+#[test]
+fn check_camv_task_recomputes_check4_and_marks_dirty() {
+    let mut model = CreasePatternModel::default();
+    model.add_line_segment(segment(0.0, 0.0, 10.0, 0.0, LineColor::Red1));
+    model.add_line_segment(segment(0.0, 0.0, -10.0, 0.0, LineColor::Blue2));
+
+    let result = check_camv_task(&model);
+
+    assert!(result.dirty);
+    assert_eq!(result.violations, check4(&model));
 }
 
 fn segment(ax: f64, ay: f64, bx: f64, by: f64, color: LineColor) -> LineSegment {

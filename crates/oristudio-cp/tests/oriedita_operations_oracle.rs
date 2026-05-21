@@ -1,6 +1,6 @@
 use oristudio_cp::checks::{
     FlatFoldabilityColor, FlatFoldabilityRule, FlatFoldabilityViolation, FlatFoldableBoundaryCheck,
-    check1, check2, check3, check4, flat_foldable_boundary_check,
+    check_camv_task, check1, check2, check3, check4, flat_foldable_boundary_check,
 };
 use oristudio_cp::geometry::{Circle, Intersection, LineColor, LineSegment, Point, RgbColor};
 use oristudio_cp::model::{CreasePatternModel, CustomLineType, TextElement};
@@ -611,6 +611,32 @@ fn check4_matches_oriedita_foldlineset_oracle() {
             run_oracle(&oracle, &args)
         );
     }
+}
+
+#[test]
+fn check_camv_task_matches_oriedita_task_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    let segments = vec![
+        segment(0.0, 0.0, 10.0, 0.0, LineColor::Red1),
+        segment(0.0, 0.0, -10.0, 0.0, LineColor::Blue2),
+    ];
+    let model = model_from_segments(&segments);
+    let result = check_camv_task(&model);
+    let mut args = vec!["check-camv-task".to_string(), segments.len().to_string()];
+    push_segment_args(&mut args, &segments);
+    let rust_summary = format!(
+        "dirty|{}\n{}",
+        result.dirty,
+        flat_foldability_violation_summary(&result.violations)
+    );
+
+    assert_eq!(rust_summary, run_oracle(&oracle, &args));
 }
 
 #[test]

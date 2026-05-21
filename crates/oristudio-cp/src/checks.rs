@@ -48,6 +48,12 @@ pub struct FlatFoldabilityViolation {
     pub little_big_little: Vec<LittleBigLittleSegment>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CamvCheckResult {
+    pub violations: Vec<FlatFoldabilityViolation>,
+    pub dirty: bool,
+}
+
 impl FlatFoldabilityViolation {
     pub fn new(point: Point, rule: FlatFoldabilityRule, color: FlatFoldabilityColor) -> Self {
         Self {
@@ -157,6 +163,14 @@ pub fn check4(model: &CreasePatternModel) -> Vec<FlatFoldabilityViolation> {
         .into_iter()
         .filter_map(|(point, lines)| find_flat_foldability_violation(point, &lines))
         .collect()
+}
+
+/// Oriedita `CheckCAMVTask.run`: recompute Check4 violations and mark the canvas dirty.
+pub fn check_camv_task(model: &CreasePatternModel) -> CamvCheckResult {
+    CamvCheckResult {
+        violations: check4(model),
+        dirty: true,
+    }
 }
 
 /// Oriedita `Check4.findFlatfoldabilityViolation` for one point and its incident lines.

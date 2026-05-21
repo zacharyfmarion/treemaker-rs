@@ -154,6 +154,7 @@ public class OrieditaGeometryOracle {
             case "foldline-check2" -> foldLineCheck2(args);
             case "foldline-check3" -> foldLineCheck3(args);
             case "foldline-check4" -> foldLineCheck4(args);
+            case "check-camv-task" -> checkCamvTask(args);
             case "foldline-del-v" -> foldLineDelV(args);
             case "foldline-del-v-cc" -> foldLineDelVCc(args);
             case "foldline-del-v-pair" -> foldLineDelVPair(args);
@@ -475,6 +476,22 @@ public class OrieditaGeometryOracle {
         for (Point point : map.getPoints()) {
             Check4.findFlatfoldabilityViolation(point, map.getLines(point)).ifPresent(violations::add);
         }
+        printFlatFoldabilityViolations(violations);
+    }
+
+    private static void checkCamvTask(String[] args) throws InterruptedException {
+        if (args.length < 2) {
+            usage("check-camv-task expects count and segment payload");
+        }
+
+        int count = Integer.parseInt(args[1]);
+        FoldLineSet set = foldLineSet(args, 2, count);
+        PointLineMap map = new PointLineMap(set.getLineSegments());
+        List<FlatFoldabilityViolation> violations = new ArrayList<>();
+        for (Point point : map.getPoints()) {
+            Check4.findFlatfoldabilityViolation(point, map.getLines(point)).ifPresent(violations::add);
+        }
+        System.out.println("dirty|true");
         printFlatFoldabilityViolations(violations);
     }
 
@@ -4773,6 +4790,7 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle foldline-check2 <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-check3 <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-check4 <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle check-camv-task <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-fix1 <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-fix2 <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-set-color <color> <indices> <count> [ax ay bx by color]...");

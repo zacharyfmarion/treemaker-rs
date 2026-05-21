@@ -254,7 +254,7 @@ mutation.
 
 | Upstream source | Behavior | Rust target | Stage | Status |
 | --- | --- | --- | --- | --- |
-| `CheckCAMVTask.java` | Combined angle and MV diagnostics. | `checks::camv` | 9 | Unsupported |
+| `CheckCAMVTask.java` | Combined angle and MV diagnostics. | `checks::check_camv_task` | 9 | Oracle-tested |
 | `FoldingEstimateTask.java` | Folding estimate execution. | `folding::estimate` | 10 | Unsupported |
 | `FoldingEstimateSpecificTask.java` | Refold with selected starting face/state. | `folding::estimate_specific` | 10 | Unsupported |
 | `FoldingEstimateSave100Task.java` | Batch/export folding estimates. | `folding::estimate_batch` | 10 | Unsupported |

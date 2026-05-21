@@ -1120,7 +1120,11 @@ Status:
   Maekawa, angle, and little-big-little rules, and preserves LBL line ordering
   and flags. The Rust API returns deterministic point-map order; the oracle
   command validates against Oriedita's static per-point checker rather than the
-  UI executor queue order. CAMV task routing remains a separate Stage 9 task.
+  UI executor queue order.
+- `CheckCAMVTask` is ported and oracle-tested as `checks::check_camv_task`.
+  The non-UI API recomputes `Check4` violations and returns the dirty flag that
+  the Java task sets on `CanvasModel`; asynchronous executor scheduling remains
+  UI/runtime integration.
 
 ### Stage 10: Folding Estimation Parity Surface
 

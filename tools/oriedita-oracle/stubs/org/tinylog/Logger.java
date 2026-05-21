@@ -10,7 +10,16 @@ public final class Logger {
     public static void info(String message, Object arg) {
     }
 
+    public static void info(String message, Object arg1, Object arg2) {
+    }
+
+    public static void info(String message, Object... args) {
+    }
+
     public static void warn(String message, Object arg) {
+    }
+
+    public static void warn(String message, Object... args) {
     }
 
     public static void error(String message) {

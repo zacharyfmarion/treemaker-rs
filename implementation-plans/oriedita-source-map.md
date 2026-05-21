@@ -82,7 +82,7 @@ stage explicitly changes it.
 | `origami/crease_pattern/worker/WireFrame_Worker.java` | Face/topology/folding preparation. | `io::fold::export_topology`, `fold_graph`, `folding` | kernel | 4, 10 | Porting; FOLD topology and wireframe oracle |
 | `origami/crease_pattern/worker/LineSegmentSetWorker.java` | Arrangement cleanup for folded subfaces. | `folding::prepare_subface_segments`, `operations::arrangement` | kernel | 5, 10 | Oracle-tested for split-arrangement preprocessing |
 | `origami/crease_pattern/worker/FoldedFigure_Worker.java` | Folded-model hierarchy and overlap solving. | `folding` | kernel | 10 | Unsupported |
-| `origami/crease_pattern/worker/FoldedFigure_Configurator.java` | Subface and hierarchy setup. | `folding` | kernel | 10 | Unsupported |
+| `origami/crease_pattern/worker/FoldedFigure_Configurator.java` | Subface and hierarchy setup. | `folding::configure_subfaces_from_segments` | kernel | 10 | Porting; configureSubFaces oracle |
 | `origami/crease_pattern/worker/SelectMode.java` | Select/unselect mode enum. | `operations::selection` | kernel | 6 | Unsupported |
 | `origami/crease_pattern/worker/foldlineset/BranchTrim.java` | Branch trimming cleanup. | `operations::arrangement` | kernel | 5 | Oracle-tested |
 | `origami/crease_pattern/worker/foldlineset/Check1.java` | Diagnostic check. | `checks` | kernel | 9 | Oracle-tested |
@@ -106,7 +106,7 @@ stage explicitly changes it.
 | `origami/folding/FoldedFigure.java` | Folding-stage coordinator. | `folding` | kernel | 10 | Unsupported |
 | `origami/folding/HierarchyList.java` | Face-order relation table. | `folding::hierarchy` | kernel | 10 | Unsupported |
 | `origami/folding/element/Face.java` | Folded face data. | `folding::face` | kernel | 10 | Unsupported |
-| `origami/folding/element/SubFace.java` | Subface data and overlap relations. | `folding::subface` | kernel | 10 | Unsupported |
+| `origami/folding/element/SubFace.java` | Subface data and overlap relations. | `folding::SubFace` | kernel | 10 | Porting; membership/reduction oracle |
 | `origami/folding/constraint/CustomConstraint.java` | User folding constraints. | `folding::constraints` | kernel | 10 | Unsupported |
 | `origami/folding/algorithm/*` | Inference, priority, Italiano, swapping algorithms. | `folding::solver` | kernel | 10 | Unsupported |
 | `origami/folding/permutation/*` | Permutation and constraint combinatorics. | `folding::solver` | kernel | 10 | Unsupported |

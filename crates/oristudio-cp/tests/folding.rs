@@ -1,4 +1,6 @@
-use oristudio_cp::folding::{estimate_wireframe_from_segments, prepare_subface_segments};
+use oristudio_cp::folding::{
+    configure_subfaces_from_segments, estimate_wireframe_from_segments, prepare_subface_segments,
+};
 use oristudio_cp::geometry::{LineColor, LineSegment, Point};
 
 #[test]
@@ -61,6 +63,24 @@ fn subface_preparation_removes_points_duplicates_and_splits_crossings() {
             .count(),
         2
     );
+}
+
+#[test]
+fn subface_configuration_maps_subfaces_to_folded_faces() {
+    let segments = square_with_diagonal();
+
+    let configuration =
+        configure_subfaces_from_segments(&segments, 1).expect("subface configuration");
+
+    assert!(!configuration.subfaces.is_empty());
+    assert_eq!(configuration.face_id_count_max, 2);
+    assert!(
+        configuration
+            .subfaces
+            .iter()
+            .any(|subface| subface.face_ids == vec![0, 1])
+    );
+    assert!(!configuration.reduced_subface_indices.is_empty());
 }
 
 fn square_with_diagonal() -> Vec<LineSegment> {

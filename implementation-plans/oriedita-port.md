@@ -1155,9 +1155,12 @@ Deliverables:
   ported as `folding::prepare_subface_segments`, covering the point removal,
   endpoint-tolerant duplicate removal, intersection division, and second cleanup
   pass that Oriedita runs before generating subdivided folded faces.
-  Subface subdivision, hierarchy constraints, overlap ordering, full
-  `FoldingEstimateTask`, full `TwoColoredTask`, and folded-model mutation
-  commands remain intentionally unsupported until their stages are ported.
+- Status: `FoldedFigure_Configurator.configureSubFaces()` is ported as
+  `folding::configure_subfaces_from_segments`, covering subface-to-face
+  membership, maximum face overlap count, and Oriedita's reduced subface set
+  pruning. Hierarchy constraints, overlap ordering, full `FoldingEstimateTask`,
+  full `TwoColoredTask`, and folded-model mutation commands remain
+  intentionally unsupported until their stages are ported.
 
 Oracle:
 

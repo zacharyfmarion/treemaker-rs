@@ -1,7 +1,10 @@
 use crate::fold_graph::{FacePositions, FoldGraph};
-use crate::geometry::{Epsilon, LineColor, LineSegment, Point, equal, equal_with_radius};
+use crate::geometry::{
+    Epsilon, LineColor, LineSegment, Point, Polygon, PolygonIntersection, equal, equal_with_radius,
+};
 use crate::model::CreasePatternModel;
 use crate::operations::arrangement::divide_intersections;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct FoldedWireframe {
@@ -19,6 +22,18 @@ pub struct FoldedWireframeLine {
     pub begin: usize,
     pub end: usize,
     pub color: LineColor,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SubFace {
+    pub face_ids: Vec<usize>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SubFaceConfiguration {
+    pub subfaces: Vec<SubFace>,
+    pub reduced_subface_indices: Vec<usize>,
+    pub face_id_count_max: usize,
 }
 
 /// Oriedita `WireFrame_Worker.folding()`: fold the line-set topology around a
@@ -98,6 +113,23 @@ pub fn prepare_subface_segments(segments: &[LineSegment]) -> Vec<LineSegment> {
     model.line_segments
 }
 
+/// Oriedita `FoldedFigure_Configurator.configureSubFaces()` for the folded
+/// wireframe and its subdivided subface arrangement, without hierarchy solving.
+pub fn configure_subfaces_from_segments(
+    segments: &[LineSegment],
+    starting_face_id: i32,
+) -> Option<SubFaceConfiguration> {
+    let folded = estimate_wireframe_from_segments(segments, starting_face_id)?;
+    let folded_segments = folded_wireframe_segments(&folded);
+    let prepared_segments = prepare_subface_segments(&folded_segments);
+    let subface_graph = FoldGraph::from_segments(&prepared_segments, true);
+    if subface_graph.faces.is_empty() {
+        return None;
+    }
+
+    Some(configure_subfaces(&folded, &subface_graph))
+}
+
 fn wireframe_from_graph(
     graph: &FoldGraph,
     face_positions: &FacePositions,
@@ -120,6 +152,114 @@ fn wireframe_from_graph(
         next_faces: face_positions.next_face.clone(),
         associated_lines: face_positions.associated_line.clone(),
     }
+}
+
+fn configure_subfaces(folded: &FoldedWireframe, subface_graph: &FoldGraph) -> SubFaceConfiguration {
+    let face_polygons = folded
+        .faces
+        .iter()
+        .map(|face| {
+            Polygon::new(
+                face.iter()
+                    .filter_map(|point| folded.points.get(*point).copied())
+                    .collect(),
+            )
+        })
+        .collect::<Vec<_>>();
+
+    let mut frequency = vec![0usize; face_polygons.len()];
+    let mut subfaces = Vec::with_capacity(subface_graph.faces.len());
+    for subface in &subface_graph.faces {
+        let inside_point = subface_polygon(subface_graph, subface).inside_point_find();
+        let mut face_ids = Vec::new();
+        for (face_index, polygon) in face_polygons.iter().enumerate() {
+            if polygon.inside(inside_point) == PolygonIntersection::Inside {
+                face_ids.push(face_index);
+                frequency[face_index] += 1;
+            }
+        }
+        subfaces.push(SubFace { face_ids });
+    }
+
+    let face_id_count_max = subfaces
+        .iter()
+        .map(|subface| subface.face_ids.len())
+        .max()
+        .unwrap_or(0);
+    let reduced_subface_indices = reduce_subface_set(&subfaces, &frequency);
+
+    SubFaceConfiguration {
+        subfaces,
+        reduced_subface_indices,
+        face_id_count_max,
+    }
+}
+
+fn folded_wireframe_segments(folded: &FoldedWireframe) -> Vec<LineSegment> {
+    folded
+        .lines
+        .iter()
+        .filter_map(|line| {
+            let a = folded.points.get(line.begin).copied()?;
+            let b = folded.points.get(line.end).copied()?;
+            Some(LineSegment::with_color(a, b, line.color))
+        })
+        .collect()
+}
+
+fn subface_polygon(graph: &FoldGraph, face: &[usize]) -> Polygon {
+    Polygon::new(
+        face.iter()
+            .filter_map(|point| graph.points.get(*point).copied())
+            .collect(),
+    )
+}
+
+fn reduce_subface_set(subfaces: &[SubFace], frequency: &[usize]) -> Vec<usize> {
+    let mut sorted = (0..subfaces.len()).collect::<Vec<_>>();
+    sorted.sort_by(|a, b| {
+        subfaces[*b]
+            .face_ids
+            .len()
+            .cmp(&subfaces[*a].face_ids.len())
+            .then_with(|| a.cmp(b))
+    });
+
+    let mut reduced_indices: Vec<usize> = Vec::new();
+    let mut face_to_reduced = HashMap::<usize, Vec<usize>>::new();
+    for subface_index in sorted {
+        let subface = &subfaces[subface_index];
+        if subface.face_ids.is_empty() {
+            continue;
+        }
+
+        let mut ids = subface.face_ids.clone();
+        ids.sort_by(|a, b| {
+            frequency
+                .get(*a)
+                .copied()
+                .unwrap_or_default()
+                .cmp(&frequency.get(*b).copied().unwrap_or_default())
+        });
+
+        let mut is_not_subset = !face_to_reduced.contains_key(&ids[0]);
+        if !is_not_subset && let Some(candidates) = face_to_reduced.get(&ids[0]) {
+            is_not_subset = !candidates.iter().any(|candidate| {
+                let reduced = &subfaces[reduced_indices[*candidate]];
+                ids.iter().skip(1).all(|id| reduced.face_ids.contains(id))
+            });
+        }
+
+        if is_not_subset {
+            let reduced_index = reduced_indices.len();
+            reduced_indices.push(subface_index);
+            for id in ids {
+                face_to_reduced.entry(id).or_default().push(reduced_index);
+            }
+        }
+    }
+
+    reduced_indices
 }
 
 fn remove_point_segments(segments: &mut Vec<LineSegment>) {

@@ -1,4 +1,7 @@
-use oristudio_cp::folding::{estimate_wireframe_from_segments, prepare_subface_segments};
+use oristudio_cp::folding::{
+    SubFaceConfiguration, configure_subfaces_from_segments, estimate_wireframe_from_segments,
+    prepare_subface_segments,
+};
 use oristudio_cp::geometry::{LineColor, LineSegment, Point};
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -63,6 +66,32 @@ fn subface_arrangement_preparation_matches_oriedita_oracle() {
 
         assert_eq!(
             line_segment_summary(&prepared),
+            run_oracle(&oracle, &oracle_args)
+        );
+    }
+}
+
+#[test]
+fn subface_configuration_matches_oriedita_oracle() {
+    let Some(oracle) = folding_oracle() else {
+        eprintln!("skipping Oriedita folding oracle test: ORIEDITA_GEOMETRY_ORACLE is not set");
+        return;
+    };
+
+    for starting_face in [1, 0] {
+        let segments = square_with_diagonal();
+        let configuration = configure_subfaces_from_segments(&segments, starting_face)
+            .expect("Rust subface configuration should succeed");
+        let mut args = vec![
+            "subface-configuration-summary".to_string(),
+            starting_face.to_string(),
+            segments.len().to_string(),
+        ];
+        push_segment_args(&mut args, &segments);
+        let oracle_args = args.iter().map(String::as_str).collect::<Vec<_>>();
+
+        assert_eq!(
+            subface_configuration_summary(&configuration),
             run_oracle(&oracle, &oracle_args)
         );
     }
@@ -167,6 +196,42 @@ fn line_segment_summary(segments: &[LineSegment]) -> String {
         ));
     }
     output
+}
+
+fn subface_configuration_summary(configuration: &SubFaceConfiguration) -> String {
+    let mut output = String::new();
+    output.push_str(&format!(
+        "subfaces|{}|{}\n",
+        configuration.subfaces.len(),
+        configuration.face_id_count_max
+    ));
+    for (index, subface) in configuration.subfaces.iter().enumerate() {
+        output.push_str(&format!(
+            "subface|{}|{}\n",
+            index,
+            joined_ids(&subface.face_ids)
+        ));
+    }
+    output.push_str(&format!(
+        "reduced|{}\n",
+        configuration.reduced_subface_indices.len()
+    ));
+    for (index, subface_index) in configuration.reduced_subface_indices.iter().enumerate() {
+        output.push_str(&format!(
+            "reduced_subface|{}|{}|{}\n",
+            index,
+            subface_index,
+            joined_ids(&configuration.subfaces[*subface_index].face_ids)
+        ));
+    }
+    output
+}
+
+fn joined_ids(ids: &[usize]) -> String {
+    ids.iter()
+        .map(|id| id.to_string())
+        .collect::<Vec<_>>()
+        .join(",")
 }
 
 fn segment(ax: f64, ay: f64, bx: f64, by: f64, color: LineColor) -> LineSegment {

@@ -23,10 +23,14 @@ import origami.crease_pattern.worker.foldlineset.Check4;
 import origami.crease_pattern.worker.foldlineset.Fix1;
 import origami.crease_pattern.worker.foldlineset.Fix2;
 import origami.crease_pattern.worker.foldlineset.OrganizeCircles;
+import origami.crease_pattern.worker.FoldedFigure_Configurator;
+import origami.crease_pattern.worker.FoldedFigure_Worker;
 import origami.crease_pattern.worker.LineSegmentSetWorker;
 import origami.crease_pattern.worker.WireFrame_Worker;
 import origami.crease_pattern.worker.linesegmentset.IntersectDivide;
 import origami.crease_pattern.worker.SelectMode;
+import origami.folding.element.SubFace;
+import origami.folding.util.IBulletinBoard;
 import origami.folding.util.SortingBox;
 
 import oriedita.editor.databinding.GridModel;
@@ -44,6 +48,7 @@ import java.awt.Rectangle;
 import java.awt.geom.Path2D;
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -77,6 +82,20 @@ public class OrieditaGeometryOracle {
         LineSegmentPair(LineSegment first, LineSegment second) {
             this.first = first;
             this.second = second;
+        }
+    }
+
+    private static class NoopBulletinBoard implements IBulletinBoard {
+        @Override
+        public void rewrite(int i, String s) {
+        }
+
+        @Override
+        public void write(String s) {
+        }
+
+        @Override
+        public void clear() {
         }
     }
 
@@ -295,6 +314,7 @@ public class OrieditaGeometryOracle {
             case "fold-topology-summary" -> foldTopologySummary(args);
             case "wireframe-folding-summary" -> wireframeFoldingSummary(args);
             case "split-subface-arrangement" -> splitSubfaceArrangement(args);
+            case "subface-configuration-summary" -> subfaceConfigurationSummary(args);
             default -> usage("unknown command: " + args[0]);
         }
     }
@@ -374,6 +394,35 @@ public class OrieditaGeometryOracle {
         LineSegmentSetWorker worker = new LineSegmentSetWorker();
         worker.set(set);
         printLineSegmentSet(worker.split_arrangement_for_SubFace_generation());
+    }
+
+    private static void subfaceConfigurationSummary(String[] args) throws Exception {
+        if (args.length < 3) {
+            usage("subface-configuration-summary expects starting face, count, and segment payload");
+        }
+
+        int startingFace = Integer.parseInt(args[1]);
+        int count = Integer.parseInt(args[2]);
+        LineSegmentSet set = lineSegmentSet(args, 3, count);
+
+        WireFrame_Worker flat = new WireFrame_Worker(3.0);
+        flat.setLineSegmentSet(set);
+        flat.setStartingFaceId(startingFace);
+        PointSet foldedNotSubdivided = flat.folding();
+
+        LineSegmentSetWorker lineWorker = new LineSegmentSetWorker();
+        lineWorker.set(new LineSegmentSet(foldedNotSubdivided));
+        lineWorker.split_arrangement_for_SubFace_generation();
+
+        WireFrame_Worker subdivided = new WireFrame_Worker(3.0);
+        subdivided.setLineSegmentSet(lineWorker.get());
+
+        NoopBulletinBoard bulletinBoard = new NoopBulletinBoard();
+        FoldedFigure_Worker foldedWorker = new FoldedFigure_Worker(bulletinBoard);
+        FoldedFigure_Configurator configurator =
+                new FoldedFigure_Configurator(bulletinBoard, foldedWorker);
+        configurator.configureSubFaces(foldedNotSubdivided, subdivided.get());
+        printSubfaceConfiguration(foldedWorker);
     }
 
     private static void intersectDividePair(String[] args) throws Exception {
@@ -4570,6 +4619,50 @@ public class OrieditaGeometryOracle {
         }
     }
 
+    private static void printSubfaceConfiguration(FoldedFigure_Worker worker) throws Exception {
+        System.out.println("subfaces|"
+                + worker.SubFaceTotal + "|"
+                + worker.FaceIdCount_max);
+        for (int i = 1; i <= worker.SubFaceTotal; i++) {
+            System.out.println("subface|" + (i - 1) + "|" + oracleSubfaceFaceIds(worker.s0[i]));
+        }
+
+        SubFace[] reduced = reflectedReducedSubfaces(worker);
+        System.out.println("reduced|" + Math.max(0, reduced.length - 1));
+        for (int i = 1; i < reduced.length; i++) {
+            System.out.println("reduced_subface|"
+                    + (i - 1) + "|"
+                    + subfaceOriginalIndex(worker.s0, reduced[i]) + "|"
+                    + oracleSubfaceFaceIds(reduced[i]));
+        }
+    }
+
+    private static SubFace[] reflectedReducedSubfaces(FoldedFigure_Worker worker) throws Exception {
+        Field field = FoldedFigure_Worker.class.getDeclaredField("s1");
+        field.setAccessible(true);
+        return (SubFace[]) field.get(worker);
+    }
+
+    private static int subfaceOriginalIndex(SubFace[] subfaces, SubFace target) {
+        for (int i = 1; i < subfaces.length; i++) {
+            if (subfaces[i] == target) {
+                return i - 1;
+            }
+        }
+        return -1;
+    }
+
+    private static String oracleSubfaceFaceIds(SubFace subface) {
+        StringBuilder output = new StringBuilder();
+        for (int i = 1; i <= subface.getFaceIdCount(); i++) {
+            if (i > 1) {
+                output.append(",");
+            }
+            output.append(subface.getFaceId(i) - 1);
+        }
+        return output.toString();
+    }
+
     private static String oracleFacePoints(origami.folding.element.Face face) {
         StringBuilder output = new StringBuilder();
         for (int i = 1; i <= face.getNumPoints(); i++) {
@@ -5379,6 +5472,7 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle fold-topology-summary <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle wireframe-folding-summary <startingFace> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle split-subface-arrangement <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle subface-configuration-summary <startingFace> <count> [ax ay bx by color]...");
         System.exit(2);
     }
 }

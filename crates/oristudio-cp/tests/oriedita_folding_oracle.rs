@@ -1,6 +1,7 @@
 use oristudio_cp::folding::{
-    SubFaceConfiguration, configure_subfaces_from_segments, estimate_wireframe_from_segments,
-    prepare_subface_segments,
+    InitialHierarchy, InitialHierarchyError, SubFaceConfiguration,
+    configure_subfaces_from_segments, estimate_wireframe_from_segments,
+    initial_hierarchy_from_segments, prepare_subface_segments,
 };
 use oristudio_cp::geometry::{LineColor, LineSegment, Point};
 use std::path::{Path, PathBuf};
@@ -92,6 +93,36 @@ fn subface_configuration_matches_oriedita_oracle() {
 
         assert_eq!(
             subface_configuration_summary(&configuration),
+            run_oracle(&oracle, &oracle_args)
+        );
+    }
+}
+
+#[test]
+fn initial_hierarchy_matches_oriedita_oracle() {
+    let Some(oracle) = folding_oracle() else {
+        eprintln!("skipping Oriedita folding oracle test: ORIEDITA_GEOMETRY_ORACLE is not set");
+        return;
+    };
+
+    for (starting_face, segments) in [
+        (1, square_with_diagonal()),
+        (1, square_with_blue_diagonal()),
+        (0, square_with_diagonal()),
+    ] {
+        let hierarchy = initial_hierarchy_from_segments(&segments, starting_face)
+            .expect("Rust initial hierarchy should not have a parity error")
+            .expect("Rust initial hierarchy should succeed");
+        let mut args = vec![
+            "initial-hierarchy-summary".to_string(),
+            starting_face.to_string(),
+            segments.len().to_string(),
+        ];
+        push_segment_args(&mut args, &segments);
+        let oracle_args = args.iter().map(String::as_str).collect::<Vec<_>>();
+
+        assert_eq!(
+            initial_hierarchy_summary(Ok(&hierarchy)),
             run_oracle(&oracle, &oracle_args)
         );
     }
@@ -227,6 +258,33 @@ fn subface_configuration_summary(configuration: &SubFaceConfiguration) -> String
     output
 }
 
+fn initial_hierarchy_summary(
+    hierarchy: Result<&InitialHierarchy, InitialHierarchyError>,
+) -> String {
+    match hierarchy {
+        Ok(hierarchy) => {
+            let mut output = String::new();
+            output.push_str(&format!(
+                "hierarchy|{}|{}\n",
+                hierarchy.faces_total,
+                hierarchy.relations.len()
+            ));
+            for relation in &hierarchy.relations {
+                output.push_str(&format!(
+                    "relation|{}|{}\n",
+                    relation.upper_face, relation.lower_face
+                ));
+            }
+            output
+        }
+        Err(InitialHierarchyError::SameParityAdjacentFaces {
+            line,
+            first_face,
+            second_face,
+        }) => format!("hierarchy_error|same_parity|{line}|{first_face}|{second_face}\n"),
+    }
+}
+
 fn joined_ids(ids: &[usize]) -> String {
     ids.iter()
         .map(|id| id.to_string())
@@ -262,6 +320,14 @@ fn square_with_diagonal() -> Vec<LineSegment> {
         ),
         LineSegment::with_color(Point::new(0.0, 0.0), Point::new(1.0, 1.0), LineColor::Red1),
     ]
+}
+
+fn square_with_blue_diagonal() -> Vec<LineSegment> {
+    let mut segments = square_with_diagonal();
+    if let Some(diagonal) = segments.last_mut() {
+        *diagonal = diagonal.with_line_color(LineColor::Blue2);
+    }
+    segments
 }
 
 fn java_double_string(value: f64) -> String {

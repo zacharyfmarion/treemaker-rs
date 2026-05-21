@@ -1158,9 +1158,12 @@ Deliverables:
 - Status: `FoldedFigure_Configurator.configureSubFaces()` is ported as
   `folding::configure_subfaces_from_segments`, covering subface-to-face
   membership, maximum face overlap count, and Oriedita's reduced subface set
-  pruning. Hierarchy constraints, overlap ordering, full `FoldingEstimateTask`,
-  full `TwoColoredTask`, and folded-model mutation commands remain
-  intentionally unsupported until their stages are ported.
+  pruning. The first `HierarchyList_configure` step is ported as
+  `folding::initial_hierarchy_from_segments`, covering mountain/valley-derived
+  face-above-face relations and Oriedita's same-parity adjacent-face error.
+  Equivalence conditions, custom constraints, overlap ordering, full
+  `FoldingEstimateTask`, full `TwoColoredTask`, and folded-model mutation
+  commands remain intentionally unsupported until their stages are ported.
 
 Oracle:
 

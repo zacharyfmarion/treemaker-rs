@@ -104,7 +104,7 @@ stage explicitly changes it.
 | `oriedita-data/src/main/java/oriedita/editor/databinding/GridModel.java` | Grid metadata saved in Oriedita extras. | `model::grid` | kernel | 3 | Unit-tested |
 | `oriedita-common/src/main/java/oriedita/editor/text/Text.java` | Text annotation carrier. | `model::text` | kernel | 3 | Unit-tested |
 | `origami/folding/FoldedFigure.java` | Folding-stage coordinator. | `folding` | kernel | 10 | Unsupported |
-| `origami/folding/HierarchyList.java` | Face-order relation table. | `folding::hierarchy` | kernel | 10 | Unsupported |
+| `origami/folding/HierarchyList.java` | Face-order relation table. | `folding::initial_hierarchy_from_segments` | kernel | 10 | Porting; initial MV relations oracle |
 | `origami/folding/element/Face.java` | Folded face data. | `folding::face` | kernel | 10 | Unsupported |
 | `origami/folding/element/SubFace.java` | Subface data and overlap relations. | `folding::SubFace` | kernel | 10 | Porting; membership/reduction oracle |
 | `origami/folding/constraint/CustomConstraint.java` | User folding constraints. | `folding::constraints` | kernel | 10 | Unsupported |

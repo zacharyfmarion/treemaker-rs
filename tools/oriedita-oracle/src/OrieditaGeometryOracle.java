@@ -29,6 +29,7 @@ import origami.crease_pattern.worker.LineSegmentSetWorker;
 import origami.crease_pattern.worker.WireFrame_Worker;
 import origami.crease_pattern.worker.linesegmentset.IntersectDivide;
 import origami.crease_pattern.worker.SelectMode;
+import origami.folding.HierarchyList;
 import origami.folding.element.SubFace;
 import origami.folding.util.IBulletinBoard;
 import origami.folding.util.SortingBox;
@@ -315,6 +316,7 @@ public class OrieditaGeometryOracle {
             case "wireframe-folding-summary" -> wireframeFoldingSummary(args);
             case "split-subface-arrangement" -> splitSubfaceArrangement(args);
             case "subface-configuration-summary" -> subfaceConfigurationSummary(args);
+            case "initial-hierarchy-summary" -> initialHierarchySummary(args);
             default -> usage("unknown command: " + args[0]);
         }
     }
@@ -423,6 +425,56 @@ public class OrieditaGeometryOracle {
                 new FoldedFigure_Configurator(bulletinBoard, foldedWorker);
         configurator.configureSubFaces(foldedNotSubdivided, subdivided.get());
         printSubfaceConfiguration(foldedWorker);
+    }
+
+    private static void initialHierarchySummary(String[] args) throws Exception {
+        if (args.length < 3) {
+            usage("initial-hierarchy-summary expects starting face, count, and segment payload");
+        }
+
+        int startingFace = Integer.parseInt(args[1]);
+        int count = Integer.parseInt(args[2]);
+        LineSegmentSet set = lineSegmentSet(args, 3, count);
+
+        WireFrame_Worker flat = new WireFrame_Worker(3.0);
+        flat.setLineSegmentSet(set);
+        flat.setStartingFaceId(startingFace);
+        PointSet folded = flat.folding();
+
+        List<int[]> relations = new ArrayList<>();
+        for (int i = 1; i <= flat.getNumLines(); i++) {
+            int faceIdMin = flat.lineInFaceBorder_min_request(i);
+            int faceIdMax = flat.lineInFaceBorder_max_request(i);
+            if (faceIdMin != faceIdMax) {
+                int minPos = flat.getIFacePosition(faceIdMin);
+                int maxPos = flat.getIFacePosition(faceIdMax);
+                if (minPos % 2 == maxPos % 2) {
+                    System.out.println("hierarchy_error|same_parity|"
+                            + (i - 1) + "|"
+                            + (faceIdMin - 1) + "|"
+                            + (faceIdMax - 1));
+                    return;
+                }
+
+                int value;
+                if (folded.getColor(i) == LineColor.RED_1) {
+                    value = minPos % 2 == 1 ? HierarchyList.ABOVE_1 : HierarchyList.BELOW_0;
+                } else {
+                    value = minPos % 2 == 1 ? HierarchyList.BELOW_0 : HierarchyList.ABOVE_1;
+                }
+
+                if (value == HierarchyList.ABOVE_1) {
+                    relations.add(new int[] {faceIdMin - 1, faceIdMax - 1});
+                } else {
+                    relations.add(new int[] {faceIdMax - 1, faceIdMin - 1});
+                }
+            }
+        }
+
+        System.out.println("hierarchy|" + folded.getNumFaces() + "|" + relations.size());
+        for (int[] relation : relations) {
+            System.out.println("relation|" + relation[0] + "|" + relation[1]);
+        }
     }
 
     private static void intersectDividePair(String[] args) throws Exception {
@@ -5473,6 +5525,7 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle wireframe-folding-summary <startingFace> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle split-subface-arrangement <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle subface-configuration-summary <startingFace> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle initial-hierarchy-summary <startingFace> <count> [ax ay bx by color]...");
         System.exit(2);
     }
 }

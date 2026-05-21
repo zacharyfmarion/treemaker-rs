@@ -1,5 +1,6 @@
 use oristudio_cp::folding::{
-    configure_subfaces_from_segments, estimate_wireframe_from_segments, prepare_subface_segments,
+    HierarchyRelation, configure_subfaces_from_segments, estimate_wireframe_from_segments,
+    initial_hierarchy_from_segments, prepare_subface_segments,
 };
 use oristudio_cp::geometry::{LineColor, LineSegment, Point};
 
@@ -81,6 +82,24 @@ fn subface_configuration_maps_subfaces_to_folded_faces() {
             .any(|subface| subface.face_ids == vec![0, 1])
     );
     assert!(!configuration.reduced_subface_indices.is_empty());
+}
+
+#[test]
+fn initial_hierarchy_uses_mountain_valley_and_face_parity() {
+    let segments = square_with_diagonal();
+
+    let hierarchy = initial_hierarchy_from_segments(&segments, 1)
+        .expect("hierarchy should not fail")
+        .expect("hierarchy");
+
+    assert_eq!(hierarchy.faces_total, 2);
+    assert_eq!(
+        hierarchy.relations,
+        vec![HierarchyRelation {
+            upper_face: 0,
+            lower_face: 1,
+        }]
+    );
 }
 
 fn square_with_diagonal() -> Vec<LineSegment> {

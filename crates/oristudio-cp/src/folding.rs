@@ -36,6 +36,27 @@ pub struct SubFaceConfiguration {
     pub face_id_count_max: usize,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InitialHierarchy {
+    pub faces_total: usize,
+    pub relations: Vec<HierarchyRelation>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HierarchyRelation {
+    pub upper_face: usize,
+    pub lower_face: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InitialHierarchyError {
+    SameParityAdjacentFaces {
+        line: usize,
+        first_face: usize,
+        second_face: usize,
+    },
+}
+
 /// Oriedita `WireFrame_Worker.folding()`: fold the line-set topology around a
 /// starting face without solving layer overlap.
 pub fn estimate_wireframe(
@@ -128,6 +149,67 @@ pub fn configure_subfaces_from_segments(
     }
 
     Some(configure_subfaces(&folded, &subface_graph))
+}
+
+/// Oriedita `FoldedFigure_Configurator.setupHierarchyList()` initial
+/// mountain/valley-derived face order table.
+pub fn initial_hierarchy_from_segments(
+    segments: &[LineSegment],
+    starting_face_id: i32,
+) -> Result<Option<InitialHierarchy>, InitialHierarchyError> {
+    if segments.is_empty() {
+        return Ok(None);
+    }
+
+    let graph = FoldGraph::from_segments(segments, true);
+    if graph.faces.is_empty() {
+        return Ok(None);
+    }
+
+    let positions = graph.face_positions(starting_face_id);
+    let mut relations = Vec::new();
+    for (line_index, line) in graph.lines.iter().enumerate() {
+        let Some((first_face, second_face)) = graph.line_face_border(line_index) else {
+            continue;
+        };
+        if first_face == second_face {
+            continue;
+        }
+
+        let first_position = positions.face_position[first_face];
+        let second_position = positions.face_position[second_face];
+        if first_position % 2 == second_position % 2 {
+            return Err(InitialHierarchyError::SameParityAdjacentFaces {
+                line: line_index,
+                first_face,
+                second_face,
+            });
+        }
+
+        let first_same_orientation = first_position % 2 == 1;
+        let first_above_second = if line.color == LineColor::Red1 {
+            first_same_orientation
+        } else {
+            !first_same_orientation
+        };
+
+        relations.push(if first_above_second {
+            HierarchyRelation {
+                upper_face: first_face,
+                lower_face: second_face,
+            }
+        } else {
+            HierarchyRelation {
+                upper_face: second_face,
+                lower_face: first_face,
+            }
+        });
+    }
+
+    Ok(Some(InitialHierarchy {
+        faces_total: graph.faces.len(),
+        relations,
+    }))
 }
 
 fn wireframe_from_graph(

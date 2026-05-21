@@ -84,6 +84,23 @@ impl FoldGraph {
             .collect()
     }
 
+    pub(crate) fn line_face_border(&self, line_index: usize) -> Option<(usize, usize)> {
+        let line = self.lines.get(line_index)?;
+        let mut min = usize::MAX;
+        let mut max = 0usize;
+        let mut found = false;
+
+        for (face_index, face) in self.faces.iter().enumerate() {
+            if face_contains_line(face, line.begin, line.end) {
+                min = min.min(face_index);
+                max = max.max(face_index);
+                found = true;
+            }
+        }
+
+        found.then_some((min, max))
+    }
+
     pub(crate) fn folded_points(&self, positions: &FacePositions) -> Vec<Point> {
         let mut folded = self.points.clone();
         for (point_index, target) in folded.iter_mut().enumerate() {
@@ -377,6 +394,22 @@ impl FoldGraph {
         }
         p
     }
+}
+
+fn face_contains_line(face: &[usize], begin: usize, end: usize) -> bool {
+    if face.is_empty() {
+        return false;
+    }
+
+    for index in 0..face.len() {
+        let a = face[index];
+        let b = face[(index + 1) % face.len()];
+        if (a == begin && b == end) || (a == end && b == begin) {
+            return true;
+        }
+    }
+
+    false
 }
 
 fn vertex_index(points: &mut Vec<Point>, point: Point) -> usize {

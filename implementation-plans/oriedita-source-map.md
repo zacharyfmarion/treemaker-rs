@@ -263,7 +263,7 @@ mutation.
 | `FoldingServiceImpl.folding_estimated` | Reuse existing fold input for selected figure. | `folding::commands::estimate` | 10 | Unsupported |
 | `FoldingServiceImpl.createTwoColoredCp` | Generate two-colored CP from selected lines. | `folding::two_colored_folding_estimate_from_segments` | 10 | Porting; pure folded estimate ported, UI selection/list wiring unsupported |
 | `FoldingServiceImpl.foldAnother` | Request another overlap solution. | `folding::fold_another`, `folding::WorkerOverlapEnumerator` | 10 | Porting; pure session action ported, command wiring unsupported |
-| `FoldingServiceImpl.duplicate` | Duplicate folded model and replay estimate order. | `folding::commands::duplicate` | 10 | Unsupported |
+| `FoldingServiceImpl.duplicate` | Duplicate folded model and replay estimate order. | `folding::duplicate_estimation_order_for_display` | 10 | Porting; replay-order mapping oracle, folded-list/task wiring unsupported |
 
 ## Diagnostic Matrix
 

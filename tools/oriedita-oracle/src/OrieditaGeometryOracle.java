@@ -330,6 +330,7 @@ public class OrieditaGeometryOracle {
             case "folding-estimate-specific-summary" -> foldingEstimateSpecificSummary(args);
             case "folding-estimate-save-batch-summary" -> foldingEstimateSaveBatchSummary(args);
             case "folding-estimate-case-filename" -> foldingEstimateCaseFilename(args);
+            case "duplicate-estimation-order" -> duplicateEstimationOrder(args);
             case "chain-permutation-summary" -> chainPermutationSummary(args);
             case "chain-permutation-temp-summary" -> chainPermutationTempSummary(args);
             case "subface-guide-permutation-summary" -> subfaceGuidePermutationSummary(args);
@@ -764,6 +765,24 @@ public class OrieditaGeometryOracle {
             filename = basename + "_" + discovered + extension;
         }
         System.out.println("case_filename|" + filename);
+    }
+
+    private static void duplicateEstimationOrder(String[] args) {
+        if (args.length != 2) {
+            usage("duplicate-estimation-order expects a FoldedFigure.DisplayStyle name");
+        }
+
+        FoldedFigure.DisplayStyle style = FoldedFigure.DisplayStyle.valueOf(args[1]);
+        FoldedFigure.EstimationOrder order = switch (style) {
+            case NONE_0 -> FoldedFigure.EstimationOrder.ORDER_0;
+            case DEVELOPMENT_1 -> FoldedFigure.EstimationOrder.ORDER_1;
+            case WIRE_2 -> FoldedFigure.EstimationOrder.ORDER_2;
+            case TRANSPARENT_3 -> FoldedFigure.EstimationOrder.ORDER_3;
+            case DEVELOPMENT_4 -> FoldedFigure.EstimationOrder.ORDER_4;
+            case PAPER_5 -> FoldedFigure.EstimationOrder.ORDER_5;
+            default -> FoldedFigure.EstimationOrder.ORDER_5;
+        };
+        System.out.println("duplicate_order|" + order.name());
     }
 
     private static void chainPermutationSummary(String[] args) throws Exception {
@@ -6638,6 +6657,7 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle folding-estimate-specific-summary <startingFace> <objective> <initialOrder> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle folding-estimate-save-batch-summary <startingFace> <objective> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle folding-estimate-case-filename <filename> <discoveredCase>");
+        System.err.println("   or: OrieditaGeometryOracle duplicate-estimation-order <displayStyle>");
         System.err.println("   or: OrieditaGeometryOracle chain-permutation-summary <digits> <guideCount> [upper lower]... <topCsv|-> <bottomCsv|-> <limit>");
         System.err.println("   or: OrieditaGeometryOracle chain-permutation-temp-summary <digits> <guideCount> [upper lower]... <topCsv|-> <bottomCsv|-> <stepsBeforeTemp> <tempUpper> <tempLower> <stepsAfterTemp> <limitAfterClear>");
         System.err.println("   or: OrieditaGeometryOracle subface-guide-permutation-summary <facesTotal> <faceCount> [faceId]... <relationCount> [upper lower]... <limit>");

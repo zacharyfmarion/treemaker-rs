@@ -1262,6 +1262,11 @@ Deliverables:
   `folding-estimate-case-filename` compare the pure behavior, including
   Oriedita's upstream `solution_sample_1.cp` fixture with 16 discovered
   solutions.
+- Status: The pure replay-order mapping inside `FoldingServiceImpl.duplicate`
+  is ported as `folding::duplicate_estimation_order_for_display`, with
+  `duplicate-estimation-order` oracle coverage. Creating a new folded-figure
+  drawer/list item and dispatching the replay task remains UI/service
+  integration work.
 - Status: Oriedita's `SubFaceSwappingAlgorithm` support logic is ported as
   `folding::SubFaceSwapper`, including visited-subface tracking, dead-end
   recording, repeated-prefix history detection, swap-counter-driven reverse

@@ -3,9 +3,10 @@ use oristudio_cp::folding::{
     EquivalenceConditionSet, FoldingEstimateSession, HierarchyRelation, InitialHierarchy,
     InitialHierarchyError, SubFace, SubFaceConfiguration, SubFacePermutationSearch,
     WorkerOverlapEnumerator, additional_estimation_from_segments, configure_subfaces_from_segments,
-    equivalence_condition_candidates_from_segments, estimate_wireframe_from_segments,
-    folding_estimate_case_filename, folding_estimate_from_segments, folding_estimate_save_batch,
-    folding_estimate_to_case, initial_hierarchy_from_segments, overlap_search_from_segments,
+    duplicate_estimation_order_for_display, equivalence_condition_candidates_from_segments,
+    estimate_wireframe_from_segments, folding_estimate_case_filename,
+    folding_estimate_from_segments, folding_estimate_save_batch, folding_estimate_to_case,
+    initial_hierarchy_from_segments, overlap_search_from_segments,
     overlap_search_from_segments_with_swap, possible_overlap_search_for_ordered_subfaces,
     possible_overlap_search_for_subfaces, possible_overlap_search_for_subfaces_with_swap,
     prepare_subface_segments, prioritize_subfaces, two_colored_folding_estimate_from_segments,
@@ -989,6 +990,33 @@ fn folding_estimate_case_filename_matches_oriedita_oracle() {
             format!(
                 "case_filename|{}\n",
                 folding_estimate_case_filename(filename, 12)
+            ),
+            run_oracle(&oracle, &args)
+        );
+    }
+}
+
+#[test]
+fn duplicate_estimation_order_matches_oriedita_oracle() {
+    let Some(oracle) = folding_oracle() else {
+        eprintln!("skipping Oriedita folding oracle test: ORIEDITA_GEOMETRY_ORACLE is not set");
+        return;
+    };
+
+    for style in [
+        oristudio_cp::folding::DisplayStyle::None0,
+        oristudio_cp::folding::DisplayStyle::Development1,
+        oristudio_cp::folding::DisplayStyle::Wire2,
+        oristudio_cp::folding::DisplayStyle::Transparent3,
+        oristudio_cp::folding::DisplayStyle::Development4,
+        oristudio_cp::folding::DisplayStyle::Paper5,
+    ] {
+        let style_name = display_style_name(style);
+        let args = ["duplicate-estimation-order", style_name];
+        assert_eq!(
+            format!(
+                "duplicate_order|ORDER_{}\n",
+                estimation_order_value(duplicate_estimation_order_for_display(style))
             ),
             run_oracle(&oracle, &args)
         );

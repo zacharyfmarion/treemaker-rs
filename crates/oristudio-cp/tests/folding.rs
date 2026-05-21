@@ -2,9 +2,10 @@ use oristudio_cp::folding::{
     ChainPermutationGenerator, FoldingEstimateSession, HierarchyRelation, InitialHierarchy,
     SubFacePermutationSearch, SubFaceSwapper, WorkerOverlapEnumerator,
     additional_estimation_from_segments, configure_subfaces_from_segments,
-    equivalence_condition_candidates_from_segments, estimate_wireframe_from_segments, fold_another,
-    folding_estimate_case_filename, folding_estimate_from_segments, folding_estimate_save_batch,
-    folding_estimate_to_case, initial_hierarchy_from_segments, overlap_search_from_segments,
+    duplicate_estimation_order_for_display, equivalence_condition_candidates_from_segments,
+    estimate_wireframe_from_segments, fold_another, folding_estimate_case_filename,
+    folding_estimate_from_segments, folding_estimate_save_batch, folding_estimate_to_case,
+    initial_hierarchy_from_segments, overlap_search_from_segments,
     overlap_search_from_segments_with_swap, possible_overlap_search_for_ordered_subfaces,
     possible_overlap_search_for_subfaces, possible_overlap_search_for_subfaces_with_swap,
     prepare_subface_segments, prioritize_subfaces, two_colored_folding_estimate_from_segments,
@@ -549,6 +550,36 @@ fn folding_estimate_save_batch_records_case_numbers_and_filename_suffixes() {
     assert_eq!(
         folding_estimate_case_filename("/tmp/folded-image", 12),
         "/tmp/folded-image"
+    );
+}
+
+#[test]
+fn duplicate_estimation_order_follows_oriedita_display_mapping() {
+    use oristudio_cp::folding::{DisplayStyle, EstimationOrder};
+
+    assert_eq!(
+        duplicate_estimation_order_for_display(DisplayStyle::None0),
+        EstimationOrder::Order0
+    );
+    assert_eq!(
+        duplicate_estimation_order_for_display(DisplayStyle::Development1),
+        EstimationOrder::Order1
+    );
+    assert_eq!(
+        duplicate_estimation_order_for_display(DisplayStyle::Wire2),
+        EstimationOrder::Order2
+    );
+    assert_eq!(
+        duplicate_estimation_order_for_display(DisplayStyle::Transparent3),
+        EstimationOrder::Order3
+    );
+    assert_eq!(
+        duplicate_estimation_order_for_display(DisplayStyle::Development4),
+        EstimationOrder::Order4
+    );
+    assert_eq!(
+        duplicate_estimation_order_for_display(DisplayStyle::Paper5),
+        EstimationOrder::Order5
     );
 }
 

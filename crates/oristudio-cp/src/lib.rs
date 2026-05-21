@@ -1103,18 +1103,18 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
     descriptor!(
         FoldAnother,
         "FoldingServiceImpl.foldAnother",
-        "folding::commands::fold_another",
+        "folding::fold_another",
         KernelIntent,
         10,
-        Unsupported
+        Porting
     ),
     descriptor!(
         DuplicateFoldedModel,
         "FoldingServiceImpl.duplicate",
-        "folding::commands::duplicate",
+        "folding::duplicate_estimation_order_for_display",
         KernelIntent,
         10,
-        Unsupported
+        Porting
     ),
     descriptor!(Check1, "Check1", "checks::check1", Kernel, 9, OracleTested),
     descriptor!(Check2, "Check2", "checks::check2", Kernel, 9, OracleTested),

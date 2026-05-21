@@ -734,6 +734,19 @@ pub fn folding_estimate_case_filename(filename: &str, discovered_case: usize) ->
     }
 }
 
+/// Oriedita `FoldingServiceImpl.duplicate` replay-order mapping for a duplicated
+/// folded figure, without folded-list creation or task dispatch.
+pub fn duplicate_estimation_order_for_display(display_style: DisplayStyle) -> EstimationOrder {
+    match display_style {
+        DisplayStyle::None0 => EstimationOrder::Order0,
+        DisplayStyle::Development1 => EstimationOrder::Order1,
+        DisplayStyle::Wire2 => EstimationOrder::Order2,
+        DisplayStyle::Transparent3 => EstimationOrder::Order3,
+        DisplayStyle::Development4 => EstimationOrder::Order4,
+        DisplayStyle::Paper5 => EstimationOrder::Order5,
+    }
+}
+
 /// Oriedita `FoldedFigure.folding_estimated(...)` stage summary from a fresh
 /// folded figure. For `ORDER_6`, this follows Oriedita and asks the same worker
 /// for the next overlap after the initial order-5 solution.

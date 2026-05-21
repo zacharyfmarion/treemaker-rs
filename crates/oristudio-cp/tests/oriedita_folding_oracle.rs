@@ -1,9 +1,10 @@
 use oristudio_cp::folding::{
     AdditionalEstimation, AdditionalEstimationError, ChainPermutationGenerator,
-    EquivalenceConditionSet, HierarchyRelation, InitialHierarchy, InitialHierarchyError,
+    EquivalenceConditionSet, HierarchyRelation, InitialHierarchy, InitialHierarchyError, SubFace,
     SubFaceConfiguration, SubFacePermutationSearch, additional_estimation_from_segments,
     configure_subfaces_from_segments, equivalence_condition_candidates_from_segments,
     estimate_wireframe_from_segments, initial_hierarchy_from_segments, prepare_subface_segments,
+    prioritize_subfaces,
 };
 use oristudio_cp::geometry::{LineColor, LineSegment, Point};
 use std::path::{Path, PathBuf};
@@ -433,6 +434,71 @@ fn subface_overlap_search_matches_oriedita_oracle() {
     }
 }
 
+#[test]
+fn subface_priority_matches_oriedita_oracle() {
+    let Some(oracle) = folding_oracle() else {
+        eprintln!("skipping Oriedita folding oracle test: ORIEDITA_GEOMETRY_ORACLE is not set");
+        return;
+    };
+
+    for case in [
+        SubFacePriorityCase {
+            faces_total: 4,
+            subfaces: &[&[0usize, 1], &[1usize, 2, 3], &[0usize, 1, 2, 3]],
+            relations: &[],
+        },
+        SubFacePriorityCase {
+            faces_total: 5,
+            subfaces: &[&[0usize, 2, 4], &[1usize, 2], &[0usize, 1, 4]],
+            relations: &[(0, 4)],
+        },
+    ] {
+        let hierarchy = InitialHierarchy {
+            faces_total: case.faces_total,
+            relations: case
+                .relations
+                .iter()
+                .map(|(upper_face, lower_face)| HierarchyRelation {
+                    upper_face: *upper_face,
+                    lower_face: *lower_face,
+                })
+                .collect(),
+        };
+        let subfaces = case
+            .subfaces
+            .iter()
+            .map(|face_ids| SubFace {
+                face_ids: face_ids.to_vec(),
+            })
+            .collect::<Vec<_>>();
+        let reduced = (0..subfaces.len()).collect::<Vec<_>>();
+        let priority = prioritize_subfaces(&subfaces, &reduced, &hierarchy);
+
+        let mut args = vec![
+            "subface-priority-summary".to_string(),
+            case.faces_total.to_string(),
+            case.subfaces.len().to_string(),
+        ];
+        for face_ids in case.subfaces {
+            args.push(face_ids.len().to_string());
+            for face_id in *face_ids {
+                args.push(face_id.to_string());
+            }
+        }
+        args.push(case.relations.len().to_string());
+        for (upper_face, lower_face) in case.relations {
+            args.push(upper_face.to_string());
+            args.push(lower_face.to_string());
+        }
+        let oracle_args = args.iter().map(String::as_str).collect::<Vec<_>>();
+
+        assert_eq!(
+            subface_priority_summary(&priority, &subfaces),
+            run_oracle(&oracle, &oracle_args)
+        );
+    }
+}
+
 fn folding_oracle() -> Option<PathBuf> {
     std::env::var("ORIEDITA_GEOMETRY_ORACLE")
         .or_else(|_| std::env::var("ORIEDITA_ORACLE"))
@@ -658,6 +724,12 @@ struct SubFaceOverlapCase<'a> {
     quadruple_conditions: &'a [(usize, usize, usize, usize)],
 }
 
+struct SubFacePriorityCase<'a> {
+    faces_total: usize,
+    subfaces: &'a [&'a [usize]],
+    relations: &'a [(usize, usize)],
+}
+
 fn chain_permutation_summary(mut generator: ChainPermutationGenerator, limit: usize) -> String {
     let mut output = String::new();
     output.push_str(&format!("permutations|{}\n", generator.count()));
@@ -794,6 +866,27 @@ fn subface_overlap_summary(
         ),
         Err(error) => format!("subface_overlap_error|{error:?}\n"),
     }
+}
+
+fn subface_priority_summary(
+    priority: &oristudio_cp::folding::SubFacePriority,
+    subfaces: &[SubFace],
+) -> String {
+    let mut output = String::new();
+    output.push_str(&format!(
+        "subface_priority|{}|{}\n",
+        priority.valid_count,
+        priority.ordered_subface_indices.len()
+    ));
+    for (rank, subface_index) in priority.ordered_subface_indices.iter().enumerate() {
+        output.push_str(&format!(
+            "priority_subface|{}|{}|{}\n",
+            rank,
+            subface_index,
+            joined_ids(&subfaces[*subface_index].face_ids)
+        ));
+    }
+    output
 }
 
 fn joined_ids(ids: &[usize]) -> String {

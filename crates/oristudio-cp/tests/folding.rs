@@ -2,7 +2,7 @@ use oristudio_cp::folding::{
     ChainPermutationGenerator, HierarchyRelation, InitialHierarchy, SubFacePermutationSearch,
     additional_estimation_from_segments, configure_subfaces_from_segments,
     equivalence_condition_candidates_from_segments, estimate_wireframe_from_segments,
-    initial_hierarchy_from_segments, prepare_subface_segments,
+    initial_hierarchy_from_segments, prepare_subface_segments, prioritize_subfaces,
 };
 use oristudio_cp::geometry::{LineColor, LineSegment, Point};
 
@@ -226,6 +226,30 @@ fn subface_overlap_search_advances_past_hierarchy_contradictions() {
 
     let ordering = search.current_ordering();
     assert!(position(&ordering, 2) < position(&ordering, 0));
+}
+
+#[test]
+fn subface_priority_prefers_new_pair_information_then_face_count() {
+    let hierarchy = InitialHierarchy {
+        faces_total: 4,
+        relations: Vec::new(),
+    };
+    let subfaces = vec![
+        oristudio_cp::folding::SubFace {
+            face_ids: vec![0, 1],
+        },
+        oristudio_cp::folding::SubFace {
+            face_ids: vec![1, 2, 3],
+        },
+        oristudio_cp::folding::SubFace {
+            face_ids: vec![0, 1, 2, 3],
+        },
+    ];
+
+    let priority = prioritize_subfaces(&subfaces, &[0, 1, 2], &hierarchy);
+
+    assert_eq!(priority.ordered_subface_indices, vec![2, 1, 0]);
+    assert_eq!(priority.valid_count, 1);
 }
 
 fn square_with_diagonal() -> Vec<LineSegment> {

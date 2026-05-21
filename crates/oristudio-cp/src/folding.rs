@@ -11,7 +11,7 @@ use std::collections::HashMap;
 
 pub use permutation::{
     ChainPermutationGenerator, PermutationError, PermutationSnapshot, SubFacePermutationSearch,
-    SubFaceSearchError,
+    SubFacePriority, SubFaceSearchError, prioritize_subfaces,
 };
 
 #[derive(Debug, Clone, PartialEq)]

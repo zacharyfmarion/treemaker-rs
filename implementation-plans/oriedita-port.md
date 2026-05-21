@@ -1188,6 +1188,11 @@ Deliverables:
   accelerator remains an explicit typed unsupported path until its own stage is
   ported. The oracle command `subface-overlap-search-summary` compares the
   resulting status, permutation count, and top-to-bottom face order.
+- Status: Oriedita's `SubFacePriority` pass is ported as
+  `folding::prioritize_subfaces`, including empty-pair observer counts, priority
+  selection by new information count, face-count tie-breaking, and valid
+  subface count calculation. The oracle command `subface-priority-summary`
+  compares ordered subface indices and valid counts.
 
 Oracle:
 

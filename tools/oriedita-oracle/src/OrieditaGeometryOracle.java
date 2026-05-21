@@ -30,6 +30,7 @@ import origami.crease_pattern.worker.WireFrame_Worker;
 import origami.crease_pattern.worker.linesegmentset.IntersectDivide;
 import origami.crease_pattern.worker.SelectMode;
 import origami.folding.HierarchyList;
+import origami.folding.algorithm.SubFacePriority;
 import origami.folding.element.SubFace;
 import origami.folding.permutation.ChainPermutationGenerator;
 import origami.folding.util.IBulletinBoard;
@@ -324,6 +325,7 @@ public class OrieditaGeometryOracle {
             case "chain-permutation-temp-summary" -> chainPermutationTempSummary(args);
             case "subface-guide-permutation-summary" -> subfaceGuidePermutationSummary(args);
             case "subface-overlap-search-summary" -> subfaceOverlapSearchSummary(args);
+            case "subface-priority-summary" -> subfacePrioritySummary(args);
             default -> usage("unknown command: " + args[0]);
         }
     }
@@ -737,6 +739,61 @@ public class OrieditaGeometryOracle {
         subFace.setGuideMap(hierarchyList);
         int result = subFace.possible_overlapping_search(hierarchyList);
         printSubfaceOverlapSearch(result, subFace, faceCount);
+    }
+
+    private static void subfacePrioritySummary(String[] args) {
+        if (args.length < 5) {
+            usage("subface-priority-summary expects faces total, subface count, subfaces, relation count, and relation pairs");
+        }
+
+        int facesTotal = Integer.parseInt(args[1]);
+        int subfaceCount = Integer.parseInt(args[2]);
+        int offset = 3;
+        SubFace[] subfaces = new SubFace[subfaceCount + 1];
+        subfaces[0] = new SubFace(new NoopBulletinBoard());
+        for (int i = 1; i <= subfaceCount; i++) {
+            int faceCount = Integer.parseInt(args[offset++]);
+            subfaces[i] = new SubFace(new NoopBulletinBoard());
+            subfaces[i].setNumDigits(faceCount);
+            for (int j = 1; j <= faceCount; j++) {
+                subfaces[i].setFaceId(j, Integer.parseInt(args[offset++]) + 1);
+            }
+        }
+
+        HierarchyList hierarchyList = new HierarchyList();
+        hierarchyList.setFacesTotal(facesTotal);
+        int relationCount = Integer.parseInt(args[offset++]);
+        for (int i = 0; i < relationCount; i++) {
+            int upper = Integer.parseInt(args[offset++]) + 1;
+            int lower = Integer.parseInt(args[offset++]) + 1;
+            hierarchyList.set(upper, lower, HierarchyList.ABOVE_1);
+        }
+
+        SubFacePriority priority = new SubFacePriority(facesTotal, subfaceCount);
+        for (int i = 1; i <= subfaceCount; i++) {
+            priority.addSubFace(subfaces[i], i, hierarchyList);
+        }
+
+        int validCount = 0;
+        int[] ordered = new int[subfaceCount + 1];
+        for (int i = 1; i <= subfaceCount; i++) {
+            long result = priority.getMaxSubFace(subfaces);
+            int selected = (int) (result & SubFacePriority.mask);
+            int max = (int) (result >>> 32);
+            ordered[i] = selected;
+            if (max > 0) {
+                validCount++;
+            }
+            priority.processSubFace(subfaces[selected], selected, hierarchyList);
+        }
+
+        System.out.println("subface_priority|" + validCount + "|" + subfaceCount);
+        for (int i = 1; i <= subfaceCount; i++) {
+            System.out.println("priority_subface|"
+                    + (i - 1) + "|"
+                    + (ordered[i] - 1) + "|"
+                    + oracleSubfaceFaceIds(subfaces[ordered[i]]));
+        }
     }
 
     private static void intersectDividePair(String[] args) throws Exception {
@@ -5988,6 +6045,7 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle chain-permutation-temp-summary <digits> <guideCount> [upper lower]... <topCsv|-> <bottomCsv|-> <stepsBeforeTemp> <tempUpper> <tempLower> <stepsAfterTemp> <limitAfterClear>");
         System.err.println("   or: OrieditaGeometryOracle subface-guide-permutation-summary <facesTotal> <faceCount> [faceId]... <relationCount> [upper lower]... <limit>");
         System.err.println("   or: OrieditaGeometryOracle subface-overlap-search-summary <facesTotal> <faceCount> [faceId]... <relationCount> [upper lower]... <tripleCount> [a b c d]... <quadCount> [a b c d]...");
+        System.err.println("   or: OrieditaGeometryOracle subface-priority-summary <facesTotal> <subfaceCount> [faceCount faceIds...]... <relationCount> [upper lower]...");
         System.exit(2);
     }
 }

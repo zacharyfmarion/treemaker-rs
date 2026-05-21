@@ -1,5 +1,6 @@
 use super::{
     EquivalenceCondition, EquivalenceConditionSet, FaceOrder, HierarchyTable, InitialHierarchy,
+    SubFace,
 };
 use std::collections::{HashMap, HashSet};
 
@@ -19,6 +20,77 @@ pub struct PermutationSnapshot {
 pub enum SubFaceSearchError {
     Permutation(PermutationError),
     CombinationGeneratorRequired { permutation_count: usize },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SubFacePriority {
+    pub ordered_subface_indices: Vec<usize>,
+    pub valid_count: usize,
+}
+
+pub fn prioritize_subfaces(
+    subfaces: &[SubFace],
+    reduced_subface_indices: &[usize],
+    hierarchy: &InitialHierarchy,
+) -> SubFacePriority {
+    let reduced_count = reduced_subface_indices.len();
+    let mut new_info_count = vec![0usize; reduced_count];
+    let mut processed = vec![false; reduced_count];
+    let mut observers = HashMap::<(usize, usize), Vec<usize>>::new();
+    let mut pair_states = PairStateTable::from_hierarchy(hierarchy);
+
+    for (reduced_index, subface_index) in reduced_subface_indices.iter().enumerate() {
+        let Some(subface) = subfaces.get(*subface_index) else {
+            continue;
+        };
+        for i in 0..subface.face_ids.len().saturating_sub(1) {
+            for j in (i + 1)..subface.face_ids.len() {
+                let pair = pair_key(subface.face_ids[i], subface.face_ids[j]);
+                if pair_states.get(pair) == PairState::Empty {
+                    observers.entry(pair).or_default().push(reduced_index);
+                    new_info_count[reduced_index] += 1;
+                }
+            }
+        }
+    }
+
+    let mut ordered_subface_indices = Vec::with_capacity(reduced_count);
+    let mut valid_count = 0usize;
+    for _ in 0..reduced_count {
+        let (selected, max_new_info) = max_priority_subface(
+            subfaces,
+            reduced_subface_indices,
+            &new_info_count,
+            &processed,
+        );
+        ordered_subface_indices.push(reduced_subface_indices[selected]);
+        if max_new_info > 0 {
+            valid_count += 1;
+        }
+        processed[selected] = true;
+
+        let Some(subface) = subfaces.get(reduced_subface_indices[selected]) else {
+            continue;
+        };
+        for i in 0..subface.face_ids.len().saturating_sub(1) {
+            for j in (i + 1)..subface.face_ids.len() {
+                let pair = pair_key(subface.face_ids[i], subface.face_ids[j]);
+                if pair_states.get(pair) == PairState::Empty {
+                    pair_states.set(pair, PairState::Unknown);
+                    if let Some(observers) = observers.get(&pair) {
+                        for observer in observers {
+                            new_info_count[*observer] = new_info_count[*observer].saturating_sub(1);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    SubFacePriority {
+        ordered_subface_indices,
+        valid_count,
+    }
 }
 
 impl From<PermutationError> for SubFaceSearchError {
@@ -662,6 +734,85 @@ impl ChainPermutationGenerator {
             set.insert(digit);
         }
         Ok((!set.is_empty()).then_some(set))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PairState {
+    Empty,
+    Unknown,
+    Above,
+    Below,
+}
+
+struct PairStateTable {
+    states: HashMap<(usize, usize), PairState>,
+}
+
+impl PairStateTable {
+    fn from_hierarchy(hierarchy: &InitialHierarchy) -> Self {
+        let mut table = Self {
+            states: HashMap::new(),
+        };
+        for relation in &hierarchy.relations {
+            table.set(
+                pair_key(relation.upper_face, relation.lower_face),
+                if relation.upper_face < relation.lower_face {
+                    PairState::Above
+                } else {
+                    PairState::Below
+                },
+            );
+        }
+        table
+    }
+
+    fn get(&self, pair: (usize, usize)) -> PairState {
+        self.states.get(&pair).copied().unwrap_or(PairState::Empty)
+    }
+
+    fn set(&mut self, pair: (usize, usize), state: PairState) {
+        self.states.insert(pair, state);
+    }
+}
+
+fn max_priority_subface(
+    subfaces: &[SubFace],
+    reduced_subface_indices: &[usize],
+    new_info_count: &[usize],
+    processed: &[bool],
+) -> (usize, usize) {
+    let mut max_new_info = 0usize;
+    let mut found = 0usize;
+    for index in 0..new_info_count.len() {
+        if processed[index] {
+            continue;
+        }
+        let found_face_count = reduced_subface_indices
+            .get(found)
+            .and_then(|subface_index| subfaces.get(*subface_index))
+            .map(|subface| subface.face_ids.len())
+            .unwrap_or(0);
+        let face_count = reduced_subface_indices
+            .get(index)
+            .and_then(|subface_index| subfaces.get(*subface_index))
+            .map(|subface| subface.face_ids.len())
+            .unwrap_or(0);
+        if new_info_count[index] > max_new_info
+            || (new_info_count[index] == max_new_info && face_count > found_face_count)
+        {
+            max_new_info = new_info_count[index];
+            found = index;
+        }
+    }
+    (found, max_new_info)
+}
+
+fn pair_key(first: usize, second: usize) -> (usize, usize) {
+    if first <= second {
+        (first, second)
+    } else {
+        (second, first)
     }
 }
 

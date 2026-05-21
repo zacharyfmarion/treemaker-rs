@@ -75,6 +75,7 @@ public class OrieditaGeometryOracle {
             case "foldline-transform-selected" -> foldLineTransformSelected(args);
             case "foldline-transform-selected-4p" -> foldLineTransformSelected4p(args);
             case "foldline-extend-to-intersection" -> foldLineExtendToIntersection(args);
+            case "foldline-draw-crease" -> foldLineDrawCrease(args);
             case "foldline-draw-point" -> foldLineDrawPoint(args);
             case "foldline-divide-count" -> foldLineDivideCount(args);
             case "foldline-divide-ratio" -> foldLineDivideRatio(args);
@@ -860,6 +861,34 @@ public class OrieditaGeometryOracle {
                 + result.getColor().getNumber());
     }
 
+    private static void foldLineDrawCrease(String[] args) {
+        if (args.length < 8) {
+            usage("foldline-draw-crease expects target, segment, count, and segment payload");
+        }
+
+        String target = args[1];
+        LineSegment segment = new LineSegment(
+                new Point(parse(args[2]), parse(args[3])),
+                new Point(parse(args[4]), parse(args[5])),
+                LineColor.fromNumber(Integer.parseInt(args[6])));
+        int count = Integer.parseInt(args[7]);
+        FoldLineSet set = foldLineSet(args, 8, count);
+        FoldLineSet aux = new FoldLineSet();
+        boolean changed = false;
+        if (Epsilon.high.gt0(segment.determineLength())) {
+            switch (target) {
+                case "fold" -> addLineSegmentLikeWorker(set, segment);
+                case "aux" -> aux.addLine(segment);
+                default -> usage("unknown draw-crease target: " + target);
+            }
+            changed = true;
+        }
+
+        System.out.println("changed|" + changed);
+        printFoldLineSet(set);
+        printAuxLineSet(aux);
+    }
+
     private static void foldLineDrawPoint(String[] args) {
         if (args.length < 6) {
             usage("foldline-draw-point expects index, target point, selection distance, count, and segment payload");
@@ -1140,6 +1169,19 @@ public class OrieditaGeometryOracle {
         }
     }
 
+    private static void printAuxLineSet(FoldLineSet set) {
+        System.out.println("aux|" + set.getTotal());
+        for (int index = 1; index <= set.getTotal(); index++) {
+            LineSegment segment = set.get(index);
+            System.out.println("auxline|"
+                    + segment.determineAX() + "|"
+                    + segment.determineAY() + "|"
+                    + segment.determineBX() + "|"
+                    + segment.determineBY() + "|"
+                    + segment.getColor().getNumber());
+        }
+    }
+
     private static void printFoldLineSetWithSelection(FoldLineSet set) {
         System.out.println("lines|" + set.getTotal());
         for (int index = 1; index <= set.getTotal(); index++) {
@@ -1270,6 +1312,7 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle foldline-advance-type <index> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-alternate-mv <startColor> <guide ax ay bx by color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-alternate-mv-crossing <startColor> <guide ax ay bx by color> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-draw-crease <fold|aux> <segment ax ay bx by color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-draw-point <index> <targetX> <targetY> <selectionDistance> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle measure-length <ax> <ay> <bx> <by>");
         System.err.println("   or: OrieditaGeometryOracle measure-angle <ax> <ay> <centerX> <centerY> <bx> <by>");

@@ -5,7 +5,7 @@ use crate::geometry::{
     line_segment_to_straight_line,
 };
 use crate::model::CreasePatternModel;
-use crate::operations::arrangement::divide_line_segment_with_new_lines;
+use crate::operations::arrangement::add_line_segment_like_worker;
 
 /// Oriedita `DRAW_POINT_14` mutation after the target segment is known.
 pub fn draw_point_on_segment(
@@ -103,10 +103,4 @@ pub fn divide_segment_by_ratio(
     }
 
     0
-}
-
-fn add_line_segment_like_worker(model: &mut CreasePatternModel, segment: &LineSegment) {
-    let original_end = model.line_segments.len();
-    model.add_line_segment(segment.clone());
-    divide_line_segment_with_new_lines(model, original_end, original_end + 1);
 }

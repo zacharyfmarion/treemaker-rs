@@ -121,7 +121,7 @@ stage explicitly changes it.
 
 | Mouse mode | Upstream handler | Rust target | Classification | Stage | Status |
 | --- | --- | --- | --- | --- | --- |
-| `DRAW_CREASE_FREE_1` | `MouseHandlerDrawCreaseFree` | `operations::construction::draw_free` | kernel | 7 | Unsupported |
+| `DRAW_CREASE_FREE_1` | `MouseHandlerDrawCreaseFree` | `operations::construction::draw_crease_segment` | kernel | 7 | Porting |
 | `MOVE_CREASE_PATTERN_2` | `MouseHandlerMoveCreasePattern` | runtime camera pan, no persisted CP mutation | ui-preview-only | later UI | Out-of-scope-ui |
 | `LINE_SEGMENT_DELETE_3` | `MouseHandlerLineSegmentDelete` | `operations::arrangement::delete_line_segment_vertex_for_index`, `operations::arrangement::delete_line_segments_for_indices` | kernel | 5 | Porting |
 | `CHANGE_CREASE_TYPE_4` | `MouseHandlerChangeCreaseType` | `operations::color::change_crease_type` | kernel | 6 | Oracle-tested |
@@ -130,7 +130,7 @@ stage explicitly changes it.
 | `INWARD_8` | `MouseHandlerInward` | `operations::construction::inward` | kernel | 7 | Unsupported |
 | `PERPENDICULAR_DRAW_9` | `MouseHandlerPerpendicularDraw` | `operations::construction::perpendicular` | kernel | 7 | Unsupported |
 | `SYMMETRIC_DRAW_10` | `MouseHandlerSymmetricDraw` | `operations::construction::symmetric` | kernel | 7 | Unsupported |
-| `DRAW_CREASE_RESTRICTED_11` | `MouseHandlerDrawCreaseRestricted` | `operations::construction::draw_restricted` | kernel | 7 | Unsupported |
+| `DRAW_CREASE_RESTRICTED_11` | `MouseHandlerDrawCreaseRestricted` | `operations::construction::draw_crease_segment` | kernel | 7 | Porting |
 | `DRAW_CREASE_SYMMETRIC_12` | `MouseHandlerDrawCreaseSymmetric` | `operations::construction::draw_symmetric` | kernel | 7 | Unsupported |
 | `DRAW_CREASE_ANGLE_RESTRICTED_13` | `MouseHandlerDrawCreaseAngleRestricted` | `operations::construction::angle_restricted` | kernel | 7 | Unsupported |
 | `DRAW_POINT_14` | `MouseHandlerDrawPoint` | `operations::point::draw_point_on_segment` | kernel | 7 | Oracle-tested |

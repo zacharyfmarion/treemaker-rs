@@ -255,6 +255,13 @@ pub fn divide_line_segment_with_new_lines(
     }
 }
 
+/// Oriedita `CreasePattern_Worker.addLineSegment` line-only insertion path.
+pub fn add_line_segment_like_worker(model: &mut CreasePatternModel, segment: &LineSegment) {
+    let original_end = model.line_segments.len();
+    model.add_line_segment(segment.clone());
+    divide_line_segment_with_new_lines(model, original_end, original_end + 1);
+}
+
 /// Oriedita `FoldLineSet.divideIntersectionsFast` for one new/existing pair.
 pub fn divide_intersections_fast(
     model: &mut CreasePatternModel,

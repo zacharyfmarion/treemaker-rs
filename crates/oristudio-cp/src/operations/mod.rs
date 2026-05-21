@@ -2,6 +2,7 @@
 
 pub mod arrangement;
 pub mod color;
+pub mod construction;
 pub mod measure;
 pub mod point;
 pub mod selection;

@@ -12,6 +12,7 @@ use oristudio_cp::operations::color::{
     change_crease_type, delete_line_type_for_indices, make_aux, make_edge, make_mountain,
     make_valley, replace_line_type_for_indices, set_line_color_for_indices, toggle_mountain_valley,
 };
+use oristudio_cp::operations::construction::{DrawCreaseTarget, draw_crease_segment};
 use oristudio_cp::operations::measure::{angle_between_three_points, length_between_points};
 use oristudio_cp::operations::point::{
     divide_segment_by_count, divide_segment_by_ratio, draw_point_on_segment,
@@ -1163,6 +1164,44 @@ fn draw_point_matches_oriedita_oracle() {
 }
 
 #[test]
+fn draw_crease_segment_matches_oriedita_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    let existing_segments = vec![segment(1.0, -1.0, 1.0, 1.0, LineColor::Black0)];
+    let fold_segment = segment(0.0, 0.0, 2.0, 0.0, LineColor::Red1);
+    let mut model = model_from_segments(&existing_segments);
+    let changed = draw_crease_segment(&mut model, &fold_segment, DrawCreaseTarget::FoldLine);
+    let mut args = vec!["foldline-draw-crease".to_string(), "fold".to_string()];
+    push_one_segment_args(&mut args, &fold_segment);
+    args.push(existing_segments.len().to_string());
+    push_segment_args(&mut args, &existing_segments);
+    let rust_summary = format!(
+        "changed|{changed}\n{}{}",
+        line_segment_set_summary(&model),
+        aux_line_segment_set_summary(&model)
+    );
+    assert_eq!(rust_summary, run_oracle(&oracle, &args));
+
+    let aux_segment = segment(0.0, 0.0, 2.0, 0.0, LineColor::Yellow7);
+    let mut model = CreasePatternModel::default();
+    let changed = draw_crease_segment(&mut model, &aux_segment, DrawCreaseTarget::AuxLine);
+    let mut args = vec!["foldline-draw-crease".to_string(), "aux".to_string()];
+    push_one_segment_args(&mut args, &aux_segment);
+    args.push("0".to_string());
+    let rust_summary = format!(
+        "changed|{changed}\n{}{}",
+        line_segment_set_summary(&model),
+        aux_line_segment_set_summary(&model)
+    );
+    assert_eq!(rust_summary, run_oracle(&oracle, &args));
+}
+
+#[test]
 fn measure_commands_match_oriedita_oracle() {
     let Some(oracle) = operations_oracle() else {
         eprintln!(
@@ -1288,6 +1327,22 @@ fn line_segment_set_with_selection_summary(model: &CreasePatternModel) -> String
             java_double_string(segment.b.y),
             segment.color.number(),
             segment.selected
+        ));
+    }
+    output
+}
+
+fn aux_line_segment_set_summary(model: &CreasePatternModel) -> String {
+    let mut output = String::new();
+    output.push_str(&format!("aux|{}\n", model.aux_line_segments.len()));
+    for segment in &model.aux_line_segments {
+        output.push_str(&format!(
+            "auxline|{}|{}|{}|{}|{}\n",
+            java_double_string(segment.a.x),
+            java_double_string(segment.a.y),
+            java_double_string(segment.b.x),
+            java_double_string(segment.b.y),
+            segment.color.number()
         ));
     }
     output

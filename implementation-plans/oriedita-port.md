@@ -934,6 +934,11 @@ Status:
   target onto the segment and calls Oriedita's `applyLineSegmentDivide` behavior
   only for strict interior projections within the selection distance. This tool
   does not add an Oriedita save-model point.
+- The shared line insertion portion of `DRAW_CREASE_FREE_1` and
+  `DRAW_CREASE_RESTRICTED_11` is ported as `draw_crease_segment`, including
+  fold-line worker insertion/splitting and separate aux-line insertion. These
+  rows remain `Porting` until the surrounding snap/endpoint-state semantics and
+  the worker's circle-intersection side effects are covered.
 - Full handler parity remains open for nearest-click line selection, Java2D
   path/lasso selection, operation-frame behavior, lengthen commands, and
   construction-handler `fix2` chaining that is not part of the selected color

@@ -1,19 +1,20 @@
 use oristudio_cp::geometry::{LineColor, LineSegment, Point};
 use oristudio_cp::model::CreasePatternModel;
 use oristudio_cp::operations::construction::{
-    DrawCreaseTarget, angle_restricted_converging_candidates, angle_system_candidates,
-    angle_system_draw_to_destination, axiom5_draw_to_destination, axiom5_indicators,
-    axiom7_draw_to_destination, axiom7_indicator, commit_axiom5_indicator,
+    DrawCreaseTarget, FoldableLineDrawOperationMode, angle_restricted_converging_candidates,
+    angle_system_candidates, angle_system_draw_to_destination, axiom5_draw_to_destination,
+    axiom5_indicators, axiom7_draw_to_destination, axiom7_indicator, commit_axiom5_indicator,
     commit_parallel_width_indicator, double_symmetric_draw,
     draw_crease_angle_restricted_3_candidates, draw_crease_angle_restricted_3_to_point,
     draw_crease_angle_restricted_5, draw_crease_angle_restricted_converging, draw_crease_segment,
-    fishbone_draw, foldable_line_input_candidates, foldable_line_input_direct,
-    foldable_line_input_fallback, foldable_line_input_to_destination, inward,
-    make_vertex_flat_foldable_candidates, make_vertex_flat_foldable_to_destination,
-    mirror_selected_lines, parallel_draw, parallel_width_indicators, perpendicular_indicator,
-    perpendicular_projection, square_bisector_from_lines_to_destination,
-    square_bisector_from_points_to_destination, square_bisector_parallel_between_destinations,
-    square_bisector_parallel_indicator, symmetric_draw,
+    fishbone_draw, foldable_line_draw_operation_mode, foldable_line_draw_switches_to_free,
+    foldable_line_input_candidates, foldable_line_input_direct, foldable_line_input_fallback,
+    foldable_line_input_to_destination, inward, make_vertex_flat_foldable_candidates,
+    make_vertex_flat_foldable_to_destination, mirror_selected_lines, parallel_draw,
+    parallel_width_indicators, perpendicular_indicator, perpendicular_projection,
+    square_bisector_from_lines_to_destination, square_bisector_from_points_to_destination,
+    square_bisector_parallel_between_destinations, square_bisector_parallel_indicator,
+    symmetric_draw,
 };
 
 #[test]
@@ -528,6 +529,29 @@ fn foldable_line_input_candidates_and_commit_paths_match_expected_geometry() {
         Point::new(-1.0, 0.0),
         Point::new(0.0, 0.0),
         LineColor::Red1,
+    ));
+}
+
+#[test]
+fn foldable_line_draw_routes_by_incident_fold_line_parity() {
+    let odd_model = model_from_segments(&[segment(0.0, 0.0, 1.0, 0.0, LineColor::Red1)]);
+    assert_eq!(
+        foldable_line_draw_operation_mode(&odd_model, Point::new(0.0, 0.0), 0.5),
+        FoldableLineDrawOperationMode::VertexMakeAngularlyFlatFoldable,
+    );
+
+    let even_model = model_from_segments(&[
+        segment(0.0, 0.0, 1.0, 0.0, LineColor::Red1),
+        segment(0.0, 0.0, 0.0, 1.0, LineColor::Blue2),
+    ]);
+    assert_eq!(
+        foldable_line_draw_operation_mode(&even_model, Point::new(0.0, 0.0), 0.5),
+        FoldableLineDrawOperationMode::DrawCreaseFree,
+    );
+    assert!(foldable_line_draw_switches_to_free(
+        Point::new(1.0, 0.0),
+        Point::new(0.0, 0.0),
+        0.5,
     ));
 }
 

@@ -826,10 +826,10 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
     descriptor!(
         FoldableLineDraw,
         "MouseHandlerFoldableLineDraw",
-        "operations::construction::foldable_line_draw",
+        "operations::construction::foldable_line_draw_operation_mode",
         Kernel,
         7,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         ReplaceLineTypeSelect,

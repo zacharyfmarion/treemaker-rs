@@ -23,6 +23,12 @@ pub enum DrawCreaseTarget {
     AuxLine,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FoldableLineDrawOperationMode {
+    DrawCreaseFree,
+    VertexMakeAngularlyFlatFoldable,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct AngleRestrictedConvergingCandidates {
     pub indicators: Vec<LineSegment>,
@@ -324,6 +330,37 @@ pub fn foldable_line_input_to_destination(
     }
     add_line_segment_like_worker(model, &result);
     true
+}
+
+/// Oriedita `FOLDABLE_LINE_DRAW_71` initial dispatch decision.
+pub fn foldable_line_draw_operation_mode(
+    model: &CreasePatternModel,
+    pointer: Point,
+    selection_distance: f64,
+) -> FoldableLineDrawOperationMode {
+    let closest_point = closest_model_point(model, pointer);
+    let resolved_point = if pointer.distance(closest_point) > selection_distance {
+        pointer
+    } else {
+        closest_point
+    };
+    if sorted_vertex_folding_lines(model, resolved_point)
+        .len()
+        .is_multiple_of(2)
+    {
+        FoldableLineDrawOperationMode::DrawCreaseFree
+    } else {
+        FoldableLineDrawOperationMode::VertexMakeAngularlyFlatFoldable
+    }
+}
+
+/// Oriedita `FOLDABLE_LINE_DRAW_71` drag switch from flat-foldable mode to free draw.
+pub fn foldable_line_draw_switches_to_free(
+    pointer: Point,
+    memo_point: Point,
+    selection_distance: f64,
+) -> bool {
+    pointer.distance(memo_point) > selection_distance
 }
 
 /// Oriedita `SnappingUtil.snapToActiveAngleSystem` without UI grid candidates.
@@ -1209,7 +1246,7 @@ fn odd_vertex_foldable_candidates(
     grid_width: f64,
     active: ActiveState,
 ) -> Vec<LineSegment> {
-    if vertex_lines.len() % 2 != 1 {
+    if vertex_lines.len().is_multiple_of(2) {
         return Vec::new();
     }
 

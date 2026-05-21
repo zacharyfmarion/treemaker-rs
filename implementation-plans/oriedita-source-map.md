@@ -189,7 +189,7 @@ stage explicitly changes it.
 | `SELECT_LINE_INTERSECTING_68` | `MouseHandlerSelectLineIntersecting` | `operations::selection::select_intersecting_line` | kernel | 6 | Oracle-tested |
 | `UNSELECT_LINE_INTERSECTING_69` | `MouseHandlerUnselectLineIntersecting` | `operations::selection::unselect_intersecting_line` | kernel | 6 | Oracle-tested |
 | `LENGTHEN_CREASE_SAME_COLOR_70` | `MouseHandlerLengthenCreaseSameColor` | `operations::transform::lengthen_crease` | kernel | 6 | Porting |
-| `FOLDABLE_LINE_DRAW_71` | `MouseHandlerFoldableLineDraw` | `operations::construction::foldable_line_draw` | kernel | 7 | Unsupported |
+| `FOLDABLE_LINE_DRAW_71` | `MouseHandlerFoldableLineDraw` | `operations::construction::foldable_line_draw_operation_mode`, `operations::construction::foldable_line_draw_switches_to_free` | kernel | 7 | Oracle-tested |
 | `REPLACE_LINE_TYPE_SELECT_72` | `MouseHandlerReplaceTypeSelect` | `operations::color::replace_line_type_for_indices` | kernel | 6 | Oracle-tested |
 | `DELETE_LINE_TYPE_SELECT_73` | `MouseHandlerDeleteTypeSelect` | `operations::color::delete_line_type_for_indices` | kernel | 6 | Oracle-tested |
 | `SELECT_LASSO_74` | `MouseHandlerSelectLasso` | `operations::selection::select_lasso` | kernel | 6 | Oracle-tested |

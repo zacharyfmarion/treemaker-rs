@@ -19,20 +19,21 @@ use oristudio_cp::operations::color::{
     make_valley, replace_line_type_for_indices, set_line_color_for_indices, toggle_mountain_valley,
 };
 use oristudio_cp::operations::construction::{
-    AngleRestrictedConvergingCandidates, DrawCreaseTarget, angle_restricted_converging_candidates,
-    angle_system_candidates, angle_system_draw_to_destination, axiom5_draw_to_destination,
-    axiom5_indicators, axiom7_draw_to_destination, axiom7_indicator, commit_axiom5_indicator,
-    commit_axiom7_indicator, commit_parallel_width_indicator,
-    commit_square_bisector_parallel_indicator, double_symmetric_draw,
-    draw_crease_angle_restricted_3_candidates, draw_crease_angle_restricted_3_to_point,
-    draw_crease_angle_restricted_5, draw_crease_angle_restricted_converging, draw_crease_segment,
-    fishbone_draw, foldable_line_input_candidates, foldable_line_input_direct,
-    foldable_line_input_to_destination, inward, make_vertex_flat_foldable_candidates,
-    make_vertex_flat_foldable_to_destination, mirror_selected_lines, parallel_draw,
-    parallel_width_indicators, perpendicular_indicator, perpendicular_projection,
-    square_bisector_from_lines_to_destination, square_bisector_from_points_to_destination,
-    square_bisector_parallel_between_destinations, square_bisector_parallel_indicator,
-    symmetric_draw,
+    AngleRestrictedConvergingCandidates, DrawCreaseTarget, FoldableLineDrawOperationMode,
+    angle_restricted_converging_candidates, angle_system_candidates,
+    angle_system_draw_to_destination, axiom5_draw_to_destination, axiom5_indicators,
+    axiom7_draw_to_destination, axiom7_indicator, commit_axiom5_indicator, commit_axiom7_indicator,
+    commit_parallel_width_indicator, commit_square_bisector_parallel_indicator,
+    double_symmetric_draw, draw_crease_angle_restricted_3_candidates,
+    draw_crease_angle_restricted_3_to_point, draw_crease_angle_restricted_5,
+    draw_crease_angle_restricted_converging, draw_crease_segment, fishbone_draw,
+    foldable_line_draw_operation_mode, foldable_line_draw_switches_to_free,
+    foldable_line_input_candidates, foldable_line_input_direct, foldable_line_input_to_destination,
+    inward, make_vertex_flat_foldable_candidates, make_vertex_flat_foldable_to_destination,
+    mirror_selected_lines, parallel_draw, parallel_width_indicators, perpendicular_indicator,
+    perpendicular_projection, square_bisector_from_lines_to_destination,
+    square_bisector_from_points_to_destination, square_bisector_parallel_between_destinations,
+    square_bisector_parallel_indicator, symmetric_draw,
 };
 use oristudio_cp::operations::generators::{
     DefaultMolecule, default_molecule, regular_polygon_no_corners,
@@ -1492,6 +1493,47 @@ fn foldable_line_input_matches_oriedita_oracle() {
 }
 
 #[test]
+fn foldable_line_draw_routing_matches_oriedita_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    let segments = vec![segment(0.0, 0.0, 1.0, 0.0, LineColor::Red1)];
+    let mode = foldable_line_draw_operation_mode(
+        &model_from_segments(&segments),
+        Point::new(0.0, 0.0),
+        0.5,
+    );
+    let mut args = vec![
+        "foldline-foldable-draw-mode".to_string(),
+        "0.0".to_string(),
+        "0.0".to_string(),
+        "0.5".to_string(),
+        segments.len().to_string(),
+    ];
+    push_segment_args(&mut args, &segments);
+    assert_eq!(
+        format!("mode|{}\n", foldable_line_draw_mode_name(mode)),
+        run_oracle(&oracle, &args)
+    );
+
+    let switched =
+        foldable_line_draw_switches_to_free(Point::new(1.0, 0.0), Point::new(0.0, 0.0), 0.5);
+    let args = vec![
+        "foldline-foldable-draw-switch".to_string(),
+        "1.0".to_string(),
+        "0.0".to_string(),
+        "0.0".to_string(),
+        "0.0".to_string(),
+        "0.5".to_string(),
+    ];
+    assert_eq!(format!("switch|{switched}\n"), run_oracle(&oracle, &args));
+}
+
+#[test]
 fn axiom7_modes_match_oriedita_oracle() {
     let Some(oracle) = operations_oracle() else {
         eprintln!(
@@ -2802,6 +2844,13 @@ fn circle_inversion_output(output: CircleInversionOutput) -> &'static str {
         CircleInversionOutput::None => "none",
         CircleInversionOutput::Circle => "circle",
         CircleInversionOutput::LineSegment => "line",
+    }
+}
+
+fn foldable_line_draw_mode_name(mode: FoldableLineDrawOperationMode) -> &'static str {
+    match mode {
+        FoldableLineDrawOperationMode::DrawCreaseFree => "free",
+        FoldableLineDrawOperationMode::VertexMakeAngularlyFlatFoldable => "flat",
     }
 }
 

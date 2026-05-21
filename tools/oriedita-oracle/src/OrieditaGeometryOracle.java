@@ -132,6 +132,8 @@ public class OrieditaGeometryOracle {
             case "foldline-foldable-input-candidates" -> foldLineFoldableInputCandidates(args);
             case "foldline-foldable-input-direct" -> foldLineFoldableInputDirect(args);
             case "foldline-foldable-input-destination" -> foldLineFoldableInputDestination(args);
+            case "foldline-foldable-draw-mode" -> foldLineFoldableDrawMode(args);
+            case "foldline-foldable-draw-switch" -> foldLineFoldableDrawSwitch(args);
             case "foldline-square-bisector-3p" -> foldLineSquareBisector3p(args);
             case "foldline-square-bisector-2l-np" -> foldLineSquareBisector2lNp(args);
             case "foldline-square-bisector-parallel-indicator" -> foldLineSquareBisectorParallelIndicator(args);
@@ -2206,6 +2208,32 @@ public class OrieditaGeometryOracle {
         printFoldLineSet(set);
     }
 
+    private static void foldLineFoldableDrawMode(String[] args) {
+        if (args.length < 5) {
+            usage("foldline-foldable-draw-mode expects pointer, selection distance, count, and segment payload");
+        }
+
+        Point pointer = new Point(parse(args[1]), parse(args[2]));
+        double selectionDistance = parse(args[3]);
+        int count = Integer.parseInt(args[4]);
+        FoldLineSet set = foldLineSet(args, 5, count);
+        Point closestPoint = set.closestPoint(pointer);
+        Point resolvedPoint = pointer.distance(closestPoint) > selectionDistance ? pointer : closestPoint;
+        String mode = vertexSortingBox(set, resolvedPoint).getTotal() % 2 == 0 ? "free" : "flat";
+        System.out.println("mode|" + mode);
+    }
+
+    private static void foldLineFoldableDrawSwitch(String[] args) {
+        if (args.length != 6) {
+            usage("foldline-foldable-draw-switch expects pointer, memo point, and selection distance");
+        }
+
+        Point pointer = new Point(parse(args[1]), parse(args[2]));
+        Point memo = new Point(parse(args[3]), parse(args[4]));
+        double selectionDistance = parse(args[5]);
+        System.out.println("switch|" + (pointer.distance(memo) > selectionDistance));
+    }
+
     private static SortingBox<LineSegment> vertexSortingBox(FoldLineSet set, Point vertex) {
         SortingBox<LineSegment> nbox = new SortingBox<>();
         for (LineSegment segment : set.getLineSegmentsIterable()) {
@@ -3643,6 +3671,8 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle foldline-foldable-input-candidates <vertexX> <vertexY> <gridWidth> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-foldable-input-direct <input ax ay bx by color> <color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-foldable-input-destination <input ax ay bx by color> <destination ax ay bx by color> <color> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-foldable-draw-mode <pointerX> <pointerY> <selectionDistance> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-foldable-draw-switch <pointerX> <pointerY> <memoX> <memoY> <selectionDistance>");
         System.err.println("   or: OrieditaGeometryOracle foldline-square-bisector-3p <p1x> <p1y> <p2x> <p2y> <p3x> <p3y> <destination ax ay bx by color> <color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-square-bisector-2l-np <first ax ay bx by color> <second ax ay bx by color> <destination ax ay bx by color> <color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-square-bisector-parallel-indicator <first ax ay bx by color> <second ax ay bx by color> <count> [ax ay bx by color]...");

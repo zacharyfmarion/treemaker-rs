@@ -419,7 +419,9 @@ Port all command behavior for:
 - `FOLDABLE_LINE_INPUT_39` is ported and oracle-tested for generated
   foldability candidates, fallback/manual input segments, direct endpoint
   commit, and destination-line commit after UI resolution.
-- Foldable-line draw mode.
+- `FOLDABLE_LINE_DRAW_71` is ported and oracle-tested for its non-UI routing
+  behavior between free crease drawing and vertex flat-foldable construction,
+  including the drag switch back to free drawing.
 - `VERTEX_MAKE_ANGULARLY_FLAT_FOLDABLE_38` is ported and oracle-tested for the
   resolved invalid-vertex kernel: odd-degree candidate generation, single-line
   color preservation, and destination commit.

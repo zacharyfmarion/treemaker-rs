@@ -622,10 +622,10 @@ Done when:
 
 ## Checklist
 
-- [ ] Stage 0: Build the CP UI command matrix from the Oriedita source map.
-- [ ] Stage 0: Assign every upstream command a left-rail/menu/palette home or an
+- [x] Stage 0: Build the CP UI command matrix from the Oriedita source map.
+- [x] Stage 0: Assign every upstream command a left-rail/menu/palette home or an
       explicit UI-only/out-of-scope reason.
-- [ ] Stage 0: Add capability and disabled-state vocabulary for CP commands.
+- [x] Stage 0: Add capability and disabled-state vocabulary for CP commands.
 - [ ] Stage 1: Add the `oristudio-cp` web runtime bridge.
 - [ ] Stage 1: Add editable CP document state separate from generated
       TreeMaker CP artifacts.

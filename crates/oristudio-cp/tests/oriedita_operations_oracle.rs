@@ -1,6 +1,7 @@
 use oristudio_cp::geometry::{Intersection, LineColor, LineSegment, Point};
 use oristudio_cp::model::CreasePatternModel;
 use oristudio_cp::operations::arrangement::{
+    delete_intersecting_or_overlapping_lines_along, delete_overlapping_lines_along,
     divide_intersections, divide_intersections_fast, divide_line_segment_with_new_lines,
     intersect_divide_pair,
 };
@@ -196,6 +197,40 @@ fn divide_line_segment_with_new_lines_matches_oriedita_foldlineset_oracle() {
     }
 }
 
+#[test]
+fn delete_inside_line_matches_oriedita_foldlineset_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    let selection = segment(2.0, 0.0, 8.0, 0.0, LineColor::Black0);
+    let segments = vec![
+        segment(0.0, 0.0, 10.0, 0.0, LineColor::Red1),
+        segment(5.0, -5.0, 5.0, 5.0, LineColor::Blue2),
+        segment(0.0, 1.0, 10.0, 1.0, LineColor::Cyan3),
+    ];
+
+    for mode in ["l", "lX"] {
+        let mut model = model_from_segments(&segments);
+        let deleted = match mode {
+            "l" => delete_overlapping_lines_along(&mut model, &selection),
+            "lX" => delete_intersecting_or_overlapping_lines_along(&mut model, &selection),
+            _ => unreachable!(),
+        };
+
+        let mut args = vec!["foldline-delete-inside".to_string(), mode.to_string()];
+        push_one_segment_args(&mut args, &selection);
+        args.push(segments.len().to_string());
+        push_segment_args(&mut args, &segments);
+
+        let rust_summary = format!("deleted|{deleted}\n{}", line_segment_set_summary(&model));
+        assert_eq!(rust_summary, run_oracle(&oracle, &args));
+    }
+}
+
 fn operations_oracle() -> Option<PathBuf> {
     std::env::var("ORIEDITA_OPERATIONS_ORACLE")
         .or_else(|_| std::env::var("ORIEDITA_GEOMETRY_ORACLE"))
@@ -244,12 +279,16 @@ fn model_from_segments(segments: &[LineSegment]) -> CreasePatternModel {
 
 fn push_segment_args(args: &mut Vec<String>, segments: &[LineSegment]) {
     for segment in segments {
-        args.push(segment.a.x.to_string());
-        args.push(segment.a.y.to_string());
-        args.push(segment.b.x.to_string());
-        args.push(segment.b.y.to_string());
-        args.push(segment.color.number().to_string());
+        push_one_segment_args(args, segment);
     }
+}
+
+fn push_one_segment_args(args: &mut Vec<String>, segment: &LineSegment) {
+    args.push(segment.a.x.to_string());
+    args.push(segment.a.y.to_string());
+    args.push(segment.b.x.to_string());
+    args.push(segment.b.y.to_string());
+    args.push(segment.color.number().to_string());
 }
 
 fn line_segment_set_summary(model: &CreasePatternModel) -> String {

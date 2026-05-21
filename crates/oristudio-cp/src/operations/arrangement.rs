@@ -4,7 +4,8 @@ use crate::geometry::{
     Epsilon, Intersection, LineColor, LineSegment, Point, StraightLine, StraightLineIntersection,
     determine_line_segment_intersection, determine_line_segment_intersection_sweet,
     determine_line_segment_intersection_with_precision, find_intersection_segments,
-    find_intersection_straight_lines, find_projection, line_segment_to_straight_line,
+    find_intersection_straight_lines, find_projection, is_line_segment_overlapping,
+    line_segment_to_straight_line, line_segment_x_kousa_decide,
 };
 use crate::model::CreasePatternModel;
 use std::collections::BTreeSet;
@@ -516,6 +517,36 @@ pub fn divide_intersections_fast(
     }
 
     Intersection::NoIntersection0
+}
+
+/// Delete lines that overlap the supplied drag/selection segment.
+pub fn delete_overlapping_lines_along(
+    model: &mut CreasePatternModel,
+    selection: &LineSegment,
+) -> bool {
+    delete_inside_line(model, selection, false)
+}
+
+/// Delete lines that overlap or X-intersect the supplied selection segment.
+pub fn delete_intersecting_or_overlapping_lines_along(
+    model: &mut CreasePatternModel,
+    selection: &LineSegment,
+) -> bool {
+    delete_inside_line(model, selection, true)
+}
+
+fn delete_inside_line(
+    model: &mut CreasePatternModel,
+    selection: &LineSegment,
+    include_crossing: bool,
+) -> bool {
+    let original_len = model.line_segments.len();
+    model.line_segments.retain(|segment| {
+        let should_delete = is_line_segment_overlapping(segment, selection)
+            || (include_crossing && line_segment_x_kousa_decide(segment, selection));
+        !should_delete
+    });
+    model.line_segments.len() != original_len
 }
 
 fn flag_at(flags: &[u8], index: usize) -> u8 {

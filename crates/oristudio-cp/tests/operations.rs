@@ -1,6 +1,7 @@
 use oristudio_cp::geometry::{LineColor, LineSegment, Point};
 use oristudio_cp::model::CreasePatternModel;
 use oristudio_cp::operations::arrangement::{
+    delete_intersecting_or_overlapping_lines_along, delete_overlapping_lines_along,
     divide_intersections, divide_intersections_fast, divide_line_segment_with_new_lines,
     intersect_divide_pair, remove_overlapping_lines, remove_overlapping_lines_with_precision,
 };
@@ -319,6 +320,76 @@ fn divide_line_segment_with_new_lines_deletes_existing_exact_duplicate() {
         Point::new(10.0, 0.0),
         Point::new(0.0, 0.0),
         LineColor::Blue2,
+    );
+}
+
+#[test]
+fn delete_overlapping_lines_along_removes_only_overlapping_segments() {
+    let mut model = CreasePatternModel::default();
+    model.add_line(Point::new(0.0, 0.0), Point::new(10.0, 0.0), LineColor::Red1);
+    model.add_line(
+        Point::new(5.0, -5.0),
+        Point::new(5.0, 5.0),
+        LineColor::Blue2,
+    );
+    model.add_line(
+        Point::new(0.0, 1.0),
+        Point::new(10.0, 1.0),
+        LineColor::Cyan3,
+    );
+    let selection = LineSegment::with_color(
+        Point::new(2.0, 0.0),
+        Point::new(8.0, 0.0),
+        LineColor::Black0,
+    );
+
+    assert!(delete_overlapping_lines_along(&mut model, &selection));
+
+    assert_eq!(model.line_segments.len(), 2);
+    assert!(contains_segment(
+        &model,
+        Point::new(5.0, -5.0),
+        Point::new(5.0, 5.0),
+        LineColor::Blue2,
+    ));
+    assert!(contains_segment(
+        &model,
+        Point::new(0.0, 1.0),
+        Point::new(10.0, 1.0),
+        LineColor::Cyan3,
+    ));
+}
+
+#[test]
+fn delete_intersecting_or_overlapping_lines_along_removes_crossing_segments_too() {
+    let mut model = CreasePatternModel::default();
+    model.add_line(Point::new(0.0, 0.0), Point::new(10.0, 0.0), LineColor::Red1);
+    model.add_line(
+        Point::new(5.0, -5.0),
+        Point::new(5.0, 5.0),
+        LineColor::Blue2,
+    );
+    model.add_line(
+        Point::new(0.0, 1.0),
+        Point::new(10.0, 1.0),
+        LineColor::Cyan3,
+    );
+    let selection = LineSegment::with_color(
+        Point::new(2.0, 0.0),
+        Point::new(8.0, 0.0),
+        LineColor::Black0,
+    );
+
+    assert!(delete_intersecting_or_overlapping_lines_along(
+        &mut model, &selection
+    ));
+
+    assert_eq!(model.line_segments.len(), 1);
+    assert_segment(
+        &model.line_segments[0],
+        Point::new(0.0, 1.0),
+        Point::new(10.0, 1.0),
+        LineColor::Cyan3,
     );
 }
 

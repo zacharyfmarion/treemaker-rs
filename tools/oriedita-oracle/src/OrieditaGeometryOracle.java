@@ -35,6 +35,7 @@ public class OrieditaGeometryOracle {
             case "intersect-divide-pair" -> intersectDividePair(args);
             case "foldline-divide-new-lines" -> foldLineDivideNewLines(args);
             case "foldline-divide-fast" -> foldLineDivideFast(args);
+            case "foldline-delete-inside" -> foldLineDeleteInside(args);
             case "custom-line-type" -> customLineType(args);
             case "orh-import-summary" -> orhImportSummary(args);
             case "orh-export-fixture" -> orhExportFixture(args);
@@ -156,6 +157,23 @@ public class OrieditaGeometryOracle {
         LineSegment.Intersection intersection = set.divideIntersectionsFast(i + 1, j + 1, toDelete);
         System.out.println("intersection|" + intersection.getState());
         printFoldLineSetDeleteSet(toDelete);
+        printFoldLineSet(set);
+    }
+
+    private static void foldLineDeleteInside(String[] args) {
+        if (args.length < 8) {
+            usage("foldline-delete-inside expects mode, selection segment, count, and segment payload");
+        }
+
+        String mode = args[1];
+        LineSegment selection = new LineSegment(
+                new Point(parse(args[2]), parse(args[3])),
+                new Point(parse(args[4]), parse(args[5])),
+                LineColor.fromNumber(Integer.parseInt(args[6])));
+        int count = Integer.parseInt(args[7]);
+        FoldLineSet set = foldLineSet(args, 8, count);
+        boolean deleted = set.deleteInsideLine(selection, mode);
+        System.out.println("deleted|" + deleted);
         printFoldLineSet(set);
     }
 
@@ -370,6 +388,7 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle intersect-divide-pair <i> <j> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-divide-new-lines <originalEnd> <addedEnd> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-divide-fast <i> <j> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-delete-inside <l|lX> <selection ax ay bx by color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle custom-line-type <customType> <lineColor>");
         System.err.println("   or: OrieditaGeometryOracle orh-import-summary <path>");
         System.err.println("   or: OrieditaGeometryOracle orh-export-fixture");

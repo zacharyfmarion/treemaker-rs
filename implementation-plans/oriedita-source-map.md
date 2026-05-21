@@ -182,8 +182,8 @@ stage explicitly changes it.
 | `OPERATION_FRAME_CREATE_61` | `MouseHandlerOperationFrameCreate` | `operations::transform::operation_frame` | kernel | 6 | Unsupported |
 | `VORONOI_CREATE_62` | `MouseHandlerVoronoiCreate` | `operations::generators::voronoi` | kernel | 8 | Unsupported |
 | `FLAT_FOLDABLE_CHECK_63` | `MouseHandlerFlatFoldableCheck` | `checks::flat_foldable` | kernel | 9 | Unsupported |
-| `CREASE_DELETE_OVERLAPPING_64` | `MouseHandlerCreaseDeleteOverlapping` | `operations::arrangement::delete_overlapping` | kernel | 5 | Unsupported |
-| `CREASE_DELETE_INTERSECTING_65` | `MouseHandlerCreaseDeleteIntersecting` | `operations::arrangement::delete_intersecting` | kernel | 5 | Unsupported |
+| `CREASE_DELETE_OVERLAPPING_64` | `MouseHandlerCreaseDeleteOverlapping` | `operations::arrangement::delete_overlapping` | kernel | 5 | Oracle-tested |
+| `CREASE_DELETE_INTERSECTING_65` | `MouseHandlerCreaseDeleteIntersecting` | `operations::arrangement::delete_intersecting` | kernel | 5 | Oracle-tested |
 | `SELECT_POLYGON_66` | `MouseHandlerSelectPolygon` | `operations::selection::select_polygon` | kernel | 6 | Unsupported |
 | `UNSELECT_POLYGON_67` | `MouseHandlerUnselectPolygon` | `operations::selection::unselect_polygon` | kernel | 6 | Unsupported |
 | `SELECT_LINE_INTERSECTING_68` | `MouseHandlerSelectLineIntersecting` | `operations::selection::select_intersecting_line` | kernel | 6 | Unsupported |

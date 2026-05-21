@@ -824,6 +824,10 @@ Status:
 - `OverlappingLineRemoval` has a direct Rust implementation with unit coverage
   for Oriedita's "keep the earlier duplicate" behavior and the optional
   precision radius.
+- `FoldLineSet.deleteInsideLine` is ported for overlap-only deletion and
+  overlap-or-X-intersection deletion, matching the tools behind
+  `CREASE_DELETE_OVERLAPPING_64` and `CREASE_DELETE_INTERSECTING_65`. Both
+  modes are covered by the real `FoldLineSet` Java oracle.
 - The current arrangement worker intentionally uses simple scans instead of
   Oriedita's quadtree acceleration. That keeps mutation parity visible first;
   spatial acceleration remains deferred until broader split/merge behavior is

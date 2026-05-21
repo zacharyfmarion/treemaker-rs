@@ -6,6 +6,7 @@
 //! behavior.
 
 pub mod canonical;
+pub mod checks;
 pub mod geometry;
 pub mod io;
 pub mod model;
@@ -762,10 +763,10 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
     descriptor!(
         FlatFoldableCheck,
         "MouseHandlerFlatFoldableCheck",
-        "checks::flat_foldable",
+        "checks::flat_foldable_boundary_check",
         Kernel,
         9,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         CreaseDeleteOverlapping,

@@ -217,6 +217,7 @@ public class OrieditaGeometryOracle {
             case "foldline-regular-polygon" -> foldLineRegularPolygon(args);
             case "foldline-voronoi" -> foldLineVoronoi(args);
             case "foldline-default-molecule" -> foldLineDefaultMolecule(args);
+            case "flat-foldable-boundary-check" -> flatFoldableBoundaryCheck(args);
             case "foldline-divide-count" -> foldLineDivideCount(args);
             case "foldline-divide-ratio" -> foldLineDivideRatio(args);
             case "measure-length" -> measureLength(args);
@@ -3739,6 +3740,86 @@ public class OrieditaGeometryOracle {
         printFoldLineSet(set);
     }
 
+    private static void flatFoldableBoundaryCheck(String[] args) {
+        if (args.length < 3) {
+            usage("flat-foldable-boundary-check expects boundary lines and fold lines");
+        }
+
+        int cursor = 1;
+        int boundaryCount = Integer.parseInt(args[cursor++]);
+        List<LineSegment> boundary = new ArrayList<>();
+        for (int index = 0; index < boundaryCount; index++) {
+            boundary.add(segment(args, cursor));
+            cursor += 5;
+        }
+        int count = Integer.parseInt(args[cursor++]);
+        FoldLineSet set = foldLineSet(args, cursor, count);
+
+        boolean suitable = true;
+        List<LineSegment> orderedCrossings = new ArrayList<>();
+        for (LineSegment boundarySegment : boundary) {
+            SortingBox<LineSegment> nbox = new SortingBox<>();
+            for (LineSegment segment : set.getLineSegmentsIterable()) {
+                LineSegment.Intersection intersection = OritaCalc.determineLineSegmentIntersection(
+                        segment,
+                        boundarySegment,
+                        Epsilon.UNKNOWN_1EN4);
+                int execute = 0;
+
+                if (intersection != LineSegment.Intersection.NO_INTERSECTION_0
+                        && intersection != LineSegment.Intersection.INTERSECTS_1) {
+                    suitable = false;
+                }
+
+                if (intersection == LineSegment.Intersection.INTERSECTS_1) {
+                    execute = 1;
+                }
+
+                if (segment.getColor().getNumber() >= 3) {
+                    execute = 0;
+                }
+
+                if (execute == 1) {
+                    nbox.addByWeight(
+                            segment,
+                            OritaCalc.distance(
+                                    boundarySegment.getA(),
+                                    OritaCalc.findIntersection(segment, boundarySegment)));
+                }
+            }
+
+            for (int index = 1; index <= nbox.getTotal(); index++) {
+                orderedCrossings.add(nbox.getValue(index));
+            }
+        }
+
+        LineColor resultColor = LineColor.YELLOW_7;
+        if (suitable) {
+            if (orderedCrossings.size() % 2 != 0) {
+                resultColor = LineColor.MAGENTA_5;
+            } else if (orderedCrossings.isEmpty()) {
+                resultColor = LineColor.CYAN_3;
+            } else {
+                LineSegment moved = new LineSegment(orderedCrossings.get(0));
+                for (int index = 1; index < orderedCrossings.size(); index++) {
+                    moved = OritaCalc.findLineSymmetryLineSegment(moved, orderedCrossings.get(index));
+                }
+                resultColor = LineColor.MAGENTA_5;
+                if (OritaCalc.equal(orderedCrossings.get(0).getA(), moved.getA(), Epsilon.UNKNOWN_1EN4)
+                        && OritaCalc.equal(orderedCrossings.get(0).getB(), moved.getB(), Epsilon.UNKNOWN_1EN4)) {
+                    resultColor = LineColor.CYAN_3;
+                }
+            }
+
+            for (int index = 0; index < boundary.size(); index++) {
+                boundary.set(index, boundary.get(index).withColor(resultColor));
+            }
+        }
+
+        System.out.println("result|" + resultColor.getNumber() + "|" + suitable + "|" + orderedCrossings.size());
+        printLineSegmentsList(boundary);
+    }
+
     private static Save defaultMoleculeSave(String path) throws Exception {
         String json = Files.readString(new File(path).toPath());
         List<Point> vertices = parsePointPairs(extractJsonArray(json, "vertices_coords"));
@@ -4449,6 +4530,7 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle foldline-regular-polygon <corners> <color> <p1x> <p1y> <p2x> <p2y> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-voronoi <selectionDistance> <color> <apply> <lineCount> [ax ay bx by color]... <circleCount> [cx cy r color]... <pointCount> [x y]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-default-molecule <resourcePath> <color> <p1x> <p1y> <p2x> <p2y> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle flat-foldable-boundary-check <boundaryCount> [ax ay bx by color]... <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle measure-length <ax> <ay> <bx> <by>");
         System.err.println("   or: OrieditaGeometryOracle measure-angle <ax> <ay> <centerX> <centerY> <bx> <by>");
         System.err.println("   or: OrieditaGeometryOracle custom-line-type <customType> <lineColor>");

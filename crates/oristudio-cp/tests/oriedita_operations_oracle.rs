@@ -1,3 +1,4 @@
+use oristudio_cp::checks::{FlatFoldableBoundaryCheck, flat_foldable_boundary_check};
 use oristudio_cp::geometry::{Circle, Intersection, LineColor, LineSegment, Point, RgbColor};
 use oristudio_cp::model::{CreasePatternModel, CustomLineType};
 use oristudio_cp::operations::arrangement::{
@@ -2409,6 +2410,54 @@ fn voronoi_create_matches_oriedita_oracle() {
 }
 
 #[test]
+fn flat_foldable_boundary_check_matches_oriedita_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    for (context, mut boundary, segments) in [
+        (
+            "zero-crossings",
+            vec![segment(-1.0, 0.0, 1.0, 0.0, LineColor::Yellow7)],
+            vec![],
+        ),
+        (
+            "odd-crossings",
+            vec![segment(-1.0, 0.0, 1.0, 0.0, LineColor::Yellow7)],
+            vec![segment(0.0, -1.0, 0.0, 1.0, LineColor::Red1)],
+        ),
+        (
+            "invalid-overlap",
+            vec![segment(-1.0, 0.0, 1.0, 0.0, LineColor::Yellow7)],
+            vec![segment(-1.0, 0.0, 1.0, 0.0, LineColor::Red1)],
+        ),
+    ] {
+        let model = model_from_segments(&segments);
+        let result = flat_foldable_boundary_check(&model, &mut boundary);
+        let mut args = vec![
+            "flat-foldable-boundary-check".to_string(),
+            boundary.len().to_string(),
+        ];
+        push_segment_args(
+            &mut args,
+            &boundary_with_color(&boundary, LineColor::Yellow7),
+        );
+        args.push(segments.len().to_string());
+        push_segment_args(&mut args, &segments);
+
+        let rust_summary = format!(
+            "{}{}",
+            flat_foldable_result_summary(result),
+            line_segment_list_summary(&boundary)
+        );
+        assert_line_summary_close(&rust_summary, &run_oracle(&oracle, &args), 1e-9, context);
+    }
+}
+
+#[test]
 fn default_molecule_generators_match_oriedita_oracle() {
     let Some(oracle) = operations_oracle() else {
         eprintln!(
@@ -3059,6 +3108,22 @@ fn voronoi_state_summary(state: &VoronoiState) -> String {
 
 fn voronoi_apply_result_summary(result: VoronoiApplyResult) -> String {
     format!("applied|{}|{}\n", result.lines_added, result.circles_added)
+}
+
+fn flat_foldable_result_summary(result: FlatFoldableBoundaryCheck) -> String {
+    format!(
+        "result|{}|{}|{}\n",
+        result.color.number(),
+        result.suitable_intersections,
+        result.crossing_count
+    )
+}
+
+fn boundary_with_color(boundary: &[LineSegment], color: LineColor) -> Vec<LineSegment> {
+    boundary
+        .iter()
+        .map(|segment| segment.with_line_color(color))
+        .collect()
 }
 
 fn optional_segment_result_summary(segment: Option<&LineSegment>) -> String {

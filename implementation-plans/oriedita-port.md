@@ -1076,6 +1076,7 @@ Validation:
 
 Deliverables:
 
+- Port the interactive `FLAT_FOLDABLE_CHECK_63` boundary-line probe.
 - Port Check1 through Check4.
 - Port combined angle/MV task behavior.
 - Port flat-foldability violation structures.
@@ -1092,6 +1093,15 @@ Validation:
 
 - `cargo test -p oristudio-cp checks`
 - `ORIEDITA_ORACLE=... cargo test -p oracle-tests --test oriedita_oracle checks`
+
+Status:
+
+- `FLAT_FOLDABLE_CHECK_63` is ported and oracle-tested as
+  `checks::flat_foldable_boundary_check` for resolved boundary segments. The
+  port preserves Oriedita's strict X-intersection requirement, folding-line-only
+  crossing count, boundary-order sorting, repeated reflection composition, and
+  cyan/magenta/yellow line-step coloring. The broader Check1-Check4 diagnostic
+  workers remain separate Stage 9 tasks.
 
 ### Stage 10: Folding Estimation Parity Surface
 

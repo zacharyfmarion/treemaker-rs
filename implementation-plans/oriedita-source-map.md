@@ -87,7 +87,7 @@ stage explicitly changes it.
 | `origami/crease_pattern/worker/foldlineset/BranchTrim.java` | Branch trimming cleanup. | `operations::arrangement` | kernel | 5 | Oracle-tested |
 | `origami/crease_pattern/worker/foldlineset/Check1.java` | Diagnostic check. | `checks` | kernel | 9 | Oracle-tested |
 | `origami/crease_pattern/worker/foldlineset/Check2.java` | Diagnostic check. | `checks` | kernel | 9 | Oracle-tested |
-| `origami/crease_pattern/worker/foldlineset/Check3.java` | Diagnostic check. | `checks` | kernel | 9 | Unsupported |
+| `origami/crease_pattern/worker/foldlineset/Check3.java` | Diagnostic check. | `checks` | kernel | 9 | Oracle-tested |
 | `origami/crease_pattern/worker/foldlineset/Check4.java` | Diagnostic check. | `checks` | kernel | 9 | Unsupported |
 | `origami/crease_pattern/worker/foldlineset/Fix1.java` | Repair operation. | `checks`, `operations::arrangement` | kernel | 9 | Oracle-tested |
 | `origami/crease_pattern/worker/foldlineset/Fix2.java` | Repair operation. | `checks`, `operations::arrangement` | kernel | 9 | Oracle-tested |
@@ -271,7 +271,7 @@ mutation.
 | --- | --- | --- | --- | --- |
 | `Check1.java` | Check1 fold-line diagnostic. | `checks::check1` | 9 | Oracle-tested |
 | `Check2.java` | Check2 fold-line diagnostic. | `checks::check2` | 9 | Oracle-tested |
-| `Check3.java` | Check3 angle/Fushimi diagnostic. | `checks::check3` | 9 | Unsupported |
+| `Check3.java` | Check3 angle/Fushimi diagnostic. | `checks::check3` | 9 | Oracle-tested |
 | `Check4.java` | Check4 CAMV/little-big-little diagnostic. | `checks::check4` | 9 | Unsupported |
 | `FlatFoldabilityViolation.java` | Flat-foldability violation payload. | `checks::diagnostic` | 9 | Unsupported |
 | `LittleBigLittleViolation.java` | Little-big-little violation payload. | `checks::diagnostic` | 9 | Unsupported |

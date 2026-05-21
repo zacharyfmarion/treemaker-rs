@@ -1,5 +1,5 @@
 use oristudio_cp::checks::{
-    FlatFoldableBoundaryCheck, check1, check2, flat_foldable_boundary_check,
+    FlatFoldableBoundaryCheck, check1, check2, check3, flat_foldable_boundary_check,
 };
 use oristudio_cp::geometry::{Circle, Intersection, LineColor, LineSegment, Point, RgbColor};
 use oristudio_cp::model::{CreasePatternModel, CustomLineType, TextElement};
@@ -532,6 +532,42 @@ fn check1_and_check2_match_oriedita_foldlineset_oracle() {
         line_segment_list_summary(&check2(&check2_model)),
         run_oracle(&oracle, &check2_args)
     );
+}
+
+#[test]
+fn check3_matches_oriedita_foldlineset_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    for segments in [
+        vec![
+            segment(0.0, 0.0, 10.0, 0.0, LineColor::Black0),
+            segment(0.0, 0.0, 0.0, 10.0, LineColor::Red1),
+        ],
+        vec![
+            segment(0.0, 0.0, 10.0, 0.0, LineColor::Red1),
+            segment(0.0, 0.0, -10.0, 0.0, LineColor::Red1),
+            segment(0.0, 0.0, 0.0, 10.0, LineColor::Blue2),
+            segment(0.0, 0.0, 0.0, -10.0, LineColor::Blue2),
+        ],
+        vec![
+            segment(0.0, 0.0, 10.0, 0.0, LineColor::Black0),
+            segment(0.0, 0.0, 0.0, 10.0, LineColor::Black0),
+            segment(0.0, 0.0, 7.0, 7.0, LineColor::Red1),
+        ],
+    ] {
+        let model = model_from_segments(&segments);
+        let mut args = vec!["foldline-check3".to_string(), segments.len().to_string()];
+        push_segment_args(&mut args, &segments);
+        assert_eq!(
+            line_segment_list_summary(&check3(&model)),
+            run_oracle(&oracle, &args)
+        );
+    }
 }
 
 #[test]

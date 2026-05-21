@@ -14,6 +14,7 @@ import origami.crease_pattern.util.CreasePattern_Worker_Toolbox;
 import origami.crease_pattern.worker.foldlineset.BranchTrim;
 import origami.crease_pattern.worker.foldlineset.Check1;
 import origami.crease_pattern.worker.foldlineset.Check2;
+import origami.crease_pattern.worker.foldlineset.Check3;
 import origami.crease_pattern.worker.foldlineset.Fix1;
 import origami.crease_pattern.worker.foldlineset.Fix2;
 import origami.crease_pattern.worker.foldlineset.OrganizeCircles;
@@ -147,6 +148,7 @@ public class OrieditaGeometryOracle {
             case "foldline-branch-trim" -> foldLineBranchTrim(args);
             case "foldline-check1" -> foldLineCheck1(args);
             case "foldline-check2" -> foldLineCheck2(args);
+            case "foldline-check3" -> foldLineCheck3(args);
             case "foldline-del-v" -> foldLineDelV(args);
             case "foldline-del-v-cc" -> foldLineDelVCc(args);
             case "foldline-del-v-pair" -> foldLineDelVPair(args);
@@ -443,6 +445,17 @@ public class OrieditaGeometryOracle {
         FoldLineSet set = foldLineSet(args, 2, count);
         Check2.apply(set);
         printLineSegmentsList(set.getCheck2LineSegment());
+    }
+
+    private static void foldLineCheck3(String[] args) {
+        if (args.length < 2) {
+            usage("foldline-check3 expects count and segment payload");
+        }
+
+        int count = Integer.parseInt(args[1]);
+        FoldLineSet set = foldLineSet(args, 2, count);
+        Check3.apply(set);
+        printLineSegmentsList(set.getCheck3LineSegment());
     }
 
     private static void foldLineDelV(String[] args) {
@@ -4710,6 +4723,7 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle foldline-del-v-all-cc <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-check1 <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-check2 <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-check3 <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-fix1 <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-fix2 <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-set-color <color> <indices> <count> [ax ay bx by color]...");

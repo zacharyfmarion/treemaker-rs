@@ -1109,8 +1109,12 @@ Status:
 - `Check1` and `Check2` are ported and oracle-tested as `checks::check1` and
   `checks::check2`. These return Oriedita's diagnostic segment lists for
   non-auxiliary overlap/containment pairs and sweet-tolerance T-intersection
-  pairs, preserving duplicate reporting and pair order. `Check3`, `Check4`,
-  CAMV, and little-big-little payloads remain separate Stage 9 tasks.
+  pairs, preserving duplicate reporting and pair order.
+- `Check3` is ported and oracle-tested as `checks::check3`. It returns
+  Oriedita's legacy zero-length vertex marker list for boundary-count,
+  Maekawa, interior extended-Fushimi, and side extended-Fushimi failures,
+  preserving repeated endpoint passes and duplicate markers. `Check4`, CAMV,
+  and little-big-little payloads remain separate Stage 9 tasks.
 
 ### Stage 10: Folding Estimation Parity Surface
 

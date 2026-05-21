@@ -790,8 +790,11 @@ Status:
 - FOLD import now applies Oriedita's line-only coordinate-normalization
   transform; circles and text intentionally remain in their source FOLD
   coordinates because Oriedita copies them outside the moved `FoldLineSet`.
-  FOLD face reconstruction still needs oracle validation before the FOLD path
-  can be promoted beyond porting.
+  FOLD export now reconstructs Oriedita-style point/edge/face topology before
+  writing, including the `Face` sentinel quirk that suppresses faces when the
+  Euler check fails. The topology path is oracle-tested against Oriedita's
+  `WireFrame_Worker`/`PointSet` classes; full raw `.fold` file comparison still
+  needs a fold-library-aware oracle.
 - `.ori` unknown/newer-version behavior is explicit: strict import rejects it,
   while a permissive entry point mirrors Oriedita's "open anyway" path. Legacy
   `.ori` conversion beyond the shared `v1`/`v1.1` payload and full

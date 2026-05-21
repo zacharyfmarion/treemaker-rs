@@ -7,6 +7,7 @@ import origami.crease_pattern.LittleBigLittleViolation;
 import origami.crease_pattern.LineSegmentSet;
 import origami.crease_pattern.OritaCalc;
 import origami.crease_pattern.PointLineMap;
+import origami.crease_pattern.PointSet;
 import origami.crease_pattern.element.Circle;
 import origami.crease_pattern.element.LineColor;
 import origami.crease_pattern.element.LineSegment;
@@ -22,6 +23,7 @@ import origami.crease_pattern.worker.foldlineset.Check4;
 import origami.crease_pattern.worker.foldlineset.Fix1;
 import origami.crease_pattern.worker.foldlineset.Fix2;
 import origami.crease_pattern.worker.foldlineset.OrganizeCircles;
+import origami.crease_pattern.worker.WireFrame_Worker;
 import origami.crease_pattern.worker.linesegmentset.IntersectDivide;
 import origami.crease_pattern.worker.SelectMode;
 import origami.folding.util.SortingBox;
@@ -289,6 +291,7 @@ public class OrieditaGeometryOracle {
             case "orh-export-fixture" -> orhExportFixture(args);
             case "obj-import-summary" -> objImportSummary(args);
             case "dxf-export-fixture" -> dxfExportFixture(args);
+            case "fold-topology-summary" -> foldTopologySummary(args);
             default -> usage("unknown command: " + args[0]);
         }
     }
@@ -4468,6 +4471,89 @@ public class OrieditaGeometryOracle {
         }
     }
 
+    private static void foldTopologySummary(String[] args) throws Exception {
+        if (args.length < 2) {
+            usage("fold-topology-summary expects count and segment payload");
+        }
+
+        int count = Integer.parseInt(args[1]);
+        LineSegmentSet set = lineSegmentSet(args, 2, count);
+        if (set.getNumLineSegments() == 0) {
+            set.addLine(new Point(0.0, 0.0), new Point(0.0, 0.0), LineColor.BLACK_0);
+        }
+
+        WireFrame_Worker worker = new WireFrame_Worker(3.0);
+        worker.setLineSegmentSetWithoutFaceOccurence(set);
+        PointSet pointSet = worker.get();
+        boolean includeFaces = pointSet.calculateFaces();
+        int exportedFaces = includeFaces ? pointSet.getNumFaces() : 0;
+
+        System.out.println("topology|"
+                + pointSet.getNumPoints() + "|"
+                + pointSet.getNumLines() + "|"
+                + exportedFaces + "|"
+                + includeFaces);
+        for (int i = 1; i <= pointSet.getNumPoints(); i++) {
+            Point point = pointSet.getPoint(i);
+            System.out.println("vertex|" + (i - 1) + "|" + point.getX() + "|" + point.getY());
+        }
+        for (int i = 1; i <= pointSet.getNumLines(); i++) {
+            System.out.println("edge|"
+                    + (i - 1) + "|"
+                    + (pointSet.getBegin(i) - 1) + "|"
+                    + (pointSet.getEnd(i) - 1) + "|"
+                    + pointSet.getColor(i).getNumber());
+        }
+        if (includeFaces) {
+            for (int i = 1; i <= pointSet.getNumFaces(); i++) {
+                origami.folding.element.Face face = pointSet.getFace(i);
+                System.out.println("face|" + (i - 1) + "|" + oracleFacePoints(face));
+                System.out.println("face_edges|" + (i - 1) + "|" + oracleFaceEdges(pointSet, face));
+            }
+        }
+    }
+
+    private static String oracleFacePoints(origami.folding.element.Face face) {
+        StringBuilder output = new StringBuilder();
+        for (int i = 1; i <= face.getNumPoints(); i++) {
+            if (i > 1) {
+                output.append(",");
+            }
+            output.append(face.getPointId(i) - 1);
+        }
+        return output.toString();
+    }
+
+    private static String oracleFaceEdges(PointSet pointSet, origami.folding.element.Face face) {
+        if (face.getNumPoints() == 0) {
+            return "";
+        }
+
+        StringBuilder output = new StringBuilder();
+        output.append(oracleFindEdge(
+                pointSet,
+                face.getPointId(1),
+                face.getPointId(face.getNumPoints())) - 1);
+        for (int i = 2; i <= face.getNumPoints(); i++) {
+            output.append(",");
+            output.append(oracleFindEdge(
+                    pointSet,
+                    face.getPointId(i),
+                    face.getPointId(i - 1)) - 1);
+        }
+        return output.toString();
+    }
+
+    private static int oracleFindEdge(PointSet pointSet, int a, int b) {
+        for (int i = 1; i <= pointSet.getNumLines(); i++) {
+            if ((pointSet.getBegin(i) == a && pointSet.getEnd(i) == b)
+                    || (pointSet.getBegin(i) == b && pointSet.getEnd(i) == a)) {
+                return i;
+            }
+        }
+        throw new IllegalStateException("edge in face not found");
+    }
+
     private static Save fixtureSave() {
         Save save = SaveProvider.createInstance();
         save.setTitle("oracle");
@@ -5233,6 +5319,7 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle orh-export-fixture");
         System.err.println("   or: OrieditaGeometryOracle obj-import-summary <path>");
         System.err.println("   or: OrieditaGeometryOracle dxf-export-fixture");
+        System.err.println("   or: OrieditaGeometryOracle fold-topology-summary <count> [ax ay bx by color]...");
         System.exit(2);
     }
 }

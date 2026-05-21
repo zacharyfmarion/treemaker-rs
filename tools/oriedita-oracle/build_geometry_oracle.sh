@@ -35,22 +35,28 @@ javac \
   "$origami_source/origami/crease_pattern/element/StraightLine.java" \
   "$origami_source/origami/crease_pattern/element/Circle.java" \
   "$origami_source/origami/crease_pattern/element/Line.java" \
+  "$origami_source/origami/crease_pattern/element/Point_p.java" \
   "$origami_source/origami/crease_pattern/element/Polygon.java" \
   "$origami_source/origami/crease_pattern/element/Rectangle.java" \
+  "$origami_source/origami/crease_pattern/FoldingException.java" \
   "$origami_source/origami/crease_pattern/OritaCalc.java" \
+  "$origami_source/origami/crease_pattern/PointSet.java" \
   "$origami_source/origami/crease_pattern/LineSegmentSet.java" \
   "$origami_source/origami/crease_pattern/FoldLineSet.java" \
+  "$origami_source/origami/crease_pattern/worker/WireFrame_Worker.java" \
   "$origami_source/origami/crease_pattern/worker/foldlineset/BranchTrim.java" \
   "$origami_source/origami/crease_pattern/worker/foldlineset/Fix1.java" \
   "$origami_source/origami/crease_pattern/worker/foldlineset/Fix2.java" \
   "$origami_source/origami/crease_pattern/worker/linesegmentset/IntersectDivide.java" \
   "$origami_source/origami/data/save/LineSegmentSave.java" \
+  "$origami_source/origami/data/save/PointSave.java" \
+  "$origami_source/origami/data/ListArray.java" \
   "$origami_source"/origami/data/quadTree/*.java \
-  "$origami_source"/origami/data/quadTree/adapter/QuadTreeAdapter.java \
-  "$origami_source"/origami/data/quadTree/adapter/LineSegmentSetAdapter.java \
-  "$origami_source"/origami/data/quadTree/adapter/LineSegmentSetLineAdapter.java \
+  "$origami_source"/origami/data/quadTree/adapter/*.java \
   "$origami_source"/origami/data/quadTree/collector/*.java \
   "$origami_source"/origami/data/quadTree/comparator/*.java \
+  "$origami_source/origami/folding/element/Face.java" \
+  "$origami_source/origami/folding/util/AverageCoordinates.java" \
   "$common_source/oriedita/editor/AbstractModel.java" \
   "$common_source/oriedita/editor/canvas/LineStyle.java" \
   "$common_source/oriedita/editor/drawing/tools/Camera.java" \

@@ -72,14 +72,14 @@ stage explicitly changes it.
 | `origami/crease_pattern/CustomLineTypes.java` | Custom line metadata. | `model::line_color` | kernel | 3 | Oracle-tested |
 | `origami/crease_pattern/FoldLineSet.java` | Main editable line/circle set. | `model`, `operations::*` | kernel | 3-9 | Porting |
 | `origami/crease_pattern/LineSegmentSet.java` | Line arrangement set used for folding and export. | `fold_graph`, `operations::arrangement` | kernel | 3-5 | Porting |
-| `origami/crease_pattern/PointSet.java` | Vertex/edge/face topology for folding/export. | `fold_graph` | kernel | 3-4 | Unsupported |
+| `origami/crease_pattern/PointSet.java` | Vertex/edge/face topology for folding/export. | `io::fold::export_topology`, `fold_graph` | kernel | 3-4, 10 | Porting; FOLD topology oracle |
 | `origami/crease_pattern/PointLineMap.java` | Point-to-line neighborhood lookup. | `model::topology` | kernel | 3 | Unsupported |
 | `origami/crease_pattern/FlatFoldabilityViolation.java` | Diagnostic payload. | `checks::diagnostic` | kernel | 9 | Oracle-tested |
 | `origami/crease_pattern/LittleBigLittleViolation.java` | Diagnostic payload. | `checks::diagnostic` | kernel | 9 | Oracle-tested |
 | `origami/crease_pattern/LassoInteractionMode.java` | Lasso selection mode. | `operations::selection::LassoInteractionMode` | kernel | 6 | Oracle-tested |
 | `origami/crease_pattern/FoldingException.java` | Folding error surface. | `folding::error` | kernel | 10 | Unsupported |
 | `origami/crease_pattern/util/CreasePattern_Worker_Toolbox.java` | Shared CP worker helpers. | `operations::*` | kernel | 5-9 | Unsupported |
-| `origami/crease_pattern/worker/WireFrame_Worker.java` | Face/topology/folding preparation. | `fold_graph`, `folding` | kernel | 4, 10 | Unsupported |
+| `origami/crease_pattern/worker/WireFrame_Worker.java` | Face/topology/folding preparation. | `io::fold::export_topology`, `fold_graph`, `folding` | kernel | 4, 10 | Porting; FOLD topology oracle |
 | `origami/crease_pattern/worker/LineSegmentSetWorker.java` | Arrangement cleanup for folded subfaces. | `folding`, `operations::arrangement` | kernel | 5, 10 | Unsupported |
 | `origami/crease_pattern/worker/FoldedFigure_Worker.java` | Folded-model hierarchy and overlap solving. | `folding` | kernel | 10 | Unsupported |
 | `origami/crease_pattern/worker/FoldedFigure_Configurator.java` | Subface and hierarchy setup. | `folding` | kernel | 10 | Unsupported |
@@ -232,22 +232,22 @@ mutation.
 | --- | --- | --- | --- | --- |
 | `CpImporter.java` | `.cp` import. | `io::cp::import` | 4 | Unit-tested |
 | `CpExporter.java` | `.cp` export and lossy-format warning. | `io::cp::export` | 4 | Unit-tested |
-| `FoldImporter.java` | `.fold` import and coordinate normalization. | `io::fold::import` | 4 | Porting |
-| `FoldExporter.java` | `.fold` export, face reconstruction, Oriedita extras. | `io::fold::export` | 4 | Porting |
+| `FoldImporter.java` | `.fold` import and coordinate normalization. | `io::fold::import` | 4 | Unit-tested |
+| `FoldExporter.java` | `.fold` export, face reconstruction, Oriedita extras. | `io::fold::export` | 4 | Unit-tested; topology oracle |
 | `OriImporter.java` | `.ori` import. | `io::ori::import` | 4 | Unit-tested |
 | `OriExporter.java` | `.ori` export. | `io::ori::export` | 4 | Unit-tested |
 | `OrhImporter.java` | `.orh` import. | `io::orh::import` | 4 | Oracle-tested |
 | `OrhExporter.java` | `.orh` export. | `io::orh::export` | 4 | Oracle-tested |
 | `ObjImporter.java` | `.obj` import. | `io::obj::import` | 4 | Oracle-tested |
 | `DxfExporter.java` | `.dxf` export. | `io::dxf::export` | 4 | Oracle-tested |
-| `OrieditaFoldFile.java` | FOLD extension fields. | `io::fold::oriedita_extensions` | 4 | Porting |
+| `OrieditaFoldFile.java` | FOLD extension fields. | `io::fold::oriedita_extensions` | 4 | Unit-tested |
 | `Save.java` | Main save model. | `io::save` | 4 | Unit-tested |
 | `BaseSave.java` | Shared save payload. | `io::save` | 4 | Unit-tested |
 | `SaveV1_0.java` | Legacy save payload. | `io::save::legacy` | 4 | Unit-tested |
 | `SaveV1_1.java` | Legacy save payload. | `io::save::legacy` | 4 | Unit-tested |
-| `SaveConverter.java` | Save-version conversion. | `io::save::convert` | 4 | Porting |
+| `SaveConverter.java` | Save-version conversion. | `io::save::convert` | 4 | Unit-tested |
 | `SaveProvider.java` | Save instance factory. | `io::save` | 4 | Unsupported |
-| `FileVersionTester.java` | Save-version detection. | `io::save::version` | 4 | Porting |
+| `FileVersionTester.java` | Save-version detection. | `io::save::version` | 4 | Unit-tested |
 | `TextSave.java` | Text persistence. | `model::text`, `io::save` | 3-4 | Unit-tested |
 
 ## Task and Service Matrix

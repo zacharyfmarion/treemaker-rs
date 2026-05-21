@@ -968,15 +968,15 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
         9,
         OracleTested
     ),
-    descriptor!(ImportCp, "CpImporter", "io::cp::import", Io, 4, Unsupported),
-    descriptor!(ExportCp, "CpExporter", "io::cp::export", Io, 4, Unsupported),
+    descriptor!(ImportCp, "CpImporter", "io::cp::import", Io, 4, UnitTested),
+    descriptor!(ExportCp, "CpExporter", "io::cp::export", Io, 4, UnitTested),
     descriptor!(
         ImportFold,
         "FoldImporter",
         "io::fold::import",
         Io,
         4,
-        Unsupported
+        UnitTested
     ),
     descriptor!(
         ExportFold,
@@ -984,7 +984,7 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
         "io::fold::export",
         Io,
         4,
-        Unsupported
+        UnitTested
     ),
     descriptor!(
         ImportOri,
@@ -992,7 +992,7 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
         "io::ori::import",
         Io,
         4,
-        Unsupported
+        UnitTested
     ),
     descriptor!(
         ExportOri,
@@ -1000,7 +1000,7 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
         "io::ori::export",
         Io,
         4,
-        Unsupported
+        UnitTested
     ),
     descriptor!(
         ImportOrh,
@@ -1008,7 +1008,7 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
         "io::orh::import",
         Io,
         4,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         ExportOrh,
@@ -1016,7 +1016,7 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
         "io::orh::export",
         Io,
         4,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         ImportObj,
@@ -1024,7 +1024,7 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
         "io::obj::import",
         Io,
         4,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         ExportDxf,
@@ -1032,7 +1032,7 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
         "io::dxf::export",
         Io,
         4,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         SaveConvert,
@@ -1040,7 +1040,7 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
         "io::save::convert",
         Io,
         4,
-        Unsupported
+        UnitTested
     ),
     descriptor!(
         SaveVersionDetect,
@@ -1048,7 +1048,7 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
         "io::save::version",
         Io,
         4,
-        Unsupported
+        UnitTested
     ),
     descriptor!(
         CheckCamv,

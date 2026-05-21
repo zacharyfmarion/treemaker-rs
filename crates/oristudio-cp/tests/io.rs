@@ -67,6 +67,21 @@ fn fold_import_reads_edges_and_oriedita_extensions() {
 }
 
 #[test]
+fn fold_import_defaults_missing_oriedita_grid_style_to_hidden_like_oriedita() {
+    let input = r#"{
+      "file_spec": 1.1,
+      "vertices_coords": [[0, 0], [10, 0]],
+      "edges_vertices": [[0, 1]],
+      "edges_assignment": ["B"]
+    }"#;
+
+    let model = fold::import_fold_json(input).expect("valid fold");
+
+    assert_eq!(model.grid.grid_size, 8);
+    assert_eq!(model.grid.base_state, GridState::Hidden);
+}
+
+#[test]
 fn fold_export_round_trips_canonical_model_data() {
     let mut model = CreasePatternModel::default();
     model.add_line_segment(
@@ -91,6 +106,74 @@ fn fold_export_round_trips_canonical_model_data() {
     let imported = fold::import_fold_json(&json).expect("imports exported fold");
 
     assert_eq!(model.canonical(1.0e-9), imported.canonical(1.0e-9));
+}
+
+#[test]
+fn fold_export_reconstructs_oriedita_face_topology() {
+    let mut model = CreasePatternModel::default();
+    for (a, b) in [
+        (Point::new(0.0, -200.0), Point::new(-200.0, 0.0)),
+        (Point::new(-200.0, 0.0), Point::new(0.0, 200.0)),
+        (Point::new(0.0, 200.0), Point::new(200.0, 0.0)),
+        (Point::new(200.0, 0.0), Point::new(0.0, -200.0)),
+    ] {
+        model.add_line(a, b, LineColor::Red1);
+    }
+
+    let document = fold::export_fold_document(&model, None);
+
+    assert_eq!(document.file_spec, Some(1.1));
+    assert_eq!(document.file_creator.as_deref(), Some("oriedita"));
+    assert_eq!(
+        document.vertices_coords,
+        vec![
+            vec![0.0, -200.0],
+            vec![-200.0, 0.0],
+            vec![0.0, 200.0],
+            vec![200.0, 0.0],
+        ]
+    );
+    assert_eq!(
+        document.edges_vertices,
+        vec![[0, 1], [1, 2], [2, 3], [3, 0]]
+    );
+    assert_eq!(document.faces_vertices, vec![vec![0, 1, 2, 3]]);
+    assert_eq!(document.faces_edges, vec![vec![3, 0, 1, 2]]);
+    assert_eq!(document.extra["oriedita:version"], "dev");
+    assert!(!document.extra.contains_key("oriedita:circles_coords"));
+    assert!(!document.extra.contains_key("oriedita:texts_coords"));
+}
+
+#[test]
+fn fold_export_suppresses_faces_when_oriedita_euler_check_fails() {
+    let mut model = CreasePatternModel::default();
+    for (a, b) in [
+        (
+            Point::new(-200.0, -200.0),
+            Point::new(-117.15728752538098, 0.0),
+        ),
+        (Point::new(0.0, 0.0), Point::new(-117.15728752538098, 0.0)),
+        (
+            Point::new(-200.0, 200.0),
+            Point::new(-117.15728752538098, 0.0),
+        ),
+        (
+            Point::new(-200.0, -200.0),
+            Point::new(0.0, -117.15728752538098),
+        ),
+        (Point::new(0.0, 0.0), Point::new(0.0, -117.15728752538098)),
+        (
+            Point::new(200.0, -200.0),
+            Point::new(0.0, -117.15728752538098),
+        ),
+    ] {
+        model.add_line(a, b, LineColor::Blue2);
+    }
+
+    let document = fold::export_fold_document(&model, None);
+
+    assert!(document.faces_vertices.is_empty());
+    assert!(document.faces_edges.is_empty());
 }
 
 #[test]

@@ -1,9 +1,10 @@
 use oristudio_cp::CreasePatternDocument;
 use oristudio_cp::geometry::{ActiveState, Circle, LineColor, LineSegment, Point, RgbColor};
-use oristudio_cp::io::{dxf, obj, orh};
+use oristudio_cp::io::{dxf, fold, obj, orh};
 use oristudio_cp::model::{CreasePatternModel, GridMetadata, GridState};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use treemaker_fold::FoldDocument;
 
 #[test]
 fn orh_import_matches_oriedita_io_oracle() {
@@ -94,6 +95,89 @@ f 1 2 3
 
     let _ = std::fs::remove_file(path);
     assert_eq!(rust_summary, oracle_summary);
+}
+
+#[test]
+fn fold_topology_matches_oriedita_wireframe_oracle() {
+    let Some(oracle) = io_oracle() else {
+        eprintln!("skipping Oriedita IO oracle test: ORIEDITA_IO_ORACLE is not set");
+        return;
+    };
+
+    let cases = vec![
+        vec![
+            LineSegment::with_color(
+                Point::new(0.0, -200.0),
+                Point::new(-200.0, 0.0),
+                LineColor::Red1,
+            ),
+            LineSegment::with_color(
+                Point::new(-200.0, 0.0),
+                Point::new(0.0, 200.0),
+                LineColor::Red1,
+            ),
+            LineSegment::with_color(
+                Point::new(0.0, 200.0),
+                Point::new(200.0, 0.0),
+                LineColor::Red1,
+            ),
+            LineSegment::with_color(
+                Point::new(200.0, 0.0),
+                Point::new(0.0, -200.0),
+                LineColor::Red1,
+            ),
+        ],
+        vec![
+            LineSegment::with_color(
+                Point::new(-200.0, -200.0),
+                Point::new(-117.15728752538098, 0.0),
+                LineColor::Blue2,
+            ),
+            LineSegment::with_color(
+                Point::new(0.0, 0.0),
+                Point::new(-117.15728752538098, 0.0),
+                LineColor::Blue2,
+            ),
+            LineSegment::with_color(
+                Point::new(-200.0, 200.0),
+                Point::new(-117.15728752538098, 0.0),
+                LineColor::Blue2,
+            ),
+            LineSegment::with_color(
+                Point::new(-200.0, -200.0),
+                Point::new(0.0, -117.15728752538098),
+                LineColor::Blue2,
+            ),
+            LineSegment::with_color(
+                Point::new(0.0, 0.0),
+                Point::new(0.0, -117.15728752538098),
+                LineColor::Blue2,
+            ),
+            LineSegment::with_color(
+                Point::new(200.0, -200.0),
+                Point::new(0.0, -117.15728752538098),
+                LineColor::Blue2,
+            ),
+        ],
+    ];
+
+    for segments in cases {
+        let mut model = CreasePatternModel::default();
+        for segment in segments {
+            model.add_line_segment(segment);
+        }
+
+        let mut args = vec![
+            "fold-topology-summary".to_string(),
+            model.line_segments.len().to_string(),
+        ];
+        push_segment_args(&mut args, &model.line_segments);
+        let oracle_args = args.iter().map(String::as_str).collect::<Vec<_>>();
+        let oracle_summary = run_oracle(&oracle, &oracle_args);
+        let rust_summary = fold_topology_summary(&model);
+
+        assert_eq!(rust_summary, oracle_summary);
+    }
 }
 
 fn io_oracle() -> Option<PathBuf> {
@@ -239,6 +323,78 @@ fn push_segment(output: &mut String, prefix: &str, segment: &LineSegment) {
         segment.customized_color.green,
         segment.customized_color.blue
     ));
+}
+
+fn push_segment_args(args: &mut Vec<String>, segments: &[LineSegment]) {
+    for segment in segments {
+        args.push(segment.a.x.to_string());
+        args.push(segment.a.y.to_string());
+        args.push(segment.b.x.to_string());
+        args.push(segment.b.y.to_string());
+        args.push(segment.color.number().to_string());
+    }
+}
+
+fn fold_topology_summary(model: &CreasePatternModel) -> String {
+    let document = fold::export_fold_document(model, None);
+    let mut output = String::new();
+    output.push_str(&format!(
+        "topology|{}|{}|{}|{}\n",
+        document.vertices_coords.len(),
+        document.edges_vertices.len(),
+        document.faces_vertices.len(),
+        !document.faces_vertices.is_empty()
+    ));
+    for (index, coords) in document.vertices_coords.iter().enumerate() {
+        output.push_str(&format!(
+            "vertex|{}|{}|{}\n",
+            index,
+            java_double_string(coords[0]),
+            java_double_string(coords[1])
+        ));
+    }
+    for (index, edge) in document.edges_vertices.iter().enumerate() {
+        let color = topology_edge_color(model, index);
+        output.push_str(&format!(
+            "edge|{}|{}|{}|{}\n",
+            index,
+            edge[0],
+            edge[1],
+            color.number()
+        ));
+    }
+    push_fold_faces(&mut output, &document);
+    output
+}
+
+fn topology_edge_color(model: &CreasePatternModel, index: usize) -> LineColor {
+    model
+        .line_segments
+        .get(index)
+        .map(|segment| segment.color)
+        .unwrap_or(LineColor::Black0)
+}
+
+fn push_fold_faces(output: &mut String, document: &FoldDocument) {
+    for (index, face) in document.faces_vertices.iter().enumerate() {
+        let points = face
+            .iter()
+            .map(|value| value.to_string())
+            .collect::<Vec<_>>()
+            .join(",");
+        output.push_str(&format!("face|{}|{}\n", index, points));
+
+        let edges = document
+            .faces_edges
+            .get(index)
+            .cloned()
+            .unwrap_or_default()
+            .iter()
+            .map(|value| value.to_string())
+            .collect::<Vec<_>>()
+            .join(",");
+        output.push_str(&format!("face_edges|{}|{}\n", index, edges));
+    }
 }
 
 fn active_state_name(active: ActiveState) -> &'static str {

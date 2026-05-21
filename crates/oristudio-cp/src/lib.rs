@@ -338,10 +338,10 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
     descriptor!(
         PerpendicularDraw,
         "MouseHandlerPerpendicularDraw",
-        "operations::construction::perpendicular",
+        "operations::construction::perpendicular_projection",
         Kernel,
         7,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         SymmetricDraw,

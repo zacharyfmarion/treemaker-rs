@@ -88,6 +88,8 @@ public class OrieditaGeometryOracle {
             case "foldline-lengthen" -> foldLineLengthen(args);
             case "foldline-parallel-draw" -> foldLineParallelDraw(args);
             case "foldline-parallel-width" -> foldLineParallelWidth(args);
+            case "foldline-perpendicular-projection" -> foldLinePerpendicularProjection(args);
+            case "foldline-perpendicular-indicator" -> foldLinePerpendicularIndicator(args);
             case "foldline-draw-crease" -> foldLineDrawCrease(args);
             case "foldline-draw-symmetric" -> foldLineDrawSymmetric(args);
             case "foldline-draw-point" -> foldLineDrawPoint(args);
@@ -1115,6 +1117,61 @@ public class OrieditaGeometryOracle {
             return result;
         }
         return null;
+    }
+
+    private static void foldLinePerpendicularProjection(String[] args) {
+        if (args.length < 10) {
+            usage("foldline-perpendicular-projection expects target point, base segment, color, count, and segment payload");
+        }
+
+        Point targetPoint = new Point(parse(args[1]), parse(args[2]));
+        LineSegment base = segment(args, 3);
+        LineColor color = LineColor.fromNumber(Integer.parseInt(args[8]));
+        int count = Integer.parseInt(args[9]);
+        FoldLineSet set = foldLineSet(args, 10, count);
+        LineSegment result = new LineSegment(
+                targetPoint,
+                OritaCalc.findProjection(OritaCalc.lineSegmentToStraightLine(base), targetPoint),
+                color);
+        boolean added = Epsilon.high.gt0(result.determineLength());
+        if (added) {
+            addLineSegmentLikeWorker(set, result);
+        }
+
+        System.out.println("added|" + added);
+        printFoldLineSet(set);
+    }
+
+    private static void foldLinePerpendicularIndicator(String[] args) {
+        if (args.length < 9) {
+            usage("foldline-perpendicular-indicator expects target point, base segment, count, and segment payload");
+        }
+
+        Point targetPoint = new Point(parse(args[1]), parse(args[2]));
+        LineSegment base = segment(args, 3);
+        int count = Integer.parseInt(args[8]);
+        FoldLineSet set = foldLineSet(args, 9, count);
+        LineSegment result = null;
+        if (OritaCalc.isPointWithinLineSpan(targetPoint, base)) {
+            LineSegment indicator = OritaCalc.fullExtendUntilHit(
+                    set,
+                    new LineSegment(
+                            targetPoint,
+                            OritaCalc.findProjection(OritaCalc.moveParallel(base, 1.0), targetPoint),
+                            LineColor.PURPLE_8));
+            result = OritaCalc.fullExtendUntilHit(set, indicator.withCoordinates(indicator.getB(), indicator.getA()));
+        }
+
+        if (result == null) {
+            System.out.println("result|null");
+        } else {
+            System.out.println("result|"
+                    + result.determineAX() + "|"
+                    + result.determineAY() + "|"
+                    + result.determineBX() + "|"
+                    + result.determineBY() + "|"
+                    + result.getColor().getNumber());
+        }
     }
 
     private static void foldLineDrawCrease(String[] args) {
@@ -2291,6 +2348,8 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle foldline-lengthen <current|same> <lineColor> <selectionDistance> <selection ax ay bx by color> <extensionX> <extensionY> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-parallel-draw <targetX> <targetY> <parallel ax ay bx by color> <destination ax ay bx by color> <color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-parallel-width <selected ax ay bx by color> <width> <choice> <color> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-perpendicular-projection <targetX> <targetY> <base ax ay bx by color> <color> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-perpendicular-indicator <targetX> <targetY> <base ax ay bx by color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-draw-crease <fold|aux> <segment ax ay bx by color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-draw-symmetric <axis ax ay bx by color> <preselected> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-draw-point <index> <targetX> <targetY> <selectionDistance> <count> [ax ay bx by color]...");

@@ -2,7 +2,7 @@ use oristudio_cp::geometry::{LineColor, LineSegment, Point};
 use oristudio_cp::model::CreasePatternModel;
 use oristudio_cp::operations::construction::{
     DrawCreaseTarget, commit_parallel_width_indicator, draw_crease_segment, mirror_selected_lines,
-    parallel_draw, parallel_width_indicators,
+    parallel_draw, parallel_width_indicators, perpendicular_indicator, perpendicular_projection,
 };
 
 #[test]
@@ -124,6 +124,43 @@ fn parallel_width_indicators_offset_selected_segment() {
     ));
     assert_eq!(model.line_segments.len(), 1);
     assert_eq!(model.line_segments[0].color, LineColor::Blue2);
+}
+
+#[test]
+fn perpendicular_projection_adds_short_projection_when_target_outside_span() {
+    let mut model = CreasePatternModel::default();
+    let base = segment(0.0, 0.0, 1.0, 0.0, LineColor::Black0);
+
+    assert!(perpendicular_projection(
+        &mut model,
+        Point::new(2.0, 1.0),
+        &base,
+        LineColor::Red1,
+    ));
+    assert!(contains_segment(
+        &model.line_segments,
+        Point::new(2.0, 1.0),
+        Point::new(2.0, 0.0),
+        LineColor::Red1,
+    ));
+}
+
+#[test]
+fn perpendicular_indicator_extends_across_existing_hits() {
+    let model = model_from_segments(&[
+        segment(-1.0, -2.0, 1.0, -2.0, LineColor::Black0),
+        segment(-1.0, 2.0, 1.0, 2.0, LineColor::Black0),
+    ]);
+    let base = segment(-1.0, 0.0, 1.0, 0.0, LineColor::Red1);
+
+    let indicator = perpendicular_indicator(&model, Point::new(0.0, 0.0), &base)
+        .expect("point on span should produce indicator");
+
+    assert_eq!(indicator.color, LineColor::Purple8);
+    assert!((indicator.a.x - 0.0).abs() < 1e-12);
+    assert!((indicator.a.y + 2.0).abs() < 1e-12);
+    assert!((indicator.b.x - 0.0).abs() < 1e-12);
+    assert!((indicator.b.y - 2.0).abs() < 1e-12);
 }
 
 fn segment(ax: f64, ay: f64, bx: f64, by: f64, color: LineColor) -> LineSegment {

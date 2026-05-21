@@ -980,6 +980,10 @@ Status:
   Oriedita's `s_step_additional_intersection` behavior, fixed-distance
   `moveParallel` indicators, selected indicator recoloring, and worker-style
   insertion splitting.
+- `PERPENDICULAR_DRAW_9` is ported and oracle-tested for the immediate
+  projection branch and the full-extend indicator branch after resolved
+  model-space inputs. Destination selection uses the same
+  `s_step_additional_intersection` helper as the parallel tool.
 
 ### Stage 8: Circle, Polygon, Base, and Generator Tools
 

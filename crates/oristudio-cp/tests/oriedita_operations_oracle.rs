@@ -20,7 +20,7 @@ use oristudio_cp::operations::color::{
 };
 use oristudio_cp::operations::construction::{
     DrawCreaseTarget, commit_parallel_width_indicator, draw_crease_segment, mirror_selected_lines,
-    parallel_draw, parallel_width_indicators,
+    parallel_draw, parallel_width_indicators, perpendicular_indicator, perpendicular_projection,
 };
 use oristudio_cp::operations::generators::{
     DefaultMolecule, default_molecule, regular_polygon_no_corners,
@@ -1228,6 +1228,46 @@ fn parallel_draw_modes_match_oriedita_oracle() {
     args.push("0".to_string());
     let rust_summary = format!("added|{added}\n{}", line_segment_set_summary(&model));
     assert_eq!(rust_summary, run_oracle(&oracle, &args));
+}
+
+#[test]
+fn perpendicular_draw_modes_match_oriedita_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    let base = segment(0.0, 0.0, 1.0, 0.0, LineColor::Black0);
+    let target = Point::new(2.0, 1.0);
+    let mut model = CreasePatternModel::default();
+    let added = perpendicular_projection(&mut model, target, &base, LineColor::Red1);
+    let mut args = vec!["foldline-perpendicular-projection".to_string()];
+    push_points_args(&mut args, &[target]);
+    push_one_segment_args(&mut args, &base);
+    args.push(LineColor::Red1.number().to_string());
+    args.push("0".to_string());
+    let rust_summary = format!("added|{added}\n{}", line_segment_set_summary(&model));
+    assert_eq!(rust_summary, run_oracle(&oracle, &args));
+
+    let indicator_segments = vec![
+        segment(-1.0, -2.0, 1.0, -2.0, LineColor::Black0),
+        segment(-1.0, 2.0, 1.0, 2.0, LineColor::Black0),
+    ];
+    let base = segment(-1.0, 0.0, 1.0, 0.0, LineColor::Red1);
+    let target = Point::new(0.0, 0.0);
+    let model = model_from_segments(&indicator_segments);
+    let indicator = perpendicular_indicator(&model, target, &base);
+    let mut args = vec!["foldline-perpendicular-indicator".to_string()];
+    push_points_args(&mut args, &[target]);
+    push_one_segment_args(&mut args, &base);
+    args.push(indicator_segments.len().to_string());
+    push_segment_args(&mut args, &indicator_segments);
+    assert_eq!(
+        optional_segment_result_summary(indicator.as_ref()),
+        run_oracle(&oracle, &args)
+    );
 }
 
 #[test]

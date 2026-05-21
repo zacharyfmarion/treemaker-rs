@@ -1,6 +1,7 @@
 use super::{
     AdditionalEstimationError, EquivalenceCondition, EquivalenceConditionSet, FaceOrder,
-    HierarchyTable, InitialHierarchy, SubFace,
+    HierarchyTable, InitialHierarchy, InitialHierarchyError, SubFace, SubFaceConfiguration,
+    run_additional_estimation,
 };
 use std::collections::{HashMap, HashSet};
 
@@ -39,6 +40,7 @@ pub struct WorkerOverlapSearch {
 pub enum WorkerOverlapSearchError {
     SubFace(SubFaceSearchError),
     AdditionalEstimation(AdditionalEstimationError),
+    InitialHierarchy(InitialHierarchyError),
     FinalAdditionalEstimationRequired {
         valid_count: usize,
         reduced_subface_count: usize,
@@ -60,6 +62,12 @@ impl From<PermutationError> for WorkerOverlapSearchError {
 impl From<AdditionalEstimationError> for WorkerOverlapSearchError {
     fn from(error: AdditionalEstimationError) -> Self {
         Self::AdditionalEstimation(error)
+    }
+}
+
+impl From<InitialHierarchyError> for WorkerOverlapSearchError {
+    fn from(error: InitialHierarchyError) -> Self {
+        Self::InitialHierarchy(error)
     }
 }
 
@@ -135,15 +143,6 @@ pub fn possible_overlap_search_for_subfaces(
     conditions: Option<&EquivalenceConditionSet>,
 ) -> Result<WorkerOverlapSearch, WorkerOverlapSearchError> {
     let priority = prioritize_subfaces(subfaces, reduced_subface_indices, hierarchy);
-    if priority.valid_count < priority.ordered_subface_indices.len() {
-        return Err(
-            WorkerOverlapSearchError::FinalAdditionalEstimationRequired {
-                valid_count: priority.valid_count,
-                reduced_subface_count: priority.ordered_subface_indices.len(),
-            },
-        );
-    }
-
     let mut searches = Vec::with_capacity(priority.ordered_subface_indices.len());
     for subface_index in &priority.ordered_subface_indices {
         let Some(subface) = subfaces.get(*subface_index) else {
@@ -158,6 +157,24 @@ pub fn possible_overlap_search_for_subfaces(
     while changed_subface != 0 {
         match inconsistent_subface_request(&mut searches, priority.valid_count, hierarchy)? {
             WorkerSearchStep::Consistent(table) => {
+                let mut table = table;
+                if let Err(error) = run_final_additional_estimation(
+                    &mut table,
+                    subfaces,
+                    reduced_subface_indices,
+                    conditions,
+                ) {
+                    return if priority.valid_count < priority.ordered_subface_indices.len() {
+                        Err(
+                            WorkerOverlapSearchError::FinalAdditionalEstimationRequired {
+                                valid_count: priority.valid_count,
+                                reduced_subface_count: priority.ordered_subface_indices.len(),
+                            },
+                        )
+                    } else {
+                        Err(error.into())
+                    };
+                }
                 return Ok(WorkerOverlapSearch {
                     found: true,
                     hierarchy: table.into_initial_hierarchy(hierarchy.faces_total),
@@ -175,6 +192,34 @@ pub fn possible_overlap_search_for_subfaces(
         hierarchy: hierarchy.clone(),
         priority,
     })
+}
+
+fn run_final_additional_estimation(
+    table: &mut HierarchyTable,
+    subfaces: &[SubFace],
+    reduced_subface_indices: &[usize],
+    conditions: Option<&EquivalenceConditionSet>,
+) -> Result<(), AdditionalEstimationError> {
+    let configuration = SubFaceConfiguration {
+        subfaces: subfaces.to_vec(),
+        reduced_subface_indices: reduced_subface_indices.to_vec(),
+        face_id_count_max: subfaces
+            .iter()
+            .map(|subface| subface.face_ids.len())
+            .max()
+            .unwrap_or(0),
+    };
+    let empty_conditions = EquivalenceConditionSet {
+        triple_conditions: Vec::new(),
+        quadruple_conditions: Vec::new(),
+    };
+    let conditions = conditions.unwrap_or(&empty_conditions);
+    run_additional_estimation(
+        table,
+        &configuration,
+        &conditions.triple_conditions,
+        &conditions.quadruple_conditions,
+    )
 }
 
 impl From<PermutationError> for SubFaceSearchError {

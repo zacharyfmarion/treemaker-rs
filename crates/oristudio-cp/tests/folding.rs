@@ -2,8 +2,8 @@ use oristudio_cp::folding::{
     ChainPermutationGenerator, HierarchyRelation, InitialHierarchy, SubFacePermutationSearch,
     additional_estimation_from_segments, configure_subfaces_from_segments,
     equivalence_condition_candidates_from_segments, estimate_wireframe_from_segments,
-    initial_hierarchy_from_segments, possible_overlap_search_for_subfaces,
-    prepare_subface_segments, prioritize_subfaces,
+    initial_hierarchy_from_segments, overlap_search_from_segments,
+    possible_overlap_search_for_subfaces, prepare_subface_segments, prioritize_subfaces,
 };
 use oristudio_cp::geometry::{LineColor, LineSegment, Point};
 
@@ -278,6 +278,17 @@ fn worker_overlap_search_composes_valid_subface_orders() {
             .iter()
             .any(|relation| relation.upper_face == 2 && relation.lower_face == 0)
     );
+}
+
+#[test]
+fn overlap_search_from_segments_runs_folded_worker_pipeline() {
+    let search = overlap_search_from_segments(&square_with_diagonal(), 1)
+        .expect("overlap search should not fail")
+        .expect("overlap search result");
+
+    assert!(search.found);
+    assert_eq!(search.hierarchy.faces_total, 2);
+    assert!(!search.hierarchy.relations.is_empty());
 }
 
 fn square_with_diagonal() -> Vec<LineSegment> {

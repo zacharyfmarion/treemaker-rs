@@ -1196,10 +1196,18 @@ Deliverables:
 - Status: Oriedita's worker-level no-swap overlap search is ported as
   `folding::possible_overlap_search_for_subfaces`, composing the priority pass,
   valid subface guide-map setup, per-subface consistency search, permutation
-  carry/rollback, and hierarchy stacking insertion. Realtime AEA, subface
-  swapping, and final recovery when non-valid reduced subfaces still contradict
-  the solution remain explicit unsupported paths. The oracle command
+  carry/rollback, hierarchy stacking insertion, and the final fixed-point AEA
+  consistency check over all reduced subfaces. Realtime AEA, subface swapping,
+  and final recovery when the final AEA reports a specific missing subface
+  remain explicit unsupported paths. The oracle command
   `worker-overlap-search-summary` compares the resulting status and hierarchy.
+- Status: The same no-swap worker search is exposed from folded line segments
+  as `folding::overlap_search_from_segments`, running the folded wireframe,
+  subface arrangement, subface membership, hierarchy setup, equivalence
+  discovery, priority, and worker search pipeline. The oracle command
+  `worker-overlap-from-segments-summary` compares this against an actual
+  Oriedita `FoldedFigure_Configurator.HierarchyList_configure` setup followed
+  by `FoldedFigure_Worker.possible_overlapping_search(false)`.
 
 Oracle:
 

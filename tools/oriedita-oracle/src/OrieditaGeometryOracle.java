@@ -327,6 +327,7 @@ public class OrieditaGeometryOracle {
             case "subface-overlap-search-summary" -> subfaceOverlapSearchSummary(args);
             case "subface-priority-summary" -> subfacePrioritySummary(args);
             case "worker-overlap-search-summary" -> workerOverlapSearchSummary(args);
+            case "worker-overlap-from-segments-summary" -> workerOverlapFromSegmentsSummary(args);
             default -> usage("unknown command: " + args[0]);
         }
     }
@@ -883,6 +884,47 @@ public class OrieditaGeometryOracle {
 
         int result = worker.possible_overlapping_search(false);
         printWorkerOverlapSearch(result, validCount, subfaceCount, worker.hierarchyList);
+    }
+
+    private static void workerOverlapFromSegmentsSummary(String[] args) throws Exception {
+        if (args.length < 3) {
+            usage("worker-overlap-from-segments-summary expects starting face, count, and segment payload");
+        }
+
+        int startingFace = Integer.parseInt(args[1]);
+        int count = Integer.parseInt(args[2]);
+        LineSegmentSet set = lineSegmentSet(args, 3, count);
+
+        WireFrame_Worker flat = new WireFrame_Worker(3.0);
+        flat.setLineSegmentSet(set);
+        flat.setStartingFaceId(startingFace);
+        PointSet folded = flat.folding();
+
+        LineSegmentSetWorker lineWorker = new LineSegmentSetWorker();
+        lineWorker.set(new LineSegmentSet(folded));
+        lineWorker.split_arrangement_for_SubFace_generation();
+
+        WireFrame_Worker subdivided = new WireFrame_Worker(3.0);
+        subdivided.setLineSegmentSet(lineWorker.get());
+
+        NoopBulletinBoard bulletinBoard = new NoopBulletinBoard();
+        FoldedFigure_Worker foldedWorker = new FoldedFigure_Worker(bulletinBoard);
+        FoldedFigure_Configurator configurator =
+                new FoldedFigure_Configurator(bulletinBoard, foldedWorker);
+        configurator.configureSubFaces(folded, subdivided.get());
+        FoldedFigure_Worker.HierarchyListStatus status = configurator.HierarchyList_configure(flat);
+        if (status != FoldedFigure_Worker.HierarchyListStatus.SUCCESSFUL_1000) {
+            System.out.println("worker_overlap_error|" + status.name());
+            return;
+        }
+
+        int result = foldedWorker.possible_overlapping_search(false);
+        SubFace[] reduced = reflectedReducedSubfaces(foldedWorker);
+        printWorkerOverlapSearch(
+                result,
+                foldedWorker.getSubFace_valid_number(),
+                Math.max(0, reduced.length - 1),
+                foldedWorker.hierarchyList);
     }
 
     private static void intersectDividePair(String[] args) throws Exception {
@@ -6159,6 +6201,7 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle subface-overlap-search-summary <facesTotal> <faceCount> [faceId]... <relationCount> [upper lower]... <tripleCount> [a b c d]... <quadCount> [a b c d]...");
         System.err.println("   or: OrieditaGeometryOracle subface-priority-summary <facesTotal> <subfaceCount> [faceCount faceIds...]... <relationCount> [upper lower]...");
         System.err.println("   or: OrieditaGeometryOracle worker-overlap-search-summary <facesTotal> <subfaceCount> [faceCount faceIds...]... <relationCount> [upper lower]... <tripleCount> [a b c d]... <quadCount> [a b c d]...");
+        System.err.println("   or: OrieditaGeometryOracle worker-overlap-from-segments-summary <startingFace> <count> [ax ay bx by color]...");
         System.exit(2);
     }
 }

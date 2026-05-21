@@ -4,7 +4,8 @@ use oristudio_cp::folding::{
     SubFaceConfiguration, SubFacePermutationSearch, additional_estimation_from_segments,
     configure_subfaces_from_segments, equivalence_condition_candidates_from_segments,
     estimate_wireframe_from_segments, initial_hierarchy_from_segments,
-    possible_overlap_search_for_subfaces, prepare_subface_segments, prioritize_subfaces,
+    overlap_search_from_segments, possible_overlap_search_for_subfaces, prepare_subface_segments,
+    prioritize_subfaces,
 };
 use oristudio_cp::geometry::{LineColor, LineSegment, Point};
 use std::path::{Path, PathBuf};
@@ -564,6 +565,33 @@ fn worker_overlap_search_matches_oriedita_no_swap_oracle() {
         worker_overlap_summary(&search),
         run_oracle(&oracle, &oracle_args)
     );
+}
+
+#[test]
+fn worker_overlap_from_segments_matches_oriedita_no_swap_oracle() {
+    let Some(oracle) = folding_oracle() else {
+        eprintln!("skipping Oriedita folding oracle test: ORIEDITA_GEOMETRY_ORACLE is not set");
+        return;
+    };
+
+    for starting_face in [1, 0] {
+        let segments = square_with_diagonal();
+        let search = overlap_search_from_segments(&segments, starting_face)
+            .expect("worker overlap search should not fail")
+            .expect("worker overlap search");
+        let mut args = vec![
+            "worker-overlap-from-segments-summary".to_string(),
+            starting_face.to_string(),
+            segments.len().to_string(),
+        ];
+        push_segment_args(&mut args, &segments);
+        let oracle_args = args.iter().map(String::as_str).collect::<Vec<_>>();
+
+        assert_eq!(
+            worker_overlap_summary(&search),
+            run_oracle(&oracle, &oracle_args)
+        );
+    }
 }
 
 fn folding_oracle() -> Option<PathBuf> {

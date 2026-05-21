@@ -359,6 +359,51 @@ pub fn additional_estimation_from_segments(
     }))
 }
 
+/// Oriedita `FoldedFigure_Worker.possible_overlapping_search(false)` after
+/// folding stages 01-04 have prepared subfaces, hierarchy relations, and
+/// equivalence conditions. This is the no-swap/no-realtime-AEA worker search
+/// used after an initial solution has already been discovered.
+pub fn overlap_search_from_segments(
+    segments: &[LineSegment],
+    starting_face_id: i32,
+) -> Result<Option<WorkerOverlapSearch>, WorkerOverlapSearchError> {
+    if segments.is_empty() {
+        return Ok(None);
+    }
+
+    let graph = FoldGraph::from_segments(segments, true);
+    if graph.faces.is_empty() {
+        return Ok(None);
+    }
+
+    let positions = graph.face_positions(starting_face_id);
+    let initial = initial_hierarchy_from_graph(&graph, &positions)?;
+    let folded = wireframe_from_graph(&graph, &positions, graph.folded_points(&positions));
+    let folded_segments = folded_wireframe_segments(&folded);
+    let prepared_segments = prepare_subface_segments(&folded_segments);
+    let subface_graph = FoldGraph::from_segments(&prepared_segments, true);
+    if subface_graph.faces.is_empty() {
+        return Ok(Some(WorkerOverlapSearch {
+            found: true,
+            hierarchy: initial,
+            priority: SubFacePriority {
+                ordered_subface_indices: Vec::new(),
+                valid_count: 0,
+            },
+        }));
+    }
+
+    let subfaces = configure_subfaces(&folded, &subface_graph);
+    let conditions = equivalence_condition_candidates_from_parts(&graph, &folded, &subfaces)?;
+    possible_overlap_search_for_subfaces(
+        &subfaces.subfaces,
+        &subfaces.reduced_subface_indices,
+        &initial,
+        Some(&conditions),
+    )
+    .map(Some)
+}
+
 fn initial_hierarchy_from_graph(
     graph: &FoldGraph,
     positions: &FacePositions,

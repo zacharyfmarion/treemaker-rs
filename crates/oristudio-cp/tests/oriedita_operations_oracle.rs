@@ -24,7 +24,7 @@ use oristudio_cp::operations::construction::{
     angle_system_draw_to_destination, axiom5_draw_to_destination, axiom5_indicators,
     axiom7_draw_to_destination, axiom7_indicator, commit_axiom5_indicator, commit_axiom7_indicator,
     commit_parallel_width_indicator, commit_square_bisector_parallel_indicator,
-    double_symmetric_draw, draw_crease_angle_restricted_3_candidates,
+    continuous_symmetric_draw, double_symmetric_draw, draw_crease_angle_restricted_3_candidates,
     draw_crease_angle_restricted_3_to_point, draw_crease_angle_restricted_5,
     draw_crease_angle_restricted_converging, draw_crease_segment, fishbone_draw,
     foldable_line_draw_operation_mode, foldable_line_draw_switches_to_free,
@@ -1641,6 +1641,46 @@ fn double_symmetric_draw_matches_oriedita_oracle() {
     push_segment_args(&mut args, &segments);
     let rust_summary = format!("added|{added}\n{}", line_segment_set_summary(&model));
     assert_eq!(rust_summary, run_oracle(&oracle, &args));
+}
+
+#[test]
+fn continuous_symmetric_draw_matches_oriedita_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    let segments = vec![
+        segment(2.0, -1.0, 2.0, 1.0, LineColor::Blue2),
+        segment(4.0, -1.0, 4.0, 1.0, LineColor::Black0),
+    ];
+    let mut model = model_from_segments(&segments);
+    let added = continuous_symmetric_draw(
+        &mut model,
+        Point::new(0.0, 0.0),
+        Point::new(1.0, 0.0),
+        LineColor::Red1,
+    );
+
+    let mut args = vec![
+        "foldline-continuous-symmetric-draw".to_string(),
+        "0.0".to_string(),
+        "0.0".to_string(),
+        "1.0".to_string(),
+        "0.0".to_string(),
+        LineColor::Red1.number().to_string(),
+        segments.len().to_string(),
+    ];
+    push_segment_args(&mut args, &segments);
+    let rust_summary = format!("added|{added}\n{}", line_segment_set_summary(&model));
+    assert_line_summary_close(
+        &rust_summary,
+        &run_oracle(&oracle, &args),
+        1e-9,
+        "continuous-symmetric-draw",
+    );
 }
 
 #[test]

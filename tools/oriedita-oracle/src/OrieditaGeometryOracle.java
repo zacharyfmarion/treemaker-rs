@@ -10,6 +10,7 @@ import origami.crease_pattern.element.LineSegment;
 import origami.crease_pattern.element.Point;
 import origami.crease_pattern.element.Polygon;
 import origami.crease_pattern.element.StraightLine;
+import origami.crease_pattern.util.CreasePattern_Worker_Toolbox;
 import origami.crease_pattern.worker.foldlineset.BranchTrim;
 import origami.crease_pattern.worker.foldlineset.Fix1;
 import origami.crease_pattern.worker.foldlineset.Fix2;
@@ -118,6 +119,7 @@ public class OrieditaGeometryOracle {
             case "foldline-axiom7-destination" -> foldLineAxiom7Destination(args);
             case "foldline-symmetric-draw" -> foldLineSymmetricDraw(args);
             case "foldline-double-symmetric-draw" -> foldLineDoubleSymmetricDraw(args);
+            case "foldline-continuous-symmetric-draw" -> foldLineContinuousSymmetricDraw(args);
             case "foldline-inward" -> foldLineInward(args);
             case "foldline-fishbone" -> foldLineFishbone(args);
             case "foldline-angle-restricted5" -> foldLineAngleRestricted5(args);
@@ -286,7 +288,7 @@ public class OrieditaGeometryOracle {
     }
 
     private static void foldLineDeleteInside(String[] args) {
-        if (args.length < 8) {
+        if (args.length < 7) {
             usage("foldline-delete-inside expects mode, selection segment, count, and segment payload");
         }
 
@@ -1622,6 +1624,134 @@ public class OrieditaGeometryOracle {
                  INTERSECTS_TSHAPE_S1_VERTICAL_BAR_26 -> true;
             default -> false;
         };
+    }
+
+    private static void foldLineContinuousSymmetricDraw(String[] args) {
+        if (args.length < 7) {
+            usage("foldline-continuous-symmetric-draw expects start point, through point, color, count, and segment payload");
+        }
+
+        Point start = new Point(parse(args[1]), parse(args[2]));
+        Point through = new Point(parse(args[3]), parse(args[4]));
+        LineColor color = LineColor.fromNumber(Integer.parseInt(args[5]));
+        int count = Integer.parseInt(args[6]);
+        FoldLineSet set = foldLineSet(args, 7, count);
+        List<LineSegment> result = new ArrayList<>();
+        continuousSymmetricSegments(set, start, through, null, result);
+
+        int added = 0;
+        LineColor lineColor = color;
+        for (LineSegment segment : result) {
+            LineSegment lineSegment = segment.withColor(lineColor);
+            lineColor = lineColor.changeMV();
+            if (Epsilon.high.gt0(lineSegment.determineLength())) {
+                addLineSegmentLikeWorker(set, lineSegment);
+                added++;
+            }
+        }
+
+        System.out.println("added|" + added);
+        printFoldLineSet(set);
+    }
+
+    private static void continuousSymmetricSegments(
+            FoldLineSet set,
+            Point a,
+            Point b,
+            Point start,
+            List<LineSegment> result) {
+        CreasePattern_Worker_Toolbox toolbox = new CreasePattern_Worker_Toolbox(set);
+        toolbox.lengthenUntilIntersectionCalculateDisregardIncludedLineSegment_new(a, b);
+        if (toolbox.getLengthenUntilIntersectionFlg_new() == StraightLine.Intersection.NONE_0) {
+            return;
+        }
+
+        LineSegment segment = new LineSegment(toolbox.getLengthenUntilIntersectionLineSegment_new());
+        result.add(segment);
+        if (start != null && Epsilon.high.eq0(start.distance(segment.getB()))) {
+            return;
+        }
+        if (toolbox.getLengthenUntilIntersectionFirstLineSegment_new().getColor() == LineColor.BLACK_0) {
+            return;
+        }
+        if (start == null) {
+            start = segment.getB();
+        }
+
+        if (toolbox.getLengthenUntilIntersectionFlg_new() == StraightLine.Intersection.INTERSECT_X_1) {
+            continuousSymmetricReflect(set, a, start, result, toolbox);
+            return;
+        }
+
+        if (toolbox.getLengthenUntilIntersectionFlg_new() == StraightLine.Intersection.INTERSECT_T_A_21
+                || toolbox.getLengthenUntilIntersectionFlg_new() == StraightLine.Intersection.INTERSECT_T_B_22) {
+            continuousSymmetricVertexSeed(set, a, b, start, result, toolbox);
+        }
+    }
+
+    private static void continuousSymmetricReflect(
+            FoldLineSet set,
+            Point a,
+            Point start,
+            List<LineSegment> result,
+            CreasePattern_Worker_Toolbox toolbox) {
+        LineSegment hit = new LineSegment(toolbox.getLengthenUntilIntersectionFirstLineSegment_new());
+        Point newA = toolbox.getLengthenUntilIntersectionPoint_new();
+        Point newB = OritaCalc.findLineSymmetryPoint(hit.getA(), hit.getB(), a);
+        continuousSymmetricSegments(set, newA, newB, start, result);
+    }
+
+    private static void continuousSymmetricVertexSeed(
+            FoldLineSet set,
+            Point a,
+            Point b,
+            Point start,
+            List<LineSegment> result,
+            CreasePattern_Worker_Toolbox toolbox) {
+        StraightLine currentLine = new StraightLine(a, b);
+        SortingBox<LineSegment> vertexLines = set.get_SortingBox_of_vertex_b_surrounding_foldLine(
+                toolbox.getLengthenUntilIntersectionLineSegment_new().getA(),
+                toolbox.getLengthenUntilIntersectionLineSegment_new().getB());
+
+        if (vertexLines.getTotal() == 2) {
+            if (currentLine.lineSegment_intersect_reverse_detail(vertexLines.getValue(1))
+                    == StraightLine.Intersection.INCLUDED_3) {
+                return;
+            }
+            if (currentLine.lineSegment_intersect_reverse_detail(vertexLines.getValue(2))
+                    == StraightLine.Intersection.INCLUDED_3) {
+                return;
+            }
+            StraightLine otherLine = new StraightLine(vertexLines.getValue(1));
+            if (otherLine.lineSegment_intersect_reverse_detail(vertexLines.getValue(2))
+                    == StraightLine.Intersection.INCLUDED_3) {
+                continuousSymmetricReflect(set, a, start, result, toolbox);
+            }
+            return;
+        }
+
+        if (vertexLines.getTotal() == 3) {
+            for (int includedIndex = 1; includedIndex <= 3; includedIndex++) {
+                if (currentLine.lineSegment_intersect_reverse_detail(vertexLines.getValue(includedIndex))
+                        != StraightLine.Intersection.INCLUDED_3) {
+                    continue;
+                }
+                int nextIndex = includedIndex + 1;
+                if (nextIndex > 3) {
+                    nextIndex -= 3;
+                }
+                int lastIndex = includedIndex + 2;
+                if (lastIndex > 3) {
+                    lastIndex -= 3;
+                }
+                StraightLine otherLine = new StraightLine(vertexLines.getValue(nextIndex));
+                if (otherLine.lineSegment_intersect_reverse_detail(vertexLines.getValue(lastIndex))
+                        == StraightLine.Intersection.INCLUDED_3) {
+                    continuousSymmetricReflect(set, a, start, result, toolbox);
+                    return;
+                }
+            }
+        }
     }
 
     private static void foldLineInward(String[] args) {
@@ -3657,6 +3787,7 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle foldline-axiom7-destination <indicator ax ay bx by color> <destination ax ay bx by color> <color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-symmetric-draw <source ax ay bx by color> <mirror ax ay bx by color> <color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-double-symmetric-draw <drag ax ay bx by color> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-continuous-symmetric-draw <startX> <startY> <throughX> <throughY> <color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-inward <p1x> <p1y> <p2x> <p2y> <p3x> <p3y> <color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-fishbone <drag ax ay bx by color> <gridWidth> <color> <selectionDistance> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-angle-restricted5 <anchorX> <anchorY> <pointerX> <pointerY> <divider> <angle1> <angle2> <angle3> <angle4> <angle5> <angle6> <selectionDistance> <color> <count> [ax ay bx by color]...");

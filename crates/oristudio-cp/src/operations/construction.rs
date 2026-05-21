@@ -2,13 +2,13 @@
 
 use crate::geometry::{
     ActiveState, Epsilon, Intersection, LineColor, LineSegment, ParallelJudgement, Point,
-    StraightLine, angle, angle_between_0_360, center, determine_line_segment_distance,
-    determine_line_segment_intersection, determine_line_segment_intersection_sweet_with_tolerances,
-    distance, find_intersection_segments, find_intersection_straight_lines,
-    find_line_symmetry_line_segment, find_line_symmetry_point, find_projection,
-    find_projection_segment, get_segment_with_length, is_line_segment_parallel,
-    is_line_segment_parallel_with_precision, is_point_within_line_span, line_segment_rotate,
-    line_segment_rotate_scaled, mid_point, move_parallel, point_rotate,
+    StraightLine, StraightLineIntersection, angle, angle_between_0_360, center,
+    determine_line_segment_distance, determine_line_segment_intersection,
+    determine_line_segment_intersection_sweet_with_tolerances, distance,
+    find_intersection_segments, find_intersection_straight_lines, find_line_symmetry_line_segment,
+    find_line_symmetry_point, find_projection, find_projection_segment, get_segment_with_length,
+    is_line_segment_parallel, is_line_segment_parallel_with_precision, is_point_within_line_span,
+    line_segment_rotate, line_segment_rotate_scaled, mid_point, move_parallel, point_rotate,
 };
 use crate::model::CreasePatternModel;
 use crate::operations::arrangement::{
@@ -56,6 +56,13 @@ struct Axiom5IndicatorDecision<'a> {
 struct WeightedVertexLine {
     segment: LineSegment,
     angle: f64,
+}
+
+struct ContinuousLengthenResult {
+    segment: LineSegment,
+    point: Point,
+    flag: StraightLineIntersection,
+    first_hit: LineSegment,
 }
 
 /// Oriedita free/restricted draw-crease insertion after endpoints are resolved.
@@ -887,6 +894,29 @@ pub fn double_symmetric_draw(model: &mut CreasePatternModel, drag_segment: &Line
     added
 }
 
+/// Oriedita `CONTINUOUS_SYMMETRIC_DRAW_52` recursive reflection draw.
+pub fn continuous_symmetric_draw(
+    model: &mut CreasePatternModel,
+    start: Point,
+    through: Point,
+    color: LineColor,
+) -> usize {
+    let mut segments = Vec::new();
+    continuous_symmetric_segments(model, start, through, None, &mut segments);
+
+    let mut line_color = color;
+    let mut added = 0;
+    for segment in segments {
+        let result = segment.with_line_color(line_color);
+        line_color = line_color.change_mv();
+        if Epsilon::HIGH.gt0(result.determine_length()) {
+            add_line_segment_like_worker(model, &result);
+            added += 1;
+        }
+    }
+    added
+}
+
 /// Oriedita `INWARD_8` final mutation after three distinct points are resolved.
 pub fn inward(
     model: &mut CreasePatternModel,
@@ -1305,6 +1335,172 @@ fn base_line_from_vertex(segment: &LineSegment, vertex: Point) -> LineSegment {
     } else {
         LineSegment::new(vertex, vertex)
     }
+}
+
+fn continuous_symmetric_segments(
+    model: &CreasePatternModel,
+    a: Point,
+    b: Point,
+    start: Option<Point>,
+    output: &mut Vec<LineSegment>,
+) {
+    let Some(hit) = lengthen_until_intersection_disregard_included(model, a, b) else {
+        return;
+    };
+
+    output.push(hit.segment.clone());
+    if start.is_some_and(|start| Epsilon::HIGH.eq0(start.distance(hit.segment.b))) {
+        return;
+    }
+    if hit.first_hit.color == LineColor::Black0 {
+        return;
+    }
+
+    let start = start.unwrap_or(hit.segment.b);
+    match hit.flag {
+        StraightLineIntersection::IntersectX1 => {
+            continuous_symmetric_reflect(model, a, start, output, &hit);
+        }
+        StraightLineIntersection::IntersectTA21 | StraightLineIntersection::IntersectTB22 => {
+            continuous_symmetric_vertex_seed(model, a, b, start, output, &hit);
+        }
+        StraightLineIntersection::None0 | StraightLineIntersection::Included3 => {}
+    }
+}
+
+fn continuous_symmetric_reflect(
+    model: &CreasePatternModel,
+    a: Point,
+    start: Point,
+    output: &mut Vec<LineSegment>,
+    hit: &ContinuousLengthenResult,
+) {
+    let new_a = hit.point;
+    let new_b = find_line_symmetry_point(hit.first_hit.a, hit.first_hit.b, a);
+    continuous_symmetric_segments(model, new_a, new_b, Some(start), output);
+}
+
+fn continuous_symmetric_vertex_seed(
+    model: &CreasePatternModel,
+    a: Point,
+    b: Point,
+    start: Point,
+    output: &mut Vec<LineSegment>,
+    hit: &ContinuousLengthenResult,
+) {
+    let current_line = StraightLine::from_points(a, b);
+    let vertex_lines = sorted_vertex_b_surrounding_fold_lines(model, hit.segment.a, hit.segment.b);
+    match vertex_lines.len() {
+        2 => {
+            if current_line.line_segment_intersect_reverse_detail(&vertex_lines[0])
+                == StraightLineIntersection::Included3
+            {
+                return;
+            }
+            if current_line.line_segment_intersect_reverse_detail(&vertex_lines[1])
+                == StraightLineIntersection::Included3
+            {
+                return;
+            }
+            if StraightLine::from_segment(&vertex_lines[0])
+                .line_segment_intersect_reverse_detail(&vertex_lines[1])
+                == StraightLineIntersection::Included3
+            {
+                continuous_symmetric_reflect(model, a, start, output, hit);
+            }
+        }
+        3 => {
+            for included_index in 0..3 {
+                if current_line.line_segment_intersect_reverse_detail(&vertex_lines[included_index])
+                    != StraightLineIntersection::Included3
+                {
+                    continue;
+                }
+                let next_index = (included_index + 1) % 3;
+                let last_index = (included_index + 2) % 3;
+                if StraightLine::from_segment(&vertex_lines[next_index])
+                    .line_segment_intersect_reverse_detail(&vertex_lines[last_index])
+                    == StraightLineIntersection::Included3
+                {
+                    continuous_symmetric_reflect(model, a, start, output, hit);
+                    return;
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
+fn lengthen_until_intersection_disregard_included(
+    model: &CreasePatternModel,
+    a: Point,
+    b: Point,
+) -> Option<ContinuousLengthenResult> {
+    let mut closest_distance = Point::new(1_000_000.0, 1_000_000.0).distance(a);
+    let straight_line = StraightLine::from_points(a, b);
+    let mut result = None;
+
+    for segment in &model.line_segments {
+        if !segment.color.is_folding_line() {
+            continue;
+        }
+        let flag = straight_line.line_segment_intersect_reverse_detail(segment);
+        if !matches!(
+            flag,
+            StraightLineIntersection::IntersectX1
+                | StraightLineIntersection::IntersectTA21
+                | StraightLineIntersection::IntersectTB22
+        ) {
+            continue;
+        }
+
+        let intersection =
+            find_intersection_straight_lines(straight_line, StraightLine::from_segment(segment));
+        if intersection.distance(a) <= Epsilon::UNKNOWN_1EN5 {
+            continue;
+        }
+        if intersection.distance(a) >= closest_distance {
+            continue;
+        }
+
+        let intersection_angle = angle((a, b, a, intersection));
+        if !(1.0..=359.0).contains(&intersection_angle) {
+            closest_distance = intersection.distance(a);
+            let segment_to_hit = LineSegment::new(a, intersection);
+            result = Some(ContinuousLengthenResult {
+                segment: segment_to_hit,
+                point: intersection,
+                flag,
+                first_hit: segment.clone(),
+            });
+        }
+    }
+
+    result
+}
+
+fn sorted_vertex_b_surrounding_fold_lines(
+    model: &CreasePatternModel,
+    a: Point,
+    b: Point,
+) -> Vec<LineSegment> {
+    let mut lines = Vec::new();
+    for segment in &model.line_segments {
+        if !segment.color.is_folding_line() {
+            continue;
+        }
+        if b.distance(segment.a) < Epsilon::FLAT {
+            lines.push((angle((b, a, segment.a, segment.b)), segment.clone()));
+        } else if b.distance(segment.b) < Epsilon::FLAT {
+            lines.push((angle((b, a, segment.b, segment.a)), segment.clone()));
+        }
+    }
+    lines.sort_by(|left, right| {
+        left.0
+            .partial_cmp(&right.0)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    lines.into_iter().map(|(_, segment)| segment).collect()
 }
 
 fn axiom5_tangent_indicators(

@@ -1009,6 +1009,11 @@ Status:
   axis kernel. The implementation preserves Oriedita's snapshot iteration,
   valid endpoint/T-intersection filter, far-endpoint reflection, extension to
   the next hit, and worker-style insertion splitting.
+- `CONTINUOUS_SYMMETRIC_DRAW_52` is ported and oracle-tested for the resolved
+  two-point kernel. The implementation preserves Oriedita's recursive
+  lengthen-to-first-hit behavior, black-edge and start-loop stopping, T-vertex
+  branching through surrounding fold lines, reflection across each hit line,
+  and alternating mountain/valley insertion.
 - `INWARD_8` is ported and oracle-tested for the resolved three-point kernel,
   preserving Oriedita's incenter calculation and per-ray insertion behavior.
 - `SQUARE_BISECTOR_7` is ported and oracle-tested across all resolved kernels:

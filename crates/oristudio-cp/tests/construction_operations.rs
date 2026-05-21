@@ -4,7 +4,7 @@ use oristudio_cp::operations::construction::{
     DrawCreaseTarget, FoldableLineDrawOperationMode, angle_restricted_converging_candidates,
     angle_system_candidates, angle_system_draw_to_destination, axiom5_draw_to_destination,
     axiom5_indicators, axiom7_draw_to_destination, axiom7_indicator, commit_axiom5_indicator,
-    commit_parallel_width_indicator, double_symmetric_draw,
+    commit_parallel_width_indicator, continuous_symmetric_draw, double_symmetric_draw,
     draw_crease_angle_restricted_3_candidates, draw_crease_angle_restricted_3_to_point,
     draw_crease_angle_restricted_5, draw_crease_angle_restricted_converging, draw_crease_segment,
     fishbone_draw, foldable_line_draw_operation_mode, foldable_line_draw_switches_to_free,
@@ -213,6 +213,36 @@ fn double_symmetric_draw_reflects_far_endpoint_across_drag_axis() {
         Point::new(-2.0, 1.0),
         Point::new(-3.0, 1.0),
         LineColor::Red1,
+    ));
+}
+
+#[test]
+fn continuous_symmetric_draw_reflects_across_successive_hits_and_alternates_colors() {
+    let mut model = model_from_segments(&[
+        segment(2.0, -1.0, 2.0, 1.0, LineColor::Blue2),
+        segment(4.0, -1.0, 4.0, 1.0, LineColor::Black0),
+    ]);
+
+    assert_eq!(
+        continuous_symmetric_draw(
+            &mut model,
+            Point::new(0.0, 0.0),
+            Point::new(1.0, 0.0),
+            LineColor::Red1,
+        ),
+        2
+    );
+    assert!(contains_segment_close(
+        &model.line_segments,
+        Point::new(0.0, 0.0),
+        Point::new(2.0, 0.0),
+        LineColor::Red1,
+    ));
+    assert!(contains_segment_close(
+        &model.line_segments,
+        Point::new(2.0, 0.0),
+        Point::new(4.0, 0.0),
+        LineColor::Blue2,
     ));
 }
 

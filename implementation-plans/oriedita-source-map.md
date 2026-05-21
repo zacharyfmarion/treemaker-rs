@@ -170,7 +170,7 @@ stage explicitly changes it.
 | `CIRCLE_DRAW_CONCENTRIC_SELECT_49` | `MouseHandlerCircleDrawConcentricSelect` | `operations::circle::concentric_select` | kernel | 8 | Oracle-tested |
 | `CIRCLE_DRAW_CONCENTRIC_TWO_CIRCLE_SELECT_50` | `MouseHandlerCircleDrawConcentricTwoCircleSelect` | `operations::circle::concentric_two_circle_select` | kernel | 8 | Oracle-tested |
 | `PARALLEL_DRAW_WIDTH_51` | `MouseHandlerParallelDrawWidth` | `operations::construction::parallel_width_indicators` | kernel | 7 | Oracle-tested |
-| `CONTINUOUS_SYMMETRIC_DRAW_52` | `MouseHandlerContinuousSymmetricDraw` | `operations::construction::continuous_symmetric` | kernel | 7 | Unsupported |
+| `CONTINUOUS_SYMMETRIC_DRAW_52` | `MouseHandlerContinuousSymmetricDraw` | `operations::construction::continuous_symmetric_draw` | kernel | 7 | Oracle-tested |
 | `DISPLAY_LENGTH_BETWEEN_POINTS_1_53` | `MouseHandlerDisplayLengthBetweenPoints` variant | `operations::measure::length_between_points` | kernel | 7 | Oracle-tested |
 | `DISPLAY_LENGTH_BETWEEN_POINTS_2_54` | `MouseHandlerDisplayLengthBetweenPoints` variant | `operations::measure::length_between_points` | kernel | 7 | Oracle-tested |
 | `DISPLAY_ANGLE_BETWEEN_THREE_POINTS_1_55` | `MouseHandlerDisplayAngleBetweenThreePoints` variant | `operations::measure::angle_between_three_points` | kernel | 7 | Oracle-tested |

@@ -674,10 +674,10 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
     descriptor!(
         ContinuousSymmetricDraw,
         "MouseHandlerContinuousSymmetricDraw",
-        "operations::construction::continuous_symmetric",
+        "operations::construction::continuous_symmetric_draw",
         Kernel,
         7,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         DisplayLengthBetweenPoints1,

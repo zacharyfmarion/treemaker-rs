@@ -946,10 +946,10 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
     descriptor!(
         Axiom5,
         "MouseHandlerAxiom5",
-        "operations::construction::axiom5",
+        "operations::construction::axiom5_indicators",
         Kernel,
         7,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         Axiom7,

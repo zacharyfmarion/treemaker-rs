@@ -6,9 +6,9 @@ use crate::geometry::{
     determine_line_segment_intersection, determine_line_segment_intersection_sweet_with_tolerances,
     distance, find_intersection_segments, find_intersection_straight_lines,
     find_line_symmetry_line_segment, find_line_symmetry_point, find_projection,
-    get_segment_with_length, is_line_segment_parallel, is_line_segment_parallel_with_precision,
-    is_point_within_line_span, line_segment_rotate, line_segment_rotate_scaled, mid_point,
-    move_parallel,
+    find_projection_segment, get_segment_with_length, is_line_segment_parallel,
+    is_line_segment_parallel_with_precision, is_point_within_line_span, line_segment_rotate,
+    line_segment_rotate_scaled, mid_point, move_parallel, point_rotate,
 };
 use crate::model::CreasePatternModel;
 use crate::operations::arrangement::{
@@ -27,6 +27,17 @@ pub enum DrawCreaseTarget {
 pub struct AngleRestrictedConvergingCandidates {
     pub indicators: Vec<LineSegment>,
     pub intersections: Vec<Point>,
+}
+
+struct Axiom5IndicatorDecision<'a> {
+    base: &'a LineSegment,
+    first_projected: &'a LineSegment,
+    second_projected: &'a LineSegment,
+    pivot: Point,
+    center1: Point,
+    center2: Point,
+    target: Point,
+    target_segment: &'a LineSegment,
 }
 
 /// Oriedita free/restricted draw-crease insertion after endpoints are resolved.
@@ -497,6 +508,111 @@ pub fn perpendicular_draw_to_destination(
     true
 }
 
+/// Oriedita `AXIOM_5` purple indicator generation after target point, target line, and pivot are resolved.
+pub fn axiom5_indicators(
+    model: &CreasePatternModel,
+    target_point: Point,
+    target_segment: &LineSegment,
+    pivot_point: Point,
+) -> Option<[LineSegment; 2]> {
+    if distance(pivot_point, target_point) <= Epsilon::UNKNOWN_1EN7 {
+        return None;
+    }
+    if is_point_within_line_span(pivot_point, target_segment)
+        && is_point_within_line_span(target_point, target_segment)
+    {
+        return None;
+    }
+
+    let radius = distance(target_point, pivot_point);
+    if radius <= Epsilon::UNKNOWN_1EN7 {
+        return None;
+    }
+
+    let mut length_a = 0.0;
+    if !is_point_within_line_span(pivot_point, target_segment) {
+        length_a = distance(
+            pivot_point,
+            find_projection_segment(target_segment, pivot_point),
+        );
+    }
+
+    if (length_a - radius).abs() < Epsilon::UNKNOWN_1EN7 {
+        return axiom5_tangent_indicators(model, target_point, target_segment, pivot_point);
+    }
+    if length_a > radius {
+        return None;
+    }
+
+    let base = LineSegment::new(target_point, pivot_point);
+    let project_point = find_projection_segment(target_segment, pivot_point);
+    let length_b = ((radius * radius) - (length_a * length_a)).sqrt();
+    let first_projected = axiom5_projected_line_of_indicator(pivot_point, project_point, length_b);
+    let second_projected =
+        axiom5_projected_line_of_indicator(pivot_point, project_point, -length_b);
+    let (first_projected, second_projected) = axiom5_process_pivot_within_segment_span(
+        first_projected,
+        second_projected,
+        target_segment,
+        pivot_point,
+    );
+    let center1 = axiom5_process_center(pivot_point, &base, &first_projected);
+    let center2 = axiom5_process_center(pivot_point, &base, &second_projected);
+    axiom5_determine_indicators(
+        model,
+        Axiom5IndicatorDecision {
+            base: &base,
+            first_projected: &first_projected,
+            second_projected: &second_projected,
+            pivot: pivot_point,
+            center1,
+            center2,
+            target: target_point,
+            target_segment,
+        },
+    )
+}
+
+/// Add the chosen Axiom 5 indicator itself.
+pub fn commit_axiom5_indicator(
+    model: &mut CreasePatternModel,
+    indicator: &LineSegment,
+    color: LineColor,
+) -> bool {
+    let reversed = LineSegment::with_color(indicator.b, indicator.a, color);
+    let result = full_extend_until_hit(model, &reversed);
+    if !Epsilon::HIGH.gt0(result.determine_length()) {
+        return false;
+    }
+    add_line_segment_like_worker(model, &result);
+    true
+}
+
+/// Oriedita `AXIOM_5` destination branch after indicators and destination are resolved.
+pub fn axiom5_draw_to_destination(
+    model: &mut CreasePatternModel,
+    pivot_point: Point,
+    indicator1: &LineSegment,
+    indicator2: &LineSegment,
+    destination: &LineSegment,
+    pointer: Point,
+    color: LineColor,
+) -> bool {
+    let intersection1 = find_intersection_segments(indicator1, destination);
+    let intersection2 = find_intersection_segments(indicator2, destination);
+    let target = if distance(pointer, intersection1) < distance(pointer, intersection2) {
+        intersection1
+    } else {
+        intersection2
+    };
+    let result = LineSegment::with_color(pivot_point, target, color);
+    if !Epsilon::HIGH.gt0(result.determine_length()) {
+        return false;
+    }
+    add_line_segment_like_worker(model, &result);
+    true
+}
+
 /// Oriedita `AXIOM_7` purple indicator generation after target inputs are resolved.
 pub fn axiom7_indicator(
     model: &CreasePatternModel,
@@ -949,6 +1065,229 @@ fn angle_restricted_converging_intersections(
         }
     }
     intersections
+}
+
+fn axiom5_tangent_indicators(
+    model: &CreasePatternModel,
+    target_point: Point,
+    target_segment: &LineSegment,
+    pivot_point: Point,
+) -> Option<[LineSegment; 2]> {
+    let projection_point = find_projection_segment(target_segment, pivot_point);
+    let projection_line = LineSegment::new(pivot_point, projection_point);
+
+    if is_point_within_line_span(target_point, &projection_line) {
+        if distance(projection_point, target_point) < Epsilon::UNKNOWN_1EN7 {
+            let midpoint = mid_point(pivot_point, projection_point);
+            return Some([
+                full_extend_until_hit(
+                    model,
+                    &LineSegment::with_color(
+                        midpoint,
+                        find_projection_segment(&move_parallel(&projection_line, -1.0), midpoint),
+                        LineColor::Purple8,
+                    ),
+                ),
+                full_extend_until_hit(
+                    model,
+                    &LineSegment::with_color(
+                        midpoint,
+                        find_projection_segment(&move_parallel(&projection_line, 1.0), midpoint),
+                        LineColor::Purple8,
+                    ),
+                ),
+            ]);
+        }
+
+        return Some([
+            full_extend_until_hit(
+                model,
+                &LineSegment::with_color(
+                    pivot_point,
+                    find_projection_segment(&move_parallel(&projection_line, 1.0), pivot_point),
+                    LineColor::Purple8,
+                ),
+            ),
+            full_extend_until_hit(
+                model,
+                &LineSegment::with_color(
+                    pivot_point,
+                    find_projection_segment(&move_parallel(&projection_line, -1.0), pivot_point),
+                    LineColor::Purple8,
+                ),
+            ),
+        ]);
+    }
+
+    let source = LineSegment::new(pivot_point, target_point);
+    let indicator = if is_line_segment_parallel(
+        StraightLine::from_segment(&source),
+        StraightLine::from_segment(&projection_line),
+    ) == ParallelJudgement::NotParallel
+    {
+        full_extend_until_hit(
+            model,
+            &LineSegment::with_color(
+                pivot_point,
+                center(pivot_point, target_point, projection_point),
+                LineColor::Purple8,
+            ),
+        )
+    } else {
+        full_extend_until_hit(
+            model,
+            &LineSegment::with_color(pivot_point, projection_point, LineColor::Purple8),
+        )
+    };
+    Some([indicator.clone(), indicator])
+}
+
+fn axiom5_projected_line_of_indicator(
+    pivot: Point,
+    project_point: Point,
+    length: f64,
+) -> LineSegment {
+    let project_line = LineSegment::new(pivot, project_point);
+    let shifted = move_parallel(&project_line, length);
+    LineSegment::new(pivot, find_projection_segment(&shifted, project_point))
+}
+
+fn axiom5_process_center(pivot: Point, first: &LineSegment, second: &LineSegment) -> Point {
+    let first_far = first.determine_furthest_endpoint(pivot);
+    let second_far = second.determine_furthest_endpoint(pivot);
+    if is_line_segment_parallel(
+        StraightLine::from_points(first_far, pivot),
+        StraightLine::from_points(pivot, second_far),
+    ) == ParallelJudgement::ParallelEqual
+    {
+        let shifted = move_parallel(first, 1.0);
+        let segment = LineSegment::new(pivot, find_projection_segment(&shifted, pivot));
+        return center(
+            first_far,
+            second_far,
+            segment.determine_furthest_endpoint(pivot),
+        );
+    }
+    center(pivot, second_far, first_far)
+}
+
+fn axiom5_process_pivot_within_segment_span(
+    mut first: LineSegment,
+    mut second: LineSegment,
+    target_segment: &LineSegment,
+    pivot: Point,
+) -> (LineSegment, LineSegment) {
+    if is_point_within_line_span(pivot, target_segment) {
+        if distance(pivot, target_segment.a) < Epsilon::UNKNOWN_1EN7 {
+            first = LineSegment::new(pivot, point_rotate(pivot, target_segment.b, 180.0));
+            second = LineSegment::new(pivot, target_segment.b);
+            return (first, second);
+        }
+        if distance(pivot, target_segment.b) < Epsilon::UNKNOWN_1EN7 {
+            first = LineSegment::new(pivot, target_segment.a);
+            second = LineSegment::new(pivot, point_rotate(pivot, target_segment.a, 180.0));
+            return (first, second);
+        }
+
+        let outside_a = target_segment.determine_length() > distance(target_segment.a, pivot)
+            && distance(target_segment.b, pivot) > target_segment.determine_length();
+        let outside_b = target_segment.determine_length() > distance(target_segment.b, pivot)
+            && distance(target_segment.a, pivot) > target_segment.determine_length();
+
+        first = LineSegment::new(
+            pivot,
+            if outside_a {
+                point_rotate(pivot, target_segment.b, 180.0)
+            } else {
+                target_segment.a
+            },
+        );
+        second = LineSegment::new(
+            pivot,
+            if outside_b {
+                point_rotate(pivot, target_segment.a, 180.0)
+            } else {
+                target_segment.b
+            },
+        );
+    }
+    (first, second)
+}
+
+fn axiom5_determine_indicators(
+    model: &CreasePatternModel,
+    decision: Axiom5IndicatorDecision<'_>,
+) -> Option<[LineSegment; 2]> {
+    if distance(
+        decision.center1,
+        find_projection_segment(decision.target_segment, decision.center1),
+    ) > Epsilon::UNKNOWN_1EN7
+        || distance(
+            decision.center2,
+            find_projection_segment(decision.target_segment, decision.center2),
+        ) > Epsilon::UNKNOWN_1EN7
+    {
+        if !is_point_within_line_span(decision.target, decision.target_segment) {
+            return Some([
+                full_extend_until_hit(
+                    model,
+                    &LineSegment::with_color(decision.pivot, decision.center1, LineColor::Purple8),
+                ),
+                full_extend_until_hit(
+                    model,
+                    &LineSegment::with_color(decision.pivot, decision.center2, LineColor::Purple8),
+                ),
+            ]);
+        }
+        if is_line_segment_parallel(
+            StraightLine::from_segment(decision.first_projected),
+            StraightLine::from_segment(decision.base),
+        ) == ParallelJudgement::ParallelEqual
+        {
+            let indicator = full_extend_until_hit(
+                model,
+                &LineSegment::with_color(decision.pivot, decision.center2, LineColor::Purple8),
+            );
+            return Some([indicator.clone(), indicator]);
+        }
+        if is_line_segment_parallel(
+            StraightLine::from_segment(decision.second_projected),
+            StraightLine::from_segment(decision.base),
+        ) == ParallelJudgement::ParallelEqual
+        {
+            let indicator = full_extend_until_hit(
+                model,
+                &LineSegment::with_color(decision.pivot, decision.center1, LineColor::Purple8),
+            );
+            return Some([indicator.clone(), indicator]);
+        }
+        return None;
+    }
+
+    Some([
+        full_extend_until_hit(
+            model,
+            &LineSegment::with_color(
+                decision.pivot,
+                find_projection_segment(
+                    &move_parallel(decision.first_projected, 1.0),
+                    decision.pivot,
+                ),
+                LineColor::Purple8,
+            ),
+        ),
+        full_extend_until_hit(
+            model,
+            &LineSegment::with_color(
+                decision.pivot,
+                find_projection_segment(
+                    &move_parallel(decision.second_projected, -1.0),
+                    decision.pivot,
+                ),
+                LineColor::Purple8,
+            ),
+        ),
+    ])
 }
 
 fn closest_line_segment_or_sentinel(model: &CreasePatternModel, point: Point) -> LineSegment {

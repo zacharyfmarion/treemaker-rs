@@ -51,6 +51,16 @@ public class OrieditaGeometryOracle {
         }
     }
 
+    private static class LineSegmentPair {
+        final LineSegment first;
+        final LineSegment second;
+
+        LineSegmentPair(LineSegment first, LineSegment second) {
+            this.first = first;
+            this.second = second;
+        }
+    }
+
     public static void main(String[] args) throws Exception {
         if (args.length < 1) {
             usage("missing command");
@@ -100,6 +110,9 @@ public class OrieditaGeometryOracle {
             case "foldline-parallel-width" -> foldLineParallelWidth(args);
             case "foldline-perpendicular-projection" -> foldLinePerpendicularProjection(args);
             case "foldline-perpendicular-indicator" -> foldLinePerpendicularIndicator(args);
+            case "foldline-axiom5-indicator" -> foldLineAxiom5Indicator(args);
+            case "foldline-axiom5-commit" -> foldLineAxiom5Commit(args);
+            case "foldline-axiom5-destination" -> foldLineAxiom5Destination(args);
             case "foldline-axiom7-indicator" -> foldLineAxiom7Indicator(args);
             case "foldline-axiom7-commit" -> foldLineAxiom7Commit(args);
             case "foldline-axiom7-destination" -> foldLineAxiom7Destination(args);
@@ -1201,6 +1214,248 @@ public class OrieditaGeometryOracle {
                     + result.determineBY() + "|"
                     + result.getColor().getNumber());
         }
+    }
+
+    private static void foldLineAxiom5Indicator(String[] args) {
+        if (args.length < 11) {
+            usage("foldline-axiom5-indicator expects target point, target segment, pivot point, count, and segment payload");
+        }
+
+        Point targetPoint = new Point(parse(args[1]), parse(args[2]));
+        LineSegment targetSegment = segment(args, 3);
+        Point pivotPoint = new Point(parse(args[8]), parse(args[9]));
+        int count = Integer.parseInt(args[10]);
+        FoldLineSet set = foldLineSet(args, 11, count);
+        LineSegmentPair indicators = axiom5Indicators(set, targetPoint, targetSegment, pivotPoint);
+        List<LineSegment> results = new ArrayList<>();
+        if (indicators != null) {
+            results.add(indicators.first);
+            results.add(indicators.second);
+        }
+        printLineSegmentsList(results);
+    }
+
+    private static void foldLineAxiom5Commit(String[] args) {
+        if (args.length < 8) {
+            usage("foldline-axiom5-commit expects indicator segment, color, count, and segment payload");
+        }
+
+        LineSegment indicator = segment(args, 1);
+        LineColor color = LineColor.fromNumber(Integer.parseInt(args[6]));
+        int count = Integer.parseInt(args[7]);
+        FoldLineSet set = foldLineSet(args, 8, count);
+        LineSegment result = OritaCalc.fullExtendUntilHit(
+                set,
+                new LineSegment(indicator.getB(), indicator.getA(), color));
+        boolean added = Epsilon.high.gt0(result.determineLength());
+        if (added) {
+            addLineSegmentLikeWorker(set, result);
+        }
+
+        System.out.println("added|" + added);
+        printFoldLineSet(set);
+    }
+
+    private static void foldLineAxiom5Destination(String[] args) {
+        if (args.length < 22) {
+            usage("foldline-axiom5-destination expects pivot point, two indicators, destination, pointer, color, count, and segment payload");
+        }
+
+        Point pivotPoint = new Point(parse(args[1]), parse(args[2]));
+        LineSegment indicator1 = segment(args, 3);
+        LineSegment indicator2 = segment(args, 8);
+        LineSegment destination = segment(args, 13);
+        Point pointer = new Point(parse(args[18]), parse(args[19]));
+        LineColor color = LineColor.fromNumber(Integer.parseInt(args[20]));
+        int count = Integer.parseInt(args[21]);
+        FoldLineSet set = foldLineSet(args, 22, count);
+
+        Point intersection1 = OritaCalc.findIntersection(indicator1, destination);
+        Point intersection2 = OritaCalc.findIntersection(indicator2, destination);
+        Point target = pointer.distance(intersection1) < pointer.distance(intersection2)
+                ? intersection1
+                : intersection2;
+        LineSegment result = new LineSegment(pivotPoint, target, color);
+        boolean added = Epsilon.high.gt0(result.determineLength());
+        if (added) {
+            addLineSegmentLikeWorker(set, result);
+        }
+
+        System.out.println("added|" + added);
+        printFoldLineSet(set);
+    }
+
+    private static LineSegmentPair axiom5Indicators(
+            FoldLineSet set,
+            Point targetPoint,
+            LineSegment targetSegment,
+            Point pivotPoint) {
+        if (OritaCalc.distance(pivotPoint, targetPoint) <= Epsilon.UNKNOWN_1EN7) {
+            return null;
+        }
+        if (OritaCalc.isPointWithinLineSpan(pivotPoint, targetSegment)
+                && OritaCalc.isPointWithinLineSpan(targetPoint, targetSegment)) {
+            return null;
+        }
+
+        double radius = OritaCalc.distance(targetPoint, pivotPoint);
+        if (radius <= Epsilon.UNKNOWN_1EN7) {
+            return null;
+        }
+
+        double lengthA = 0.0;
+        if (!OritaCalc.isPointWithinLineSpan(pivotPoint, targetSegment)) {
+            lengthA = OritaCalc.distance(pivotPoint, OritaCalc.findProjection(targetSegment, pivotPoint));
+        }
+
+        if (Math.abs(lengthA - radius) < Epsilon.UNKNOWN_1EN7) {
+            return axiom5TangentIndicators(set, targetPoint, targetSegment, pivotPoint);
+        }
+        if (lengthA > radius) {
+            return null;
+        }
+
+        LineSegment base = new LineSegment(targetPoint, pivotPoint);
+        Point projectPoint = OritaCalc.findProjection(targetSegment, pivotPoint);
+        double lengthB = Math.sqrt((radius * radius) - (lengthA * lengthA));
+        LineSegment first = axiom5ProjectedLineOfIndicator(pivotPoint, projectPoint, lengthB);
+        LineSegment second = axiom5ProjectedLineOfIndicator(pivotPoint, projectPoint, -lengthB);
+        LineSegmentPair adjusted = axiom5ProcessPivotWithinSegmentSpan(first, second, targetSegment, pivotPoint);
+        first = adjusted.first;
+        second = adjusted.second;
+
+        Point center1 = axiom5ProcessCenter(pivotPoint, base, first);
+        Point center2 = axiom5ProcessCenter(pivotPoint, base, second);
+        return axiom5DetermineIndicators(
+                set, base, first, second, pivotPoint, center1, center2, targetPoint, targetSegment);
+    }
+
+    private static LineSegmentPair axiom5TangentIndicators(
+            FoldLineSet set,
+            Point targetPoint,
+            LineSegment targetSegment,
+            Point pivotPoint) {
+        Point projectionPoint = OritaCalc.findProjection(targetSegment, pivotPoint);
+        LineSegment projectionLine = new LineSegment(pivotPoint, projectionPoint);
+
+        if (OritaCalc.isPointWithinLineSpan(targetPoint, projectionLine)) {
+            if (OritaCalc.distance(projectionPoint, targetPoint) < Epsilon.UNKNOWN_1EN7) {
+                Point midpoint = OritaCalc.midPoint(pivotPoint, projectionPoint);
+                return new LineSegmentPair(
+                        OritaCalc.fullExtendUntilHit(set, new LineSegment(midpoint,
+                                OritaCalc.findProjection(OritaCalc.moveParallel(projectionLine, -1.0), midpoint),
+                                LineColor.PURPLE_8)),
+                        OritaCalc.fullExtendUntilHit(set, new LineSegment(midpoint,
+                                OritaCalc.findProjection(OritaCalc.moveParallel(projectionLine, 1.0), midpoint),
+                                LineColor.PURPLE_8)));
+            }
+
+            return new LineSegmentPair(
+                    OritaCalc.fullExtendUntilHit(set, new LineSegment(pivotPoint,
+                            OritaCalc.findProjection(OritaCalc.moveParallel(projectionLine, 1.0), pivotPoint),
+                            LineColor.PURPLE_8)),
+                    OritaCalc.fullExtendUntilHit(set, new LineSegment(pivotPoint,
+                            OritaCalc.findProjection(OritaCalc.moveParallel(projectionLine, -1.0), pivotPoint),
+                            LineColor.PURPLE_8)));
+        }
+
+        LineSegment result;
+        if (OritaCalc.isLineSegmentParallel(new LineSegment(pivotPoint, targetPoint), projectionLine)
+                == OritaCalc.ParallelJudgement.NOT_PARALLEL) {
+            result = OritaCalc.fullExtendUntilHit(set, new LineSegment(
+                    pivotPoint,
+                    OritaCalc.center(pivotPoint, targetPoint, projectionPoint),
+                    LineColor.PURPLE_8));
+        } else {
+            result = OritaCalc.fullExtendUntilHit(set, new LineSegment(pivotPoint, projectionPoint, LineColor.PURPLE_8));
+        }
+        return new LineSegmentPair(result, result);
+    }
+
+    private static LineSegment axiom5ProjectedLineOfIndicator(Point pivot, Point projectPoint, double length) {
+        LineSegment projectLine = new LineSegment(pivot, projectPoint);
+        return new LineSegment(pivot, OritaCalc.findProjection(OritaCalc.moveParallel(projectLine, length), projectPoint));
+    }
+
+    private static Point axiom5ProcessCenter(Point pivot, LineSegment first, LineSegment second) {
+        if (OritaCalc.isLineSegmentParallel(
+                new StraightLine(first.determineFurthestEndpoint(pivot), pivot),
+                new StraightLine(pivot, second.determineFurthestEndpoint(pivot)))
+                == OritaCalc.ParallelJudgement.PARALLEL_EQUAL) {
+            LineSegment segment = new LineSegment(pivot, OritaCalc.findProjection(OritaCalc.moveParallel(first, 1.0), pivot));
+            return OritaCalc.center(
+                    first.determineFurthestEndpoint(pivot),
+                    second.determineFurthestEndpoint(pivot),
+                    segment.determineFurthestEndpoint(pivot));
+        }
+        return OritaCalc.center(pivot, second.determineFurthestEndpoint(pivot), first.determineFurthestEndpoint(pivot));
+    }
+
+    private static LineSegmentPair axiom5ProcessPivotWithinSegmentSpan(
+            LineSegment first,
+            LineSegment second,
+            LineSegment targetSegment,
+            Point pivot) {
+        if (OritaCalc.isPointWithinLineSpan(pivot, targetSegment)) {
+            if (OritaCalc.distance(pivot, targetSegment.getA()) < Epsilon.UNKNOWN_1EN7) {
+                return new LineSegmentPair(
+                        new LineSegment(pivot, OritaCalc.point_rotate(pivot, targetSegment.getB(), 180)),
+                        new LineSegment(pivot, targetSegment.getB()));
+            }
+            if (OritaCalc.distance(pivot, targetSegment.getB()) < Epsilon.UNKNOWN_1EN7) {
+                return new LineSegmentPair(
+                        new LineSegment(pivot, targetSegment.getA()),
+                        new LineSegment(pivot, OritaCalc.point_rotate(pivot, targetSegment.getA(), 180)));
+            }
+
+            boolean outsideA = targetSegment.determineLength() > OritaCalc.distance(targetSegment.getA(), pivot)
+                    && OritaCalc.distance(targetSegment.getB(), pivot) > targetSegment.determineLength();
+            boolean outsideB = targetSegment.determineLength() > OritaCalc.distance(targetSegment.getB(), pivot)
+                    && OritaCalc.distance(targetSegment.getA(), pivot) > targetSegment.determineLength();
+
+            first = new LineSegment(pivot,
+                    outsideA ? OritaCalc.point_rotate(pivot, targetSegment.getB(), 180) : targetSegment.getA());
+            second = new LineSegment(pivot,
+                    outsideB ? OritaCalc.point_rotate(pivot, targetSegment.getA(), 180) : targetSegment.getB());
+        }
+        return new LineSegmentPair(first, second);
+    }
+
+    private static LineSegmentPair axiom5DetermineIndicators(
+            FoldLineSet set,
+            LineSegment base,
+            LineSegment first,
+            LineSegment second,
+            Point pivot,
+            Point center1,
+            Point center2,
+            Point target,
+            LineSegment targetSegment) {
+        if (OritaCalc.distance(center1, OritaCalc.findProjection(targetSegment, center1)) > Epsilon.UNKNOWN_1EN7
+                || OritaCalc.distance(center2, OritaCalc.findProjection(targetSegment, center2)) > Epsilon.UNKNOWN_1EN7) {
+            if (!OritaCalc.isPointWithinLineSpan(target, targetSegment)) {
+                return new LineSegmentPair(
+                        OritaCalc.fullExtendUntilHit(set, new LineSegment(pivot, center1, LineColor.PURPLE_8)),
+                        OritaCalc.fullExtendUntilHit(set, new LineSegment(pivot, center2, LineColor.PURPLE_8)));
+            }
+            if (OritaCalc.isLineSegmentParallel(first, base) == OritaCalc.ParallelJudgement.PARALLEL_EQUAL) {
+                LineSegment result = OritaCalc.fullExtendUntilHit(set, new LineSegment(pivot, center2, LineColor.PURPLE_8));
+                return new LineSegmentPair(result, result);
+            }
+            if (OritaCalc.isLineSegmentParallel(second, base) == OritaCalc.ParallelJudgement.PARALLEL_EQUAL) {
+                LineSegment result = OritaCalc.fullExtendUntilHit(set, new LineSegment(pivot, center1, LineColor.PURPLE_8));
+                return new LineSegmentPair(result, result);
+            }
+            return null;
+        }
+
+        return new LineSegmentPair(
+                OritaCalc.fullExtendUntilHit(set, new LineSegment(pivot,
+                        OritaCalc.findProjection(OritaCalc.moveParallel(first, 1.0), pivot),
+                        LineColor.PURPLE_8)),
+                OritaCalc.fullExtendUntilHit(set, new LineSegment(pivot,
+                        OritaCalc.findProjection(OritaCalc.moveParallel(second, -1.0), pivot),
+                        LineColor.PURPLE_8)));
     }
 
     private static void foldLineAxiom7Indicator(String[] args) {
@@ -3182,6 +3437,9 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle foldline-parallel-width <selected ax ay bx by color> <width> <choice> <color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-perpendicular-projection <targetX> <targetY> <base ax ay bx by color> <color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-perpendicular-indicator <targetX> <targetY> <base ax ay bx by color> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-axiom5-indicator <targetX> <targetY> <target ax ay bx by color> <pivotX> <pivotY> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-axiom5-commit <indicator ax ay bx by color> <color> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-axiom5-destination <pivotX> <pivotY> <indicator1 ax ay bx by color> <indicator2 ax ay bx by color> <destination ax ay bx by color> <pointerX> <pointerY> <color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-axiom7-indicator <targetX> <targetY> <target ax ay bx by color> <perpendicular ax ay bx by color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-axiom7-commit <indicator ax ay bx by color> <color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-axiom7-destination <indicator ax ay bx by color> <destination ax ay bx by color> <color> <count> [ax ay bx by color]...");

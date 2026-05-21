@@ -20,8 +20,9 @@ use oristudio_cp::operations::color::{
 };
 use oristudio_cp::operations::construction::{
     AngleRestrictedConvergingCandidates, DrawCreaseTarget, angle_restricted_converging_candidates,
-    angle_system_candidates, angle_system_draw_to_destination, axiom7_draw_to_destination,
-    axiom7_indicator, commit_axiom7_indicator, commit_parallel_width_indicator,
+    angle_system_candidates, angle_system_draw_to_destination, axiom5_draw_to_destination,
+    axiom5_indicators, axiom7_draw_to_destination, axiom7_indicator, commit_axiom5_indicator,
+    commit_axiom7_indicator, commit_parallel_width_indicator,
     commit_square_bisector_parallel_indicator, double_symmetric_draw,
     draw_crease_angle_restricted_3_candidates, draw_crease_angle_restricted_3_to_point,
     draw_crease_angle_restricted_5, draw_crease_angle_restricted_converging, draw_crease_segment,
@@ -1275,6 +1276,87 @@ fn perpendicular_draw_modes_match_oriedita_oracle() {
     assert_eq!(
         optional_segment_result_summary(indicator.as_ref()),
         run_oracle(&oracle, &args)
+    );
+}
+
+#[test]
+fn axiom5_modes_match_oriedita_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    let target_segment = segment(2.0, -2.0, 2.0, 2.0, LineColor::Black0);
+    let destination = segment(-1.0, 1.0, 3.0, 1.0, LineColor::Black0);
+    let segments = vec![
+        target_segment.clone(),
+        segment(-1.0, 2.0, 3.0, 2.0, LineColor::Black0),
+        segment(-1.0, -2.0, 3.0, -2.0, LineColor::Black0),
+        destination.clone(),
+    ];
+    let model = model_from_segments(&segments);
+    let indicators = axiom5_indicators(
+        &model,
+        Point::new(0.0, 0.0),
+        &target_segment,
+        Point::new(1.0, 0.0),
+    )
+    .expect("tangent Axiom 5 fixture should produce indicators");
+    let mut args = vec!["foldline-axiom5-indicator".to_string()];
+    push_points_args(&mut args, &[Point::new(0.0, 0.0)]);
+    push_one_segment_args(&mut args, &target_segment);
+    push_points_args(&mut args, &[Point::new(1.0, 0.0)]);
+    args.push(segments.len().to_string());
+    push_segment_args(&mut args, &segments);
+    assert_line_summary_close(
+        &line_segment_list_summary(&indicators),
+        &run_oracle(&oracle, &args),
+        1e-9,
+        "axiom5-indicator",
+    );
+
+    let mut model = model_from_segments(&segments);
+    let added = commit_axiom5_indicator(&mut model, &indicators[0], LineColor::Red1);
+    let mut args = vec!["foldline-axiom5-commit".to_string()];
+    push_one_segment_args(&mut args, &indicators[0]);
+    args.push(LineColor::Red1.number().to_string());
+    args.push(segments.len().to_string());
+    push_segment_args(&mut args, &segments);
+    let rust_summary = format!("added|{added}\n{}", line_segment_set_summary(&model));
+    assert_line_summary_close(
+        &rust_summary,
+        &run_oracle(&oracle, &args),
+        1e-9,
+        "axiom5-commit",
+    );
+
+    let mut model = model_from_segments(&segments);
+    let added = axiom5_draw_to_destination(
+        &mut model,
+        Point::new(1.0, 0.0),
+        &indicators[0],
+        &indicators[1],
+        &destination,
+        Point::new(1.0, 1.1),
+        LineColor::Blue2,
+    );
+    let mut args = vec!["foldline-axiom5-destination".to_string()];
+    push_points_args(&mut args, &[Point::new(1.0, 0.0)]);
+    push_one_segment_args(&mut args, &indicators[0]);
+    push_one_segment_args(&mut args, &indicators[1]);
+    push_one_segment_args(&mut args, &destination);
+    push_points_args(&mut args, &[Point::new(1.0, 1.1)]);
+    args.push(LineColor::Blue2.number().to_string());
+    args.push(segments.len().to_string());
+    push_segment_args(&mut args, &segments);
+    let rust_summary = format!("added|{added}\n{}", line_segment_set_summary(&model));
+    assert_line_summary_close(
+        &rust_summary,
+        &run_oracle(&oracle, &args),
+        1e-9,
+        "axiom5-destination",
     );
 }
 

@@ -419,7 +419,9 @@ Port all command behavior for:
 - Foldable-line input.
 - Foldable-line draw mode.
 - Vertex make angularly flat-foldable.
-- Axiom 5 construction.
+- `AXIOM_5` is ported and oracle-tested for indicator generation, direct
+  indicator commit, and destination-intersection commit after the target point,
+  target line, and pivot point are resolved.
 - Axiom 7 construction.
 - Preview-independent computed candidates for every construction command.
 

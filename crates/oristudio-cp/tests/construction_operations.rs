@@ -2,7 +2,8 @@ use oristudio_cp::geometry::{LineColor, LineSegment, Point};
 use oristudio_cp::model::CreasePatternModel;
 use oristudio_cp::operations::construction::{
     DrawCreaseTarget, angle_restricted_converging_candidates, angle_system_candidates,
-    angle_system_draw_to_destination, axiom7_draw_to_destination, axiom7_indicator,
+    angle_system_draw_to_destination, axiom5_draw_to_destination, axiom5_indicators,
+    axiom7_draw_to_destination, axiom7_indicator, commit_axiom5_indicator,
     commit_parallel_width_indicator, double_symmetric_draw,
     draw_crease_angle_restricted_3_candidates, draw_crease_angle_restricted_3_to_point,
     draw_crease_angle_restricted_5, draw_crease_angle_restricted_converging, draw_crease_segment,
@@ -392,6 +393,60 @@ fn axiom7_indicator_extends_fold_line_and_clips_to_destination() {
         &model.line_segments,
         Point::new(2.0, 1.0),
         indicator.a,
+        LineColor::Blue2,
+    ));
+}
+
+#[test]
+fn axiom5_tangent_indicators_commit_and_destination_draw() {
+    let target = segment(2.0, -2.0, 2.0, 2.0, LineColor::Black0);
+    let top = segment(-1.0, 2.0, 3.0, 2.0, LineColor::Black0);
+    let bottom = segment(-1.0, -2.0, 3.0, -2.0, LineColor::Black0);
+    let destination = segment(-1.0, 1.0, 3.0, 1.0, LineColor::Black0);
+    let mut model = model_from_segments(&[target.clone(), top, bottom, destination.clone()]);
+
+    let indicators = axiom5_indicators(&model, Point::new(0.0, 0.0), &target, Point::new(1.0, 0.0))
+        .expect("tangent Axiom 5 setup should produce indicators");
+    assert_eq!(indicators[0].color, LineColor::Purple8);
+    assert!(
+        same_segment_close(
+            &indicators[0],
+            Point::new(1.0, 0.0),
+            Point::new(1.0, 2.0),
+            LineColor::Purple8,
+        ) || same_segment_close(
+            &indicators[0],
+            Point::new(1.0, 0.0),
+            Point::new(1.0, -2.0),
+            LineColor::Purple8,
+        )
+    );
+
+    assert!(commit_axiom5_indicator(
+        &mut model,
+        &indicators[0],
+        LineColor::Red1,
+    ));
+    assert!(
+        model
+            .line_segments
+            .iter()
+            .any(|segment| segment.color == LineColor::Red1)
+    );
+
+    assert!(axiom5_draw_to_destination(
+        &mut model,
+        Point::new(1.0, 0.0),
+        &indicators[0],
+        &indicators[1],
+        &destination,
+        Point::new(1.0, 1.1),
+        LineColor::Blue2,
+    ));
+    assert!(contains_segment_close(
+        &model.line_segments,
+        Point::new(1.0, 0.0),
+        Point::new(1.0, 1.0),
         LineColor::Blue2,
     ));
 }

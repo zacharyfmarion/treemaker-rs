@@ -857,9 +857,13 @@ Status:
   Oriedita's explicit color-combination matrix.
 - `Fix1.apply` and `Fix2.apply` are ported and oracle-tested for duplicate
   repair, inaccurate-overlap selection marking, and near-T split insertion
-  order. The newer precision-data `FIX_INACCURATE_107` handler remains a
-  separate later task because it uses bundled binary correction tables and
-  selected-line box workflows rather than these `FoldLineSet` workers.
+  order.
+- `FIX_INACCURATE_107` is ported and oracle-tested as
+  `checks::fix_inaccurate_for_indices`. The port includes Oriedita's automatic
+  BP grid search, bundled 22.5-degree binary correction table, square/default
+  xform behavior, selected-line replacement, and post-insertion line division.
+  UI bulletin-board messages, selection gesture wiring, and async `check4`
+  refresh are left for UI integration.
 - The current arrangement worker intentionally uses simple scans instead of
   Oriedita's quadtree acceleration. That keeps mutation parity visible first;
   spatial acceleration remains deferred until broader split/merge behavior is
@@ -1125,6 +1129,9 @@ Status:
   The non-UI API recomputes `Check4` violations and returns the dirty flag that
   the Java task sets on `CanvasModel`; asynchronous executor scheduling remains
   UI/runtime integration.
+- The selected-line precision repair path behind `FIX_INACCURATE_107` is
+  ported and oracle-tested, including BP and 22.5-degree modes. Stage 9 repair
+  work now covers `Fix1`, `Fix2`, and the precision-data command.
 
 ### Stage 10: Folding Estimation Parity Surface
 

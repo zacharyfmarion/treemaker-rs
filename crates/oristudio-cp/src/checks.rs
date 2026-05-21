@@ -8,6 +8,9 @@ use crate::geometry::{
     find_intersection_segments, find_line_symmetry_line_segment,
 };
 use crate::model::CreasePatternModel;
+use crate::operations::arrangement::divide_line_segment_with_new_lines;
+
+const FIX_DATA_22_5_BYTES: &[u8] = include_bytes!("../resources/fix-precision/fixData_22_5.bin");
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FlatFoldableBoundaryCheck {
@@ -54,6 +57,52 @@ pub struct CamvCheckResult {
     pub dirty: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct FixInaccurateOptions {
+    pub fix_precision: f64,
+    pub use_bp: bool,
+    pub use_22_5: bool,
+}
+
+impl Default for FixInaccurateOptions {
+    fn default() -> Self {
+        Self {
+            fix_precision: 0.05,
+            use_bp: true,
+            use_22_5: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FixInaccurateType {
+    Bp,
+    Pure22_5,
+    Other,
+    Empty,
+}
+
+impl FixInaccurateType {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Bp => "BP",
+            Self::Pure22_5 => "PURE_22_5",
+            Self::Other => "OTHER",
+            Self::Empty => "EMPTY",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct FixInaccurateResult {
+    pub num_fixed_lines: usize,
+    pub num_fixable_lines: usize,
+    pub fixed_lines: Vec<LineSegment>,
+    pub fix_type: FixInaccurateType,
+    pub applied: bool,
+    pub warning: bool,
+}
+
 impl FlatFoldabilityViolation {
     pub fn new(point: Point, rule: FlatFoldabilityRule, color: FlatFoldabilityColor) -> Self {
         Self {
@@ -70,6 +119,19 @@ impl FlatFoldabilityViolation {
             rule: FlatFoldabilityRule::LittleBigLittle,
             color: FlatFoldabilityColor::Correct,
             little_big_little,
+        }
+    }
+}
+
+impl FixInaccurateResult {
+    fn empty() -> Self {
+        Self {
+            num_fixed_lines: 0,
+            num_fixable_lines: 0,
+            fixed_lines: Vec::new(),
+            fix_type: FixInaccurateType::Empty,
+            applied: false,
+            warning: false,
         }
     }
 }
@@ -171,6 +233,60 @@ pub fn check_camv_task(model: &CreasePatternModel) -> CamvCheckResult {
         violations: check4(model),
         dirty: true,
     }
+}
+
+/// Oriedita `MouseHandlerCreaseFixInaccurate`: fix selected folding-line coordinates.
+pub fn fix_inaccurate_for_indices(
+    model: &mut CreasePatternModel,
+    indices: &[usize],
+    options: FixInaccurateOptions,
+) -> FixInaccurateResult {
+    let selected_lines = indices
+        .iter()
+        .filter_map(|index| model.line_segments.get(*index))
+        .filter(|segment| segment.color.is_folding_line())
+        .cloned()
+        .collect::<Vec<_>>();
+
+    if selected_lines.is_empty() {
+        return FixInaccurateResult::empty();
+    }
+
+    let xform = fix_inaccurate_xform(&selected_lines);
+    let transformed_lines = fix_inaccurate_do_xform(&selected_lines, xform);
+    let to_fix = fix_inaccurate_coordinates(&transformed_lines);
+    let mut result = fix_inaccurate_values(&to_fix, options);
+
+    if result.fix_type == FixInaccurateType::Empty
+        || result.num_fixable_lines == 0
+        || result.fixed_values.is_empty()
+    {
+        return result.into_public(false, false, Vec::new());
+    }
+
+    result.fixed_values = fix_inaccurate_undo_xform_values(result.fixed_values, xform);
+    let fixed_lines = fix_inaccurate_lines_from_values(&selected_lines, &result.fixed_values);
+    let warning = result.fix_type == FixInaccurateType::Pure22_5
+        && !xform.in_default_square
+        && !xform.is_square;
+
+    for (line, fixed_line) in selected_lines.iter().zip(fixed_lines.iter()) {
+        if let Some(index) = model
+            .line_segments
+            .iter()
+            .position(|candidate| candidate == line)
+        {
+            model.line_segments.remove(index);
+        }
+        model.add_line_segment(fixed_line.clone());
+    }
+
+    let added_count = fixed_lines.len();
+    let added_end = model.line_segments.len();
+    let original_end = added_end.saturating_sub(added_count);
+    divide_line_segment_with_new_lines(model, original_end, added_end);
+
+    result.into_public(true, warning, fixed_lines)
 }
 
 /// Oriedita `Check4.findFlatfoldabilityViolation` for one point and its incident lines.
@@ -343,6 +459,374 @@ fn check3_point(model: &CreasePatternModel, point: Point, diagnostics: &mut Vec<
     if tss_black == 2 && !extended_fushimi_decide_sides_model(model, point) {
         diagnostics.push(LineSegment::new(point, point));
     }
+}
+
+#[derive(Debug, Clone)]
+struct FixInaccurateRawResult {
+    num_fixed_lines: usize,
+    num_fixable_lines: usize,
+    fixed_values: Vec<f64>,
+    fix_type: FixInaccurateType,
+}
+
+impl FixInaccurateRawResult {
+    fn empty() -> Self {
+        Self {
+            num_fixed_lines: 0,
+            num_fixable_lines: 0,
+            fixed_values: Vec::new(),
+            fix_type: FixInaccurateType::Empty,
+        }
+    }
+
+    fn into_public(
+        self,
+        applied: bool,
+        warning: bool,
+        fixed_lines: Vec<LineSegment>,
+    ) -> FixInaccurateResult {
+        FixInaccurateResult {
+            num_fixed_lines: self.num_fixed_lines,
+            num_fixable_lines: self.num_fixable_lines,
+            fixed_lines,
+            fix_type: self.fix_type,
+            applied,
+            warning,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct FixInaccurateXform {
+    is_square: bool,
+    in_default_square: bool,
+    scale: f64,
+    delta_x: f64,
+    delta_y: f64,
+}
+
+fn fix_inaccurate_xform(lines: &[LineSegment]) -> FixInaccurateXform {
+    let allowed_error = 0.001;
+    let mut max_x = -f64::MAX;
+    let mut max_y = -f64::MAX;
+    let mut min_x = f64::MAX;
+    let mut min_y = f64::MAX;
+
+    for line in lines {
+        min_x = min_x.min(line.a.x).min(line.b.x);
+        max_x = max_x.max(line.a.x).max(line.b.x);
+        min_y = min_y.min(line.a.y).min(line.b.y);
+        max_y = max_y.max(line.a.y).max(line.b.y);
+    }
+
+    let is_square = ((min_y - max_y).abs() - (min_x - max_x).abs()).abs() < allowed_error;
+    let in_default_square = min_x > -(200.0 + allowed_error)
+        && min_y > -(200.0 + allowed_error)
+        && max_x < 200.0 + allowed_error
+        && max_y < 200.0 + allowed_error;
+    let delta_x = min_x + (max_x - min_x).abs() / 2.0;
+    let delta_y = min_y + (max_y - min_y).abs() / 2.0;
+    let scale = 400.0 / (max_x - min_x).abs();
+
+    FixInaccurateXform {
+        is_square,
+        in_default_square,
+        scale,
+        delta_x,
+        delta_y,
+    }
+}
+
+fn fix_inaccurate_do_xform(lines: &[LineSegment], xform: FixInaccurateXform) -> Vec<LineSegment> {
+    lines
+        .iter()
+        .map(|line| {
+            if xform.is_square && !xform.in_default_square {
+                line.with_coordinates(
+                    Point::new(
+                        (line.a.x - xform.delta_x) * xform.scale,
+                        (line.a.y - xform.delta_y) * xform.scale,
+                    ),
+                    Point::new(
+                        (line.b.x - xform.delta_x) * xform.scale,
+                        (line.b.y - xform.delta_y) * xform.scale,
+                    ),
+                )
+            } else {
+                line.clone()
+            }
+        })
+        .collect()
+}
+
+fn fix_inaccurate_coordinates(lines: &[LineSegment]) -> Vec<f64> {
+    let mut coordinates = Vec::with_capacity(lines.len() * 4);
+    for line in lines {
+        coordinates.push(line.a.x);
+        coordinates.push(line.a.y);
+        coordinates.push(line.b.x);
+        coordinates.push(line.b.y);
+    }
+    coordinates
+}
+
+fn fix_inaccurate_values(to_fix: &[f64], options: FixInaccurateOptions) -> FixInaccurateRawResult {
+    let mut results = Vec::new();
+
+    if options.use_bp {
+        results.push(fix_inaccurate_bp(to_fix));
+        if results[0].num_fixable_lines as f64 > (to_fix.len() as f64 / 4.0 * 0.9) {
+            return results.remove(0);
+        }
+    }
+
+    if options.use_22_5 {
+        let precision = options.fix_precision / 100.0;
+        let fix_data = fix_inaccurate_data_22_5();
+        results.push(fix_inaccurate_with_data(to_fix, precision, &fix_data));
+    }
+
+    let mut max_lines = 0usize;
+    let mut return_result = FixInaccurateRawResult::empty();
+    for result in results {
+        if result.num_fixable_lines > max_lines {
+            max_lines = result.num_fixable_lines;
+            return_result = result;
+        }
+    }
+
+    return_result
+}
+
+fn fix_inaccurate_bp(to_fix: &[f64]) -> FixInaccurateRawResult {
+    let mut out_values = Vec::with_capacity(to_fix.len());
+    let allowed_error = 0.00000000001;
+    let base_precision = 0.0013;
+    let grid_search_end_percent = 0.9;
+    let necessary_improvement_grid = 1.15;
+
+    let mut grid_size = 0.0;
+    let mut precision = 0.0;
+    let mut fixed_with_previous_best_grid = 0usize;
+    let mut num_fixable_lines = 0usize;
+    let mut end_grid_search = false;
+
+    for grid_iteration in 1..=16 {
+        num_fixable_lines = 0;
+        let grid_size_search = match grid_iteration {
+            1 => 1024.0,
+            2 => 1536.0,
+            3 => 1280.0,
+            4 => 1792.0,
+            5 => 1152.0,
+            6 => 1408.0,
+            7 => 1664.0,
+            8 => 1920.0,
+            9 => 1088.0,
+            10 => 1216.0,
+            11 => 1344.0,
+            12 => 1472.0,
+            13 => 1600.0,
+            14 => 1728.0,
+            15 => 1856.0,
+            _ => 1984.0,
+        };
+        precision = (base_precision * grid_size_search) / 200.0;
+
+        let mut is_line_fixed = false;
+        for (i, value) in to_fix.iter().enumerate() {
+            if i % 4 == 0 {
+                is_line_fixed = false;
+            }
+
+            let current_value = value / 200.0 * grid_size_search;
+            let nearest_int = current_value.round();
+            if (current_value - nearest_int).abs() > precision {
+                continue;
+            }
+            if !is_line_fixed {
+                is_line_fixed = true;
+                num_fixable_lines += 1;
+            }
+        }
+
+        if (num_fixable_lines as f64)
+            > (fixed_with_previous_best_grid as f64) * necessary_improvement_grid
+        {
+            grid_size = grid_size_search;
+            fixed_with_previous_best_grid = num_fixable_lines;
+        }
+
+        if num_fixable_lines as f64 > (to_fix.len() as f64 / 4.0) * grid_search_end_percent {
+            end_grid_search = true;
+        }
+
+        if end_grid_search {
+            break;
+        }
+    }
+
+    let mut is_line_fixed = false;
+    let mut num_fixed_lines = 0usize;
+    for (i, value) in to_fix.iter().enumerate() {
+        if i % 4 == 0 {
+            is_line_fixed = false;
+        }
+
+        let mut current_value = value / 200.0 * grid_size;
+        let nearest_int = current_value.round();
+        if (current_value - nearest_int).abs() < precision
+            && (current_value - nearest_int).abs() > allowed_error
+        {
+            if !is_line_fixed {
+                is_line_fixed = true;
+                num_fixed_lines += 1;
+            }
+            current_value = nearest_int;
+        }
+
+        out_values.push(current_value * 200.0 / grid_size);
+    }
+
+    FixInaccurateRawResult {
+        num_fixed_lines,
+        num_fixable_lines,
+        fixed_values: out_values,
+        fix_type: FixInaccurateType::Bp,
+    }
+}
+
+fn fix_inaccurate_with_data(
+    input_values: &[f64],
+    precision: f64,
+    fix_data: &[f64],
+) -> FixInaccurateRawResult {
+    let mut out_values = Vec::with_capacity(input_values.len());
+    let mut previous_fixed_positions = Vec::<f64>::new();
+    let allowed_error = 0.00000000001;
+    let mut is_line_fixed = false;
+    let mut num_fixable_lines = 0usize;
+    let mut num_fixed_lines = 0usize;
+
+    for (i, value) in input_values.iter().enumerate() {
+        if i % 4 == 0 {
+            is_line_fixed = false;
+        }
+
+        let mut current_value = *value;
+        let is_negative = current_value < 0.0;
+        if is_negative {
+            current_value *= -1.0;
+        }
+
+        let mut skip_slow = false;
+        for fixed in &previous_fixed_positions {
+            if (current_value - *fixed).abs() > precision {
+                continue;
+            }
+            if (current_value - *fixed).abs() > allowed_error {
+                current_value = *fixed;
+                if !is_line_fixed {
+                    is_line_fixed = true;
+                    num_fixable_lines += 1;
+                    num_fixed_lines += 1;
+                    skip_slow = true;
+                    break;
+                }
+            } else if !is_line_fixed {
+                is_line_fixed = true;
+                num_fixable_lines += 1;
+                break;
+            }
+        }
+
+        if !skip_slow {
+            for fixed in fix_data {
+                if (current_value - *fixed).abs() > precision {
+                    continue;
+                }
+                if (current_value - *fixed).abs() > allowed_error {
+                    current_value = *fixed;
+                    previous_fixed_positions.push(*fixed);
+                    if !is_line_fixed {
+                        is_line_fixed = true;
+                        num_fixable_lines += 1;
+                        num_fixed_lines += 1;
+                        break;
+                    }
+                } else if !is_line_fixed {
+                    is_line_fixed = true;
+                    num_fixable_lines += 1;
+                    break;
+                }
+            }
+        }
+
+        if is_negative {
+            current_value *= -1.0;
+        }
+        out_values.push(current_value);
+    }
+
+    FixInaccurateRawResult {
+        num_fixed_lines,
+        num_fixable_lines,
+        fixed_values: out_values,
+        fix_type: FixInaccurateType::Pure22_5,
+    }
+}
+
+fn fix_inaccurate_undo_xform_values(values: Vec<f64>, xform: FixInaccurateXform) -> Vec<f64> {
+    let allowed_error = 0.000000000001;
+    if !xform.is_square || xform.in_default_square {
+        return values;
+    }
+
+    values
+        .into_iter()
+        .enumerate()
+        .map(|(i, value)| {
+            let delta = if i % 2 == 0 {
+                xform.delta_x
+            } else {
+                xform.delta_y
+            };
+            undo_xform_calc(value / xform.scale + delta, allowed_error)
+        })
+        .collect()
+}
+
+fn undo_xform_calc(position: f64, allowed_error: f64) -> f64 {
+    let close = position.round();
+    if (close - position).abs() < allowed_error {
+        close
+    } else {
+        position
+    }
+}
+
+fn fix_inaccurate_lines_from_values(templates: &[LineSegment], values: &[f64]) -> Vec<LineSegment> {
+    templates
+        .iter()
+        .zip(values.chunks_exact(4))
+        .map(|(line, coordinates)| {
+            line.with_coordinates(
+                Point::new(coordinates[0], coordinates[1]),
+                Point::new(coordinates[2], coordinates[3]),
+            )
+        })
+        .collect()
+}
+
+fn fix_inaccurate_data_22_5() -> Vec<f64> {
+    FIX_DATA_22_5_BYTES
+        .chunks_exact(8)
+        .map(|chunk| {
+            let mut bytes = [0u8; 8];
+            bytes.copy_from_slice(chunk);
+            f64::from_le_bytes(bytes)
+        })
+        .collect()
 }
 
 fn maekawa_color(red: usize, blue: usize) -> FlatFoldabilityColor {

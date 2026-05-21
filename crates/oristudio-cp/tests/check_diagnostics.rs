@@ -1,5 +1,6 @@
 use oristudio_cp::checks::{
-    FlatFoldabilityColor, FlatFoldabilityRule, check_camv_task, check1, check2, check3, check4,
+    FixInaccurateOptions, FixInaccurateType, FlatFoldabilityColor, FlatFoldabilityRule,
+    check_camv_task, check1, check2, check3, check4, fix_inaccurate_for_indices,
 };
 use oristudio_cp::geometry::{LineColor, LineSegment, Point};
 use oristudio_cp::model::CreasePatternModel;
@@ -105,6 +106,48 @@ fn check_camv_task_recomputes_check4_and_marks_dirty() {
 
     assert!(result.dirty);
     assert_eq!(result.violations, check4(&model));
+}
+
+#[test]
+fn fix_inaccurate_bp_snaps_near_grid_coordinates() {
+    let mut model = CreasePatternModel::default();
+    model.add_line_segment(segment(0.1954, 0.0, 10.0, 0.0, LineColor::Red1));
+
+    let result = fix_inaccurate_for_indices(
+        &mut model,
+        &[0],
+        FixInaccurateOptions {
+            use_bp: true,
+            use_22_5: false,
+            fix_precision: 0.05,
+        },
+    );
+
+    assert_eq!(result.fix_type, FixInaccurateType::Bp);
+    assert!(result.applied);
+    assert_eq!(result.num_fixed_lines, 1);
+    assert!((model.line_segments[0].a.x - 0.1953125).abs() < 1e-12);
+}
+
+#[test]
+fn fix_inaccurate_uses_bundled_twenty_two_point_five_data() {
+    let mut model = CreasePatternModel::default();
+    model.add_line_segment(segment(117.1574, 0.0, 200.0, 0.0, LineColor::Blue2));
+
+    let result = fix_inaccurate_for_indices(
+        &mut model,
+        &[0],
+        FixInaccurateOptions {
+            use_bp: false,
+            use_22_5: true,
+            fix_precision: 0.05,
+        },
+    );
+
+    assert_eq!(result.fix_type, FixInaccurateType::Pure22_5);
+    assert!(result.applied);
+    assert_eq!(result.num_fixed_lines, 1);
+    assert!((model.line_segments[0].a.x - 117.157287525381).abs() < 1e-12);
 }
 
 fn segment(ax: f64, ay: f64, bx: f64, by: f64, color: LineColor) -> LineSegment {

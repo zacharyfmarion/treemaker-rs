@@ -963,10 +963,10 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
     descriptor!(
         FixInaccurate,
         "MouseHandlerCreaseFixInaccurate",
-        "checks::fix_inaccurate",
+        "checks::fix_inaccurate_for_indices",
         Kernel,
         9,
-        Unsupported
+        OracleTested
     ),
     descriptor!(ImportCp, "CpImporter", "io::cp::import", Io, 4, Unsupported),
     descriptor!(ExportCp, "CpExporter", "io::cp::export", Io, 4, Unsupported),
@@ -1118,8 +1118,22 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
     descriptor!(Check2, "Check2", "checks::check2", Kernel, 9, OracleTested),
     descriptor!(Check3, "Check3", "checks::check3", Kernel, 9, OracleTested),
     descriptor!(Check4, "Check4", "checks::check4", Kernel, 9, OracleTested),
-    descriptor!(Fix1, "Fix1", "checks::fix1", Kernel, 9, Unsupported),
-    descriptor!(Fix2, "Fix2", "checks::fix2", Kernel, 9, Unsupported),
+    descriptor!(
+        Fix1,
+        "Fix1",
+        "operations::arrangement::fix1",
+        Kernel,
+        9,
+        OracleTested
+    ),
+    descriptor!(
+        Fix2,
+        "Fix2",
+        "operations::arrangement::fix2",
+        Kernel,
+        9,
+        OracleTested
+    ),
     descriptor!(
         OrganizeCircles,
         "OrganizeCircles",

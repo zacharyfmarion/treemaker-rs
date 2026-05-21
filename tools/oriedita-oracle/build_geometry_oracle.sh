@@ -72,6 +72,8 @@ javac \
   "$data_source/oriedita/editor/export/DxfExporter.java" \
   "$oracle_root/src/OrieditaGeometryOracle.java"
 
+cp "$source_root/oriedita/src/main/resources/fixData_22_5.bin" "$classes_root/fixData_22_5.bin"
+
 cat > "$build_root/oriedita-geometry-oracle" <<EOF
 #!/usr/bin/env bash
 set -euo pipefail

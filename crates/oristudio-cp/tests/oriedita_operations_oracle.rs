@@ -1,6 +1,7 @@
 use oristudio_cp::checks::{
-    FlatFoldabilityColor, FlatFoldabilityRule, FlatFoldabilityViolation, FlatFoldableBoundaryCheck,
-    check_camv_task, check1, check2, check3, check4, flat_foldable_boundary_check,
+    FixInaccurateOptions, FixInaccurateResult, FlatFoldabilityColor, FlatFoldabilityRule,
+    FlatFoldabilityViolation, FlatFoldableBoundaryCheck, check_camv_task, check1, check2, check3,
+    check4, fix_inaccurate_for_indices, flat_foldable_boundary_check,
 };
 use oristudio_cp::geometry::{Circle, Intersection, LineColor, LineSegment, Point, RgbColor};
 use oristudio_cp::model::{CreasePatternModel, CustomLineType, TextElement};
@@ -681,6 +682,64 @@ fn fix_workers_match_oriedita_foldlineset_oracle() {
         line_segment_set_with_selection_summary(&model),
         run_oracle(&oracle, &args)
     );
+}
+
+#[test]
+fn fix_inaccurate_matches_oriedita_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    for (segments, options, indices) in [
+        (
+            vec![segment(0.1954, 0.0, 10.0, 0.0, LineColor::Red1)],
+            FixInaccurateOptions {
+                use_bp: true,
+                use_22_5: false,
+                fix_precision: 0.05,
+            },
+            vec![0usize],
+        ),
+        (
+            vec![segment(117.1574, 0.0, 200.0, 0.0, LineColor::Blue2)],
+            FixInaccurateOptions {
+                use_bp: false,
+                use_22_5: true,
+                fix_precision: 0.05,
+            },
+            vec![0usize],
+        ),
+        (
+            vec![segment(0.3, 0.0, 10.7, 0.0, LineColor::Cyan3)],
+            FixInaccurateOptions::default(),
+            vec![0usize],
+        ),
+    ] {
+        let mut model = model_from_segments(&segments);
+        let result = fix_inaccurate_for_indices(&mut model, &indices, options);
+        let mut args = vec![
+            "foldline-fix-inaccurate".to_string(),
+            options.use_bp.to_string(),
+            options.use_22_5.to_string(),
+            options.fix_precision.to_string(),
+            indices
+                .iter()
+                .map(|index| index.to_string())
+                .collect::<Vec<_>>()
+                .join(","),
+            segments.len().to_string(),
+        ];
+        push_segment_args(&mut args, &segments);
+        let rust_summary = format!(
+            "{}{}",
+            fix_inaccurate_result_summary(&result),
+            line_segment_set_summary(&model)
+        );
+        assert_eq!(rust_summary, run_oracle(&oracle, &args));
+    }
 }
 
 #[test]
@@ -3342,6 +3401,17 @@ fn flat_foldability_color_name(color: FlatFoldabilityColor) -> &'static str {
         FlatFoldabilityColor::Correct => "CORRECT",
         FlatFoldabilityColor::Unknown => "UNKNOWN",
     }
+}
+
+fn fix_inaccurate_result_summary(result: &FixInaccurateResult) -> String {
+    format!(
+        "result|{}|{}|{}|{}|{}\n",
+        result.fix_type.as_str(),
+        result.num_fixed_lines,
+        result.num_fixable_lines,
+        result.applied,
+        result.warning
+    )
 }
 
 fn line_segment_set_with_selection_summary(model: &CreasePatternModel) -> String {

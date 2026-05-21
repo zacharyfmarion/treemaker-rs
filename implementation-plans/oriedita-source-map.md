@@ -206,7 +206,7 @@ stage explicitly changes it.
 | `ADD_FOLDING_CONSTRAINT` | `MouseHandlerAddFoldingConstraints` | `folding::constraints` | kernel | 10 | Unsupported |
 | `AXIOM_5` | `MouseHandlerAxiom5` | `operations::construction::axiom5_indicators`, `operations::construction::commit_axiom5_indicator`, `operations::construction::axiom5_draw_to_destination` | kernel | 7 | Oracle-tested |
 | `AXIOM_7` | `MouseHandlerAxiom7` | `operations::construction::axiom7_indicator`, `operations::construction::commit_axiom7_indicator`, `operations::construction::axiom7_draw_to_destination` | kernel | 7 | Oracle-tested |
-| `FIX_INACCURATE_107` | `MouseHandlerCreaseFixInaccurate` | `checks::fix_inaccurate`, `operations::arrangement` | kernel | 5, 9 | Unsupported |
+| `FIX_INACCURATE_107` | `MouseHandlerCreaseFixInaccurate` | `checks::fix_inaccurate_for_indices`, `operations::arrangement` | kernel | 5, 9 | Oracle-tested |
 
 ## Step Handler Infrastructure
 
@@ -276,9 +276,9 @@ mutation.
 | `FlatFoldabilityViolation.java` | Flat-foldability violation payload. | `checks::diagnostic` | 9 | Oracle-tested |
 | `LittleBigLittleViolation.java` | Little-big-little violation payload. | `checks::diagnostic` | 9 | Oracle-tested |
 | `MouseHandlerFlatFoldableCheck.java` | User-triggered flat-foldable check. | `checks::flat_foldable` | 9 | Unsupported |
-| `MouseHandlerCreaseFixInaccurate.java` | Inaccurate line repair command. | `checks::fix_inaccurate` | 9 | Unsupported |
-| `Fix1.java` | Repair helper. | `checks::fix1` | 9 | Unsupported |
-| `Fix2.java` | Repair helper. | `checks::fix2` | 9 | Unsupported |
+| `MouseHandlerCreaseFixInaccurate.java` | Inaccurate line repair command. | `checks::fix_inaccurate_for_indices` | 9 | Oracle-tested |
+| `Fix1.java` | Repair helper. | `operations::arrangement::fix1` | 9 | Oracle-tested |
+| `Fix2.java` | Repair helper. | `operations::arrangement::fix2` | 9 | Oracle-tested |
 
 ## Oracle Fixture Families
 

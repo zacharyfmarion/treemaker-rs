@@ -40,7 +40,11 @@ import java.awt.Color;
 import java.awt.Rectangle;
 import java.awt.geom.Path2D;
 import java.io.File;
+import java.io.IOException;
 import java.lang.reflect.Method;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.DoubleBuffer;
 import java.nio.file.Files;
 import java.util.Collection;
 import java.util.HashSet;
@@ -135,6 +139,40 @@ public class OrieditaGeometryOracle {
         Point selectionStart = null;
     }
 
+    private enum OracleFixerType {
+        BP, PURE_22_5, OTHER, EMPTY
+    }
+
+    private static class OracleFixerResult {
+        long numFixedLines;
+        long numFixableLines;
+        ArrayList<Double> lines;
+        OracleFixerType type;
+
+        OracleFixerResult(long numFixedLines, long numFixableLines, ArrayList<Double> lines, OracleFixerType type) {
+            this.numFixedLines = numFixedLines;
+            this.numFixableLines = numFixableLines;
+            this.lines = lines;
+            this.type = type;
+        }
+    }
+
+    private static class OracleFixXform {
+        boolean isSquare;
+        boolean inDefaultSquare;
+        double scale;
+        double deltaX;
+        double deltaY;
+
+        OracleFixXform(boolean isSquare, boolean inDefaultSquare, double scale, double deltaX, double deltaY) {
+            this.isSquare = isSquare;
+            this.inDefaultSquare = inDefaultSquare;
+            this.scale = scale;
+            this.deltaX = deltaX;
+            this.deltaY = deltaY;
+        }
+    }
+
     public static void main(String[] args) throws Exception {
         if (args.length < 1) {
             usage("missing command");
@@ -162,6 +200,7 @@ public class OrieditaGeometryOracle {
             case "foldline-del-v-all-cc" -> foldLineDelVAllCc(args);
             case "foldline-fix1" -> foldLineFix1(args);
             case "foldline-fix2" -> foldLineFix2(args);
+            case "foldline-fix-inaccurate" -> foldLineFixInaccurate(args);
             case "foldline-set-color" -> foldLineSetColor(args);
             case "foldline-change-type" -> foldLineChangeType(args);
             case "foldline-make-color" -> foldLineMakeColor(args);
@@ -591,6 +630,70 @@ public class OrieditaGeometryOracle {
         FoldLineSet set = foldLineSet(args, 2, count);
         Fix2.apply(set);
         printFoldLineSetWithSelection(set);
+    }
+
+    private static void foldLineFixInaccurate(String[] args) throws Exception {
+        if (args.length < 6) {
+            usage("foldline-fix-inaccurate expects useBP, use22_5, precision, indices, count, and segment payload");
+        }
+
+        boolean useBp = Boolean.parseBoolean(args[1]);
+        boolean use22_5 = Boolean.parseBoolean(args[2]);
+        double precision = parse(args[3]);
+        String indices = args[4];
+        int count = Integer.parseInt(args[5]);
+        FoldLineSet set = foldLineSet(args, 6, count);
+        List<LineSegment> selectedLines = selectedFoldLines(set, indices)
+                .stream()
+                .filter(line -> line.getColor().isFoldingLine())
+                .toList();
+
+        boolean applied = false;
+        boolean warning = false;
+        OracleFixXform xform = oracleFixXform(selectedLines);
+        ArrayList<LineSegment> transformed = oracleDoXform(selectedLines, xform);
+        ArrayList<Double> toFix = new ArrayList<>();
+        for (LineSegment segment : transformed) {
+            toFix.add(segment.getA().getX());
+            toFix.add(segment.getA().getY());
+            toFix.add(segment.getB().getX());
+            toFix.add(segment.getB().getY());
+        }
+
+        OracleFixerResult result = oracleFix(toFix, useBp, use22_5, precision);
+        String type = result.type.name();
+        long numFixedLines = result.numFixedLines;
+        long numFixableLines = result.numFixableLines;
+        ArrayList<Double> fixedValues = result.lines;
+
+        if (!selectedLines.isEmpty()
+                && !type.equals("EMPTY")
+                && numFixableLines != 0
+                && !fixedValues.isEmpty()) {
+            warning = type.equals("PURE_22_5")
+                    && !xform.inDefaultSquare
+                    && !xform.isSquare;
+            fixedValues = oracleUndoXform(fixedValues, xform);
+
+            int i = 0;
+            for (LineSegment line : selectedLines) {
+                set.deleteLine(line);
+                LineSegment fixed = line.withCoordinates(
+                        fixedValues.get(i),
+                        fixedValues.get(i + 1),
+                        fixedValues.get(i + 2),
+                        fixedValues.get(i + 3));
+                set.addLine(fixed);
+                i += 4;
+            }
+
+            set.divideLineSegmentWithNewLines(set.getTotal() - selectedLines.size(), set.getTotal());
+            applied = true;
+        }
+
+        System.out.println("result|" + type + "|" + numFixedLines + "|" + numFixableLines
+                + "|" + applied + "|" + warning);
+        printFoldLineSet(set);
     }
 
     private static void foldLineSetColor(String[] args) {
@@ -4697,6 +4800,269 @@ public class OrieditaGeometryOracle {
         return lines;
     }
 
+    private static OracleFixXform oracleFixXform(Collection<LineSegment> lines) {
+        double allowedError = 0.001;
+        double maxX = -Double.MAX_VALUE;
+        double maxY = -Double.MAX_VALUE;
+        double minX = Double.MAX_VALUE;
+        double minY = Double.MAX_VALUE;
+        for (var ls : lines) {
+            minX = Math.min(minX, Math.min(ls.getA().getX(), ls.getB().getX()));
+            maxX = Math.max(maxX, Math.max(ls.getA().getX(), ls.getB().getX()));
+            minY = Math.min(minY, Math.min(ls.getA().getY(), ls.getB().getY()));
+            maxY = Math.max(maxY, Math.max(ls.getA().getY(), ls.getB().getY()));
+        }
+        boolean isSquare = Math.abs(Math.abs(minY - maxY) - Math.abs(minX - maxX)) < allowedError;
+        boolean inDefaultSquare = (minX > -(200 + allowedError)) &&
+                (minY > -(200 + allowedError)) &&
+                (maxX < (200 + allowedError)) &&
+                (maxY < (200 + allowedError));
+        double midX = minX + Math.abs(maxX - minX) / 2;
+        double midY = minY + Math.abs(maxY - minY) / 2;
+        double scale = 400 / Math.abs(maxX - minX);
+        return new OracleFixXform(isSquare, inDefaultSquare, scale, midX, midY);
+    }
+
+    private static ArrayList<LineSegment> oracleDoXform(Collection<LineSegment> lines, OracleFixXform xform) {
+        ArrayList<LineSegment> out = new ArrayList<>();
+        for (var ls : lines) {
+            var ls2 = ls.withCoordinates((ls.getA().getX() - xform.deltaX) * xform.scale,
+                    (ls.getA().getY() - xform.deltaY) * xform.scale,
+                    (ls.getB().getX() - xform.deltaX) * xform.scale,
+                    (ls.getB().getY() - xform.deltaY) * xform.scale);
+            if (xform.isSquare && !xform.inDefaultSquare) {
+                out.add(ls2);
+            } else {
+                out.add(ls);
+            }
+        }
+        return out;
+    }
+
+    private static ArrayList<Double> oracleUndoXform(ArrayList<Double> lines, OracleFixXform xform) {
+        double allowedError = 0.000000000001;
+        if (xform.isSquare && !xform.inDefaultSquare) {
+            ArrayList<Double> out = new ArrayList<>();
+            for (int i = 0; i < lines.size(); i += 4) {
+                double pos = lines.get(i) / xform.scale + xform.deltaX;
+                out.add(oracleUndoXformCalc(pos, allowedError));
+                pos = lines.get(i + 1) / xform.scale + xform.deltaY;
+                out.add(oracleUndoXformCalc(pos, allowedError));
+                pos = lines.get(i + 2) / xform.scale + xform.deltaX;
+                out.add(oracleUndoXformCalc(pos, allowedError));
+                pos = lines.get(i + 3) / xform.scale + xform.deltaY;
+                out.add(oracleUndoXformCalc(pos, allowedError));
+            }
+            return out;
+        }
+        return lines;
+    }
+
+    private static double oracleUndoXformCalc(double pos, double allowedError) {
+        double close = (double) Math.round(pos);
+        if (Math.abs(close - pos) < allowedError) {
+            return close;
+        }
+        return pos;
+    }
+
+    private static OracleFixerResult oracleFix(ArrayList<Double> toFix, boolean useBp, boolean use22_5, double fixPrecision) {
+        ArrayList<OracleFixerResult> results = new ArrayList<>();
+        if (useBp) {
+            results.add(oracleFixBp(toFix));
+            if (results.get(0).numFixableLines > (toFix.size() / 4.0 * .9)) {
+                return results.get(0);
+            }
+        }
+        if (use22_5) {
+            results.add(oracleFixWithData(toFix, fixPrecision / 100.0, oracleFixData22_5()));
+        }
+
+        long maxLines = 0;
+        OracleFixerResult returnResult = new OracleFixerResult(0, 0, new ArrayList<>(), OracleFixerType.EMPTY);
+        for (OracleFixerResult result : results) {
+            if (result.numFixableLines > maxLines) {
+                maxLines = result.numFixableLines;
+                returnResult = result;
+            }
+        }
+        return returnResult;
+    }
+
+    private static OracleFixerResult oracleFixBp(ArrayList<Double> toFix) {
+        ArrayList<Double> outLines = new ArrayList<>();
+        double allowedError = 0.00000000001;
+        int gridSize = 0;
+        double currentValue;
+        double nearestInt;
+        final double basePrecision = 0.0013;
+        double precision = 0;
+        int gridSizeSearch = 0;
+        long numLinesFixedWithPrevBestGrid = 0;
+        boolean endGridSearch = false;
+        final float gridSearchEndPercent = .9f;
+        final float necessaryImprovementGrid = 1.15f;
+        boolean isLineFixed = false;
+        long numFixableLines = 0;
+        long numFixedLines = 0;
+
+        for (int gridIteration = 1; gridIteration <= 16; gridIteration++) {
+            numFixableLines = 0;
+            switch (gridIteration) {
+                case 1 -> gridSizeSearch = 1024;
+                case 2 -> gridSizeSearch = 1536;
+                case 3 -> gridSizeSearch = 1280;
+                case 4 -> gridSizeSearch = 1792;
+                case 5 -> gridSizeSearch = 1152;
+                case 6 -> gridSizeSearch = 1408;
+                case 7 -> gridSizeSearch = 1664;
+                case 8 -> gridSizeSearch = 1920;
+                case 9 -> gridSizeSearch = 1088;
+                case 10 -> gridSizeSearch = 1216;
+                case 11 -> gridSizeSearch = 1344;
+                case 12 -> gridSizeSearch = 1472;
+                case 13 -> gridSizeSearch = 1600;
+                case 14 -> gridSizeSearch = 1728;
+                case 15 -> gridSizeSearch = 1856;
+                case 16 -> gridSizeSearch = 1984;
+            }
+            precision = (basePrecision * gridSizeSearch) / 200.0;
+
+            for (int i = 0; i < toFix.size(); i++) {
+                currentValue = toFix.get(i);
+                if ((i % 4) == 0) {
+                    isLineFixed = false;
+                }
+                currentValue = currentValue / 200 * gridSizeSearch;
+                nearestInt = (double) Math.round(currentValue);
+                if (Math.abs(currentValue - nearestInt) > precision) {
+                    continue;
+                }
+                if (!isLineFixed) {
+                    isLineFixed = true;
+                    numFixableLines++;
+                }
+            }
+
+            if (numFixableLines > (numLinesFixedWithPrevBestGrid) * necessaryImprovementGrid) {
+                gridSize = gridSizeSearch;
+                numLinesFixedWithPrevBestGrid = numFixableLines;
+            }
+            if (numFixableLines > ((toFix.size() / 4.0) * gridSearchEndPercent)) {
+                endGridSearch = true;
+            }
+            isLineFixed = false;
+            if (endGridSearch) {
+                break;
+            }
+        }
+
+        for (int i = 0; i < toFix.size(); i++) {
+            currentValue = toFix.get(i);
+            if ((i % 4) == 0) {
+                isLineFixed = false;
+            }
+            currentValue = currentValue / 200 * gridSize;
+            nearestInt = (double) Math.round(currentValue);
+            if (Math.abs(currentValue - nearestInt) < precision) {
+                if (Math.abs(currentValue - nearestInt) > allowedError) {
+                    if (!isLineFixed) {
+                        isLineFixed = true;
+                        numFixedLines++;
+                    }
+                    currentValue = nearestInt;
+                }
+            }
+            currentValue = currentValue * 200 / gridSize;
+            outLines.add(currentValue);
+        }
+
+        return new OracleFixerResult(numFixedLines, numFixableLines, outLines, OracleFixerType.BP);
+    }
+
+    private static OracleFixerResult oracleFixWithData(ArrayList<Double> inLines, double precision, double[] fixData) {
+        ArrayList<Double> outLines = new ArrayList<>();
+        ArrayList<Double> prevFixedPositions = new ArrayList<>();
+        double allowedError = 0.00000000001;
+        double currentValue;
+        boolean isNegative;
+        boolean skipSlow;
+        boolean isLineFixed = false;
+        long numFixableLines = 0;
+        long numFixedLines = 0;
+
+        for (int i = 0; i < inLines.size(); i++) {
+            currentValue = inLines.get(i);
+            skipSlow = false;
+            isNegative = false;
+            if (((i % 4) == 0)) {
+                isLineFixed = false;
+            }
+            if (currentValue < 0) {
+                isNegative = true;
+                currentValue *= -1;
+            }
+            for (Double prevFixedPosition : prevFixedPositions) {
+                if (Math.abs(currentValue - prevFixedPosition) > precision) {
+                    continue;
+                }
+                if (Math.abs(currentValue - prevFixedPosition) > allowedError) {
+                    currentValue = prevFixedPosition;
+                    if (!isLineFixed) {
+                        isLineFixed = true;
+                        numFixableLines++;
+                        numFixedLines++;
+                        skipSlow = true;
+                        break;
+                    }
+                } else if (!isLineFixed) {
+                    isLineFixed = true;
+                    numFixableLines++;
+                    break;
+                }
+            }
+            if (!skipSlow) {
+                for (double fixDatum : fixData) {
+                    if (Math.abs(currentValue - fixDatum) > precision) {
+                        continue;
+                    }
+                    if (Math.abs(currentValue - fixDatum) > allowedError) {
+                        currentValue = fixDatum;
+                        prevFixedPositions.add(fixDatum);
+                        if (!isLineFixed) {
+                            isLineFixed = true;
+                            numFixableLines++;
+                            numFixedLines++;
+                            break;
+                        }
+                    } else if (!isLineFixed) {
+                        isLineFixed = true;
+                        numFixableLines++;
+                        break;
+                    }
+                }
+            }
+            if (isNegative) {
+                currentValue *= -1;
+            }
+            outLines.add(currentValue);
+        }
+        return new OracleFixerResult(numFixedLines, numFixableLines, outLines, OracleFixerType.PURE_22_5);
+    }
+
+    private static double[] oracleFixData22_5() {
+        try (var stream = OrieditaGeometryOracle.class.getClassLoader().getResourceAsStream("fixData_22_5.bin")) {
+            byte[] bytes = stream.readAllBytes();
+            ByteBuffer byteBuffer = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN);
+            DoubleBuffer db = byteBuffer.asDoubleBuffer();
+            double[] fixData = new double[db.remaining()];
+            db.get(fixData);
+            return fixData;
+        } catch (IOException | NullPointerException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     private static void printSaveSummary(Save save) {
         System.out.println("title|" + nullToEmpty(save.getTitle()));
         System.out.println("lines|" + save.getLineSegments().size());
@@ -4793,6 +5159,7 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle check-camv-task <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-fix1 <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-fix2 <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-fix-inaccurate <useBP> <use22_5> <precision> <indices> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-set-color <color> <indices> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-change-type <index> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-make-color <color> <indices> <count> [ax ay bx by color]...");

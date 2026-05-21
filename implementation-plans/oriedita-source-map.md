@@ -145,8 +145,8 @@ stage explicitly changes it.
 | `CREASE_MAKE_VALLEY_24` | `MouseHandlerCreaseMakeValley` | `operations::color::make_valley` | kernel | 6 | Unsupported |
 | `CREASE_MAKE_EDGE_25` | `MouseHandlerCreaseMakeEdge` | `operations::color::make_edge` | kernel | 6 | Unsupported |
 | `BACKGROUND_CHANGE_POSITION_26` | `MouseHandlerBackgroundChangePosition` | none | ui-preview-only | later UI | Out-of-scope-ui |
-| `LINE_SEGMENT_DIVISION_27` | `MouseHandlerLineSegmentDivision` | `operations::point::divide_segment` | kernel | 7 | Unsupported |
-| `LINE_SEGMENT_RATIO_SET_28` | `MouseHandlerLineSegmentRatioSet` | `operations::point::ratio_divide_segment` | kernel | 7 | Unsupported |
+| `LINE_SEGMENT_DIVISION_27` | `MouseHandlerLineSegmentDivision` | `operations::point::divide_segment_by_count` | kernel | 7 | Oracle-tested |
+| `LINE_SEGMENT_RATIO_SET_28` | `MouseHandlerLineSegmentRatioSet` | `operations::point::divide_segment_by_ratio` | kernel | 7 | Oracle-tested |
 | `POLYGON_SET_NO_CORNERS_29` | `MouseHandlerPolygonSetNoCorners` | `operations::generators::regular_polygon` | kernel | 8 | Unsupported |
 | `CREASE_ADVANCE_TYPE_30` | `MouseHandlerCreaseAdvanceType` | `operations::color::advance_type` | kernel | 6 | Unsupported |
 | `CREASE_MOVE_4P_31` | `MouseHandlerCreaseMove4p` | `operations::transform::move_selected_lines_by_points` | kernel | 6 | Oracle-tested |

@@ -908,6 +908,13 @@ Status:
   behavior also includes candidate-line discovery, target-line mode selection,
   color-mode handling, insertion splitting, and line-circle intersection side
   effects.
+- `LINE_SEGMENT_DIVISION_27` and `LINE_SEGMENT_RATIO_SET_28` are ported as
+  `operations::point` commands once the handler has resolved its drag segment
+  and numeric parameters. The port preserves Oriedita's generated subsegment
+  formulas, ratio-command endpoint reversal, and worker-style insertion
+  splitting against existing lines. The committed oracle fixtures are line-only;
+  the `CreasePattern_Worker.addLineSegment` circle-intersection side effect
+  remains tracked with the Stage 8 circle tool work.
 - Full handler parity remains open for nearest-click line selection, Java2D
   path/lasso selection, operation-frame behavior, lengthen commands, and
   handler-level `fix2` chaining.

@@ -66,6 +66,8 @@ public class OrieditaGeometryOracle {
             case "foldline-transform-selected" -> foldLineTransformSelected(args);
             case "foldline-transform-selected-4p" -> foldLineTransformSelected4p(args);
             case "foldline-extend-to-intersection" -> foldLineExtendToIntersection(args);
+            case "foldline-divide-count" -> foldLineDivideCount(args);
+            case "foldline-divide-ratio" -> foldLineDivideRatio(args);
             case "custom-line-type" -> customLineType(args);
             case "orh-import-summary" -> orhImportSummary(args);
             case "orh-export-fixture" -> orhExportFixture(args);
@@ -627,6 +629,79 @@ public class OrieditaGeometryOracle {
                 + result.getColor().getNumber());
     }
 
+    private static void foldLineDivideCount(String[] args) {
+        if (args.length < 8) {
+            usage("foldline-divide-count expects division count, segment, count, and segment payload");
+        }
+
+        int divisionCount = Integer.parseInt(args[1]);
+        LineSegment segment = new LineSegment(
+                new Point(parse(args[2]), parse(args[3])),
+                new Point(parse(args[4]), parse(args[5])),
+                LineColor.fromNumber(Integer.parseInt(args[6])));
+        int count = Integer.parseInt(args[7]);
+        FoldLineSet set = foldLineSet(args, 8, count);
+
+        if (divisionCount != 0 && Epsilon.high.gt0(segment.determineLength())) {
+            for (int i = 0; i <= divisionCount - 1; i++) {
+                double ax = ((double) (divisionCount - i) * segment.determineAX()
+                        + (double) i * segment.determineBX()) / ((double) divisionCount);
+                double ay = ((double) (divisionCount - i) * segment.determineAY()
+                        + (double) i * segment.determineBY()) / ((double) divisionCount);
+                double bx = ((double) (divisionCount - i - 1) * segment.determineAX()
+                        + (double) (i + 1) * segment.determineBX()) / ((double) divisionCount);
+                double by = ((double) (divisionCount - i - 1) * segment.determineAY()
+                        + (double) (i + 1) * segment.determineBY()) / ((double) divisionCount);
+                addLineSegmentLikeWorker(set, new LineSegment(ax, ay, bx, by).withColor(segment.getColor()));
+            }
+        }
+
+        printFoldLineSet(set);
+    }
+
+    private static void foldLineDivideRatio(String[] args) {
+        if (args.length < 9) {
+            usage("foldline-divide-ratio expects ratio s, ratio t, segment, count, and segment payload");
+        }
+
+        double ratioS = parse(args[1]);
+        double ratioT = parse(args[2]);
+        LineSegment segment = new LineSegment(
+                new Point(parse(args[3]), parse(args[4])),
+                new Point(parse(args[5]), parse(args[6])),
+                LineColor.fromNumber(Integer.parseInt(args[7])));
+        int count = Integer.parseInt(args[8]);
+        FoldLineSet set = foldLineSet(args, 9, count);
+
+        if (Epsilon.high.gt0(segment.determineLength())) {
+            LineSegment dragSegment = segment.withAB(segment.getB(), segment.getA());
+            if ((ratioS == 0.0 && ratioT != 0.0) || (ratioS != 0.0 && ratioT == 0.0)) {
+                addLineSegmentLikeWorker(set, dragSegment);
+            }
+            if (ratioS != 0.0 && ratioT != 0.0) {
+                double nx = (ratioT * dragSegment.determineBX()
+                        + ratioS * dragSegment.determineAX())
+                        / (ratioS + ratioT);
+                double ny = (ratioT * dragSegment.determineBY()
+                        + ratioS * dragSegment.determineAY())
+                        / (ratioS + ratioT);
+                LineSegment sAd = new LineSegment().withColor(segment.getColor());
+                addLineSegmentLikeWorker(set, sAd.withCoordinates(
+                        dragSegment.determineAX(),
+                        dragSegment.determineAY(),
+                        nx,
+                        ny));
+                addLineSegmentLikeWorker(set, sAd.withCoordinates(
+                        dragSegment.determineBX(),
+                        dragSegment.determineBY(),
+                        nx,
+                        ny));
+            }
+        }
+
+        printFoldLineSet(set);
+    }
+
     private static void orhImportSummary(String[] args) throws Exception {
         if (args.length != 2) {
             usage("orh-import-summary expects a file path");
@@ -724,6 +799,12 @@ public class OrieditaGeometryOracle {
                     LineColor.fromNumber(Integer.parseInt(args[base + 4])));
         }
         return set;
+    }
+
+    private static void addLineSegmentLikeWorker(FoldLineSet set, LineSegment segment) {
+        set.addLine(segment);
+        int totalOld = set.getTotal();
+        set.divideLineSegmentWithNewLines(totalOld - 1, totalOld);
     }
 
     private static Polygon polygon(String[] args, int offset, int count) {

@@ -2,5 +2,6 @@
 
 pub mod arrangement;
 pub mod color;
+pub mod point;
 pub mod selection;
 pub mod transform;

@@ -17,7 +17,9 @@ line-overlap/intersection selection via `select_lX`, and
 line deletion, line-type replacement, and line-type deletion. Transform
 commands cover FoldLineSet translation plus selected move/copy and four-point
 selected move/copy. The lengthen groundwork includes
-`OritaCalc.extendToIntersectionPoint_2`.
+`OritaCalc.extendToIntersectionPoint_2`. Point-tool commands cover the
+line-only portions of count-based and ratio-based segment division, including
+the worker-style line insertion splitting used by the handlers.
 
 The oracle intentionally compiles against a pinned Oriedita source checkout
 instead of reimplementing the behavior in Rust.

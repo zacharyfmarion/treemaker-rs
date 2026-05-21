@@ -10,6 +10,7 @@ use oristudio_cp::operations::color::{
     delete_line_type_for_indices, replace_line_type_for_indices, set_line_color_for_indices,
     toggle_mountain_valley,
 };
+use oristudio_cp::operations::point::{divide_segment_by_count, divide_segment_by_ratio};
 use oristudio_cp::operations::selection::{
     delete_selected_lines, select_all, select_box, select_connected_from_point, select_indices,
     select_intersecting_line, select_polygon, unselect_all, unselect_indices,
@@ -921,6 +922,62 @@ fn extend_to_intersection_matches_oriedita_oracle() {
             run_oracle(&oracle, &args)
         );
     }
+}
+
+#[test]
+fn point_line_division_matches_oriedita_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    let count_segment = segment(0.0, 0.0, 2.0, 0.0, LineColor::Red1);
+    let count_segments = vec![segment(1.0, -1.0, 1.0, 1.0, LineColor::Black0)];
+    let mut count_model = model_from_segments(&count_segments);
+    divide_segment_by_count(&mut count_model, &count_segment, 2);
+
+    let mut count_args = vec!["foldline-divide-count".to_string(), "2".to_string()];
+    push_one_segment_args(&mut count_args, &count_segment);
+    count_args.push(count_segments.len().to_string());
+    push_segment_args(&mut count_args, &count_segments);
+    assert_eq!(
+        line_segment_set_summary(&count_model),
+        run_oracle(&oracle, &count_args)
+    );
+
+    let ratio_segment = segment(0.0, 0.0, 10.0, 0.0, LineColor::Blue2);
+    let mut ratio_model = CreasePatternModel::default();
+    divide_segment_by_ratio(&mut ratio_model, &ratio_segment, 1.0, 3.0);
+
+    let mut ratio_args = vec![
+        "foldline-divide-ratio".to_string(),
+        "1.0".to_string(),
+        "3.0".to_string(),
+    ];
+    push_one_segment_args(&mut ratio_args, &ratio_segment);
+    ratio_args.push("0".to_string());
+    assert_eq!(
+        line_segment_set_summary(&ratio_model),
+        run_oracle(&oracle, &ratio_args)
+    );
+
+    let zero_ratio_segment = segment(-1.0, 2.0, 3.0, 2.0, LineColor::Cyan3);
+    let mut zero_ratio_model = CreasePatternModel::default();
+    divide_segment_by_ratio(&mut zero_ratio_model, &zero_ratio_segment, 0.0, 4.0);
+
+    let mut zero_ratio_args = vec![
+        "foldline-divide-ratio".to_string(),
+        "0.0".to_string(),
+        "4.0".to_string(),
+    ];
+    push_one_segment_args(&mut zero_ratio_args, &zero_ratio_segment);
+    zero_ratio_args.push("0".to_string());
+    assert_eq!(
+        line_segment_set_summary(&zero_ratio_model),
+        run_oracle(&oracle, &zero_ratio_args)
+    );
 }
 
 fn operations_oracle() -> Option<PathBuf> {

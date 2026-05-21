@@ -21,6 +21,11 @@ import type { SelectablePartKind } from '../../lib/selection';
 import type { SymmetryAuthoringPair } from '../../lib/symmetryAuthoring';
 import type { FileService } from '../../platform/fileService';
 import type { ImportedCreasePatternDocument } from '../../lib/creasePatternImport';
+import type {
+  OristudioCpDocumentState,
+  OristudioCpOperationDescriptor,
+} from '../../engine/oristudioCpTypes';
+import type { OristudioCpOperationId } from '../../lib/oristudioCpCommands';
 
 export interface RecentProject {
   id: string;
@@ -34,6 +39,9 @@ export interface ProjectSliceState {
   project: TreeProject;
   documentMode: DocumentMode;
   importedCreasePattern: ImportedCreasePatternDocument | null;
+  oristudioCpDocument: OristudioCpDocumentState | null;
+  oristudioCpOperationDescriptors: OristudioCpOperationDescriptor[];
+  oristudioCpError: string | null;
   projectLoadId: number;
   currentFilePath: string | null;
   currentFileName: string;
@@ -59,6 +67,8 @@ export interface ProjectSliceActions {
     text: string,
     source: { filename: string; path?: string | null }
   ) => Promise<void>;
+  executeOristudioCpCommand: (operationId: OristudioCpOperationId) => Promise<boolean>;
+  clearOristudioCpDocument: () => Promise<void>;
   openProject: (fileService?: FileService) => Promise<boolean>;
   saveProject: (fileService?: FileService) => Promise<boolean>;
   saveProjectAs: (fileService?: FileService) => Promise<boolean>;

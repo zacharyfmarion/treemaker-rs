@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "crates/oristudio-cp",
+    "crates/oristudio-cp-wasm",
     "crates/treemaker-flatfold",
     "crates/treemaker-fold",
     "crates/treemaker-sequence",

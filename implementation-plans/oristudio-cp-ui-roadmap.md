@@ -626,10 +626,10 @@ Done when:
 - [x] Stage 0: Assign every upstream command a left-rail/menu/palette home or an
       explicit UI-only/out-of-scope reason.
 - [x] Stage 0: Add capability and disabled-state vocabulary for CP commands.
-- [ ] Stage 1: Add the `oristudio-cp` web runtime bridge.
-- [ ] Stage 1: Add editable CP document state separate from generated
+- [x] Stage 1: Add the `oristudio-cp` web runtime bridge.
+- [x] Stage 1: Add editable CP document state separate from generated
       TreeMaker CP artifacts.
-- [ ] Stage 1: Add command-result and unsupported-operation mapping.
+- [x] Stage 1: Add command-result and unsupported-operation mapping.
 - [x] Stage 2 baseline: Rebase onto the landed CP pane pan/zoom/fit viewport
       work from `main`.
 - [ ] Stage 2: Extend the landed viewport with edit-grade CP viewport state.

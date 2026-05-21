@@ -45,6 +45,8 @@ export function CreasePatternPanel() {
   const error = useWorkspaceStore((state) => state.error);
   const documentMode = useWorkspaceStore((state) => state.documentMode);
   const importedCreasePattern = useWorkspaceStore((state) => state.importedCreasePattern);
+  const oristudioCpDocument = useWorkspaceStore((state) => state.oristudioCpDocument);
+  const oristudioCpError = useWorkspaceStore((state) => state.oristudioCpError);
   const projectLoadId = useWorkspaceStore((state) => state.projectLoadId);
   const mode = useWorkspaceStore((state) => state.creaseColorMode);
   const selection = useWorkspaceStore((state) => state.selection);
@@ -67,7 +69,15 @@ export function CreasePatternPanel() {
             : 'No crease pattern';
   const sourceLabel =
     documentMode === 'crease-pattern' && importedCreasePattern
-      ? `${importedCreasePattern.source.filename} | ${importedCreasePattern.lineOnly ? 'View only' : 'Simulatable'}`
+      ? [
+          importedCreasePattern.source.filename,
+          importedCreasePattern.lineOnly ? 'View only' : 'Simulatable',
+          oristudioCpDocument
+            ? `Editable kernel: ${oristudioCpDocument.summary.line_segments} lines`
+            : oristudioCpError
+              ? `Kernel unavailable: ${shortStatus(oristudioCpError)}`
+              : 'Editable kernel pending',
+        ].join(' | ')
       : null;
 
   const getViewportSize = useCallback((): ViewportSize | null => {

@@ -1,0 +1,24 @@
+[package]
+name = "oristudio-cp-wasm"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "wasm-bindgen package for the Ori Studio Oriedita-compatible crease-pattern kernel"
+repository.workspace = true
+homepage.workspace = true
+keywords = ["origami", "oriedita", "crease-pattern"]
+categories = ["wasm", "algorithms"]
+include = ["Cargo.toml", "src/**", "tests/**", "!pkg/**"]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+oristudio-cp.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde-wasm-bindgen.workspace = true
+wasm-bindgen.workspace = true
+
+[dev-dependencies]
+wasm-bindgen-test.workspace = true

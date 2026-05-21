@@ -3,8 +3,9 @@ use oristudio_cp::folding::{
     SubFaceSwapper, additional_estimation_from_segments, configure_subfaces_from_segments,
     equivalence_condition_candidates_from_segments, estimate_wireframe_from_segments,
     initial_hierarchy_from_segments, overlap_search_from_segments,
-    overlap_search_from_segments_with_swap, possible_overlap_search_for_subfaces,
-    possible_overlap_search_for_subfaces_with_swap, prepare_subface_segments, prioritize_subfaces,
+    overlap_search_from_segments_with_swap, possible_overlap_search_for_ordered_subfaces,
+    possible_overlap_search_for_subfaces, possible_overlap_search_for_subfaces_with_swap,
+    prepare_subface_segments, prioritize_subfaces,
 };
 use oristudio_cp::geometry::{LineColor, LineSegment, Point};
 
@@ -343,6 +344,35 @@ fn worker_overlap_search_with_swap_runs_realtime_search_path() {
 
     assert!(!search.found);
     assert_eq!(search.priority.valid_count, 2);
+}
+
+#[test]
+fn worker_overlap_search_promotes_final_aea_error_subface() {
+    let hierarchy = InitialHierarchy {
+        faces_total: 3,
+        relations: vec![HierarchyRelation {
+            upper_face: 2,
+            lower_face: 0,
+        }],
+    };
+    let subfaces = vec![
+        oristudio_cp::folding::SubFace {
+            face_ids: vec![0, 1],
+        },
+        oristudio_cp::folding::SubFace {
+            face_ids: vec![1, 2],
+        },
+        oristudio_cp::folding::SubFace {
+            face_ids: vec![0, 1, 2],
+        },
+    ];
+
+    let search = possible_overlap_search_for_ordered_subfaces(&subfaces, 2, &hierarchy, None, true)
+        .expect("worker search should be supported");
+
+    assert!(search.found);
+    assert_eq!(search.priority.valid_count, 3);
+    assert_eq!(search.priority.ordered_subface_indices, vec![1, 2, 0]);
 }
 
 #[test]

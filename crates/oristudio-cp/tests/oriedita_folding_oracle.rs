@@ -5,8 +5,8 @@ use oristudio_cp::folding::{
     configure_subfaces_from_segments, equivalence_condition_candidates_from_segments,
     estimate_wireframe_from_segments, initial_hierarchy_from_segments,
     overlap_search_from_segments, overlap_search_from_segments_with_swap,
-    possible_overlap_search_for_subfaces, possible_overlap_search_for_subfaces_with_swap,
-    prepare_subface_segments, prioritize_subfaces,
+    possible_overlap_search_for_ordered_subfaces, possible_overlap_search_for_subfaces,
+    possible_overlap_search_for_subfaces_with_swap, prepare_subface_segments, prioritize_subfaces,
 };
 use oristudio_cp::geometry::{LineColor, LineSegment, Point};
 use std::path::{Path, PathBuf};
@@ -608,6 +608,46 @@ fn worker_overlap_search_with_swap_matches_oriedita_oracle() {
 }
 
 #[test]
+fn worker_overlap_final_recovery_matches_oriedita_oracle() {
+    let Some(oracle) = folding_oracle() else {
+        eprintln!("skipping Oriedita folding oracle test: ORIEDITA_GEOMETRY_ORACLE is not set");
+        return;
+    };
+
+    let case = WorkerOverlapCase {
+        faces_total: 3,
+        subfaces: &[&[0usize, 1], &[1, 2], &[0, 1, 2]],
+        relations: &[(2, 0)],
+        triple_conditions: &[],
+        quadruple_conditions: &[],
+    };
+    let hierarchy = InitialHierarchy {
+        faces_total: case.faces_total,
+        relations: vec![HierarchyRelation {
+            upper_face: 2,
+            lower_face: 0,
+        }],
+    };
+    let subfaces = case
+        .subfaces
+        .iter()
+        .map(|face_ids| SubFace {
+            face_ids: face_ids.to_vec(),
+        })
+        .collect::<Vec<_>>();
+    let search = possible_overlap_search_for_ordered_subfaces(&subfaces, 2, &hierarchy, None, true)
+        .expect("worker overlap search");
+
+    let args = worker_overlap_ordered_args("worker-overlap-ordered-summary", &case, 2, true);
+    let oracle_args = args.iter().map(String::as_str).collect::<Vec<_>>();
+
+    assert_eq!(
+        worker_overlap_summary_with_order(&search),
+        run_oracle(&oracle, &oracle_args)
+    );
+}
+
+#[test]
 fn worker_overlap_from_segments_matches_oriedita_no_swap_oracle() {
     let Some(oracle) = folding_oracle() else {
         eprintln!("skipping Oriedita folding oracle test: ORIEDITA_GEOMETRY_ORACLE is not set");
@@ -957,6 +997,47 @@ fn worker_overlap_args(command: &str, case: &WorkerOverlapCase<'_>) -> Vec<Strin
         command.to_string(),
         case.faces_total.to_string(),
         case.subfaces.len().to_string(),
+    ];
+    for face_ids in case.subfaces {
+        args.push(face_ids.len().to_string());
+        for face_id in *face_ids {
+            args.push(face_id.to_string());
+        }
+    }
+    args.push(case.relations.len().to_string());
+    for (upper_face, lower_face) in case.relations {
+        args.push(upper_face.to_string());
+        args.push(lower_face.to_string());
+    }
+    args.push(case.triple_conditions.len().to_string());
+    for (a, b, c, d) in case.triple_conditions {
+        args.push(a.to_string());
+        args.push(b.to_string());
+        args.push(c.to_string());
+        args.push(d.to_string());
+    }
+    args.push(case.quadruple_conditions.len().to_string());
+    for (a, b, c, d) in case.quadruple_conditions {
+        args.push(a.to_string());
+        args.push(b.to_string());
+        args.push(c.to_string());
+        args.push(d.to_string());
+    }
+    args
+}
+
+fn worker_overlap_ordered_args(
+    command: &str,
+    case: &WorkerOverlapCase<'_>,
+    valid_count: usize,
+    swap: bool,
+) -> Vec<String> {
+    let mut args = vec![
+        command.to_string(),
+        case.faces_total.to_string(),
+        case.subfaces.len().to_string(),
+        valid_count.to_string(),
+        swap.to_string(),
     ];
     for face_ids in case.subfaces {
         args.push(face_ids.len().to_string());

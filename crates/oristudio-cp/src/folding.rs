@@ -12,8 +12,9 @@ use std::collections::HashMap;
 pub use permutation::{
     ChainPermutationGenerator, PermutationError, PermutationSnapshot, SubFacePermutationSearch,
     SubFacePriority, SubFaceSearchError, SubFaceSwapper, WorkerOverlapSearch,
-    WorkerOverlapSearchError, possible_overlap_search_for_subfaces,
-    possible_overlap_search_for_subfaces_with_swap, prioritize_subfaces,
+    WorkerOverlapSearchError, possible_overlap_search_for_ordered_subfaces,
+    possible_overlap_search_for_subfaces, possible_overlap_search_for_subfaces_with_swap,
+    prioritize_subfaces,
 };
 
 #[derive(Debug, Clone, PartialEq)]

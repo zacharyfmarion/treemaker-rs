@@ -1200,13 +1200,16 @@ Deliverables:
   permutation carry/rollback, hierarchy stacking insertion, final AEA feedback
   into permutation search, the false-result last-hierarchy snapshot, realtime
   AEA checkpoints, subface swapping, swap counters, and temp-guide clearing
-  during swap-over. The Rust port uses the existing fixed-point/one-pass AEA
-  implementation rather than Oriedita's optimized reactive Italiano data
-  structures, so that difference is performance-oriented rather than a scoped
-  behavior reduction. Final recovery when the final AEA reports a specific
-  missing reduced subface remains an explicit unsupported path. Oracle commands
-  `worker-overlap-search-summary` and `worker-overlap-search-swap-summary`
-  compare the resulting status, hierarchy, and swap-order state.
+  during swap-over. Final recovery when AEA identifies an unsearched reduced
+  subface is ported too: the missing subface is promoted into the valid set,
+  given a guide map from the saved hierarchy, and the search continues. The
+  Rust port uses the existing fixed-point/one-pass AEA implementation rather
+  than Oriedita's optimized reactive Italiano data structures, so that
+  difference is performance-oriented rather than a scoped behavior reduction.
+  Oracle commands `worker-overlap-search-summary`,
+  `worker-overlap-search-swap-summary`, and
+  `worker-overlap-ordered-summary` compare the resulting status, hierarchy,
+  swap-order state, and final-recovery behavior.
 - Status: The same worker searches are exposed from folded line segments as
   `folding::overlap_search_from_segments` and
   `folding::overlap_search_from_segments_with_swap`, running the folded

@@ -322,6 +322,7 @@ public class OrieditaGeometryOracle {
             case "additional-estimation-summary" -> additionalEstimationSummary(args);
             case "chain-permutation-summary" -> chainPermutationSummary(args);
             case "chain-permutation-temp-summary" -> chainPermutationTempSummary(args);
+            case "subface-guide-permutation-summary" -> subfaceGuidePermutationSummary(args);
             default -> usage("unknown command: " + args[0]);
         }
     }
@@ -661,6 +662,34 @@ public class OrieditaGeometryOracle {
             }
             printChainPermutation(i, changed, generator, numDigits);
         }
+    }
+
+    private static void subfaceGuidePermutationSummary(String[] args) throws Exception {
+        if (args.length < 6) {
+            usage("subface-guide-permutation-summary expects faces total, face count, face ids, relation count, relation pairs, and limit");
+        }
+
+        int facesTotal = Integer.parseInt(args[1]);
+        int faceCount = Integer.parseInt(args[2]);
+        int offset = 3;
+        SubFace subFace = new SubFace(new NoopBulletinBoard());
+        subFace.setNumDigits(faceCount);
+        for (int i = 1; i <= faceCount; i++) {
+            subFace.setFaceId(i, Integer.parseInt(args[offset++]) + 1);
+        }
+
+        HierarchyList hierarchyList = new HierarchyList();
+        hierarchyList.setFacesTotal(facesTotal);
+        int relationCount = Integer.parseInt(args[offset++]);
+        for (int i = 0; i < relationCount; i++) {
+            int upper = Integer.parseInt(args[offset++]) + 1;
+            int lower = Integer.parseInt(args[offset++]) + 1;
+            hierarchyList.set(upper, lower, HierarchyList.ABOVE_1);
+        }
+        int limit = Integer.parseInt(args[offset]);
+
+        subFace.setGuideMap(hierarchyList);
+        printSubfacePermutationSequence(subFace, faceCount, limit);
     }
 
     private static void intersectDividePair(String[] args) throws Exception {
@@ -4928,6 +4957,48 @@ public class OrieditaGeometryOracle {
                 + permutation);
     }
 
+    private static void printSubfacePermutationSequence(
+            SubFace subFace,
+            int faceCount,
+            int limit) throws Exception {
+        Method getPermutation = SubFace.class.getDeclaredMethod("getPermutation", int.class);
+        getPermutation.setAccessible(true);
+        System.out.println("subface_permutations|" + subFace.getPermutationCount());
+        if (limit <= 0) {
+            return;
+        }
+        printSubfacePermutation(0, 0, subFace, getPermutation, faceCount);
+        for (int i = 1; i < limit; i++) {
+            int changed = subFace.next(faceCount);
+            if (changed == 0) {
+                System.out.println("end|" + i + "|0|" + subFace.getPermutationCount());
+                return;
+            }
+            printSubfacePermutation(i, changed, subFace, getPermutation, faceCount);
+        }
+    }
+
+    private static void printSubfacePermutation(
+            int step,
+            int changed,
+            SubFace subFace,
+            Method getPermutation,
+            int faceCount) throws Exception {
+        StringBuilder permutation = new StringBuilder();
+        for (int i = 1; i <= faceCount; i++) {
+            if (i > 1) {
+                permutation.append(",");
+            }
+            int localIndex = (Integer) getPermutation.invoke(subFace, i);
+            permutation.append(subFace.getFaceId(localIndex) - 1);
+        }
+        System.out.println("subface_permutation|"
+                + step + "|"
+                + changed + "|"
+                + subFace.getPermutationCount() + "|"
+                + permutation);
+    }
+
     private static FoldedFigure_Worker configuredSubfaceWorker(PointSet folded) throws Exception {
         LineSegmentSetWorker lineWorker = new LineSegmentSetWorker();
         lineWorker.set(new LineSegmentSet(folded));
@@ -5848,6 +5919,7 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle additional-estimation-summary <startingFace> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle chain-permutation-summary <digits> <guideCount> [upper lower]... <topCsv|-> <bottomCsv|-> <limit>");
         System.err.println("   or: OrieditaGeometryOracle chain-permutation-temp-summary <digits> <guideCount> [upper lower]... <topCsv|-> <bottomCsv|-> <stepsBeforeTemp> <tempUpper> <tempLower> <stepsAfterTemp> <limitAfterClear>");
+        System.err.println("   or: OrieditaGeometryOracle subface-guide-permutation-summary <facesTotal> <faceCount> [faceId]... <relationCount> [upper lower]... <limit>");
         System.exit(2);
     }
 }

@@ -1,9 +1,9 @@
 use oristudio_cp::folding::{
     AdditionalEstimation, AdditionalEstimationError, ChainPermutationGenerator,
-    EquivalenceConditionSet, InitialHierarchy, InitialHierarchyError, SubFaceConfiguration,
-    additional_estimation_from_segments, configure_subfaces_from_segments,
-    equivalence_condition_candidates_from_segments, estimate_wireframe_from_segments,
-    initial_hierarchy_from_segments, prepare_subface_segments,
+    EquivalenceConditionSet, HierarchyRelation, InitialHierarchy, InitialHierarchyError,
+    SubFaceConfiguration, SubFacePermutationSearch, additional_estimation_from_segments,
+    configure_subfaces_from_segments, equivalence_condition_candidates_from_segments,
+    estimate_wireframe_from_segments, initial_hierarchy_from_segments, prepare_subface_segments,
 };
 use oristudio_cp::geometry::{LineColor, LineSegment, Point};
 use std::path::{Path, PathBuf};
@@ -278,6 +278,64 @@ fn chain_permutation_temp_guides_match_oriedita_oracle() {
     );
 }
 
+#[test]
+fn subface_guide_permutations_match_oriedita_oracle() {
+    let Some(oracle) = folding_oracle() else {
+        eprintln!("skipping Oriedita folding oracle test: ORIEDITA_GEOMETRY_ORACLE is not set");
+        return;
+    };
+
+    for case in [
+        SubFaceGuideCase {
+            faces_total: 4,
+            face_ids: &[0, 1, 2, 3],
+            relations: &[(0, 1), (1, 2), (0, 2)],
+            limit: 10,
+        },
+        SubFaceGuideCase {
+            faces_total: 5,
+            face_ids: &[1, 2, 4],
+            relations: &[(1, 4), (2, 4)],
+            limit: 8,
+        },
+    ] {
+        let hierarchy = InitialHierarchy {
+            faces_total: case.faces_total,
+            relations: case
+                .relations
+                .iter()
+                .map(|(upper_face, lower_face)| HierarchyRelation {
+                    upper_face: *upper_face,
+                    lower_face: *lower_face,
+                })
+                .collect(),
+        };
+        let mut search = SubFacePermutationSearch::new(case.face_ids.to_vec());
+        search.set_guide_map(&hierarchy, None).expect("guide map");
+
+        let mut args = vec![
+            "subface-guide-permutation-summary".to_string(),
+            case.faces_total.to_string(),
+            case.face_ids.len().to_string(),
+        ];
+        for face_id in case.face_ids {
+            args.push(face_id.to_string());
+        }
+        args.push(case.relations.len().to_string());
+        for (upper_face, lower_face) in case.relations {
+            args.push(upper_face.to_string());
+            args.push(lower_face.to_string());
+        }
+        args.push(case.limit.to_string());
+        let oracle_args = args.iter().map(String::as_str).collect::<Vec<_>>();
+
+        assert_eq!(
+            subface_guide_summary(search, case.limit),
+            run_oracle(&oracle, &oracle_args)
+        );
+    }
+}
+
 fn folding_oracle() -> Option<PathBuf> {
     std::env::var("ORIEDITA_GEOMETRY_ORACLE")
         .or_else(|_| std::env::var("ORIEDITA_ORACLE"))
@@ -488,6 +546,13 @@ struct PermutationCase<'a> {
     limit: usize,
 }
 
+struct SubFaceGuideCase<'a> {
+    faces_total: usize,
+    face_ids: &'a [usize],
+    relations: &'a [(usize, usize)],
+    limit: usize,
+}
+
 fn chain_permutation_summary(mut generator: ChainPermutationGenerator, limit: usize) -> String {
     let mut output = String::new();
     output.push_str(&format!("permutations|{}\n", generator.count()));
@@ -572,6 +637,42 @@ fn push_chain_permutation(
         changed,
         generator.count(),
         joined_ids(&generator.current_permutation())
+    ));
+}
+
+fn subface_guide_summary(mut search: SubFacePermutationSearch, limit: usize) -> String {
+    let mut output = String::new();
+    output.push_str(&format!(
+        "subface_permutations|{}\n",
+        search.permutation_count()
+    ));
+    if limit == 0 {
+        return output;
+    }
+    push_subface_permutation(&mut output, 0, 0, &search);
+    for step in 1..limit {
+        let changed = search.next(search.face_ids().len()).expect("valid advance");
+        if changed == 0 {
+            output.push_str(&format!("end|{}|0|{}\n", step, search.permutation_count()));
+            return output;
+        }
+        push_subface_permutation(&mut output, step, changed, &search);
+    }
+    output
+}
+
+fn push_subface_permutation(
+    output: &mut String,
+    step: usize,
+    changed: usize,
+    search: &SubFacePermutationSearch,
+) {
+    output.push_str(&format!(
+        "subface_permutation|{}|{}|{}|{}\n",
+        step,
+        changed,
+        search.permutation_count(),
+        joined_ids(&search.current_ordering())
     ));
 }
 

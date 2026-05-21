@@ -1,4 +1,7 @@
-use std::collections::HashSet;
+use super::{
+    EquivalenceCondition, EquivalenceConditionSet, FaceOrder, HierarchyTable, InitialHierarchy,
+};
+use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PermutationError {
@@ -10,6 +13,130 @@ pub struct PermutationSnapshot {
     pub changed_digit: usize,
     pub count: usize,
     pub permutation: Vec<usize>,
+}
+
+#[derive(Debug, Clone)]
+pub struct SubFacePermutationSearch {
+    face_ids: Vec<usize>,
+    face_id_map: HashMap<usize, usize>,
+    generator: ChainPermutationGenerator,
+    triple_conditions: HashMap<usize, Vec<EquivalenceCondition>>,
+    quadruple_conditions: Vec<EquivalenceCondition>,
+}
+
+impl SubFacePermutationSearch {
+    pub fn new(face_ids: Vec<usize>) -> Self {
+        let face_count = face_ids.len();
+        Self {
+            face_ids,
+            face_id_map: HashMap::new(),
+            generator: ChainPermutationGenerator::new(face_count),
+            triple_conditions: HashMap::new(),
+            quadruple_conditions: Vec::new(),
+        }
+    }
+
+    pub fn face_ids(&self) -> &[usize] {
+        &self.face_ids
+    }
+
+    pub fn permutation_count(&self) -> usize {
+        self.generator.count()
+    }
+
+    pub fn current_ordering(&self) -> Vec<usize> {
+        (1..=self.face_ids.len())
+            .filter_map(|position| {
+                let local_index = self.generator.permutation_at(position)?;
+                local_index
+                    .checked_sub(1)
+                    .and_then(|index| self.face_ids.get(index))
+                    .copied()
+            })
+            .collect()
+    }
+
+    pub fn next(&mut self, digit: usize) -> Result<usize, PermutationError> {
+        self.generator.next(digit)
+    }
+
+    /// Oriedita `SubFace.setGuideMap()`: derive permutation guides from the
+    /// known face hierarchy, retain equivalence conditions that are local to
+    /// this subface, and initialize the generator.
+    pub fn set_guide_map(
+        &mut self,
+        hierarchy: &InitialHierarchy,
+        conditions: Option<&EquivalenceConditionSet>,
+    ) -> Result<(), PermutationError> {
+        let face_count = self.face_ids.len();
+        self.face_id_map.clear();
+        for (index, face_id) in self.face_ids.iter().enumerate() {
+            self.face_id_map.insert(*face_id, index + 1);
+        }
+
+        self.generator = ChainPermutationGenerator::new(face_count);
+        let table = HierarchyTable::from_initial(hierarchy);
+        for face_index in 1..=face_count {
+            let mut upper_face_ids = Vec::new();
+            let mut upper_face_enabled = Vec::new();
+
+            for i in 1..=face_count {
+                if table.get(self.face_ids[i - 1], self.face_ids[face_index - 1])
+                    == Some(FaceOrder::Above)
+                {
+                    upper_face_ids.push(i);
+                    upper_face_enabled.push(true);
+                }
+            }
+
+            for i in 0..upper_face_ids.len().saturating_sub(1) {
+                for j in 0..upper_face_ids.len() {
+                    if table.get(
+                        self.face_ids[upper_face_ids[i] - 1],
+                        self.face_ids[upper_face_ids[j] - 1],
+                    ) == Some(FaceOrder::Above)
+                    {
+                        upper_face_enabled[i] = false;
+                        break;
+                    }
+                }
+            }
+
+            for (i, upper_face_id) in upper_face_ids.iter().enumerate() {
+                if upper_face_enabled[i] {
+                    self.generator.add_guide(*upper_face_id, face_index)?;
+                }
+            }
+        }
+
+        self.triple_conditions.clear();
+        self.quadruple_conditions.clear();
+        if let Some(conditions) = conditions {
+            for condition in &conditions.triple_conditions {
+                if self.fast_contains(*condition) {
+                    self.triple_conditions
+                        .entry(condition.a)
+                        .or_default()
+                        .push(*condition);
+                }
+            }
+            for condition in &conditions.quadruple_conditions {
+                if self.fast_contains(*condition) {
+                    self.quadruple_conditions.push(*condition);
+                }
+            }
+        }
+
+        self.generator.initialize();
+        Ok(())
+    }
+
+    fn fast_contains(&self, condition: EquivalenceCondition) -> bool {
+        self.face_id_map.contains_key(&condition.a)
+            && self.face_id_map.contains_key(&condition.b)
+            && self.face_id_map.contains_key(&condition.c)
+            && self.face_id_map.contains_key(&condition.d)
+    }
 }
 
 /// Oriedita `ChainPermutationGenerator`, including persistent and temporary

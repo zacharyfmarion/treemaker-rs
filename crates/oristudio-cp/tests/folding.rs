@@ -1,7 +1,8 @@
 use oristudio_cp::folding::{
-    ChainPermutationGenerator, HierarchyRelation, additional_estimation_from_segments,
-    configure_subfaces_from_segments, equivalence_condition_candidates_from_segments,
-    estimate_wireframe_from_segments, initial_hierarchy_from_segments, prepare_subface_segments,
+    ChainPermutationGenerator, HierarchyRelation, InitialHierarchy, SubFacePermutationSearch,
+    additional_estimation_from_segments, configure_subfaces_from_segments,
+    equivalence_condition_candidates_from_segments, estimate_wireframe_from_segments,
+    initial_hierarchy_from_segments, prepare_subface_segments,
 };
 use oristudio_cp::geometry::{LineColor, LineSegment, Point};
 
@@ -177,6 +178,34 @@ fn chain_permutation_generator_supports_temporary_guides() {
     assert_eq!(generator.current_permutation().len(), 3);
 }
 
+#[test]
+fn subface_permutation_search_builds_transitive_reduced_guides() {
+    let hierarchy = InitialHierarchy {
+        faces_total: 4,
+        relations: vec![
+            HierarchyRelation {
+                upper_face: 0,
+                lower_face: 1,
+            },
+            HierarchyRelation {
+                upper_face: 1,
+                lower_face: 2,
+            },
+            HierarchyRelation {
+                upper_face: 0,
+                lower_face: 2,
+            },
+        ],
+    };
+    let mut search = SubFacePermutationSearch::new(vec![0, 1, 2, 3]);
+    search.set_guide_map(&hierarchy, None).expect("guide map");
+
+    for ordering in collect_subface_orderings(search, 12) {
+        assert!(position(&ordering, 0) < position(&ordering, 1));
+        assert!(position(&ordering, 1) < position(&ordering, 2));
+    }
+}
+
 fn square_with_diagonal() -> Vec<LineSegment> {
     vec![
         LineSegment::with_color(
@@ -239,6 +268,20 @@ fn collect_permutations(mut generator: ChainPermutationGenerator, limit: usize) 
             break;
         }
         permutations.push(generator.current_permutation());
+    }
+    permutations
+}
+
+fn collect_subface_orderings(
+    mut search: SubFacePermutationSearch,
+    limit: usize,
+) -> Vec<Vec<usize>> {
+    let mut permutations = Vec::new();
+    for step in 0..limit {
+        if step > 0 && search.next(search.face_ids().len()).expect("advance") == 0 {
+            break;
+        }
+        permutations.push(search.current_ordering());
     }
     permutations
 }

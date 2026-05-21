@@ -9,7 +9,9 @@ use crate::model::CreasePatternModel;
 use crate::operations::arrangement::divide_intersections;
 use std::collections::HashMap;
 
-pub use permutation::{ChainPermutationGenerator, PermutationError, PermutationSnapshot};
+pub use permutation::{
+    ChainPermutationGenerator, PermutationError, PermutationSnapshot, SubFacePermutationSearch,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct FoldedWireframe {

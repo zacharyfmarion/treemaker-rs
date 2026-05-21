@@ -1176,6 +1176,11 @@ Deliverables:
   next-permutation behavior. Oracle commands `chain-permutation-summary` and
   `chain-permutation-temp-summary` compare the Rust sequence against Oriedita
   before the overlap search is wired on top.
+- Status: Oriedita's `SubFace.setGuideMap()` hierarchy-to-permutation-guide
+  setup is ported as `folding::SubFacePermutationSearch`, including local face
+  mapping, transitive reduction of hierarchy guides, retained local equivalence
+  conditions, and initialized subface ordering sequences. The oracle command
+  `subface-guide-permutation-summary` compares those sequences with Oriedita.
 
 Oracle:
 

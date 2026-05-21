@@ -72,6 +72,28 @@ pub struct EquivalenceCondition {
     pub d: usize,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AdditionalEstimation {
+    pub hierarchy: InitialHierarchy,
+    pub triple_conditions: Vec<EquivalenceCondition>,
+    pub quadruple_conditions: Vec<EquivalenceCondition>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AdditionalEstimationError {
+    InitialHierarchy(InitialHierarchyError),
+    Contradiction {
+        upper_face: usize,
+        lower_face: usize,
+    },
+}
+
+impl From<InitialHierarchyError> for AdditionalEstimationError {
+    fn from(error: InitialHierarchyError) -> Self {
+        Self::InitialHierarchy(error)
+    }
+}
+
 /// Oriedita `WireFrame_Worker.folding()`: fold the line-set topology around a
 /// starting face without solving layer overlap.
 pub fn estimate_wireframe(
@@ -283,6 +305,52 @@ pub fn equivalence_condition_candidates_from_segments(
     }))
 }
 
+/// Oriedita `AdditionalEstimationAlgorithm` fixed-point inference over the
+/// reduced SubFace set and generated equivalence conditions.
+pub fn additional_estimation_from_segments(
+    segments: &[LineSegment],
+    starting_face_id: i32,
+) -> Result<Option<AdditionalEstimation>, AdditionalEstimationError> {
+    if segments.is_empty() {
+        return Ok(None);
+    }
+
+    let graph = FoldGraph::from_segments(segments, true);
+    if graph.faces.is_empty() {
+        return Ok(None);
+    }
+
+    let positions = graph.face_positions(starting_face_id);
+    let initial = initial_hierarchy_from_graph(&graph, &positions)?;
+    let folded = wireframe_from_graph(&graph, &positions, graph.folded_points(&positions));
+    let folded_segments = folded_wireframe_segments(&folded);
+    let prepared_segments = prepare_subface_segments(&folded_segments);
+    let subface_graph = FoldGraph::from_segments(&prepared_segments, true);
+    if subface_graph.faces.is_empty() {
+        return Ok(Some(AdditionalEstimation {
+            hierarchy: initial,
+            triple_conditions: Vec::new(),
+            quadruple_conditions: Vec::new(),
+        }));
+    }
+
+    let subfaces = configure_subfaces(&folded, &subface_graph);
+    let conditions = equivalence_condition_candidates_from_parts(&graph, &folded, &subfaces)?;
+    let mut table = HierarchyTable::from_initial(&initial);
+    run_additional_estimation(
+        &mut table,
+        &subfaces,
+        &conditions.triple_conditions,
+        &conditions.quadruple_conditions,
+    )?;
+
+    Ok(Some(AdditionalEstimation {
+        hierarchy: table.into_initial_hierarchy(initial.faces_total),
+        triple_conditions: conditions.triple_conditions,
+        quadruple_conditions: conditions.quadruple_conditions,
+    }))
+}
+
 fn initial_hierarchy_from_graph(
     graph: &FoldGraph,
     positions: &FacePositions,
@@ -329,6 +397,91 @@ fn initial_hierarchy_from_graph(
     Ok(InitialHierarchy {
         faces_total: graph.faces.len(),
         relations,
+    })
+}
+
+fn equivalence_condition_candidates_from_parts(
+    graph: &FoldGraph,
+    folded: &FoldedWireframe,
+    subfaces: &SubFaceConfiguration,
+) -> Result<EquivalenceConditionSet, InitialHierarchyError> {
+    let hierarchy = InitialHierarchy {
+        faces_total: graph.faces.len(),
+        relations: initial_hierarchy_from_graph(
+            graph,
+            &FacePositions {
+                starting_face: folded.starting_face,
+                face_position: folded.face_positions.clone(),
+                next_face: folded.next_faces.clone(),
+                associated_line: folded.associated_lines.clone(),
+            },
+        )?
+        .relations,
+    };
+    let folded_segments = folded_wireframe_segments(folded);
+    let face_polygons = folded_face_polygons(folded);
+    let mut triple_conditions = Vec::new();
+    for line_index in 0..graph.lines.len() {
+        let Some((first_face, second_face)) = graph.line_face_border(line_index) else {
+            continue;
+        };
+        if first_face == second_face {
+            continue;
+        }
+        let Some(segment) = folded_segments.get(line_index) else {
+            continue;
+        };
+        for (face_index, polygon) in face_polygons.iter().enumerate() {
+            if face_index != first_face
+                && face_index != second_face
+                && polygon.convex_inside(segment)
+            {
+                let (above, below) = normalized_pair(&hierarchy, first_face, second_face);
+                triple_conditions.push(EquivalenceCondition {
+                    a: face_index,
+                    b: above,
+                    c: face_index,
+                    d: below,
+                });
+            }
+        }
+    }
+
+    let mut quadruple_conditions = Vec::new();
+    for first_line in 0..graph.lines.len().saturating_sub(1) {
+        let Some((first_a, first_b)) = graph.line_face_border(first_line) else {
+            continue;
+        };
+        if first_a == first_b {
+            continue;
+        }
+        let Some(first_segment) = folded_segments.get(first_line) else {
+            continue;
+        };
+        for second_line in (first_line + 1)..graph.lines.len() {
+            let Some((second_a, second_b)) = graph.line_face_border(second_line) else {
+                continue;
+            };
+            if second_a == second_b {
+                continue;
+            }
+            let Some(second_segment) = folded_segments.get(second_line) else {
+                continue;
+            };
+            if determine_line_segment_intersection(first_segment, second_segment)
+                .is_segment_overlapping()
+                && subfaces_contain_all(subfaces, [first_a, first_b, second_a, second_b])
+            {
+                let (a, b) = normalized_pair(&hierarchy, first_a, first_b);
+                let (c, d) = normalized_pair(&hierarchy, second_a, second_b);
+                quadruple_conditions.push(EquivalenceCondition { a, b, c, d });
+            }
+        }
+    }
+
+    Ok(EquivalenceConditionSet {
+        triple_conditions,
+        quadruple_conditions,
     })
 }
 
@@ -440,6 +593,203 @@ fn subfaces_contain_all(configuration: &SubFaceConfiguration, faces: [usize; 4])
             .get(*index)
             .is_some_and(|subface| faces.iter().all(|face| subface.face_ids.contains(face)))
     })
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FaceOrder {
+    Above,
+    Below,
+}
+
+struct HierarchyTable {
+    order: HashMap<(usize, usize), FaceOrder>,
+}
+
+impl HierarchyTable {
+    fn from_initial(initial: &InitialHierarchy) -> Self {
+        let mut table = Self {
+            order: HashMap::new(),
+        };
+        for relation in &initial.relations {
+            let _ = table.infer_above(relation.upper_face, relation.lower_face);
+        }
+        table
+    }
+
+    fn get(&self, first: usize, second: usize) -> Option<FaceOrder> {
+        if first == second {
+            return None;
+        }
+        if first < second {
+            self.order.get(&(first, second)).copied()
+        } else {
+            self.order.get(&(second, first)).map(|order| match order {
+                FaceOrder::Above => FaceOrder::Below,
+                FaceOrder::Below => FaceOrder::Above,
+            })
+        }
+    }
+
+    fn infer_above(
+        &mut self,
+        upper: usize,
+        lower: usize,
+    ) -> Result<bool, AdditionalEstimationError> {
+        if upper == lower || self.get(upper, lower) == Some(FaceOrder::Below) {
+            return Err(AdditionalEstimationError::Contradiction {
+                upper_face: upper,
+                lower_face: lower,
+            });
+        }
+        if self.get(upper, lower) == Some(FaceOrder::Above) {
+            return Ok(false);
+        }
+
+        if upper < lower {
+            self.order.insert((upper, lower), FaceOrder::Above);
+        } else {
+            self.order.insert((lower, upper), FaceOrder::Below);
+        }
+        Ok(true)
+    }
+
+    fn into_initial_hierarchy(self, faces_total: usize) -> InitialHierarchy {
+        let mut relations = self
+            .order
+            .into_iter()
+            .map(|((first, second), order)| match order {
+                FaceOrder::Above => HierarchyRelation {
+                    upper_face: first,
+                    lower_face: second,
+                },
+                FaceOrder::Below => HierarchyRelation {
+                    upper_face: second,
+                    lower_face: first,
+                },
+            })
+            .collect::<Vec<_>>();
+        relations.sort_by_key(|relation| (relation.upper_face, relation.lower_face));
+        InitialHierarchy {
+            faces_total,
+            relations,
+        }
+    }
+}
+
+fn run_additional_estimation(
+    table: &mut HierarchyTable,
+    subfaces: &SubFaceConfiguration,
+    triple_conditions: &[EquivalenceCondition],
+    quadruple_conditions: &[EquivalenceCondition],
+) -> Result<(), AdditionalEstimationError> {
+    loop {
+        let mut changes = 0usize;
+        changes += infer_subface_transitivity(table, subfaces)?;
+        for condition in triple_conditions {
+            changes += apply_triple_condition(table, *condition)?;
+        }
+        for condition in quadruple_conditions {
+            changes += apply_quadruple_condition(table, *condition)?;
+        }
+        if changes == 0 {
+            return Ok(());
+        }
+    }
+}
+
+fn infer_subface_transitivity(
+    table: &mut HierarchyTable,
+    subfaces: &SubFaceConfiguration,
+) -> Result<usize, AdditionalEstimationError> {
+    let mut changes = 0usize;
+    for subface_index in &subfaces.reduced_subface_indices {
+        let Some(subface) = subfaces.subfaces.get(*subface_index) else {
+            continue;
+        };
+        for upper in &subface.face_ids {
+            for middle in &subface.face_ids {
+                if table.get(*upper, *middle) != Some(FaceOrder::Above) {
+                    continue;
+                }
+                for lower in &subface.face_ids {
+                    if table.get(*middle, *lower) == Some(FaceOrder::Above)
+                        && table.infer_above(*upper, *lower)?
+                    {
+                        changes += 1;
+                    }
+                }
+            }
+        }
+    }
+    Ok(changes)
+}
+
+fn apply_triple_condition(
+    table: &mut HierarchyTable,
+    condition: EquivalenceCondition,
+) -> Result<usize, AdditionalEstimationError> {
+    let a = condition.a;
+    let b = condition.b;
+    let d = condition.d;
+    if table.get(a, b) == Some(FaceOrder::Above) {
+        return table.infer_above(a, d).map(usize::from);
+    }
+    if table.get(a, b) == Some(FaceOrder::Below) {
+        return table.infer_above(d, a).map(usize::from);
+    }
+    if table.get(a, d) == Some(FaceOrder::Above) {
+        return table.infer_above(a, b).map(usize::from);
+    }
+    if table.get(a, d) == Some(FaceOrder::Below) {
+        return table.infer_above(b, a).map(usize::from);
+    }
+    Ok(0)
+}
+
+fn apply_quadruple_condition(
+    table: &mut HierarchyTable,
+    condition: EquivalenceCondition,
+) -> Result<usize, AdditionalEstimationError> {
+    let a = condition.a;
+    let b = condition.b;
+    let c = condition.c;
+    let d = condition.d;
+    let mut changes = 0usize;
+
+    if table.get(a, c) == Some(FaceOrder::Above) && table.get(b, d) == Some(FaceOrder::Above) {
+        changes += usize::from(table.infer_above(a, d)?);
+        changes += usize::from(table.infer_above(b, c)?);
+    }
+    if table.get(a, d) == Some(FaceOrder::Above) && table.get(b, c) == Some(FaceOrder::Above) {
+        changes += usize::from(table.infer_above(a, c)?);
+        changes += usize::from(table.infer_above(b, d)?);
+    }
+    if table.get(a, c) == Some(FaceOrder::Below) && table.get(b, d) == Some(FaceOrder::Below) {
+        changes += usize::from(table.infer_above(d, a)?);
+        changes += usize::from(table.infer_above(c, b)?);
+    }
+    if table.get(a, d) == Some(FaceOrder::Below) && table.get(b, c) == Some(FaceOrder::Below) {
+        changes += usize::from(table.infer_above(c, a)?);
+        changes += usize::from(table.infer_above(d, b)?);
+    }
+    if table.get(a, c) == Some(FaceOrder::Above) && table.get(c, b) == Some(FaceOrder::Above) {
+        changes += usize::from(table.infer_above(a, d)?);
+        changes += usize::from(table.infer_above(d, b)?);
+    }
+    if table.get(a, d) == Some(FaceOrder::Above) && table.get(d, b) == Some(FaceOrder::Above) {
+        changes += usize::from(table.infer_above(a, c)?);
+        changes += usize::from(table.infer_above(c, b)?);
+    }
+    if table.get(c, a) == Some(FaceOrder::Above) && table.get(a, d) == Some(FaceOrder::Above) {
+        changes += usize::from(table.infer_above(c, b)?);
+        changes += usize::from(table.infer_above(b, d)?);
+    }
+    if table.get(c, b) == Some(FaceOrder::Above) && table.get(b, d) == Some(FaceOrder::Above) {
+        changes += usize::from(table.infer_above(c, a)?);
+        changes += usize::from(table.infer_above(a, d)?);
+    }
+
+    Ok(changes)
 }
 
 fn reduce_subface_set(subfaces: &[SubFace], frequency: &[usize]) -> Vec<usize> {

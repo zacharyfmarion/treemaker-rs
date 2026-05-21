@@ -1,5 +1,6 @@
 use oristudio_cp::folding::{
-    EquivalenceConditionSet, InitialHierarchy, InitialHierarchyError, SubFaceConfiguration,
+    AdditionalEstimation, AdditionalEstimationError, EquivalenceConditionSet, InitialHierarchy,
+    InitialHierarchyError, SubFaceConfiguration, additional_estimation_from_segments,
     configure_subfaces_from_segments, equivalence_condition_candidates_from_segments,
     estimate_wireframe_from_segments, initial_hierarchy_from_segments, prepare_subface_segments,
 };
@@ -149,6 +150,33 @@ fn equivalence_condition_candidates_match_oriedita_oracle() {
 
         assert_eq!(
             equivalence_condition_summary(&conditions),
+            run_oracle(&oracle, &oracle_args)
+        );
+    }
+}
+
+#[test]
+fn additional_estimation_matches_oriedita_oracle() {
+    let Some(oracle) = folding_oracle() else {
+        eprintln!("skipping Oriedita folding oracle test: ORIEDITA_GEOMETRY_ORACLE is not set");
+        return;
+    };
+
+    for starting_face in [1, 0] {
+        let segments = square_with_diagonal();
+        let estimation = additional_estimation_from_segments(&segments, starting_face)
+            .expect("Rust additional estimation should not have an initial hierarchy error")
+            .expect("Rust additional estimation should succeed");
+        let mut args = vec![
+            "additional-estimation-summary".to_string(),
+            starting_face.to_string(),
+            segments.len().to_string(),
+        ];
+        push_segment_args(&mut args, &segments);
+        let oracle_args = args.iter().map(String::as_str).collect::<Vec<_>>();
+
+        assert_eq!(
+            additional_estimation_summary(Ok(&estimation)),
             run_oracle(&oracle, &oracle_args)
         );
     }
@@ -331,6 +359,29 @@ fn equivalence_condition_summary(conditions: &EquivalenceConditionSet) -> String
         ));
     }
     output
+}
+
+fn additional_estimation_summary(
+    estimation: Result<&AdditionalEstimation, AdditionalEstimationError>,
+) -> String {
+    match estimation {
+        Ok(estimation) => {
+            let mut output = String::new();
+            output.push_str(&format!(
+                "additional|{}|{}\n",
+                estimation.hierarchy.faces_total,
+                estimation.hierarchy.relations.len()
+            ));
+            for relation in &estimation.hierarchy.relations {
+                output.push_str(&format!(
+                    "relation|{}|{}\n",
+                    relation.upper_face, relation.lower_face
+                ));
+            }
+            output
+        }
+        Err(error) => format!("additional_error|{error:?}\n"),
+    }
 }
 
 fn joined_ids(ids: &[usize]) -> String {

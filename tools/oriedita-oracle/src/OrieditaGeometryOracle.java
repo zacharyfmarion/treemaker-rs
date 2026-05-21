@@ -318,6 +318,7 @@ public class OrieditaGeometryOracle {
             case "subface-configuration-summary" -> subfaceConfigurationSummary(args);
             case "initial-hierarchy-summary" -> initialHierarchySummary(args);
             case "equivalence-candidates-summary" -> equivalenceCandidatesSummary(args);
+            case "additional-estimation-summary" -> additionalEstimationSummary(args);
             default -> usage("unknown command: " + args[0]);
         }
     }
@@ -545,6 +546,41 @@ public class OrieditaGeometryOracle {
         for (int[] condition : quadruples) {
             System.out.println("quad|" + condition[0] + "|" + condition[1] + "|" + condition[2] + "|" + condition[3]);
         }
+    }
+
+    private static void additionalEstimationSummary(String[] args) throws Exception {
+        if (args.length < 3) {
+            usage("additional-estimation-summary expects starting face, count, and segment payload");
+        }
+
+        int startingFace = Integer.parseInt(args[1]);
+        int count = Integer.parseInt(args[2]);
+        LineSegmentSet set = lineSegmentSet(args, 3, count);
+
+        WireFrame_Worker flat = new WireFrame_Worker(3.0);
+        flat.setLineSegmentSet(set);
+        flat.setStartingFaceId(startingFace);
+        PointSet folded = flat.folding();
+
+        LineSegmentSetWorker lineWorker = new LineSegmentSetWorker();
+        lineWorker.set(new LineSegmentSet(folded));
+        lineWorker.split_arrangement_for_SubFace_generation();
+
+        WireFrame_Worker subdivided = new WireFrame_Worker(3.0);
+        subdivided.setLineSegmentSet(lineWorker.get());
+
+        NoopBulletinBoard bulletinBoard = new NoopBulletinBoard();
+        FoldedFigure_Worker foldedWorker = new FoldedFigure_Worker(bulletinBoard);
+        FoldedFigure_Configurator configurator =
+                new FoldedFigure_Configurator(bulletinBoard, foldedWorker);
+        configurator.configureSubFaces(folded, subdivided.get());
+        FoldedFigure_Worker.HierarchyListStatus status = configurator.HierarchyList_configure(flat);
+        if (status != FoldedFigure_Worker.HierarchyListStatus.SUCCESSFUL_1000) {
+            System.out.println("additional_error|" + status.name());
+            return;
+        }
+
+        printHierarchyRelations(foldedWorker.hierarchyList);
     }
 
     private static void intersectDividePair(String[] args) throws Exception {
@@ -4759,6 +4795,21 @@ public class OrieditaGeometryOracle {
         }
     }
 
+    private static void printHierarchyRelations(HierarchyList hierarchyList) {
+        List<int[]> relations = new ArrayList<>();
+        for (int i = 1; i <= hierarchyList.getFacesTotal(); i++) {
+            for (int j = 1; j <= hierarchyList.getFacesTotal(); j++) {
+                if (i != j && hierarchyList.get(i, j) == HierarchyList.ABOVE_1) {
+                    relations.add(new int[] {i - 1, j - 1});
+                }
+            }
+        }
+        System.out.println("additional|" + hierarchyList.getFacesTotal() + "|" + relations.size());
+        for (int[] relation : relations) {
+            System.out.println("relation|" + relation[0] + "|" + relation[1]);
+        }
+    }
+
     private static FoldedFigure_Worker configuredSubfaceWorker(PointSet folded) throws Exception {
         LineSegmentSetWorker lineWorker = new LineSegmentSetWorker();
         lineWorker.set(new LineSegmentSet(folded));
@@ -5663,6 +5714,7 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle subface-configuration-summary <startingFace> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle initial-hierarchy-summary <startingFace> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle equivalence-candidates-summary <startingFace> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle additional-estimation-summary <startingFace> <count> [ax ay bx by color]...");
         System.exit(2);
     }
 }

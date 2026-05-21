@@ -1,5 +1,5 @@
 use oristudio_cp::folding::{
-    HierarchyRelation, configure_subfaces_from_segments,
+    HierarchyRelation, additional_estimation_from_segments, configure_subfaces_from_segments,
     equivalence_condition_candidates_from_segments, estimate_wireframe_from_segments,
     initial_hierarchy_from_segments, prepare_subface_segments,
 };
@@ -114,6 +114,18 @@ fn equivalence_condition_candidates_are_exposed() {
     assert!(
         !conditions.triple_conditions.is_empty() || !conditions.quadruple_conditions.is_empty()
     );
+}
+
+#[test]
+fn additional_estimation_produces_hierarchy_relations() {
+    let segments = square_with_diagonal();
+
+    let estimation = additional_estimation_from_segments(&segments, 1)
+        .expect("additional estimation should not fail")
+        .expect("additional estimation");
+
+    assert_eq!(estimation.hierarchy.faces_total, 2);
+    assert_eq!(estimation.hierarchy.relations.len(), 1);
 }
 
 fn square_with_diagonal() -> Vec<LineSegment> {

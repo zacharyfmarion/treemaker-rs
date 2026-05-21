@@ -16,7 +16,8 @@ line-overlap/intersection selection via `select_lX`, and
 `selectProbablyConnected`. Selection-dependent type commands cover selected
 line deletion, line-type replacement, and line-type deletion. Transform
 commands cover FoldLineSet translation plus selected move/copy and four-point
-selected move/copy.
+selected move/copy. The lengthen groundwork includes
+`OritaCalc.extendToIntersectionPoint_2`.
 
 The oracle intentionally compiles against a pinned Oriedita source checkout
 instead of reimplementing the behavior in Rust.

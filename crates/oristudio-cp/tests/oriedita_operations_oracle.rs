@@ -16,8 +16,8 @@ use oristudio_cp::operations::selection::{
     unselect_intersecting_line, unselect_polygon,
 };
 use oristudio_cp::operations::transform::{
-    copy_selected_lines, copy_selected_lines_by_points, move_selected_lines,
-    move_selected_lines_by_points, translate_model,
+    copy_selected_lines, copy_selected_lines_by_points, extend_to_intersection_point_2,
+    move_selected_lines, move_selected_lines_by_points, translate_model,
 };
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -886,6 +886,41 @@ fn transform_commands_match_oriedita_foldlineset_oracle() {
         line_segment_set_with_selection_summary(&model),
         run_oracle(&oracle, &args)
     );
+}
+
+#[test]
+fn extend_to_intersection_matches_oriedita_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    for (source, segments) in [
+        (
+            segment(0.0, 0.0, 1.0, 0.0, LineColor::Red1),
+            vec![
+                segment(5.0, -1.0, 5.0, 1.0, LineColor::Blue2),
+                segment(10.0, -1.0, 10.0, 1.0, LineColor::Black0),
+            ],
+        ),
+        (
+            segment(0.0, 0.0, 1.0, 0.0, LineColor::Red1),
+            vec![segment(5.0, 0.0, 7.0, 0.0, LineColor::Blue2)],
+        ),
+    ] {
+        let model = model_from_segments(&segments);
+        let result = extend_to_intersection_point_2(&model, &source);
+        let mut args = vec!["foldline-extend-to-intersection".to_string()];
+        push_one_segment_args(&mut args, &source);
+        args.push(segments.len().to_string());
+        push_segment_args(&mut args, &segments);
+        assert_eq!(
+            optional_segment_result_summary(Some(&result)),
+            run_oracle(&oracle, &args)
+        );
+    }
 }
 
 fn operations_oracle() -> Option<PathBuf> {

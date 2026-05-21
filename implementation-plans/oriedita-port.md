@@ -901,6 +901,13 @@ Status:
   four-point move/copy against real `FoldLineSet`. Oriedita's
   `MOVE_CREASE_PATTERN_2` handler is camera panning rather than a persisted CP
   mutation, so it remains a later UI/runtime mapping rather than a kernel edit.
+- The core `OritaCalc.extendToIntersectionPoint_2` helper used by lengthen and
+  several construction tools is ported and oracle-tested for crossing-line and
+  collinear-endpoint fixtures. The higher-level `LENGTHEN_CREASE_5` and
+  `LENGTHEN_CREASE_SAME_COLOR_70` handlers remain open because their full
+  behavior also includes candidate-line discovery, target-line mode selection,
+  color-mode handling, insertion splitting, and line-circle intersection side
+  effects.
 - Full handler parity remains open for nearest-click line selection, Java2D
   path/lasso selection, operation-frame behavior, lengthen commands, and
   handler-level `fix2` chaining.

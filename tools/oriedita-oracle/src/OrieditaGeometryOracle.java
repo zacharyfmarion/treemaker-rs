@@ -65,6 +65,7 @@ public class OrieditaGeometryOracle {
             case "foldline-translate" -> foldLineTranslate(args);
             case "foldline-transform-selected" -> foldLineTransformSelected(args);
             case "foldline-transform-selected-4p" -> foldLineTransformSelected4p(args);
+            case "foldline-extend-to-intersection" -> foldLineExtendToIntersection(args);
             case "custom-line-type" -> customLineType(args);
             case "orh-import-summary" -> orhImportSummary(args);
             case "orh-export-fixture" -> orhExportFixture(args);
@@ -604,6 +605,26 @@ public class OrieditaGeometryOracle {
         set.divideLineSegmentWithNewLines(totalOld, totalNew);
         set.unselect_all();
         printFoldLineSetWithSelection(set);
+    }
+
+    private static void foldLineExtendToIntersection(String[] args) {
+        if (args.length < 7) {
+            usage("foldline-extend-to-intersection expects segment, count, and segment payload");
+        }
+
+        LineSegment segment = new LineSegment(
+                new Point(parse(args[1]), parse(args[2])),
+                new Point(parse(args[3]), parse(args[4])),
+                LineColor.fromNumber(Integer.parseInt(args[5])));
+        int count = Integer.parseInt(args[6]);
+        FoldLineSet set = foldLineSet(args, 7, count);
+        LineSegment result = OritaCalc.extendToIntersectionPoint_2(set, segment);
+        System.out.println("result|"
+                + result.determineAX() + "|"
+                + result.determineAY() + "|"
+                + result.determineBX() + "|"
+                + result.determineBY() + "|"
+                + result.getColor().getNumber());
     }
 
     private static void orhImportSummary(String[] args) throws Exception {

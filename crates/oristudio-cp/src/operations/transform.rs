@@ -1,6 +1,10 @@
 //! Transform operations ported from Oriedita selected-line move/copy handlers.
 
-use crate::geometry::{Epsilon, LineSegment, Point, angle, point_rotate_scaled};
+use crate::geometry::{
+    Epsilon, Intersection, LineSegment, Point, StraightLine, StraightLineIntersection, angle,
+    determine_line_segment_intersection_sweet_with_tolerances, find_intersection_straight_lines,
+    point_rotate_scaled,
+};
 use crate::model::CreasePatternModel;
 use crate::operations::arrangement::divide_line_segment_with_new_lines;
 use crate::operations::selection::{delete_selected_lines, unselect_all};
@@ -119,6 +123,58 @@ pub fn transform_segments_by_points(
     }
 }
 
+/// Oriedita `OritaCalc.extendToIntersectionPoint_2`.
+pub fn extend_to_intersection_point_2(
+    model: &CreasePatternModel,
+    segment: &LineSegment,
+) -> LineSegment {
+    let mut add_segment = segment.clone();
+    let mut intersection_point = Point::new(1_000_000.0, 1_000_000.0);
+    let mut intersection_distance = intersection_point.distance(add_segment.a);
+    let straight_line = StraightLine::from_points(add_segment.a, add_segment.b);
+
+    for existing in &model.line_segments {
+        let straight_intersection = straight_line.line_segment_intersect_reverse_detail(existing);
+        let segment_intersection = determine_line_segment_intersection_sweet_with_tolerances(
+            segment,
+            existing,
+            Epsilon::UNKNOWN_1EN5,
+            Epsilon::UNKNOWN_1EN5,
+        );
+
+        if straight_intersection.is_intersecting()
+            && !segment_intersection.is_endpoint_intersection()
+        {
+            intersection_point = find_intersection_straight_lines(
+                straight_line,
+                StraightLine::from_segment(existing),
+            );
+            if should_extend_to(
+                add_segment.a,
+                add_segment.b,
+                intersection_point,
+                intersection_distance,
+            ) {
+                intersection_distance = intersection_point.distance(add_segment.a);
+                add_segment = add_segment.with_b(intersection_point);
+            }
+        }
+
+        if straight_intersection == StraightLineIntersection::Included3
+            && segment_intersection != Intersection::ParallelEqual31
+        {
+            for point in [existing.a, existing.b] {
+                if should_extend_to(add_segment.a, add_segment.b, point, intersection_distance) {
+                    intersection_distance = point.distance(add_segment.a);
+                    add_segment = add_segment.with_b(point);
+                }
+            }
+        }
+    }
+
+    add_segment.with_a(segment.b)
+}
+
 fn selected_line_segments(model: &CreasePatternModel) -> Vec<LineSegment> {
     model
         .line_segments
@@ -143,4 +199,16 @@ fn translate_segments(segments: &mut [LineSegment], delta: Point) {
 
 fn translate_segment(segment: &LineSegment, delta: Point) -> LineSegment {
     segment.with_coordinates(segment.a.move_by(delta), segment.b.move_by(delta))
+}
+
+fn should_extend_to(origin: Point, direction: Point, point: Point, current_distance: f64) -> bool {
+    if point.distance(origin) <= Epsilon::UNKNOWN_1EN5 {
+        return false;
+    }
+    if point.distance(origin) >= current_distance {
+        return false;
+    }
+
+    let angle = angle((origin, direction, origin, point));
+    !(1.0..=359.0).contains(&angle)
 }

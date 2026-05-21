@@ -1,8 +1,8 @@
 use oristudio_cp::geometry::{Circle, LineColor, LineSegment, Point};
 use oristudio_cp::model::CreasePatternModel;
 use oristudio_cp::operations::transform::{
-    copy_selected_lines, copy_selected_lines_by_points, move_selected_lines,
-    move_selected_lines_by_points, translate_model,
+    copy_selected_lines, copy_selected_lines_by_points, extend_to_intersection_point_2,
+    move_selected_lines, move_selected_lines_by_points, translate_model,
 };
 
 #[test]
@@ -107,6 +107,39 @@ fn four_point_selected_move_and_copy_apply_oriedita_scale_rotate_translate() {
         &copy_model.line_segments[1],
         Point::new(0.0, 2.0),
         Point::new(-2.0, 2.0),
+        LineColor::Red1,
+    );
+}
+
+#[test]
+fn extend_to_intersection_point_extends_from_b_to_nearest_forward_hit() {
+    let model = model_from_segments(&[
+        segment(5.0, -1.0, 5.0, 1.0, LineColor::Blue2),
+        segment(10.0, -1.0, 10.0, 1.0, LineColor::Black0),
+    ]);
+    let source = segment(0.0, 0.0, 1.0, 0.0, LineColor::Red1);
+
+    let result = extend_to_intersection_point_2(&model, &source);
+
+    assert_segment(
+        &result,
+        Point::new(1.0, 0.0),
+        Point::new(5.0, 0.0),
+        LineColor::Red1,
+    );
+}
+
+#[test]
+fn extend_to_intersection_point_uses_collinear_endpoint_hits() {
+    let model = model_from_segments(&[segment(5.0, 0.0, 7.0, 0.0, LineColor::Blue2)]);
+    let source = segment(0.0, 0.0, 1.0, 0.0, LineColor::Red1);
+
+    let result = extend_to_intersection_point_2(&model, &source);
+
+    assert_segment(
+        &result,
+        Point::new(1.0, 0.0),
+        Point::new(5.0, 0.0),
         LineColor::Red1,
     );
 }

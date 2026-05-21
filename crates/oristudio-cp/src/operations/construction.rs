@@ -2,7 +2,7 @@
 
 use crate::geometry::{
     Epsilon, Intersection, LineColor, LineSegment, ParallelJudgement, Point, StraightLine, angle,
-    center, determine_line_segment_distance,
+    angle_between_0_360, center, determine_line_segment_distance,
     determine_line_segment_intersection_sweet_with_tolerances, distance,
     find_intersection_segments, find_intersection_straight_lines, find_line_symmetry_line_segment,
     find_line_symmetry_point, find_projection, get_segment_with_length, is_line_segment_parallel,
@@ -36,6 +36,109 @@ pub fn draw_crease_segment(
         DrawCreaseTarget::AuxLine => model.add_aux_line_segment(segment.clone()),
     }
     true
+}
+
+/// Oriedita `DRAW_CREASE_ANGLE_RESTRICTED_5_37` snap-and-insert kernel.
+pub fn draw_crease_angle_restricted_5(
+    model: &mut CreasePatternModel,
+    anchor: Point,
+    pointer: Point,
+    angle_system_divider: i32,
+    angles: [f64; 6],
+    selection_distance: f64,
+    color: LineColor,
+) -> bool {
+    let release = snap_to_close_point_in_active_angle_system(
+        model,
+        anchor,
+        pointer,
+        angle_system_divider,
+        angles,
+        selection_distance,
+    );
+    draw_crease_segment(
+        model,
+        &LineSegment::with_color(anchor, release, color),
+        DrawCreaseTarget::FoldLine,
+    )
+}
+
+/// Oriedita `SnappingUtil.snapToActiveAngleSystem` without UI grid candidates.
+pub fn snap_to_active_angle_system(
+    model: &CreasePatternModel,
+    start: Point,
+    point: Point,
+    angle_system_divider: i32,
+    angles: [f64; 6],
+    selection_distance: f64,
+) -> Point {
+    let base = LineSegment::new(point, start);
+    let radians = if angle_system_divider != 0 {
+        let angle_step = 180.0 / angle_system_divider as f64;
+        (angle_step * (angle(&base) / angle_step).round()).to_radians()
+    } else {
+        let current_angle = angle(&base);
+        let mut best_difference = 1000.0;
+        let mut best_angle = 0.0;
+        for angle in angles {
+            let candidate = angle - 180.0;
+            let difference = angle_between_0_360(candidate - current_angle)
+                .min(angle_between_0_360(current_angle - candidate));
+            if difference < best_difference {
+                best_difference = difference;
+                best_angle = candidate;
+            }
+        }
+        best_angle.to_radians()
+    };
+
+    let closest_segment = closest_line_segment_or_sentinel(model, point);
+    let snap_line = LineSegment::new(
+        base.b,
+        Point::new(
+            base.determine_bx() + radians.cos(),
+            base.determine_by() + radians.sin(),
+        ),
+    );
+    let mut result = find_projection(StraightLine::from_segment(&snap_line), point);
+    if determine_line_segment_distance(point, &closest_segment) <= selection_distance
+        && is_line_segment_parallel_with_precision(
+            StraightLine::from_segment(&closest_segment),
+            StraightLine::from_segment(&snap_line),
+            Epsilon::PARALLEL_FOR_FIX,
+        ) == ParallelJudgement::NotParallel
+    {
+        result = find_intersection_segments(&closest_segment, &snap_line);
+    }
+    result
+}
+
+/// Oriedita `SnappingUtil.snapToClosePointInActiveAngleSystem` without UI grid candidates.
+pub fn snap_to_close_point_in_active_angle_system(
+    model: &CreasePatternModel,
+    start: Point,
+    point: Point,
+    angle_system_divider: i32,
+    angles: [f64; 6],
+    selection_distance: f64,
+) -> Point {
+    let snapped = snap_to_active_angle_system(
+        model,
+        start,
+        point,
+        angle_system_divider,
+        angles,
+        selection_distance,
+    );
+    let closest_point = closest_model_point(model, snapped);
+    let offset_angle = angle((start, snapped, start, closest_point));
+    let offset =
+        Epsilon::UNKNOWN_1EN5 < offset_angle && offset_angle <= 360.0 - Epsilon::UNKNOWN_1EN5;
+    if offset || snapped.distance(closest_point) > selection_distance {
+        snapped
+    } else {
+        closest_point
+    }
 }
 
 /// Oriedita `DRAW_CREASE_SYMMETRIC_12` mutation after the mirror axis is known.
@@ -576,6 +679,40 @@ fn next_fishbone_color(color: LineColor) -> LineColor {
         LineColor::Blue2 => LineColor::Red1,
         other => other,
     }
+}
+
+fn closest_line_segment_or_sentinel(model: &CreasePatternModel, point: Point) -> LineSegment {
+    let mut closest = LineSegment::new(
+        Point::new(100_000.0, 100_000.0),
+        Point::new(100_000.0, 100_000.1),
+    );
+    let mut minimum = 100_000.0;
+    for segment in &model.line_segments {
+        let distance = determine_line_segment_distance(point, segment);
+        if minimum > distance {
+            minimum = distance;
+            closest = segment.clone();
+        }
+    }
+    closest
+}
+
+fn closest_model_point(model: &CreasePatternModel, point: Point) -> Point {
+    let mut closest = Point::new(100_000.0, 100_000.0);
+    for segment in &model.line_segments {
+        for endpoint in [segment.a, segment.b] {
+            if point.distance_squared(endpoint) < point.distance_squared(closest) {
+                closest = endpoint;
+            }
+        }
+    }
+    for circle in &model.circles {
+        let center = circle.determine_center();
+        if point.distance_squared(center) < point.distance_squared(closest) {
+            closest = center;
+        }
+    }
+    closest
 }
 
 fn is_double_symmetric_intersection(intersection: Intersection) -> bool {

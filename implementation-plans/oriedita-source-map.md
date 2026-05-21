@@ -155,7 +155,7 @@ stage explicitly changes it.
 | `CREASE_MAKE_MV_34` | `MouseHandlerCreaseMakeMV` | `operations::color::alternate_mountain_valley_along` | kernel | 6 | Oracle-tested |
 | `DOUBLE_SYMMETRIC_DRAW_35` | `MouseHandlerDoubleSymmetricDraw` | `operations::construction::double_symmetric_draw` | kernel | 7 | Oracle-tested |
 | `CREASES_ALTERNATE_MV_36` | `MouseHandlerCreasesAlternateMV` | `operations::color::alternate_mountain_valley_crossing` | kernel | 6 | Oracle-tested |
-| `DRAW_CREASE_ANGLE_RESTRICTED_5_37` | `MouseHandlerDrawCreaseAngleRestricted5` | `operations::construction::angle_restricted_5` | kernel | 7 | Unsupported |
+| `DRAW_CREASE_ANGLE_RESTRICTED_5_37` | `MouseHandlerDrawCreaseAngleRestricted5` | `operations::construction::draw_crease_angle_restricted_5`, `operations::construction::snap_to_active_angle_system`, `operations::construction::snap_to_close_point_in_active_angle_system` | kernel | 7 | Oracle-tested |
 | `VERTEX_MAKE_ANGULARLY_FLAT_FOLDABLE_38` | `MouseHandlerVertexMakeAngularlyFlatFoldable` | `operations::construction::make_vertex_flat_foldable` | kernel | 7, 9 | Unsupported |
 | `FOLDABLE_LINE_INPUT_39` | `MouseHandlerFoldableLineInput` | `operations::construction::foldable_line_input` | kernel | 7 | Unsupported |
 | `PARALLEL_DRAW_40` | `MouseHandlerParallelDraw` | `operations::construction::parallel_draw` | kernel | 7 | Oracle-tested |

@@ -2,11 +2,12 @@ use oristudio_cp::geometry::{LineColor, LineSegment, Point};
 use oristudio_cp::model::CreasePatternModel;
 use oristudio_cp::operations::construction::{
     DrawCreaseTarget, axiom7_draw_to_destination, axiom7_indicator,
-    commit_parallel_width_indicator, double_symmetric_draw, draw_crease_segment, fishbone_draw,
-    inward, mirror_selected_lines, parallel_draw, parallel_width_indicators,
-    perpendicular_indicator, perpendicular_projection, square_bisector_from_lines_to_destination,
-    square_bisector_from_points_to_destination, square_bisector_parallel_between_destinations,
-    square_bisector_parallel_indicator, symmetric_draw,
+    commit_parallel_width_indicator, double_symmetric_draw, draw_crease_angle_restricted_5,
+    draw_crease_segment, fishbone_draw, inward, mirror_selected_lines, parallel_draw,
+    parallel_width_indicators, perpendicular_indicator, perpendicular_projection,
+    square_bisector_from_lines_to_destination, square_bisector_from_points_to_destination,
+    square_bisector_parallel_between_destinations, square_bisector_parallel_indicator,
+    symmetric_draw,
 };
 
 #[test]
@@ -390,6 +391,27 @@ fn axiom7_indicator_extends_fold_line_and_clips_to_destination() {
         Point::new(2.0, 1.0),
         indicator.a,
         LineColor::Blue2,
+    ));
+}
+
+#[test]
+fn angle_restricted_5_snaps_to_angle_system_and_nearby_line() {
+    let mut model = model_from_segments(&[segment(2.0, -1.0, 2.0, 1.0, LineColor::Black0)]);
+
+    assert!(draw_crease_angle_restricted_5(
+        &mut model,
+        Point::new(0.0, 0.0),
+        Point::new(2.0, 0.2),
+        4,
+        [40.0, 60.0, 80.0, 30.0, 50.0, 100.0],
+        0.5,
+        LineColor::Red1,
+    ));
+    assert!(contains_segment_close(
+        &model.line_segments,
+        Point::new(0.0, 0.0),
+        Point::new(2.0, 0.0),
+        LineColor::Red1,
     ));
 }
 

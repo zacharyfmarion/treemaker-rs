@@ -554,10 +554,10 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
     descriptor!(
         DrawCreaseAngleRestricted5,
         "MouseHandlerDrawCreaseAngleRestricted5",
-        "operations::construction::angle_restricted_5",
+        "operations::construction::draw_crease_angle_restricted_5",
         Kernel,
         7,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         VertexMakeAngularlyFlatFoldable,

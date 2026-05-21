@@ -97,6 +97,7 @@ public class OrieditaGeometryOracle {
             case "foldline-double-symmetric-draw" -> foldLineDoubleSymmetricDraw(args);
             case "foldline-inward" -> foldLineInward(args);
             case "foldline-fishbone" -> foldLineFishbone(args);
+            case "foldline-angle-restricted5" -> foldLineAngleRestricted5(args);
             case "foldline-square-bisector-3p" -> foldLineSquareBisector3p(args);
             case "foldline-square-bisector-2l-np" -> foldLineSquareBisector2lNp(args);
             case "foldline-square-bisector-parallel-indicator" -> foldLineSquareBisectorParallelIndicator(args);
@@ -1460,6 +1461,98 @@ public class OrieditaGeometryOracle {
         return color;
     }
 
+    private static void foldLineAngleRestricted5(String[] args) {
+        if (args.length < 15) {
+            usage("foldline-angle-restricted5 expects anchor, pointer, divider, six angles, selection distance, color, count, and segment payload");
+        }
+
+        Point anchor = new Point(parse(args[1]), parse(args[2]));
+        Point pointer = new Point(parse(args[3]), parse(args[4]));
+        int divider = Integer.parseInt(args[5]);
+        double[] angles = new double[] {
+                parse(args[6]),
+                parse(args[7]),
+                parse(args[8]),
+                parse(args[9]),
+                parse(args[10]),
+                parse(args[11]),
+        };
+        double selectionDistance = parse(args[12]);
+        LineColor color = LineColor.fromNumber(Integer.parseInt(args[13]));
+        int count = Integer.parseInt(args[14]);
+        FoldLineSet set = foldLineSet(args, 15, count);
+
+        Point release = snapToClosePointInActiveAngleSystem(set, anchor, pointer, divider, angles, selectionDistance);
+        LineSegment result = new LineSegment(anchor, release, color);
+        boolean added = Epsilon.high.gt0(result.determineLength());
+        if (added) {
+            addLineSegmentLikeWorker(set, result);
+        }
+
+        System.out.println("added|" + added);
+        printFoldLineSet(set);
+    }
+
+    private static Point snapToActiveAngleSystem(
+            FoldLineSet set,
+            Point start,
+            Point point,
+            int angleSystemDivider,
+            double[] angles,
+            double selectionDistance) {
+        double radians;
+        LineSegment base = new LineSegment(point, start);
+        if (angleSystemDivider != 0) {
+            double angleStep = 180.0 / (double) angleSystemDivider;
+            radians = (Math.PI / 180.0) * angleStep * (int) Math.round(OritaCalc.angle(base) / angleStep);
+        } else {
+            double currentAngle = OritaCalc.angle(base);
+            double minDifference = 1000.0;
+            double chosenAngle = 0.0;
+            for (int i = 0; i < 6; i++) {
+                double candidate = angles[i] - 180.0;
+                double difference = Math.min(
+                        OritaCalc.angle_between_0_360(candidate - currentAngle),
+                        OritaCalc.angle_between_0_360(currentAngle - candidate));
+                if (difference < minDifference) {
+                    minDifference = difference;
+                    chosenAngle = candidate;
+                }
+            }
+            radians = (Math.PI / 180.0) * chosenAngle;
+        }
+
+        LineSegment closestSegment = set.getClosestLineSegment(point);
+        LineSegment snapLine = new LineSegment(
+                base.getB(),
+                new Point(base.determineBX() + Math.cos(radians), base.determineBY() + Math.sin(radians)));
+        Point result = OritaCalc.findProjection(snapLine, point);
+        if (OritaCalc.determineLineSegmentDistance(point, closestSegment) <= selectionDistance) {
+            if (OritaCalc.isLineSegmentParallel(closestSegment, snapLine, Epsilon.PARALLEL_FOR_FIX)
+                    == OritaCalc.ParallelJudgement.NOT_PARALLEL) {
+                result = OritaCalc.findIntersection(closestSegment, snapLine);
+            }
+        }
+        return result;
+    }
+
+    private static Point snapToClosePointInActiveAngleSystem(
+            FoldLineSet set,
+            Point start,
+            Point point,
+            int angleSystemDivider,
+            double[] angles,
+            double selectionDistance) {
+        Point snapped = snapToActiveAngleSystem(set, start, point, angleSystemDivider, angles, selectionDistance);
+        Point closestPoint = set.closestPoint(snapped);
+        double offsetAngle = OritaCalc.angle(start, snapped, start, closestPoint);
+        boolean offset = (Epsilon.UNKNOWN_1EN5 < offsetAngle) && (offsetAngle <= 360.0 - Epsilon.UNKNOWN_1EN5);
+        if (offset || snapped.distance(closestPoint) > selectionDistance) {
+            return snapped;
+        }
+        return closestPoint;
+    }
+
     private static void foldLineSquareBisector3p(String[] args) {
         if (args.length < 14) {
             usage("foldline-square-bisector-3p expects three points, destination segment, color, count, and segment payload");
@@ -2789,6 +2882,7 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle foldline-double-symmetric-draw <drag ax ay bx by color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-inward <p1x> <p1y> <p2x> <p2y> <p3x> <p3y> <color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-fishbone <drag ax ay bx by color> <gridWidth> <color> <selectionDistance> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-angle-restricted5 <anchorX> <anchorY> <pointerX> <pointerY> <divider> <angle1> <angle2> <angle3> <angle4> <angle5> <angle6> <selectionDistance> <color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-square-bisector-3p <p1x> <p1y> <p2x> <p2y> <p3x> <p3y> <destination ax ay bx by color> <color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-square-bisector-2l-np <first ax ay bx by color> <second ax ay bx by color> <destination ax ay bx by color> <color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-square-bisector-parallel-indicator <first ax ay bx by color> <second ax ay bx by color> <count> [ax ay bx by color]...");

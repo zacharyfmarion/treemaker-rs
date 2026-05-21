@@ -21,11 +21,11 @@ use oristudio_cp::operations::color::{
 use oristudio_cp::operations::construction::{
     DrawCreaseTarget, axiom7_draw_to_destination, axiom7_indicator, commit_axiom7_indicator,
     commit_parallel_width_indicator, commit_square_bisector_parallel_indicator,
-    double_symmetric_draw, draw_crease_segment, fishbone_draw, inward, mirror_selected_lines,
-    parallel_draw, parallel_width_indicators, perpendicular_indicator, perpendicular_projection,
-    square_bisector_from_lines_to_destination, square_bisector_from_points_to_destination,
-    square_bisector_parallel_between_destinations, square_bisector_parallel_indicator,
-    symmetric_draw,
+    double_symmetric_draw, draw_crease_angle_restricted_5, draw_crease_segment, fishbone_draw,
+    inward, mirror_selected_lines, parallel_draw, parallel_width_indicators,
+    perpendicular_indicator, perpendicular_projection, square_bisector_from_lines_to_destination,
+    square_bisector_from_points_to_destination, square_bisector_parallel_between_destinations,
+    square_bisector_parallel_indicator, symmetric_draw,
 };
 use oristudio_cp::operations::generators::{
     DefaultMolecule, default_molecule, regular_polygon_no_corners,
@@ -2085,6 +2085,52 @@ fn draw_crease_segment_matches_oriedita_oracle() {
         aux_line_segment_set_summary(&model)
     );
     assert_eq!(rust_summary, run_oracle(&oracle, &args));
+}
+
+#[test]
+fn angle_restricted_5_matches_oriedita_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    let segments = vec![segment(2.0, -1.0, 2.0, 1.0, LineColor::Black0)];
+    let mut model = model_from_segments(&segments);
+    let angles = [40.0, 60.0, 80.0, 30.0, 50.0, 100.0];
+    let added = draw_crease_angle_restricted_5(
+        &mut model,
+        Point::new(0.0, 0.0),
+        Point::new(2.0, 0.2),
+        4,
+        angles,
+        0.5,
+        LineColor::Red1,
+    );
+
+    let mut args = vec![
+        "foldline-angle-restricted5".to_string(),
+        "0.0".to_string(),
+        "0.0".to_string(),
+        "2.0".to_string(),
+        "0.2".to_string(),
+        "4".to_string(),
+    ];
+    for angle in angles {
+        args.push(angle.to_string());
+    }
+    args.push("0.5".to_string());
+    args.push(LineColor::Red1.number().to_string());
+    args.push(segments.len().to_string());
+    push_segment_args(&mut args, &segments);
+    let rust_summary = format!("added|{added}\n{}", line_segment_set_summary(&model));
+    assert_line_summary_close(
+        &rust_summary,
+        &run_oracle(&oracle, &args),
+        1e-12,
+        "angle-restricted-5",
+    );
 }
 
 #[test]

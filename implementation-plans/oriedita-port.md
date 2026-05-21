@@ -1004,6 +1004,11 @@ Status:
 - `AXIOM_7` is ported and oracle-tested for resolved inputs, including purple
   indicator construction, direct indicator commit, and destination clipping via
   the same extended-segment helper used by the parallel/perpendicular tools.
+- `DRAW_CREASE_ANGLE_RESTRICTED_5_37` is ported and oracle-tested for resolved
+  model-space inputs, including active angle-system snapping, nearby line
+  intersection correction, nearby endpoint/circle-center correction, and
+  worker-style insertion. UI grid candidate snapping remains an input resolver
+  concern for the later UI integration layer.
 
 ### Stage 8: Circle, Polygon, Base, and Generator Tools
 

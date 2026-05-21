@@ -3,7 +3,8 @@ use oristudio_cp::model::CreasePatternModel;
 use oristudio_cp::operations::circle::{
     CircleInversionOutput, change_custom_color_for_indices, concentric, concentric_select,
     concentric_select_candidates, concentric_two_circle_select, draw, free, invert_circle,
-    invert_line_segment, organize, separate, through_three_points,
+    invert_line_segment, organize, separate, tangent_lines_point_circle, tangent_lines_two_circles,
+    through_three_points,
 };
 
 #[test]
@@ -249,4 +250,31 @@ fn change_custom_color_updates_circles_and_cyan_lines_with_oriedita_value_lookup
     assert_eq!(model.line_segments[0].customized, 1);
     assert_eq!(model.line_segments[1].customized, 0);
     assert_eq!(model.line_segments[2].customized, 0);
+}
+
+#[test]
+fn tangent_line_candidates_use_purple_indicator_segments() {
+    let model = CreasePatternModel::default();
+    let point_candidates = tangent_lines_point_circle(
+        &model,
+        Point::new(5.0, 0.0),
+        Circle::new(0.0, 0.0, 1.0, LineColor::Cyan3),
+    );
+    assert_eq!(point_candidates.len(), 2);
+    assert!(
+        point_candidates
+            .iter()
+            .all(|segment| segment.color == LineColor::Purple8)
+    );
+
+    let circle_candidates = tangent_lines_two_circles(
+        Circle::new(0.0, 0.0, 1.0, LineColor::Cyan3),
+        Circle::new(5.0, 0.0, 1.0, LineColor::Cyan3),
+    );
+    assert_eq!(circle_candidates.len(), 4);
+    assert!(
+        circle_candidates
+            .iter()
+            .all(|segment| segment.color == LineColor::Purple8)
+    );
 }

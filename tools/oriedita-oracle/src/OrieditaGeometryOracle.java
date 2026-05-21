@@ -91,6 +91,8 @@ public class OrieditaGeometryOracle {
             case "foldline-circle-invert-line" -> foldLineCircleInvertLine(args);
             case "foldline-circle-organize" -> foldLineCircleOrganize(args);
             case "foldline-circle-change-color" -> foldLineCircleChangeColor(args);
+            case "foldline-circle-tangent-point" -> foldLineCircleTangentPoint(args);
+            case "foldline-circle-tangent-two" -> foldLineCircleTangentTwo(args);
             case "foldline-divide-count" -> foldLineDivideCount(args);
             case "foldline-divide-ratio" -> foldLineDivideRatio(args);
             case "measure-length" -> measureLength(args);
@@ -1256,6 +1258,129 @@ public class OrieditaGeometryOracle {
         printFoldLineSetWithCustomization(set);
     }
 
+    private static void foldLineCircleTangentPoint(String[] args) {
+        if (args.length < 8) {
+            usage("foldline-circle-tangent-point expects point, circle, line count, and fold lines");
+        }
+
+        Point point = new Point(parse(args[1]), parse(args[2]));
+        Circle circle = circle(args, 3);
+        int lineCount = Integer.parseInt(args[7]);
+        FoldLineSet set = foldLineSet(args, 8, lineCount);
+        printLineSegmentsList(tangentPointCircle(set, point, circle));
+    }
+
+    private static List<LineSegment> tangentPointCircle(FoldLineSet set, Point point, Circle circle) {
+        List<LineSegment> indicators = new ArrayList<>();
+        if (Math.abs(circle.getR() - OritaCalc.distance(circle.determineCenter(), point)) < Epsilon.UNKNOWN_1EN7) {
+            LineSegment projectionLine = new LineSegment(circle.determineCenter(), point);
+            indicators.add(OritaCalc.fullExtendUntilHit(set, new LineSegment(point,
+                    OritaCalc.findProjection(OritaCalc.moveParallel(projectionLine, 1), point),
+                    LineColor.PURPLE_8)));
+            indicators.add(OritaCalc.fullExtendUntilHit(set, new LineSegment(point,
+                    OritaCalc.findProjection(OritaCalc.moveParallel(projectionLine, -1), point),
+                    LineColor.PURPLE_8)));
+            return indicators;
+        }
+        LineSegment diameter = new LineSegment(point, circle.determineCenter());
+        Circle constructCir = new Circle(diameter, LineColor.GREEN_6);
+        LineSegment connectSegment = OritaCalc
+                .circle_to_circle_no_intersection_wo_musubu_lineSegment(constructCir, circle);
+        indicators.add(new LineSegment(point, connectSegment.getA(), LineColor.PURPLE_8));
+        indicators.add(new LineSegment(point, connectSegment.getB(), LineColor.PURPLE_8));
+        return indicators;
+    }
+
+    private static void foldLineCircleTangentTwo(String[] args) {
+        if (args.length != 9) {
+            usage("foldline-circle-tangent-two expects two circles");
+        }
+
+        printLineSegmentsList(tangentTwoCircles(circle(args, 1), circle(args, 5)));
+    }
+
+    private static List<LineSegment> tangentTwoCircles(Circle circle1, Circle circle2) {
+        List<LineSegment> indicators = new ArrayList<>();
+        Point c1 = circle1.determineCenter();
+        Point c2 = circle2.determineCenter();
+
+        double x1 = circle1.getX();
+        double y1 = circle1.getY();
+        double r1 = circle1.getR();
+        double x2 = circle2.getX();
+        double y2 = circle2.getY();
+        double r2 = circle2.getR();
+        double xp = x2 - x1;
+        double yp = y2 - y1;
+        double distanceSquared = xp * xp + yp * yp;
+        double radiusDifferenceSquared = (r1 - r2) * (r1 - r2);
+        double radiusSumSquared = (r1 + r2) * (r1 + r2);
+
+        if (c1.distance(c2) < Epsilon.UNKNOWN_1EN6) return indicators;
+        if (distanceSquared < radiusDifferenceSquared) return indicators;
+
+        if (Math.abs(distanceSquared - radiusDifferenceSquared) < Epsilon.UNKNOWN_1EN7) {
+            Point kouten = OritaCalc.internalDivisionRatio(c1, c2, -r1, r2);
+            StraightLine ty = new StraightLine(c1, kouten).orthogonalize(kouten);
+            indicators.add(OritaCalc.circle_to_straightLine_no_intersect_wo_connect_LineSegment(
+                    new Circle(kouten, (r1 + r2) / 2.0, LineColor.BLACK_0), ty)
+                    .withColor(LineColor.PURPLE_8));
+            return indicators;
+        }
+
+        indicators.addAll(externalTangentSegments(x1, y1, x2, y2, r1, r2, xp, yp, distanceSquared));
+        if (radiusDifferenceSquared < distanceSquared && distanceSquared < radiusSumSquared) {
+            return indicators;
+        }
+        if (Math.abs(distanceSquared - radiusSumSquared) < Epsilon.UNKNOWN_1EN7) {
+            Point kouten = OritaCalc.internalDivisionRatio(c1, c2, r1, r2);
+            StraightLine ty = new StraightLine(c1, kouten).orthogonalize(kouten);
+            indicators.add(OritaCalc.circle_to_straightLine_no_intersect_wo_connect_LineSegment(
+                    new Circle(kouten, (r1 + r2) / 2.0, LineColor.BLACK_0), ty)
+                    .withColor(LineColor.PURPLE_8));
+            return indicators;
+        }
+        if (radiusSumSquared < distanceSquared) {
+            indicators.addAll(internalTangentSegments(x1, y1, x2, y2, r1, r2, xp, yp, distanceSquared));
+        }
+        return indicators;
+    }
+
+    private static List<LineSegment> externalTangentSegments(double x1, double y1, double x2, double y2,
+                                                             double r1, double r2, double xp, double yp,
+                                                             double distanceSquared) {
+        double root = Math.sqrt(distanceSquared - (r1 - r2) * (r1 - r2));
+        double xq1 = r1 * (xp * (r1 - r2) + yp * root) / distanceSquared;
+        double yq1 = r1 * (yp * (r1 - r2) - xp * root) / distanceSquared;
+        double xq2 = r1 * (xp * (r1 - r2) - yp * root) / distanceSquared;
+        double yq2 = r1 * (yp * (r1 - r2) + xp * root) / distanceSquared;
+        return tangentSegmentsFromOffsets(x1, y1, x2, y2, new double[][]{{xq1, yq1}, {xq2, yq2}});
+    }
+
+    private static List<LineSegment> internalTangentSegments(double x1, double y1, double x2, double y2,
+                                                             double r1, double r2, double xp, double yp,
+                                                             double distanceSquared) {
+        double root = Math.sqrt(distanceSquared - (r1 + r2) * (r1 + r2));
+        double xq3 = r1 * (xp * (r1 + r2) + yp * root) / distanceSquared;
+        double yq3 = r1 * (yp * (r1 + r2) - xp * root) / distanceSquared;
+        double xq4 = r1 * (xp * (r1 + r2) - yp * root) / distanceSquared;
+        double yq4 = r1 * (yp * (r1 + r2) + xp * root) / distanceSquared;
+        return tangentSegmentsFromOffsets(x1, y1, x2, y2, new double[][]{{xq3, yq3}, {xq4, yq4}});
+    }
+
+    private static List<LineSegment> tangentSegmentsFromOffsets(double x1, double y1, double x2, double y2, double[][] offsets) {
+        List<LineSegment> indicators = new ArrayList<>();
+        for (double[] offset : offsets) {
+            double xr = offset[0] + x1;
+            double yr = offset[1] + y1;
+            StraightLine t = new StraightLine(x1, y1, xr, yr).orthogonalize(new Point(xr, yr));
+            indicators.add(new LineSegment(new Point(xr, yr),
+                    OritaCalc.findProjection(t, new Point(x2, y2)),
+                    LineColor.PURPLE_8));
+        }
+        return indicators;
+    }
+
     private static void foldLineDivideCount(String[] args) {
         if (args.length < 8) {
             usage("foldline-divide-count expects division count, segment, count, and segment payload");
@@ -1512,6 +1637,18 @@ public class OrieditaGeometryOracle {
         }
     }
 
+    private static void printLineSegmentsList(List<LineSegment> segments) {
+        System.out.println("lines|" + segments.size());
+        for (LineSegment segment : segments) {
+            System.out.println("line|"
+                    + segment.determineAX() + "|"
+                    + segment.determineAY() + "|"
+                    + segment.determineBX() + "|"
+                    + segment.determineBY() + "|"
+                    + segment.getColor().getNumber());
+        }
+    }
+
     private static void printFoldLineSet(FoldLineSet set) {
         System.out.println("lines|" + set.getTotal());
         for (int index = 1; index <= set.getTotal(); index++) {
@@ -1714,6 +1851,8 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle foldline-circle-invert-line <segment ax ay bx by color> <inversion x y r color>");
         System.err.println("   or: OrieditaGeometryOracle foldline-circle-organize <circleCount> [x y r color]... <lineCount> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-circle-change-color <circleIndices> <auxLineIndices> <r> <g> <b> <circleCount> [x y r color]... <lineCount> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-circle-tangent-point <pointX> <pointY> <circle x y r color> <lineCount> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-circle-tangent-two <circle1 x y r color> <circle2 x y r color>");
         System.err.println("   or: OrieditaGeometryOracle measure-length <ax> <ay> <bx> <by>");
         System.err.println("   or: OrieditaGeometryOracle measure-angle <ax> <ay> <centerX> <centerY> <bx> <by>");
         System.err.println("   or: OrieditaGeometryOracle custom-line-type <customType> <lineColor>");

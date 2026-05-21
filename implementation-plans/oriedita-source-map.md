@@ -163,7 +163,7 @@ stage explicitly changes it.
 | `CIRCLE_DRAW_42` | `MouseHandlerCircleDraw` | `operations::circle::draw` | kernel | 8 | Oracle-tested |
 | `CIRCLE_DRAW_THREE_POINT_43` | `MouseHandlerCircleDrawThreePoint` | `operations::circle::through_three_points` | kernel | 8 | Oracle-tested |
 | `CIRCLE_DRAW_SEPARATE_44` | `MouseHandlerCircleDrawSeparate` | `operations::circle::separate` | kernel | 8 | Oracle-tested |
-| `CIRCLE_DRAW_TANGENT_LINE_45` | `MouseHandlerCircleDrawTangentLine` | `operations::circle::tangent_line` | kernel | 8 | Unsupported |
+| `CIRCLE_DRAW_TANGENT_LINE_45` | `MouseHandlerCircleDrawTangentLine` | `operations::circle::tangent_line` | kernel | 8 | Porting |
 | `CIRCLE_DRAW_INVERTED_46` | `MouseHandlerCircleDrawInverted` | `operations::circle::inverted` | kernel | 8 | Oracle-tested |
 | `CIRCLE_DRAW_FREE_47` | `MouseHandlerCircleDrawFree` | `operations::circle::free` | kernel | 8 | Oracle-tested |
 | `CIRCLE_DRAW_CONCENTRIC_48` | `MouseHandlerCircleDrawConcentric` | `operations::circle::concentric` | kernel | 8 | Oracle-tested |

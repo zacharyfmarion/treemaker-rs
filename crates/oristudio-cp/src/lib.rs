@@ -621,7 +621,7 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
         "operations::circle::tangent_line",
         Kernel,
         8,
-        Unsupported
+        Porting
     ),
     descriptor!(
         CircleDrawInverted,

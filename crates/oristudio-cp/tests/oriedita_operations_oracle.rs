@@ -10,7 +10,8 @@ use oristudio_cp::operations::arrangement::{
 use oristudio_cp::operations::circle::{
     CircleInversionOutput, change_custom_color_for_indices, concentric, concentric_select,
     concentric_two_circle_select, draw as draw_circle, free as draw_circle_free, invert_circle,
-    invert_line_segment, organize, separate, through_three_points,
+    invert_line_segment, organize, separate, tangent_lines_point_circle, tangent_lines_two_circles,
+    through_three_points,
 };
 use oristudio_cp::operations::color::{
     advance_line_type, alternate_mountain_valley_along, alternate_mountain_valley_crossing,
@@ -1445,6 +1446,40 @@ fn circle_change_color_matches_oriedita_oracle() {
 }
 
 #[test]
+fn circle_tangent_candidates_match_oriedita_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    let model = CreasePatternModel::default();
+    let point = Point::new(5.0, 0.0);
+    let circle = Circle::new(0.0, 0.0, 1.0, LineColor::Cyan3);
+    let candidates = tangent_lines_point_circle(&model, point, circle);
+    let mut args = vec!["foldline-circle-tangent-point".to_string()];
+    push_points_args(&mut args, &[point]);
+    push_circle_args(&mut args, circle);
+    args.push("0".to_string());
+    assert_eq!(
+        line_segment_list_summary(&candidates),
+        run_oracle(&oracle, &args)
+    );
+
+    let circle1 = Circle::new(0.0, 0.0, 1.0, LineColor::Cyan3);
+    let circle2 = Circle::new(5.0, 0.0, 1.0, LineColor::Cyan3);
+    let candidates = tangent_lines_two_circles(circle1, circle2);
+    let mut args = vec!["foldline-circle-tangent-two".to_string()];
+    push_circle_args(&mut args, circle1);
+    push_circle_args(&mut args, circle2);
+    assert_eq!(
+        line_segment_list_summary(&candidates),
+        run_oracle(&oracle, &args)
+    );
+}
+
+#[test]
 fn draw_crease_segment_matches_oriedita_oracle() {
     let Some(oracle) = operations_oracle() else {
         eprintln!(
@@ -1618,9 +1653,13 @@ fn push_points_args(args: &mut Vec<String>, points: &[Point]) {
 }
 
 fn line_segment_set_summary(model: &CreasePatternModel) -> String {
+    line_segment_list_summary(&model.line_segments)
+}
+
+fn line_segment_list_summary(segments: &[LineSegment]) -> String {
     let mut output = String::new();
-    output.push_str(&format!("lines|{}\n", model.line_segments.len()));
-    for segment in &model.line_segments {
+    output.push_str(&format!("lines|{}\n", segments.len()));
+    for segment in segments {
         output.push_str(&format!(
             "line|{}|{}|{}|{}|{}\n",
             java_double_string(segment.a.x),

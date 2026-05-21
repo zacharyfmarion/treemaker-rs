@@ -416,7 +416,9 @@ Port all command behavior for:
 - Parallel construction.
 - Parallel-by-width construction.
 - Fishbone construction.
-- Foldable-line input.
+- `FOLDABLE_LINE_INPUT_39` is ported and oracle-tested for generated
+  foldability candidates, fallback/manual input segments, direct endpoint
+  commit, and destination-line commit after UI resolution.
 - Foldable-line draw mode.
 - `VERTEX_MAKE_ANGULARLY_FLAT_FOLDABLE_38` is ported and oracle-tested for the
   resolved invalid-vertex kernel: odd-degree candidate generation, single-line

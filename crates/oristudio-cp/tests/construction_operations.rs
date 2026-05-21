@@ -7,12 +7,13 @@ use oristudio_cp::operations::construction::{
     commit_parallel_width_indicator, double_symmetric_draw,
     draw_crease_angle_restricted_3_candidates, draw_crease_angle_restricted_3_to_point,
     draw_crease_angle_restricted_5, draw_crease_angle_restricted_converging, draw_crease_segment,
-    fishbone_draw, inward, make_vertex_flat_foldable_candidates,
-    make_vertex_flat_foldable_to_destination, mirror_selected_lines, parallel_draw,
-    parallel_width_indicators, perpendicular_indicator, perpendicular_projection,
-    square_bisector_from_lines_to_destination, square_bisector_from_points_to_destination,
-    square_bisector_parallel_between_destinations, square_bisector_parallel_indicator,
-    symmetric_draw,
+    fishbone_draw, foldable_line_input_candidates, foldable_line_input_direct,
+    foldable_line_input_fallback, foldable_line_input_to_destination, inward,
+    make_vertex_flat_foldable_candidates, make_vertex_flat_foldable_to_destination,
+    mirror_selected_lines, parallel_draw, parallel_width_indicators, perpendicular_indicator,
+    perpendicular_projection, square_bisector_from_lines_to_destination,
+    square_bisector_from_points_to_destination, square_bisector_parallel_between_destinations,
+    square_bisector_parallel_indicator, symmetric_draw,
 };
 
 #[test]
@@ -476,6 +477,51 @@ fn make_vertex_flat_foldable_generates_odd_vertex_candidate_and_commits_to_desti
         &candidates.candidates[0],
         &destination,
         candidates.commit_color,
+    ));
+    assert!(contains_segment_close(
+        &model.line_segments,
+        Point::new(-1.0, 0.0),
+        Point::new(0.0, 0.0),
+        LineColor::Red1,
+    ));
+}
+
+#[test]
+fn foldable_line_input_candidates_and_commit_paths_match_expected_geometry() {
+    let source = segment(0.0, 0.0, 1.0, 0.0, LineColor::Red1);
+    let destination = segment(-1.0, -1.0, -1.0, 1.0, LineColor::Black0);
+    let mut model = model_from_segments(&[source, destination.clone()]);
+
+    let candidates = foldable_line_input_candidates(&model, Point::new(0.0, 0.0), 1.0);
+    assert_eq!(candidates.len(), 1);
+    assert!(same_segment_close(
+        &candidates[0],
+        Point::new(0.0, 0.0),
+        Point::new(-1.0, 0.0),
+        LineColor::Purple8,
+    ));
+
+    let fallback = foldable_line_input_fallback(Point::new(2.0, 2.0));
+    assert_eq!(fallback.a, Point::new(2.0, 2.0));
+    assert_eq!(fallback.b, Point::new(2.0, 2.0));
+
+    assert!(foldable_line_input_direct(
+        &mut model,
+        &candidates[0],
+        LineColor::Blue2,
+    ));
+    assert!(contains_segment_close(
+        &model.line_segments,
+        Point::new(0.0, 0.0),
+        Point::new(-1.0, 0.0),
+        LineColor::Blue2,
+    ));
+
+    assert!(foldable_line_input_to_destination(
+        &mut model,
+        &candidates[0],
+        &destination,
+        LineColor::Red1,
     ));
     assert!(contains_segment_close(
         &model.line_segments,

@@ -273,6 +273,59 @@ pub fn make_vertex_flat_foldable_to_destination(
     true
 }
 
+/// Oriedita `FOLDABLE_LINE_INPUT_39` generated step candidates after the starting vertex is resolved.
+pub fn foldable_line_input_candidates(
+    model: &CreasePatternModel,
+    vertex: Point,
+    grid_width: f64,
+) -> Vec<LineSegment> {
+    odd_vertex_foldable_candidates(
+        &sorted_vertex_folding_lines(model, vertex),
+        vertex,
+        grid_width,
+        ActiveState::ActiveA1,
+    )
+}
+
+/// Oriedita `FOLDABLE_LINE_INPUT_39` fallback step when no flat-foldable candidate exists.
+pub fn foldable_line_input_fallback(vertex: Point) -> LineSegment {
+    LineSegment::with_color(vertex, vertex, LineColor::Purple8)
+        .with_active(ActiveState::ActiveBoth3)
+}
+
+/// Oriedita `FOLDABLE_LINE_INPUT_39` final add when the resolved input segment endpoint is accepted.
+pub fn foldable_line_input_direct(
+    model: &mut CreasePatternModel,
+    input: &LineSegment,
+    color: LineColor,
+) -> bool {
+    let result = LineSegment::with_color(input.a, input.b, color);
+    if !Epsilon::HIGH.gt0(result.determine_length()) {
+        return false;
+    }
+    add_line_segment_like_worker(model, &result);
+    true
+}
+
+/// Oriedita `FOLDABLE_LINE_INPUT_39` final add when the input segment is clipped to an existing line.
+pub fn foldable_line_input_to_destination(
+    model: &mut CreasePatternModel,
+    input: &LineSegment,
+    destination: &LineSegment,
+    color: LineColor,
+) -> bool {
+    let result = LineSegment::with_color(
+        find_intersection_segments(input, destination),
+        input.a,
+        color,
+    );
+    if !Epsilon::HIGH.gt0(result.determine_length()) {
+        return false;
+    }
+    add_line_segment_like_worker(model, &result);
+    true
+}
+
 /// Oriedita `SnappingUtil.snapToActiveAngleSystem` without UI grid candidates.
 pub fn snap_to_active_angle_system(
     model: &CreasePatternModel,

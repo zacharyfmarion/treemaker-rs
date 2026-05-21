@@ -570,10 +570,10 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
     descriptor!(
         FoldableLineInput,
         "MouseHandlerFoldableLineInput",
-        "operations::construction::foldable_line_input",
+        "operations::construction::foldable_line_input_candidates",
         Kernel,
         7,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         ParallelDraw,

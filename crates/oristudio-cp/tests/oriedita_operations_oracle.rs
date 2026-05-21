@@ -26,7 +26,8 @@ use oristudio_cp::operations::construction::{
     commit_square_bisector_parallel_indicator, double_symmetric_draw,
     draw_crease_angle_restricted_3_candidates, draw_crease_angle_restricted_3_to_point,
     draw_crease_angle_restricted_5, draw_crease_angle_restricted_converging, draw_crease_segment,
-    fishbone_draw, inward, make_vertex_flat_foldable_candidates,
+    fishbone_draw, foldable_line_input_candidates, foldable_line_input_direct,
+    foldable_line_input_to_destination, inward, make_vertex_flat_foldable_candidates,
     make_vertex_flat_foldable_to_destination, mirror_selected_lines, parallel_draw,
     parallel_width_indicators, perpendicular_indicator, perpendicular_projection,
     square_bisector_from_lines_to_destination, square_bisector_from_points_to_destination,
@@ -1422,6 +1423,71 @@ fn make_vertex_flat_foldable_matches_oriedita_oracle() {
         &run_oracle(&oracle, &args),
         1e-9,
         "make-vertex-flat-foldable-destination",
+    );
+}
+
+#[test]
+fn foldable_line_input_matches_oriedita_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    let vertex = Point::new(0.0, 0.0);
+    let destination = segment(-1.0, -1.0, -1.0, 1.0, LineColor::Black0);
+    let segments = vec![
+        segment(0.0, 0.0, 1.0, 0.0, LineColor::Red1),
+        destination.clone(),
+    ];
+    let candidates = foldable_line_input_candidates(&model_from_segments(&segments), vertex, 1.0);
+    let mut args = vec!["foldline-foldable-input-candidates".to_string()];
+    push_points_args(&mut args, &[vertex]);
+    args.push("1.0".to_string());
+    args.push(segments.len().to_string());
+    push_segment_args(&mut args, &segments);
+    assert_line_summary_close(
+        &line_segment_list_summary(&candidates),
+        &run_oracle(&oracle, &args),
+        1e-9,
+        "foldable-input-candidates",
+    );
+
+    let mut model = model_from_segments(&segments);
+    let added = foldable_line_input_direct(&mut model, &candidates[0], LineColor::Blue2);
+    let mut args = vec!["foldline-foldable-input-direct".to_string()];
+    push_one_segment_args(&mut args, &candidates[0]);
+    args.push(LineColor::Blue2.number().to_string());
+    args.push(segments.len().to_string());
+    push_segment_args(&mut args, &segments);
+    let rust_summary = format!("added|{added}\n{}", line_segment_set_summary(&model));
+    assert_line_summary_close(
+        &rust_summary,
+        &run_oracle(&oracle, &args),
+        1e-9,
+        "foldable-input-direct",
+    );
+
+    let mut model = model_from_segments(&segments);
+    let added = foldable_line_input_to_destination(
+        &mut model,
+        &candidates[0],
+        &destination,
+        LineColor::Red1,
+    );
+    let mut args = vec!["foldline-foldable-input-destination".to_string()];
+    push_one_segment_args(&mut args, &candidates[0]);
+    push_one_segment_args(&mut args, &destination);
+    args.push(LineColor::Red1.number().to_string());
+    args.push(segments.len().to_string());
+    push_segment_args(&mut args, &segments);
+    let rust_summary = format!("added|{added}\n{}", line_segment_set_summary(&model));
+    assert_line_summary_close(
+        &rust_summary,
+        &run_oracle(&oracle, &args),
+        1e-9,
+        "foldable-input-destination",
     );
 }
 

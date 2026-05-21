@@ -129,6 +129,9 @@ public class OrieditaGeometryOracle {
             case "foldline-angle-system-draw" -> foldLineAngleSystemDraw(args);
             case "foldline-make-vertex-flat-foldable-candidates" -> foldLineMakeVertexFlatFoldableCandidates(args);
             case "foldline-make-vertex-flat-foldable-destination" -> foldLineMakeVertexFlatFoldableDestination(args);
+            case "foldline-foldable-input-candidates" -> foldLineFoldableInputCandidates(args);
+            case "foldline-foldable-input-direct" -> foldLineFoldableInputDirect(args);
+            case "foldline-foldable-input-destination" -> foldLineFoldableInputDestination(args);
             case "foldline-square-bisector-3p" -> foldLineSquareBisector3p(args);
             case "foldline-square-bisector-2l-np" -> foldLineSquareBisector2lNp(args);
             case "foldline-square-bisector-parallel-indicator" -> foldLineSquareBisectorParallelIndicator(args);
@@ -2148,6 +2151,61 @@ public class OrieditaGeometryOracle {
         printFoldLineSet(set);
     }
 
+    private static void foldLineFoldableInputCandidates(String[] args) {
+        if (args.length < 5) {
+            usage("foldline-foldable-input-candidates expects vertex, grid width, count, and segment payload");
+        }
+
+        Point vertex = new Point(parse(args[1]), parse(args[2]));
+        double gridWidth = parse(args[3]);
+        int count = Integer.parseInt(args[4]);
+        FoldLineSet set = foldLineSet(args, 5, count);
+        printLineSegmentsList(oddVertexFoldableCandidates(
+                vertexSortingBox(set, vertex),
+                vertex,
+                gridWidth,
+                LineSegment.ActiveState.ACTIVE_A_1));
+    }
+
+    private static void foldLineFoldableInputDirect(String[] args) {
+        if (args.length < 8) {
+            usage("foldline-foldable-input-direct expects input segment, color, count, and segment payload");
+        }
+
+        LineSegment input = segment(args, 1);
+        LineColor color = LineColor.fromNumber(Integer.parseInt(args[6]));
+        int count = Integer.parseInt(args[7]);
+        FoldLineSet set = foldLineSet(args, 8, count);
+        LineSegment result = new LineSegment(input.getA(), input.getB(), color);
+        boolean added = Epsilon.high.gt0(result.determineLength());
+        if (added) {
+            addLineSegmentLikeWorker(set, result);
+        }
+
+        System.out.println("added|" + added);
+        printFoldLineSet(set);
+    }
+
+    private static void foldLineFoldableInputDestination(String[] args) {
+        if (args.length < 13) {
+            usage("foldline-foldable-input-destination expects input segment, destination segment, color, count, and segment payload");
+        }
+
+        LineSegment input = segment(args, 1);
+        LineSegment destination = segment(args, 6);
+        LineColor color = LineColor.fromNumber(Integer.parseInt(args[11]));
+        int count = Integer.parseInt(args[12]);
+        FoldLineSet set = foldLineSet(args, 13, count);
+        LineSegment result = new LineSegment(OritaCalc.findIntersection(input, destination), input.getA(), color);
+        boolean added = Epsilon.high.gt0(result.determineLength());
+        if (added) {
+            addLineSegmentLikeWorker(set, result);
+        }
+
+        System.out.println("added|" + added);
+        printFoldLineSet(set);
+    }
+
     private static SortingBox<LineSegment> vertexSortingBox(FoldLineSet set, Point vertex) {
         SortingBox<LineSegment> nbox = new SortingBox<>();
         for (LineSegment segment : set.getLineSegmentsIterable()) {
@@ -3582,6 +3640,9 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle foldline-angle-system-draw <releaseX> <releaseY> <selected ax ay bx by color> <destination ax ay bx by color> <color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-make-vertex-flat-foldable-candidates <vertexX> <vertexY> <gridWidth> <color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-make-vertex-flat-foldable-destination <vertexX> <vertexY> <candidate ax ay bx by color> <destination ax ay bx by color> <color> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-foldable-input-candidates <vertexX> <vertexY> <gridWidth> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-foldable-input-direct <input ax ay bx by color> <color> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-foldable-input-destination <input ax ay bx by color> <destination ax ay bx by color> <color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-square-bisector-3p <p1x> <p1y> <p2x> <p2y> <p3x> <p3y> <destination ax ay bx by color> <color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-square-bisector-2l-np <first ax ay bx by color> <second ax ay bx by color> <destination ax ay bx by color> <color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-square-bisector-parallel-indicator <first ax ay bx by color> <second ax ay bx by color> <count> [ax ay bx by color]...");

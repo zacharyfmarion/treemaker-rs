@@ -6,6 +6,7 @@ import origami.crease_pattern.element.Circle;
 import origami.crease_pattern.element.LineColor;
 import origami.crease_pattern.element.LineSegment;
 import origami.crease_pattern.element.Point;
+import origami.crease_pattern.element.Polygon;
 import origami.crease_pattern.worker.foldlineset.BranchTrim;
 import origami.crease_pattern.worker.foldlineset.Fix1;
 import origami.crease_pattern.worker.foldlineset.Fix2;
@@ -51,6 +52,12 @@ public class OrieditaGeometryOracle {
             case "foldline-fix2" -> foldLineFix2(args);
             case "foldline-set-color" -> foldLineSetColor(args);
             case "foldline-change-mv" -> foldLineChangeMv(args);
+            case "foldline-select-all" -> foldLineSelectAll(args);
+            case "foldline-select-indices" -> foldLineSelectIndices(args);
+            case "foldline-select-box" -> foldLineSelectBox(args);
+            case "foldline-select-polygon" -> foldLineSelectPolygon(args);
+            case "foldline-select-lx" -> foldLineSelectLx(args);
+            case "foldline-select-connected" -> foldLineSelectConnected(args);
             case "custom-line-type" -> customLineType(args);
             case "orh-import-summary" -> orhImportSummary(args);
             case "orh-export-fixture" -> orhExportFixture(args);
@@ -328,6 +335,128 @@ public class OrieditaGeometryOracle {
         printFoldLineSet(set);
     }
 
+    private static void foldLineSelectAll(String[] args) {
+        if (args.length < 4) {
+            usage("foldline-select-all expects action, preselected indices, count, and segment payload");
+        }
+
+        String action = args[1];
+        int count = Integer.parseInt(args[3]);
+        FoldLineSet set = foldLineSet(args, 4, count);
+        applySelectedIndices(set, args[2], 2);
+
+        switch (action) {
+            case "select" -> set.select_all();
+            case "unselect" -> set.unselect_all();
+            default -> usage("unknown select-all action: " + action);
+        }
+
+        printFoldLineSetWithSelection(set);
+    }
+
+    private static void foldLineSelectIndices(String[] args) {
+        if (args.length < 5) {
+            usage("foldline-select-indices expects action, indices, preselected indices, count, and segment payload");
+        }
+
+        String action = args[1];
+        int count = Integer.parseInt(args[4]);
+        FoldLineSet set = foldLineSet(args, 5, count);
+        applySelectedIndices(set, args[3], 2);
+
+        for (int index : parseIndices(args[2])) {
+            switch (action) {
+                case "select" -> set.select(index + 1);
+                case "unselect" -> set.get(index + 1).setSelected(0);
+                default -> usage("unknown select-indices action: " + action);
+            }
+        }
+
+        printFoldLineSetWithSelection(set);
+    }
+
+    private static void foldLineSelectBox(String[] args) {
+        if (args.length < 5) {
+            usage("foldline-select-box expects action, preselected indices, vertex count, vertices, count, and segment payload");
+        }
+
+        String action = args[1];
+        int vertexCount = Integer.parseInt(args[3]);
+        int countOffset = 4 + vertexCount * 2;
+        int count = Integer.parseInt(args[countOffset]);
+        FoldLineSet set = foldLineSet(args, countOffset + 1, count);
+        applySelectedIndices(set, args[2], 2);
+        Polygon polygon = polygon(args, 4, vertexCount);
+
+        for (LineSegment line : set.lineSegmentsInside(polygon)) {
+            switch (action) {
+                case "select" -> line.setSelected(2);
+                case "unselect" -> line.setSelected(0);
+                default -> usage("unknown select-box action: " + action);
+            }
+        }
+
+        printFoldLineSetWithSelection(set);
+    }
+
+    private static void foldLineSelectPolygon(String[] args) {
+        if (args.length < 5) {
+            usage("foldline-select-polygon expects action, preselected indices, vertex count, vertices, count, and segment payload");
+        }
+
+        String action = args[1];
+        int vertexCount = Integer.parseInt(args[3]);
+        int countOffset = 4 + vertexCount * 2;
+        int count = Integer.parseInt(args[countOffset]);
+        FoldLineSet set = foldLineSet(args, countOffset + 1, count);
+        applySelectedIndices(set, args[2], 2);
+        Polygon polygon = polygon(args, 4, vertexCount);
+
+        switch (action) {
+            case "select" -> set.select_Takakukei(polygon, "select");
+            case "unselect" -> set.select_Takakukei(polygon, "unselectAction");
+            default -> usage("unknown select-polygon action: " + action);
+        }
+
+        printFoldLineSetWithSelection(set);
+    }
+
+    private static void foldLineSelectLx(String[] args) {
+        if (args.length < 9) {
+            usage("foldline-select-lx expects action, preselected indices, selection segment, count, and segment payload");
+        }
+
+        String action = args[1];
+        LineSegment selection = new LineSegment(
+                new Point(parse(args[3]), parse(args[4])),
+                new Point(parse(args[5]), parse(args[6])),
+                LineColor.fromNumber(Integer.parseInt(args[7])));
+        int count = Integer.parseInt(args[8]);
+        FoldLineSet set = foldLineSet(args, 9, count);
+        applySelectedIndices(set, args[2], 2);
+
+        switch (action) {
+            case "select" -> set.select_lX(selection, "select_lX");
+            case "unselect" -> set.select_lX(selection, "unselect_lX");
+            default -> usage("unknown select-lx action: " + action);
+        }
+
+        printFoldLineSetWithSelection(set);
+    }
+
+    private static void foldLineSelectConnected(String[] args) {
+        if (args.length < 5) {
+            usage("foldline-select-connected expects point, preselected indices, count, and segment payload");
+        }
+
+        Point point = new Point(parse(args[1]), parse(args[2]));
+        int count = Integer.parseInt(args[4]);
+        FoldLineSet set = foldLineSet(args, 5, count);
+        applySelectedIndices(set, args[3], 2);
+        set.selectProbablyConnected(point);
+        printFoldLineSetWithSelection(set);
+    }
+
     private static void orhImportSummary(String[] args) throws Exception {
         if (args.length != 2) {
             usage("orh-import-summary expects a file path");
@@ -425,6 +554,35 @@ public class OrieditaGeometryOracle {
                     LineColor.fromNumber(Integer.parseInt(args[base + 4])));
         }
         return set;
+    }
+
+    private static Polygon polygon(String[] args, int offset, int count) {
+        List<Point> points = new ArrayList<>();
+        for (int index = 0; index < count; index++) {
+            int base = offset + index * 2;
+            points.add(new Point(parse(args[base]), parse(args[base + 1])));
+        }
+        return new Polygon(points);
+    }
+
+    private static void applySelectedIndices(FoldLineSet set, String indices, int selected) {
+        for (int index : parseIndices(indices)) {
+            set.get(index + 1).setSelected(selected);
+        }
+    }
+
+    private static List<Integer> parseIndices(String indices) {
+        List<Integer> result = new ArrayList<>();
+        if (indices.equals("-") || indices.isEmpty()) {
+            return result;
+        }
+
+        for (String value : indices.split(",")) {
+            if (!value.isEmpty()) {
+                result.add(Integer.parseInt(value));
+            }
+        }
+        return result;
     }
 
     private static void printLineSegmentSet(LineSegmentSet set) {

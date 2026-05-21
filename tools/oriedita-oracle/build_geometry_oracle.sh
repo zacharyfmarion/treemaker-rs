@@ -35,6 +35,7 @@ javac \
   "$origami_source/origami/crease_pattern/element/StraightLine.java" \
   "$origami_source/origami/crease_pattern/element/Circle.java" \
   "$origami_source/origami/crease_pattern/element/Line.java" \
+  "$origami_source/origami/crease_pattern/element/Polygon.java" \
   "$origami_source/origami/crease_pattern/OritaCalc.java" \
   "$origami_source/origami/crease_pattern/LineSegmentSet.java" \
   "$origami_source/origami/crease_pattern/FoldLineSet.java" \

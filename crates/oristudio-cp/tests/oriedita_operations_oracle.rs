@@ -7,6 +7,10 @@ use oristudio_cp::operations::arrangement::{
     fix2, intersect_divide_pair,
 };
 use oristudio_cp::operations::color::{set_line_color_for_indices, toggle_mountain_valley};
+use oristudio_cp::operations::selection::{
+    select_all, select_box, select_connected_from_point, select_indices, select_intersecting_line,
+    select_polygon, unselect_all, unselect_indices, unselect_intersecting_line, unselect_polygon,
+};
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -481,6 +485,227 @@ fn color_operations_match_oriedita_foldlineset_oracle() {
     assert_eq!(line_segment_set_summary(&model), run_oracle(&oracle, &args));
 }
 
+#[test]
+fn selection_primitives_match_oriedita_foldlineset_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    let segments = vec![
+        segment(0.0, 0.0, 10.0, 0.0, LineColor::Red1),
+        segment(5.0, -5.0, 5.0, 5.0, LineColor::Blue2),
+        segment(0.0, 1.0, 10.0, 1.0, LineColor::Black0),
+    ];
+
+    let mut model = model_from_segments(&segments);
+    select_all(&mut model);
+    let mut args = vec![
+        "foldline-select-all".to_string(),
+        "select".to_string(),
+        "-".to_string(),
+        segments.len().to_string(),
+    ];
+    push_segment_args(&mut args, &segments);
+    assert_eq!(
+        line_segment_set_with_selection_summary(&model),
+        run_oracle(&oracle, &args)
+    );
+
+    let mut model = model_from_segments(&segments);
+    for index in 0..segments.len() {
+        model.line_segments[index] = model.line_segments[index].with_selected(2);
+    }
+    unselect_all(&mut model);
+    let mut args = vec![
+        "foldline-select-all".to_string(),
+        "unselect".to_string(),
+        "0,1,2".to_string(),
+        segments.len().to_string(),
+    ];
+    push_segment_args(&mut args, &segments);
+    assert_eq!(
+        line_segment_set_with_selection_summary(&model),
+        run_oracle(&oracle, &args)
+    );
+
+    let mut model = model_from_segments(&segments);
+    select_indices(&mut model, &[0, 2]);
+    let mut args = vec![
+        "foldline-select-indices".to_string(),
+        "select".to_string(),
+        "0,2".to_string(),
+        "-".to_string(),
+        segments.len().to_string(),
+    ];
+    push_segment_args(&mut args, &segments);
+    assert_eq!(
+        line_segment_set_with_selection_summary(&model),
+        run_oracle(&oracle, &args)
+    );
+
+    let mut model = model_from_segments(&segments);
+    model.line_segments[0] = model.line_segments[0].with_selected(2);
+    model.line_segments[2] = model.line_segments[2].with_selected(2);
+    unselect_indices(&mut model, &[2]);
+    let mut args = vec![
+        "foldline-select-indices".to_string(),
+        "unselect".to_string(),
+        "2".to_string(),
+        "0,2".to_string(),
+        segments.len().to_string(),
+    ];
+    push_segment_args(&mut args, &segments);
+    assert_eq!(
+        line_segment_set_with_selection_summary(&model),
+        run_oracle(&oracle, &args)
+    );
+}
+
+#[test]
+fn polygon_and_intersection_selection_match_oriedita_foldlineset_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    let polygon_segments = vec![
+        segment(0.25, 0.25, 0.75, 0.75, LineColor::Red1),
+        segment(-1.0, 0.0, 0.0, 0.0, LineColor::Blue2),
+        segment(-1.0, 0.5, 2.0, 0.5, LineColor::Black0),
+    ];
+    let polygon = vec![
+        Point::new(0.0, 0.0),
+        Point::new(1.0, 0.0),
+        Point::new(1.0, 1.0),
+        Point::new(0.0, 1.0),
+    ];
+
+    let mut model = model_from_segments(&polygon_segments);
+    select_polygon(
+        &mut model,
+        &oristudio_cp::geometry::Polygon::new(polygon.clone()),
+    );
+    let mut args = vec![
+        "foldline-select-polygon".to_string(),
+        "select".to_string(),
+        "-".to_string(),
+        polygon.len().to_string(),
+    ];
+    push_points_args(&mut args, &polygon);
+    args.push(polygon_segments.len().to_string());
+    push_segment_args(&mut args, &polygon_segments);
+    assert_eq!(
+        line_segment_set_with_selection_summary(&model),
+        run_oracle(&oracle, &args)
+    );
+
+    model.line_segments[2] = model.line_segments[2].with_selected(2);
+    unselect_polygon(
+        &mut model,
+        &oristudio_cp::geometry::Polygon::new(polygon.clone()),
+    );
+    let mut args = vec![
+        "foldline-select-polygon".to_string(),
+        "unselect".to_string(),
+        "0,2".to_string(),
+        polygon.len().to_string(),
+    ];
+    push_points_args(&mut args, &polygon);
+    args.push(polygon_segments.len().to_string());
+    push_segment_args(&mut args, &polygon_segments);
+    assert_eq!(
+        line_segment_set_with_selection_summary(&model),
+        run_oracle(&oracle, &args)
+    );
+
+    let mut box_model = model_from_segments(&polygon_segments);
+    select_box(
+        &mut box_model,
+        &oristudio_cp::geometry::Polygon::new(polygon.clone()),
+    );
+    let mut args = vec![
+        "foldline-select-box".to_string(),
+        "select".to_string(),
+        "-".to_string(),
+        polygon.len().to_string(),
+    ];
+    push_points_args(&mut args, &polygon);
+    args.push(polygon_segments.len().to_string());
+    push_segment_args(&mut args, &polygon_segments);
+    assert_eq!(
+        line_segment_set_with_selection_summary(&box_model),
+        run_oracle(&oracle, &args)
+    );
+
+    let mut lx_model = model_from_segments(&polygon_segments);
+    let selection = segment(-0.5, 0.5, 1.5, 0.5, LineColor::Magenta5);
+    select_intersecting_line(&mut lx_model, &selection);
+    let mut args = vec![
+        "foldline-select-lx".to_string(),
+        "select".to_string(),
+        "-".to_string(),
+    ];
+    push_one_segment_args(&mut args, &selection);
+    args.push(polygon_segments.len().to_string());
+    push_segment_args(&mut args, &polygon_segments);
+    assert_eq!(
+        line_segment_set_with_selection_summary(&lx_model),
+        run_oracle(&oracle, &args)
+    );
+
+    unselect_intersecting_line(&mut lx_model, &selection);
+    let mut args = vec![
+        "foldline-select-lx".to_string(),
+        "unselect".to_string(),
+        "0,2".to_string(),
+    ];
+    push_one_segment_args(&mut args, &selection);
+    args.push(polygon_segments.len().to_string());
+    push_segment_args(&mut args, &polygon_segments);
+    assert_eq!(
+        line_segment_set_with_selection_summary(&lx_model),
+        run_oracle(&oracle, &args)
+    );
+}
+
+#[test]
+fn connected_selection_matches_oriedita_foldlineset_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    let segments = vec![
+        segment(0.0, 0.0, 1.0, 0.0, LineColor::Red1),
+        segment(1.0, 0.0, 2.0, 0.0, LineColor::Blue2),
+        segment(2.0, 0.0, 3.0, 0.0, LineColor::Black0),
+        segment(10.0, 0.0, 11.0, 0.0, LineColor::Cyan3),
+    ];
+    let mut model = model_from_segments(&segments);
+    select_connected_from_point(&mut model, Point::new(1.0, 0.0));
+
+    let mut args = vec![
+        "foldline-select-connected".to_string(),
+        "1".to_string(),
+        "0".to_string(),
+        "-".to_string(),
+        segments.len().to_string(),
+    ];
+    push_segment_args(&mut args, &segments);
+
+    assert_eq!(
+        line_segment_set_with_selection_summary(&model),
+        run_oracle(&oracle, &args)
+    );
+}
+
 fn operations_oracle() -> Option<PathBuf> {
     std::env::var("ORIEDITA_OPERATIONS_ORACLE")
         .or_else(|_| std::env::var("ORIEDITA_GEOMETRY_ORACLE"))
@@ -539,6 +764,13 @@ fn push_one_segment_args(args: &mut Vec<String>, segment: &LineSegment) {
     args.push(segment.b.x.to_string());
     args.push(segment.b.y.to_string());
     args.push(segment.color.number().to_string());
+}
+
+fn push_points_args(args: &mut Vec<String>, points: &[Point]) {
+    for point in points {
+        args.push(point.x.to_string());
+        args.push(point.y.to_string());
+    }
 }
 
 fn line_segment_set_summary(model: &CreasePatternModel) -> String {

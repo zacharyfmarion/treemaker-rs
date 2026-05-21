@@ -137,8 +137,8 @@ stage explicitly changes it.
 | `DELETE_POINT_15` | `MouseHandlerDeletePoint` | `operations::point::delete_point` | kernel | 5 | Oracle-tested |
 | `ANGLE_SYSTEM_16` | `MouseHandlerAngleSystem` | `operations::construction::angle_system` | kernel | 7 | Unsupported |
 | `DRAW_CREASE_ANGLE_RESTRICTED_3_18` | `MouseHandlerDrawCreaseAngleRestricted3_2` | `operations::construction::angle_restricted_3` | kernel | 7 | Unsupported |
-| `CREASE_SELECT_19` | `MouseHandlerCreaseSelect` | `operations::selection::select_line` | kernel | 6 | Unsupported |
-| `CREASE_UNSELECT_20` | `MouseHandlerCreaseUnselect` | `operations::selection::unselect_line` | kernel | 6 | Unsupported |
+| `CREASE_SELECT_19` | `MouseHandlerCreaseSelect` | `operations::selection::select_indices`, `operations::selection::select_box` | kernel | 6 | Porting |
+| `CREASE_UNSELECT_20` | `MouseHandlerCreaseUnselect` | `operations::selection::unselect_indices`, `operations::selection::unselect_box` | kernel | 6 | Porting |
 | `CREASE_MOVE_21` | `MouseHandlerCreaseMove` | `operations::transform::move_selection` | kernel | 6 | Unsupported |
 | `CREASE_COPY_22` | `MouseHandlerCreaseCopy` | `operations::transform::copy_selection` | kernel | 6 | Unsupported |
 | `CREASE_MAKE_MOUNTAIN_23` | `MouseHandlerCreaseMakeMountain` | `operations::color::make_mountain` | kernel | 6 | Unsupported |
@@ -184,10 +184,10 @@ stage explicitly changes it.
 | `FLAT_FOLDABLE_CHECK_63` | `MouseHandlerFlatFoldableCheck` | `checks::flat_foldable` | kernel | 9 | Unsupported |
 | `CREASE_DELETE_OVERLAPPING_64` | `MouseHandlerCreaseDeleteOverlapping` | `operations::arrangement::delete_overlapping` | kernel | 5 | Oracle-tested |
 | `CREASE_DELETE_INTERSECTING_65` | `MouseHandlerCreaseDeleteIntersecting` | `operations::arrangement::delete_intersecting` | kernel | 5 | Oracle-tested |
-| `SELECT_POLYGON_66` | `MouseHandlerSelectPolygon` | `operations::selection::select_polygon` | kernel | 6 | Unsupported |
-| `UNSELECT_POLYGON_67` | `MouseHandlerUnselectPolygon` | `operations::selection::unselect_polygon` | kernel | 6 | Unsupported |
-| `SELECT_LINE_INTERSECTING_68` | `MouseHandlerSelectLineIntersecting` | `operations::selection::select_intersecting_line` | kernel | 6 | Unsupported |
-| `UNSELECT_LINE_INTERSECTING_69` | `MouseHandlerUnselectLineIntersecting` | `operations::selection::unselect_intersecting_line` | kernel | 6 | Unsupported |
+| `SELECT_POLYGON_66` | `MouseHandlerSelectPolygon` | `operations::selection::select_polygon` | kernel | 6 | Oracle-tested |
+| `UNSELECT_POLYGON_67` | `MouseHandlerUnselectPolygon` | `operations::selection::unselect_polygon` | kernel | 6 | Oracle-tested |
+| `SELECT_LINE_INTERSECTING_68` | `MouseHandlerSelectLineIntersecting` | `operations::selection::select_intersecting_line` | kernel | 6 | Oracle-tested |
+| `UNSELECT_LINE_INTERSECTING_69` | `MouseHandlerUnselectLineIntersecting` | `operations::selection::unselect_intersecting_line` | kernel | 6 | Oracle-tested |
 | `LENGTHEN_CREASE_SAME_COLOR_70` | `MouseHandlerLengthenCreaseSameColor` | `operations::transform::lengthen_same_color` | kernel | 6 | Unsupported |
 | `FOLDABLE_LINE_DRAW_71` | `MouseHandlerFoldableLineDraw` | `operations::construction::foldable_line_draw` | kernel | 7 | Unsupported |
 | `REPLACE_LINE_TYPE_SELECT_72` | `MouseHandlerReplaceTypeSelect` | `operations::color::replace_selected_type` | kernel | 6 | Unsupported |
@@ -217,8 +217,8 @@ stage explicitly changes it.
 | `StepFactory.java` | Reusable point/box/line-selection steps. | `operations::command_state` | kernel | 1, 6-8 | Unsupported |
 | `ObjCoordStepNode.java` | Model-space point input step. | `operations::command_state` | kernel | 1 | Unsupported |
 | `SelectPointStepNode.java` | Point selection step. | `operations::command_state` | kernel | 1, 6-8 | Unsupported |
-| `BoxSelectStepNode.java` | Box selection step. | `operations::selection` | kernel | 6 | Unsupported |
-| `BoxSelectLinesStepNode.java` | Box line selection step. | `operations::selection` | kernel | 6 | Unsupported |
+| `BoxSelectStepNode.java` | Box selection step. | `operations::selection` | kernel | 6 | Porting |
+| `BoxSelectLinesStepNode.java` | Box line selection step. | `operations::selection::select_box`, `operations::selection::unselect_box` | kernel | 6 | Oracle-tested |
 | `IPreviewStepNode.java` | Preview marker. | command result candidates | kernel-preview | 7-8 | Unsupported |
 | `ICameraStepNode.java` | Camera/model coordinate marker. | none | out-of-scope-ui | later UI | Out-of-scope-ui |
 

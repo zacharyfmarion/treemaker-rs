@@ -876,10 +876,21 @@ Status:
   auxiliary-live-line replacement path that deletes, re-adds, and insertion-splits
   converted cyan lines. The Oriedita oracle validates that path and
   `LineColor.changeMV`-style mountain/valley toggling.
+- `operations::selection` now ports the FoldLineSet-level selection primitives:
+  select/unselect all, index-based line select/unselect, box selection using
+  `lineSegmentsInside`, polygon select/unselect using `select_Takakukei`, line
+  intersection/overlap selection using `select_lX`, and
+  `selectProbablyConnected`. These paths have Rust unit coverage and Oriedita
+  oracle coverage. The tests preserve Oriedita's distinction between box
+  selection, which selects any line touching a box boundary or interior, and
+  polygon selection, which ignores outside-to-outside lines that merely pass
+  through the polygon.
 - Rust unit coverage also exists for selected-line make mountain/valley/edge/aux
   wrappers, the `CREASE_ADVANCE_TYPE_30` click cycle, and the overlapping-line
   alternation used by `CREASE_MAKE_MV_34`. Full handler parity remains open for
-  box/lasso selection integration and handler-level `fix2` chaining.
+  nearest-click line selection, Java2D path/lasso selection, selection-dependent
+  delete/replace type handlers, transform commands, operation-frame behavior,
+  lengthen commands, and handler-level `fix2` chaining.
 
 ### Stage 7: Construction Tools
 

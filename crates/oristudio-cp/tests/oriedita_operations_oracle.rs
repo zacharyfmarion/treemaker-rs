@@ -15,6 +15,10 @@ use oristudio_cp::operations::selection::{
     select_intersecting_line, select_polygon, unselect_all, unselect_indices,
     unselect_intersecting_line, unselect_polygon,
 };
+use oristudio_cp::operations::transform::{
+    copy_selected_lines, copy_selected_lines_by_points, move_selected_lines,
+    move_selected_lines_by_points, translate_model,
+};
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -774,6 +778,110 @@ fn connected_selection_matches_oriedita_foldlineset_oracle() {
     ];
     push_segment_args(&mut args, &segments);
 
+    assert_eq!(
+        line_segment_set_with_selection_summary(&model),
+        run_oracle(&oracle, &args)
+    );
+}
+
+#[test]
+fn transform_commands_match_oriedita_foldlineset_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    let translate_segments = vec![
+        segment(0.0, 0.0, 1.0, 0.0, LineColor::Red1),
+        segment(0.0, 2.0, 1.0, 2.0, LineColor::Blue2),
+    ];
+    let mut model = model_from_segments(&translate_segments);
+    translate_model(&mut model, 5.0, -2.0);
+    let mut args = vec![
+        "foldline-translate".to_string(),
+        "5".to_string(),
+        "-2".to_string(),
+        translate_segments.len().to_string(),
+    ];
+    push_segment_args(&mut args, &translate_segments);
+    assert_eq!(
+        line_segment_set_with_selection_summary(&model),
+        run_oracle(&oracle, &args)
+    );
+
+    let selected_segments = vec![
+        segment(1.0, -1.0, 1.0, 2.0, LineColor::Black0),
+        segment(0.0, 0.0, 2.0, 0.0, LineColor::Red1),
+    ];
+    let mut model = model_from_segments(&selected_segments);
+    model.line_segments[1] = model.line_segments[1].with_selected(2);
+    move_selected_lines(&mut model, Point::new(0.0, 1.0));
+    let mut args = vec![
+        "foldline-transform-selected".to_string(),
+        "move".to_string(),
+        "0".to_string(),
+        "1".to_string(),
+        "1".to_string(),
+        selected_segments.len().to_string(),
+    ];
+    push_segment_args(&mut args, &selected_segments);
+    assert_eq!(
+        line_segment_set_with_selection_summary(&model),
+        run_oracle(&oracle, &args)
+    );
+
+    let mut model = model_from_segments(&selected_segments);
+    model.line_segments[1] = model.line_segments[1].with_selected(2);
+    copy_selected_lines(&mut model, Point::new(0.0, 1.0));
+    let mut args = vec![
+        "foldline-transform-selected".to_string(),
+        "copy".to_string(),
+        "0".to_string(),
+        "1".to_string(),
+        "1".to_string(),
+        selected_segments.len().to_string(),
+    ];
+    push_segment_args(&mut args, &selected_segments);
+    assert_eq!(
+        line_segment_set_with_selection_summary(&model),
+        run_oracle(&oracle, &args)
+    );
+
+    let four_point_segments = vec![segment(1.0, 0.0, 1.0, 1.0, LineColor::Red1)];
+    let original_a = Point::new(0.0, 0.0);
+    let original_b = Point::new(1.0, 0.0);
+    let target_a = Point::new(2.0, 3.0);
+    let target_b = Point::new(4.0, 3.0);
+
+    let mut model = model_from_segments(&four_point_segments);
+    model.line_segments[0] = model.line_segments[0].with_selected(2);
+    move_selected_lines_by_points(&mut model, original_a, original_b, target_a, target_b);
+    let mut args = vec![
+        "foldline-transform-selected-4p".to_string(),
+        "move".to_string(),
+    ];
+    push_points_args(&mut args, &[original_a, original_b, target_a, target_b]);
+    args.push("0".to_string());
+    args.push(four_point_segments.len().to_string());
+    push_segment_args(&mut args, &four_point_segments);
+    assert_eq!(
+        line_segment_set_with_selection_summary(&model),
+        run_oracle(&oracle, &args)
+    );
+
+    let mut model = model_from_segments(&four_point_segments);
+    model.line_segments[0] = model.line_segments[0].with_selected(2);
+    copy_selected_lines_by_points(&mut model, original_a, original_b, target_a, target_b);
+    let mut args = vec![
+        "foldline-transform-selected-4p".to_string(),
+        "copy".to_string(),
+    ];
+    push_points_args(&mut args, &[original_a, original_b, target_a, target_b]);
+    args.push("0".to_string());
+    args.push(four_point_segments.len().to_string());
+    push_segment_args(&mut args, &four_point_segments);
     assert_eq!(
         line_segment_set_with_selection_summary(&model),
         run_oracle(&oracle, &args)

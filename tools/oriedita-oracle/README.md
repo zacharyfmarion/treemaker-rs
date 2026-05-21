@@ -14,7 +14,9 @@ The first selection commands cover select/unselect all, index selection, box
 selection via `lineSegmentsInside`, polygon selection via `select_Takakukei`,
 line-overlap/intersection selection via `select_lX`, and
 `selectProbablyConnected`. Selection-dependent type commands cover selected
-line deletion, line-type replacement, and line-type deletion.
+line deletion, line-type replacement, and line-type deletion. Transform
+commands cover FoldLineSet translation plus selected move/copy and four-point
+selected move/copy.
 
 The oracle intentionally compiles against a pinned Oriedita source checkout
 instead of reimplementing the behavior in Rust.

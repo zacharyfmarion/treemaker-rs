@@ -122,7 +122,7 @@ stage explicitly changes it.
 | Mouse mode | Upstream handler | Rust target | Classification | Stage | Status |
 | --- | --- | --- | --- | --- | --- |
 | `DRAW_CREASE_FREE_1` | `MouseHandlerDrawCreaseFree` | `operations::construction::draw_free` | kernel | 7 | Unsupported |
-| `MOVE_CREASE_PATTERN_2` | `MouseHandlerMoveCreasePattern` | `operations::transform::move_document` | kernel | 6 | Unsupported |
+| `MOVE_CREASE_PATTERN_2` | `MouseHandlerMoveCreasePattern` | runtime camera pan, no persisted CP mutation | ui-preview-only | later UI | Out-of-scope-ui |
 | `LINE_SEGMENT_DELETE_3` | `MouseHandlerLineSegmentDelete` | `operations::arrangement::delete_line` | kernel | 5 | Unsupported |
 | `CHANGE_CREASE_TYPE_4` | `MouseHandlerChangeCreaseType` | `operations::color::change_type` | kernel | 6 | Unsupported |
 | `LENGTHEN_CREASE_5` | `MouseHandlerLengthenCrease` | `operations::transform::lengthen` | kernel | 6 | Unsupported |
@@ -139,8 +139,8 @@ stage explicitly changes it.
 | `DRAW_CREASE_ANGLE_RESTRICTED_3_18` | `MouseHandlerDrawCreaseAngleRestricted3_2` | `operations::construction::angle_restricted_3` | kernel | 7 | Unsupported |
 | `CREASE_SELECT_19` | `MouseHandlerCreaseSelect` | `operations::selection::select_indices`, `operations::selection::select_box` | kernel | 6 | Porting |
 | `CREASE_UNSELECT_20` | `MouseHandlerCreaseUnselect` | `operations::selection::unselect_indices`, `operations::selection::unselect_box` | kernel | 6 | Porting |
-| `CREASE_MOVE_21` | `MouseHandlerCreaseMove` | `operations::transform::move_selection` | kernel | 6 | Unsupported |
-| `CREASE_COPY_22` | `MouseHandlerCreaseCopy` | `operations::transform::copy_selection` | kernel | 6 | Unsupported |
+| `CREASE_MOVE_21` | `MouseHandlerCreaseMove` | `operations::transform::move_selected_lines` | kernel | 6 | Oracle-tested |
+| `CREASE_COPY_22` | `MouseHandlerCreaseCopy` | `operations::transform::copy_selected_lines` | kernel | 6 | Oracle-tested |
 | `CREASE_MAKE_MOUNTAIN_23` | `MouseHandlerCreaseMakeMountain` | `operations::color::make_mountain` | kernel | 6 | Unsupported |
 | `CREASE_MAKE_VALLEY_24` | `MouseHandlerCreaseMakeValley` | `operations::color::make_valley` | kernel | 6 | Unsupported |
 | `CREASE_MAKE_EDGE_25` | `MouseHandlerCreaseMakeEdge` | `operations::color::make_edge` | kernel | 6 | Unsupported |
@@ -149,8 +149,8 @@ stage explicitly changes it.
 | `LINE_SEGMENT_RATIO_SET_28` | `MouseHandlerLineSegmentRatioSet` | `operations::point::ratio_divide_segment` | kernel | 7 | Unsupported |
 | `POLYGON_SET_NO_CORNERS_29` | `MouseHandlerPolygonSetNoCorners` | `operations::generators::regular_polygon` | kernel | 8 | Unsupported |
 | `CREASE_ADVANCE_TYPE_30` | `MouseHandlerCreaseAdvanceType` | `operations::color::advance_type` | kernel | 6 | Unsupported |
-| `CREASE_MOVE_4P_31` | `MouseHandlerCreaseMove4p` | `operations::transform::move_4p` | kernel | 6 | Unsupported |
-| `CREASE_COPY_4P_32` | `MouseHandlerCreaseCopy4p` | `operations::transform::copy_4p` | kernel | 6 | Unsupported |
+| `CREASE_MOVE_4P_31` | `MouseHandlerCreaseMove4p` | `operations::transform::move_selected_lines_by_points` | kernel | 6 | Oracle-tested |
+| `CREASE_COPY_4P_32` | `MouseHandlerCreaseCopy4p` | `operations::transform::copy_selected_lines_by_points` | kernel | 6 | Oracle-tested |
 | `FISH_BONE_DRAW_33` | `MouseHandlerFishBoneDraw` | `operations::construction::fishbone` | kernel | 7 | Unsupported |
 | `CREASE_MAKE_MV_34` | `MouseHandlerCreaseMakeMV` | `operations::color::make_mountain_valley` | kernel | 6 | Unsupported |
 | `DOUBLE_SYMMETRIC_DRAW_35` | `MouseHandlerDoubleSymmetricDraw` | `operations::construction::double_symmetric` | kernel | 7 | Unsupported |

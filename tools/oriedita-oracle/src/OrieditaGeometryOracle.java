@@ -1,4 +1,5 @@
 import origami.crease_pattern.CustomLineTypes;
+import origami.Epsilon;
 import origami.crease_pattern.FoldLineSet;
 import origami.crease_pattern.LineSegmentSet;
 import origami.crease_pattern.OritaCalc;
@@ -61,6 +62,9 @@ public class OrieditaGeometryOracle {
             case "foldline-delete-selected" -> foldLineDeleteSelected(args);
             case "foldline-replace-type" -> foldLineReplaceType(args);
             case "foldline-delete-type" -> foldLineDeleteType(args);
+            case "foldline-translate" -> foldLineTranslate(args);
+            case "foldline-transform-selected" -> foldLineTransformSelected(args);
+            case "foldline-transform-selected-4p" -> foldLineTransformSelected4p(args);
             case "custom-line-type" -> customLineType(args);
             case "orh-import-summary" -> orhImportSummary(args);
             case "orh-export-fixture" -> orhExportFixture(args);
@@ -505,6 +509,100 @@ public class OrieditaGeometryOracle {
         for (LineSegment line : lines) {
             set.deleteLine(line);
         }
+        printFoldLineSetWithSelection(set);
+    }
+
+    private static void foldLineTranslate(String[] args) {
+        if (args.length < 4) {
+            usage("foldline-translate expects dx, dy, count, and segment payload");
+        }
+
+        double dx = parse(args[1]);
+        double dy = parse(args[2]);
+        int count = Integer.parseInt(args[3]);
+        FoldLineSet set = foldLineSet(args, 4, count);
+        set.move(dx, dy);
+        printFoldLineSetWithSelection(set);
+    }
+
+    private static void foldLineTransformSelected(String[] args) {
+        if (args.length < 6) {
+            usage("foldline-transform-selected expects mode, dx, dy, preselected indices, count, and segment payload");
+        }
+
+        String mode = args[1];
+        double dx = parse(args[2]);
+        double dy = parse(args[3]);
+        int count = Integer.parseInt(args[5]);
+        FoldLineSet set = foldLineSet(args, 6, count);
+        applySelectedIndices(set, args[4], 2);
+
+        if (Epsilon.high.gt0(new Point(dx, dy).distance(new Point(0.0, 0.0)))) {
+            FoldLineSet selected = new FoldLineSet();
+            Save save = SaveProvider.createInstance();
+            set.getMemoSelectOption(save, 2);
+            selected.setSave(save);
+
+            switch (mode) {
+                case "move" -> set.delSelectedLineSegmentFast();
+                case "copy" -> {}
+                default -> usage("unknown transform-selected mode: " + mode);
+            }
+
+            selected.move(dx, dy);
+            if (mode.equals("copy")) {
+                selected.unselect_all();
+            }
+
+            int totalOld = set.getTotal();
+            Save movedSave = SaveProvider.createInstance();
+            selected.getSave(movedSave);
+            set.addSave(movedSave);
+            int totalNew = set.getTotal();
+            set.divideLineSegmentWithNewLines(totalOld, totalNew);
+            set.unselect_all();
+        }
+
+        printFoldLineSetWithSelection(set);
+    }
+
+    private static void foldLineTransformSelected4p(String[] args) {
+        if (args.length < 12) {
+            usage("foldline-transform-selected-4p expects mode, four points, preselected indices, count, and segment payload");
+        }
+
+        String mode = args[1];
+        Point originalA = new Point(parse(args[2]), parse(args[3]));
+        Point originalB = new Point(parse(args[4]), parse(args[5]));
+        Point targetA = new Point(parse(args[6]), parse(args[7]));
+        Point targetB = new Point(parse(args[8]), parse(args[9]));
+        int count = Integer.parseInt(args[11]);
+        FoldLineSet set = foldLineSet(args, 12, count);
+        applySelectedIndices(set, args[10], 2);
+
+        FoldLineSet selected = new FoldLineSet();
+        Save save = SaveProvider.createInstance();
+        set.getMemoSelectOption(save, 2);
+        selected.setSave(save);
+
+        switch (mode) {
+            case "move" -> set.delSelectedLineSegmentFast();
+            case "copy" -> {}
+            default -> usage("unknown transform-selected-4p mode: " + mode);
+        }
+
+        selected.move(originalA, originalB, targetA, targetB);
+        if (mode.equals("copy")) {
+            selected.unselect_all();
+        }
+
+        int totalOld = set.getTotal();
+        Save movedSave = SaveProvider.createInstance();
+        selected.getSave(movedSave);
+        set.addSave(movedSave);
+        int totalNew = set.getTotal();
+        set.divideLineSegmentWithNewLines(totalOld, totalNew);
+        set.unselect_all();
         printFoldLineSetWithSelection(set);
     }
 

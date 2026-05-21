@@ -893,9 +893,17 @@ Status:
   oracle coverage. This slice also fixed `FoldLineSet.setColor(Collection,
   LineColor)` duplicate handling so a selected line value changes every equal
   duplicate, matching Oriedita's `HashSet` membership pass.
+- `operations::transform` now ports the FoldLineSet mutations behind
+  `CREASE_MOVE_21`, `CREASE_COPY_22`, `CREASE_MOVE_4P_31`, and
+  `CREASE_COPY_4P_32`: selected-line extraction, delete-or-copy behavior,
+  translation or four-point scale/rotate/translate, insertion splitting, and
+  final unselect-all. The oracle validates translation, selected move/copy, and
+  four-point move/copy against real `FoldLineSet`. Oriedita's
+  `MOVE_CREASE_PATTERN_2` handler is camera panning rather than a persisted CP
+  mutation, so it remains a later UI/runtime mapping rather than a kernel edit.
 - Full handler parity remains open for nearest-click line selection, Java2D
-  path/lasso selection, transform commands, operation-frame behavior, lengthen
-  commands, and handler-level `fix2` chaining.
+  path/lasso selection, operation-frame behavior, lengthen commands, and
+  handler-level `fix2` chaining.
 
 ### Stage 7: Construction Tools
 

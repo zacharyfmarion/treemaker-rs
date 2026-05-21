@@ -3,3 +3,4 @@
 pub mod arrangement;
 pub mod color;
 pub mod selection;
+pub mod transform;

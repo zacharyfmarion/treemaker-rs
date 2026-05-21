@@ -867,10 +867,10 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
     descriptor!(
         Text,
         "MouseHandlerText",
-        "model::text",
+        "operations::text",
         Kernel,
-        3,
-        Unsupported
+        6,
+        OracleTested
     ),
     descriptor!(
         DrawBlintz,

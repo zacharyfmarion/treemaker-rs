@@ -1,6 +1,6 @@
 use oristudio_cp::checks::{FlatFoldableBoundaryCheck, flat_foldable_boundary_check};
 use oristudio_cp::geometry::{Circle, Intersection, LineColor, LineSegment, Point, RgbColor};
-use oristudio_cp::model::{CreasePatternModel, CustomLineType};
+use oristudio_cp::model::{CreasePatternModel, CustomLineType, TextElement};
 use oristudio_cp::operations::arrangement::{
     branch_trim, del_v_all, del_v_all_color_change, del_v_at_point, del_v_at_point_color_change,
     del_v_pair, delete_intersecting_or_overlapping_lines_along,
@@ -48,6 +48,10 @@ use oristudio_cp::operations::selection::{
     delete_selected_lines, select_all, select_box, select_connected_from_point, select_indices,
     select_intersecting_line, select_lasso, select_polygon, unselect_all, unselect_indices,
     unselect_intersecting_line, unselect_lasso, unselect_polygon,
+};
+use oristudio_cp::operations::text::{
+    TextSelectionState, text_create_or_select_pressed, text_delete_at, text_delete_box,
+    text_drag_selected,
 };
 use oristudio_cp::operations::transform::{
     LengthenColorMode, OperationFrame, OperationFrameDragState, copy_selected_lines,
@@ -2458,6 +2462,85 @@ fn flat_foldable_boundary_check_matches_oriedita_oracle() {
 }
 
 #[test]
+fn text_operations_match_oriedita_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    let mut model = CreasePatternModel::default();
+    let mut state = TextSelectionState::default();
+    text_create_or_select_pressed(&mut model, &mut state, Point::new(10.0, 10.0));
+    text_drag_selected(&mut model, &mut state, Point::new(15.0, 12.0));
+    let args = text_sequence_args(
+        TextSelectionState::default(),
+        &[],
+        &[
+            TextEvent::Press(Point::new(10.0, 10.0)),
+            TextEvent::Drag(Point::new(15.0, 12.0)),
+        ],
+    );
+    assert_eq!(text_summary(&model, &state), run_oracle(&oracle, &args));
+
+    let mut model = CreasePatternModel::default();
+    model.add_text(TextElement::new(10.0, 10.0, "a"));
+    model.add_text(TextElement::new(50.0, 50.0, "b"));
+    let mut state = TextSelectionState {
+        selected: Some(0),
+        is_selected: true,
+        dirty: true,
+        selection_start: None,
+    };
+    text_delete_at(&mut model, &mut state, Point::new(11.0, 10.0));
+    let args = text_sequence_args(
+        TextSelectionState {
+            selected: Some(0),
+            is_selected: true,
+            dirty: true,
+            selection_start: None,
+        },
+        &[
+            TextElement::new(10.0, 10.0, "a"),
+            TextElement::new(50.0, 50.0, "b"),
+        ],
+        &[TextEvent::Delete(Point::new(11.0, 10.0))],
+    );
+    assert_eq!(text_summary(&model, &state), run_oracle(&oracle, &args));
+
+    let mut model = CreasePatternModel::default();
+    model.add_text(TextElement::new(10.0, 10.0, "a"));
+    model.add_text(TextElement::new(60.0, 60.0, "b"));
+    let mut state = TextSelectionState {
+        selected: Some(1),
+        is_selected: true,
+        dirty: false,
+        selection_start: None,
+    };
+    text_delete_box(
+        &mut model,
+        &mut state,
+        Point::new(0.0, 0.0),
+        Point::new(40.0, 40.0),
+    );
+    let args = text_sequence_args(
+        TextSelectionState {
+            selected: Some(1),
+            is_selected: true,
+            dirty: false,
+            selection_start: None,
+        },
+        &[
+            TextElement::new(10.0, 10.0, "a"),
+            TextElement::new(60.0, 60.0, "b"),
+        ],
+        &[TextEvent::Box(Point::new(0.0, 0.0), Point::new(40.0, 40.0))],
+    );
+    assert_eq!(text_summary(&model, &state), run_oracle(&oracle, &args));
+}
+
+#[test]
 fn default_molecule_generators_match_oriedita_oracle() {
     let Some(oracle) = operations_oracle() else {
         eprintln!(
@@ -2960,6 +3043,63 @@ fn voronoi_args(
     args
 }
 
+enum TextEvent {
+    Press(Point),
+    Drag(Point),
+    Delete(Point),
+    Box(Point, Point),
+}
+
+fn text_sequence_args(
+    state: TextSelectionState,
+    texts: &[TextElement],
+    events: &[TextEvent],
+) -> Vec<String> {
+    let mut args = vec![
+        "text-sequence".to_string(),
+        state
+            .selected
+            .map(|index| index.to_string())
+            .unwrap_or_else(|| "-1".to_string()),
+        state.is_selected.to_string(),
+        state.dirty.to_string(),
+        texts.len().to_string(),
+    ];
+    for text in texts {
+        args.push(text.x.0.to_string());
+        args.push(text.y.0.to_string());
+        args.push(text.text.clone());
+    }
+    args.push(events.len().to_string());
+    for event in events {
+        match event {
+            TextEvent::Press(point) => {
+                args.push("press".to_string());
+                args.push(point.x.to_string());
+                args.push(point.y.to_string());
+            }
+            TextEvent::Drag(point) => {
+                args.push("drag".to_string());
+                args.push(point.x.to_string());
+                args.push(point.y.to_string());
+            }
+            TextEvent::Delete(point) => {
+                args.push("delete".to_string());
+                args.push(point.x.to_string());
+                args.push(point.y.to_string());
+            }
+            TextEvent::Box(first, second) => {
+                args.push("box".to_string());
+                args.push(first.x.to_string());
+                args.push(first.y.to_string());
+                args.push(second.x.to_string());
+                args.push(second.y.to_string());
+            }
+        }
+    }
+    args
+}
+
 fn push_points_args(args: &mut Vec<String>, points: &[Point]) {
     for point in points {
         args.push(point.x.to_string());
@@ -3108,6 +3248,36 @@ fn voronoi_state_summary(state: &VoronoiState) -> String {
 
 fn voronoi_apply_result_summary(result: VoronoiApplyResult) -> String {
     format!("applied|{}|{}\n", result.lines_added, result.circles_added)
+}
+
+fn text_summary(model: &CreasePatternModel, state: &TextSelectionState) -> String {
+    let mut output = String::new();
+    let (has_start, start) = state
+        .selection_start
+        .map(|point| (true, point))
+        .unwrap_or((false, Point::origin()));
+    output.push_str(&format!(
+        "textstate|{}|{}|{}|{}|{}|{}\n",
+        state
+            .selected
+            .map(|index| index.to_string())
+            .unwrap_or_else(|| "-1".to_string()),
+        state.is_selected,
+        state.dirty,
+        has_start,
+        java_double_string(start.x),
+        java_double_string(start.y),
+    ));
+    output.push_str(&format!("texts|{}\n", model.texts.len()));
+    for text in &model.texts {
+        output.push_str(&format!(
+            "text|{}|{}|{}\n",
+            java_double_string(text.x.0),
+            java_double_string(text.y.0),
+            text.text
+        ));
+    }
+    output
 }
 
 fn flat_foldable_result_summary(result: FlatFoldableBoundaryCheck) -> String {

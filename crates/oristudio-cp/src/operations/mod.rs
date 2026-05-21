@@ -8,4 +8,5 @@ pub mod generators;
 pub mod measure;
 pub mod point;
 pub mod selection;
+pub mod text;
 pub mod transform;

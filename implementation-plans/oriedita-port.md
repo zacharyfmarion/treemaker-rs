@@ -930,6 +930,11 @@ Status:
   create, corner drag, side drag, box drag, endpoint/circle-center snapping,
   tiny-frame deactivation, and reset behavior; actual screen-camera projection
   remains a UI integration concern.
+- `TEXT` is ported and oracle-tested for the non-UI annotation semantics:
+  create-or-select press, selected text dragging, point deletion, box deletion,
+  selected-text state updates, and Oriedita's default headless text bounds. Text
+  editing widget focus, cursor changes, and rendered font metrics remain UI
+  integration concerns.
 - The core `OritaCalc.extendToIntersectionPoint_2` helper used by lengthen and
   several construction tools is ported and oracle-tested for crossing-line and
   collinear-endpoint fixtures. The higher-level `LENGTHEN_CREASE_5` and

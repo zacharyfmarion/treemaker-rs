@@ -27,8 +27,10 @@ import oriedita.editor.export.OrhImporter;
 import oriedita.editor.canvas.OperationFrame;
 import oriedita.editor.save.Save;
 import oriedita.editor.save.SaveProvider;
+import oriedita.editor.text.Text;
 
 import java.awt.Color;
+import java.awt.Rectangle;
 import java.awt.geom.Path2D;
 import java.io.File;
 import java.lang.reflect.Method;
@@ -116,6 +118,13 @@ public class OrieditaGeometryOracle {
             line.voronoiB = voronoiB;
             return line;
         }
+    }
+
+    private static class OracleTextState {
+        int selected = -1;
+        boolean isSelected = false;
+        boolean dirty = false;
+        Point selectionStart = null;
     }
 
     public static void main(String[] args) throws Exception {
@@ -218,6 +227,7 @@ public class OrieditaGeometryOracle {
             case "foldline-voronoi" -> foldLineVoronoi(args);
             case "foldline-default-molecule" -> foldLineDefaultMolecule(args);
             case "flat-foldable-boundary-check" -> flatFoldableBoundaryCheck(args);
+            case "text-sequence" -> textSequence(args);
             case "foldline-divide-count" -> foldLineDivideCount(args);
             case "foldline-divide-ratio" -> foldLineDivideRatio(args);
             case "measure-length" -> measureLength(args);
@@ -3820,6 +3830,198 @@ public class OrieditaGeometryOracle {
         printLineSegmentsList(boundary);
     }
 
+    private static void textSequence(String[] args) {
+        if (args.length < 6) {
+            usage("text-sequence expects selected state, texts, and events");
+        }
+
+        int cursor = 1;
+        OracleTextState state = new OracleTextState();
+        state.selected = Integer.parseInt(args[cursor++]);
+        state.isSelected = Boolean.parseBoolean(args[cursor++]);
+        state.dirty = Boolean.parseBoolean(args[cursor++]);
+        int textCount = Integer.parseInt(args[cursor++]);
+        List<Text> texts = new ArrayList<>();
+        for (int index = 0; index < textCount; index++) {
+            texts.add(new Text(parse(args[cursor]), parse(args[cursor + 1]), args[cursor + 2]));
+            cursor += 3;
+        }
+        int eventCount = Integer.parseInt(args[cursor++]);
+        for (int index = 0; index < eventCount; index++) {
+            String event = args[cursor++];
+            switch (event) {
+                case "press" -> {
+                    Point point = new Point(parse(args[cursor]), parse(args[cursor + 1]));
+                    cursor += 2;
+                    textCreateOrSelectPressed(texts, state, point);
+                }
+                case "drag" -> {
+                    Point point = new Point(parse(args[cursor]), parse(args[cursor + 1]));
+                    cursor += 2;
+                    textDragSelected(texts, state, point);
+                }
+                case "delete" -> {
+                    Point point = new Point(parse(args[cursor]), parse(args[cursor + 1]));
+                    cursor += 2;
+                    textDeleteAt(texts, state, point);
+                }
+                case "box" -> {
+                    Point first = new Point(parse(args[cursor]), parse(args[cursor + 1]));
+                    Point second = new Point(parse(args[cursor + 2]), parse(args[cursor + 3]));
+                    cursor += 4;
+                    textDeleteBox(texts, state, first, second);
+                }
+                default -> usage("unknown text event: " + event);
+            }
+        }
+        if (cursor != args.length) {
+            usage("text-sequence payload length mismatch");
+        }
+
+        printTextState(texts, state);
+    }
+
+    private static void textCreateOrSelectPressed(List<Text> texts, OracleTextState state, Point point) {
+        if (state.isSelected) {
+            if (!trySelectText(texts, state, point)) {
+                state.isSelected = false;
+                if (state.dirty) {
+                    state.dirty = false;
+                }
+            }
+        } else {
+            selectOrCreateText(texts, state, point);
+        }
+        state.selectionStart = point;
+    }
+
+    private static void textDragSelected(List<Text> texts, OracleTextState state, Point point) {
+        if (!state.isSelected || state.selected < 0 || state.selected >= texts.size() || state.selectionStart == null) {
+            return;
+        }
+        Text text = texts.get(state.selected);
+        text.setY(text.getY() + point.getY() - state.selectionStart.getY());
+        text.setX(text.getX() + point.getX() - state.selectionStart.getX());
+        state.dirty = true;
+        state.selectionStart = point;
+    }
+
+    private static boolean textDeleteAt(List<Text> texts, OracleTextState state, Point point) {
+        int nearest = findNearestText(texts, state, point);
+        if (nearest == -1) {
+            return false;
+        }
+        texts.remove(nearest);
+        reconcileDeletedText(state, nearest);
+        state.dirty = false;
+        return true;
+    }
+
+    private static int textDeleteBox(List<Text> texts, OracleTextState state, Point first, Point second) {
+        Rectangle selection = textSelectionRectangle(first, second);
+        List<Integer> deleted = new ArrayList<>();
+        for (int index = 0; index < texts.size(); index++) {
+            Rectangle bounds = textDeleteBounds(texts.get(index));
+            if (selection.contains(bounds) || selection.intersects(bounds) || bounds.contains(selection)) {
+                deleted.add(index);
+            }
+        }
+
+        for (int index = deleted.size() - 1; index >= 0; index--) {
+            int deletedIndex = deleted.get(index);
+            texts.remove(deletedIndex);
+            reconcileDeletedText(state, deletedIndex);
+        }
+        if (!deleted.isEmpty()) {
+            state.dirty = false;
+        }
+        return deleted.size();
+    }
+
+    private static void selectOrCreateText(List<Text> texts, OracleTextState state, Point point) {
+        if (!trySelectText(texts, state, point)) {
+            if (state.isSelected && state.dirty) {
+                state.dirty = false;
+            }
+            texts.add(new Text(point.getX(), point.getY(), ""));
+            state.selected = texts.size() - 1;
+        }
+        state.isSelected = true;
+    }
+
+    private static boolean trySelectText(List<Text> texts, OracleTextState state, Point point) {
+        int nearest = findNearestText(texts, state, point);
+        if (nearest == -1) {
+            return false;
+        }
+        if (state.isSelected && state.selected != nearest && state.dirty) {
+            state.dirty = false;
+        }
+        state.selected = nearest;
+        return true;
+    }
+
+    private static int findNearestText(List<Text> texts, OracleTextState state, Point point) {
+        double minDist = 100000000.0;
+        int nearest = -1;
+        java.awt.Point awtPoint = new java.awt.Point((int) point.getX(), (int) point.getY());
+        for (int index = 0; index < texts.size(); index++) {
+            Text text = texts.get(index);
+            Rectangle bounds = textSelectionBounds(text, state.isSelected && state.selected == index);
+            if (bounds.contains(awtPoint)) {
+                double distance = point.distance(text.getPos());
+                if (distance < minDist) {
+                    minDist = distance;
+                    nearest = index;
+                }
+            }
+        }
+        return nearest;
+    }
+
+    private static void reconcileDeletedText(OracleTextState state, int deletedIndex) {
+        if (state.selected == deletedIndex) {
+            state.selected = -1;
+            state.isSelected = false;
+        } else if (deletedIndex < state.selected) {
+            state.selected--;
+        }
+    }
+
+    private static Rectangle textSelectionBounds(Text text, boolean selected) {
+        Point pos = text.getPos();
+        Rectangle bounds = text.calculateBounds();
+        int selectionRadius = selected ? 7 : 1;
+        bounds.setLocation((int) pos.getX() - 3 - selectionRadius, (int) pos.getY() - 10 - selectionRadius);
+        bounds.setSize(bounds.width + 8 + selectionRadius * 5, bounds.height + 10 + selectionRadius * 5);
+        return bounds;
+    }
+
+    private static Rectangle textDeleteBounds(Text text) {
+        Rectangle bounds = text.calculateBounds();
+        Point pos = text.getPos();
+        bounds.setLocation((int) pos.getX(), (int) pos.getY());
+        return bounds;
+    }
+
+    private static Rectangle textSelectionRectangle(Point first, Point second) {
+        if (first.getX() > second.getX()) {
+            double tmp = first.getX();
+            first = first.withX(second.getX());
+            second = second.withX(tmp);
+        }
+        if (first.getY() > second.getY()) {
+            double tmp = first.getY();
+            first = first.withY(second.getY());
+            second = second.withY(tmp);
+        }
+        return new Rectangle(
+                (int) first.getX(),
+                (int) first.getY(),
+                (int) (second.getX() - first.getX()),
+                (int) (second.getY() - first.getY()));
+    }
+
     private static Save defaultMoleculeSave(String path) throws Exception {
         String json = Files.readString(new File(path).toPath());
         List<Point> vertices = parsePointPairs(extractJsonArray(json, "vertices_coords"));
@@ -4210,6 +4412,21 @@ public class OrieditaGeometryOracle {
         }
     }
 
+    private static void printTextState(List<Text> texts, OracleTextState state) {
+        boolean hasStart = state.selectionStart != null;
+        System.out.println("textstate|"
+                + state.selected + "|"
+                + state.isSelected + "|"
+                + state.dirty + "|"
+                + hasStart + "|"
+                + (hasStart ? state.selectionStart.getX() : 0.0) + "|"
+                + (hasStart ? state.selectionStart.getY() : 0.0));
+        System.out.println("texts|" + texts.size());
+        for (Text text : texts) {
+            System.out.println("text|" + text.getX() + "|" + text.getY() + "|" + text.getText());
+        }
+    }
+
     private static Polygon polygon(String[] args, int offset, int count) {
         List<Point> points = new ArrayList<>();
         for (int index = 0; index < count; index++) {
@@ -4531,6 +4748,7 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle foldline-voronoi <selectionDistance> <color> <apply> <lineCount> [ax ay bx by color]... <circleCount> [cx cy r color]... <pointCount> [x y]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-default-molecule <resourcePath> <color> <p1x> <p1y> <p2x> <p2y> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle flat-foldable-boundary-check <boundaryCount> [ax ay bx by color]... <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle text-sequence <selectedIndex|-1> <selected> <dirty> <textCount> [x y text]... <eventCount> [press|drag|delete x y | box x1 y1 x2 y2]...");
         System.err.println("   or: OrieditaGeometryOracle measure-length <ax> <ay> <bx> <by>");
         System.err.println("   or: OrieditaGeometryOracle measure-angle <ax> <ay> <centerX> <centerY> <bx> <by>");
         System.err.println("   or: OrieditaGeometryOracle custom-line-type <customType> <lineColor>");

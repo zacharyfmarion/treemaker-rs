@@ -194,7 +194,7 @@ stage explicitly changes it.
 | `DELETE_LINE_TYPE_SELECT_73` | `MouseHandlerDeleteTypeSelect` | `operations::color::delete_line_type_for_indices` | kernel | 6 | Oracle-tested |
 | `SELECT_LASSO_74` | `MouseHandlerSelectLasso` | `operations::selection::select_lasso` | kernel | 6 | Oracle-tested |
 | `UNSELECT_LASSO_75` | `MouseHandlerUnselectLasso` | `operations::selection::unselect_lasso` | kernel | 6 | Oracle-tested |
-| `TEXT` | `MouseHandlerText` | `model::text`, `operations::text` | kernel | 3, 4 | Unsupported |
+| `TEXT` | `MouseHandlerText` | `model::text`, `operations::text` | kernel | 3, 6 | Oracle-tested |
 | `DRAW_BLINTZ` | `MouseHandlerDrawBlintz` | `operations::generators::default_molecule` | kernel | 8 | Oracle-tested |
 | `DRAW_FISH_BASE` | `MouseHandlerDrawFishBase` | `operations::generators::default_molecule` | kernel | 8 | Oracle-tested |
 | `DRAW_DOVE_BASE` | `MouseHandlerDrawDoveBase` | `operations::generators::default_molecule` | kernel | 8 | Oracle-tested |

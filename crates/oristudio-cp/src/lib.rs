@@ -7,6 +7,8 @@
 
 pub mod canonical;
 pub mod checks;
+mod fold_graph;
+pub mod folding;
 pub mod geometry;
 pub mod io;
 pub mod model;
@@ -1255,14 +1257,14 @@ mod tests {
 
         let error = execute_command(
             &mut document,
-            CreasePatternCommand::new(OperationId::DrawCreaseFree),
+            CreasePatternCommand::new(OperationId::FoldingEstimate),
         )
         .expect_err("stage one operations should be unsupported");
 
         assert_eq!(
             error,
             CommandError::UnsupportedOperation {
-                operation: OperationId::DrawCreaseFree,
+                operation: OperationId::FoldingEstimate,
             }
         );
         assert_eq!(document, original);

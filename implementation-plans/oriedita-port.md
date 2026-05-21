@@ -1146,6 +1146,14 @@ Deliverables:
 - Add custom constraint support.
 - Add two-color crease-pattern generation.
 - Add another-overlap and duplicate-folded-model behavior.
+- Status: the reusable `fold_graph` topology layer now backs both FOLD export
+  and folding preparation. The first Oriedita `WireFrame_Worker` pass is ported
+  as `folding::estimate_wireframe*`, including starting-face resolution,
+  adjacent face-position propagation, and folded wireframe vertex coordinates,
+  with direct oracle validation through `wireframe-folding-summary`.
+  Subface subdivision, hierarchy constraints, overlap ordering, full
+  `FoldingEstimateTask`, full `TwoColoredTask`, and folded-model mutation
+  commands remain intentionally unsupported until their stages are ported.
 
 Oracle:
 
@@ -1156,7 +1164,8 @@ Oracle:
 
 Validation:
 
-- `cargo test -p oristudio-cp folding`
+- `cargo test -p oristudio-cp --test folding`
+- `ORIEDITA_GEOMETRY_ORACLE=... cargo test -p oristudio-cp --test oriedita_folding_oracle`
 - `cargo test -p treemaker-flatfold`
 - `ORIEDITA_ORACLE=... cargo test -p oracle-tests --test oriedita_oracle folding`
 

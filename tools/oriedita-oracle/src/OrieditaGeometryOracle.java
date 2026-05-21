@@ -292,6 +292,7 @@ public class OrieditaGeometryOracle {
             case "obj-import-summary" -> objImportSummary(args);
             case "dxf-export-fixture" -> dxfExportFixture(args);
             case "fold-topology-summary" -> foldTopologySummary(args);
+            case "wireframe-folding-summary" -> wireframeFoldingSummary(args);
             default -> usage("unknown command: " + args[0]);
         }
     }
@@ -4513,6 +4514,48 @@ public class OrieditaGeometryOracle {
         }
     }
 
+    private static void wireframeFoldingSummary(String[] args) throws Exception {
+        if (args.length < 3) {
+            usage("wireframe-folding-summary expects starting face, count, and segment payload");
+        }
+
+        int startingFace = Integer.parseInt(args[1]);
+        int count = Integer.parseInt(args[2]);
+        LineSegmentSet set = lineSegmentSet(args, 3, count);
+        WireFrame_Worker worker = new WireFrame_Worker(3.0);
+        worker.setLineSegmentSet(set);
+        int resolvedStartingFace = worker.setStartingFaceId(startingFace);
+        PointSet folded = worker.folding();
+        printWireframeSummary(folded, worker, resolvedStartingFace);
+    }
+
+    private static void printWireframeSummary(
+            PointSet pointSet,
+            WireFrame_Worker worker,
+            int startingFace) {
+        System.out.println("wireframe|"
+                + pointSet.getNumPoints() + "|"
+                + pointSet.getNumLines() + "|"
+                + pointSet.getNumFaces() + "|"
+                + (startingFace - 1));
+        for (int i = 1; i <= pointSet.getNumPoints(); i++) {
+            Point point = pointSet.getPoint(i);
+            System.out.println("vertex|" + (i - 1) + "|" + point.getX() + "|" + point.getY());
+        }
+        for (int i = 1; i <= pointSet.getNumLines(); i++) {
+            System.out.println("edge|"
+                    + (i - 1) + "|"
+                    + (pointSet.getBegin(i) - 1) + "|"
+                    + (pointSet.getEnd(i) - 1) + "|"
+                    + pointSet.getColor(i).getNumber());
+        }
+        for (int i = 1; i <= pointSet.getNumFaces(); i++) {
+            origami.folding.element.Face face = pointSet.getFace(i);
+            System.out.println("face|" + (i - 1) + "|" + oracleFacePoints(face));
+            System.out.println("face_position|" + (i - 1) + "|" + worker.getIFacePosition(i));
+        }
+    }
+
     private static String oracleFacePoints(origami.folding.element.Face face) {
         StringBuilder output = new StringBuilder();
         for (int i = 1; i <= face.getNumPoints(); i++) {
@@ -5320,6 +5363,7 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle obj-import-summary <path>");
         System.err.println("   or: OrieditaGeometryOracle dxf-export-fixture");
         System.err.println("   or: OrieditaGeometryOracle fold-topology-summary <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle wireframe-folding-summary <startingFace> <count> [ax ay bx by color]...");
         System.exit(2);
     }
 }

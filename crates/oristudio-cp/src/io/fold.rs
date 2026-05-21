@@ -1,7 +1,6 @@
 use super::{IoError, Result};
-use crate::geometry::{
-    Circle, LineColor, LineSegment, Point, Polygon, angle, equal, point_rotate_scaled,
-};
+use crate::fold_graph::FoldGraph;
+use crate::geometry::{Circle, LineColor, LineSegment, Point, angle, point_rotate_scaled};
 use crate::model::{
     CreasePatternModel, GridState, TextElement, custom_color_from_hex, custom_color_hex,
     fold_angle_for_line_color, fold_assignment_for_line_color, line_color_for_fold_assignment,
@@ -52,7 +51,7 @@ pub fn import_fold_document(fold: &FoldDocument) -> Result<CreasePatternModel> {
 
 /// Export a FOLD document with Oriedita extension fields.
 pub fn export_fold_document(model: &CreasePatternModel, title: Option<String>) -> FoldDocument {
-    let topology = export_topology(model);
+    let topology = FoldGraph::from_model_for_export(model);
     let mut assignments = Vec::new();
     let mut fold_angles = Vec::new();
     let mut edge_custom_colors = Vec::new();
@@ -69,11 +68,11 @@ pub fn export_fold_document(model: &CreasePatternModel, title: Option<String>) -
 
     let mut fold = FoldDocument::new(
         topology
-            .vertices
+            .points
             .iter()
             .map(|point| vec![point.x, point.y])
             .collect(),
-        topology.edges,
+        topology.edges_vertices(),
     );
     fold.file_spec = Some(1.1);
     fold.file_creator = Some("oriedita".to_string());
@@ -81,8 +80,8 @@ pub fn export_fold_document(model: &CreasePatternModel, title: Option<String>) -
     fold.edges_assignment = assignments;
     fold.edges_fold_angle = fold_angles;
     if topology.include_faces {
-        fold.faces_vertices = topology.faces_vertices;
-        fold.faces_edges = topology.faces_edges;
+        fold.faces_vertices = topology.faces.clone();
+        fold.faces_edges = topology.faces_edges();
     }
 
     fold.extra.insert(
@@ -111,248 +110,6 @@ pub fn export_fold_json(model: &CreasePatternModel, title: Option<String>) -> Re
     Ok(serde_json::to_string_pretty(&export_fold_document(
         model, title,
     ))?)
-}
-
-#[derive(Debug, Clone)]
-struct ExportTopology {
-    segments: Vec<LineSegment>,
-    vertices: Vec<Point>,
-    edges: Vec<[usize; 2]>,
-    include_faces: bool,
-    faces_vertices: Vec<Vec<usize>>,
-    faces_edges: Vec<Vec<usize>>,
-}
-
-fn export_topology(model: &CreasePatternModel) -> ExportTopology {
-    let segments = if model.line_segments.is_empty() {
-        vec![LineSegment::with_color(
-            Point::new(0.0, 0.0),
-            Point::new(0.0, 0.0),
-            LineColor::Black0,
-        )]
-    } else {
-        model.line_segments.clone()
-    };
-
-    let mut vertices = Vec::new();
-    let mut edges = Vec::with_capacity(segments.len());
-    for segment in &segments {
-        let a = topology_vertex_index(&mut vertices, segment.a);
-        let b = topology_vertex_index(&mut vertices, segment.b);
-        edges.push([a, b]);
-    }
-
-    let (include_faces, faces_vertices, faces_edges) = topology_faces(&vertices, &edges);
-
-    ExportTopology {
-        segments,
-        vertices,
-        edges,
-        include_faces,
-        faces_vertices,
-        faces_edges,
-    }
-}
-
-fn topology_vertex_index(vertices: &mut Vec<Point>, point: Point) -> usize {
-    if let Some(index) = vertices
-        .iter()
-        .position(|candidate| equal(*candidate, point))
-    {
-        return index;
-    }
-
-    vertices.push(point);
-    vertices.len() - 1
-}
-
-fn topology_faces(
-    vertices: &[Point],
-    edges: &[[usize; 2]],
-) -> (bool, Vec<Vec<usize>>, Vec<Vec<usize>>) {
-    let mut point_linking = vec![Vec::<usize>::new(); vertices.len()];
-    for edge in edges {
-        if edge[0] < point_linking.len() && edge[1] < point_linking.len() {
-            point_linking[edge[0]].push(edge[1]);
-            point_linking[edge[1]].push(edge[0]);
-        }
-    }
-
-    let mut face_point_map = vec![Vec::<usize>::new(); vertices.len()];
-    let mut faces = Vec::<Vec<usize>>::new();
-
-    for edge in edges {
-        let begin = edge[0];
-        let end = edge[1];
-
-        let forward = topology_face_request(begin, end, vertices, &point_linking);
-        if topology_should_add_face(&forward, begin, vertices, &faces, &face_point_map) {
-            topology_add_face(forward, &mut faces, &mut face_point_map);
-        }
-
-        let reverse = topology_face_request(end, begin, vertices, &point_linking);
-        if topology_should_add_face(&reverse, begin, vertices, &faces, &face_point_map) {
-            topology_add_face(reverse, &mut faces, &mut face_point_map);
-        }
-    }
-
-    let euler = faces.len() as isize - edges.len() as isize + vertices.len() as isize;
-    let include_faces = euler == 1 || (euler - 1).abs() as f64 <= 0.005 * faces.len() as f64;
-    if !include_faces {
-        return (false, Vec::new(), Vec::new());
-    }
-
-    let faces_edges = faces
-        .iter()
-        .map(|face| topology_face_edges(face, edges))
-        .collect();
-
-    (true, faces, faces_edges)
-}
-
-fn topology_face_request(
-    start: usize,
-    end: usize,
-    vertices: &[Point],
-    point_linking: &[Vec<usize>],
-) -> Vec<usize> {
-    if start >= vertices.len() || end >= vertices.len() {
-        return Vec::new();
-    }
-
-    let mut face = vec![start, end];
-    let mut next = topology_r_point(start, end, vertices, point_linking);
-    let mut added_after_seed = false;
-
-    loop {
-        let Some(next_point) = next else {
-            if added_after_seed {
-                // Oriedita `Face` stores a sentinel point id 0; after at least
-                // one added vertex, falling off a dangling branch still returns
-                // the partial face because that sentinel is "contained".
-                topology_align_face(&mut face);
-                return face;
-            }
-            return Vec::new();
-        };
-        if face.contains(&next_point) {
-            topology_align_face(&mut face);
-            return face;
-        }
-
-        face.push(next_point);
-        added_after_seed = true;
-        let count = face.len();
-        next = topology_r_point(face[count - 2], face[count - 1], vertices, point_linking);
-    }
-}
-
-fn topology_r_point(
-    previous: usize,
-    current: usize,
-    vertices: &[Point],
-    point_linking: &[Vec<usize>],
-) -> Option<usize> {
-    let linked_points = point_linking.get(current)?;
-    if !point_linking
-        .get(previous)
-        .is_some_and(|linked| linked.contains(&current))
-    {
-        return None;
-    }
-
-    let mut result = None;
-    let mut best_angle = 876.0;
-    for candidate in linked_points {
-        if *candidate == previous {
-            continue;
-        }
-        let candidate_angle = angle((
-            vertices[current],
-            vertices[previous],
-            vertices[current],
-            vertices[*candidate],
-        ));
-        if candidate_angle <= best_angle {
-            result = Some(*candidate);
-            best_angle = candidate_angle;
-        }
-    }
-
-    result
-}
-
-fn topology_align_face(face: &mut Vec<usize>) {
-    let Some(minimum) = face.iter().copied().min() else {
-        return;
-    };
-    while face.first().copied() != Some(minimum) {
-        let first = face.remove(0);
-        face.push(first);
-    }
-}
-
-fn topology_should_add_face(
-    face: &[usize],
-    begin: usize,
-    vertices: &[Point],
-    faces: &[Vec<usize>],
-    face_point_map: &[Vec<usize>],
-) -> bool {
-    if face.is_empty()
-        || topology_face_area(face, vertices) <= 0.0
-        || face_point_map
-            .get(begin)
-            .is_some_and(|existing| existing.iter().any(|index| faces[*index] == face))
-    {
-        return false;
-    }
-
-    true
-}
-
-fn topology_add_face(
-    face: Vec<usize>,
-    faces: &mut Vec<Vec<usize>>,
-    face_point_map: &mut [Vec<usize>],
-) {
-    let face_index = faces.len();
-    for point in &face {
-        if let Some(entries) = face_point_map.get_mut(*point) {
-            entries.push(face_index);
-        }
-    }
-    faces.push(face);
-}
-
-fn topology_face_area(face: &[usize], vertices: &[Point]) -> f64 {
-    let points = face
-        .iter()
-        .filter_map(|index| vertices.get(*index).copied())
-        .collect::<Vec<_>>();
-    Polygon::new(points).calculate_area()
-}
-
-fn topology_face_edges(face: &[usize], edges: &[[usize; 2]]) -> Vec<usize> {
-    if face.is_empty() {
-        return Vec::new();
-    }
-
-    let mut face_edges = Vec::with_capacity(face.len());
-    let first = face[0];
-    let last = face[face.len() - 1];
-    face_edges.push(topology_find_edge(first, last, edges));
-    for index in 1..face.len() {
-        face_edges.push(topology_find_edge(face[index], face[index - 1], edges));
-    }
-    face_edges
-}
-
-fn topology_find_edge(a: usize, b: usize, edges: &[[usize; 2]]) -> usize {
-    edges
-        .iter()
-        .position(|edge| (edge[0] == a && edge[1] == b) || (edge[0] == b && edge[1] == a))
-        .unwrap_or(usize::MAX)
 }
 
 fn vertex_point(fold: &FoldDocument, index: usize) -> Result<Point> {

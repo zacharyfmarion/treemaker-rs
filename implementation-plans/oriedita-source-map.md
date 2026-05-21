@@ -72,14 +72,14 @@ stage explicitly changes it.
 | `origami/crease_pattern/CustomLineTypes.java` | Custom line metadata. | `model::line_color` | kernel | 3 | Oracle-tested |
 | `origami/crease_pattern/FoldLineSet.java` | Main editable line/circle set. | `model`, `operations::*` | kernel | 3-9 | Porting |
 | `origami/crease_pattern/LineSegmentSet.java` | Line arrangement set used for folding and export. | `fold_graph`, `operations::arrangement` | kernel | 3-5 | Porting |
-| `origami/crease_pattern/PointSet.java` | Vertex/edge/face topology for folding/export. | `io::fold::export_topology`, `fold_graph` | kernel | 3-4, 10 | Porting; FOLD topology oracle |
+| `origami/crease_pattern/PointSet.java` | Vertex/edge/face topology for folding/export. | `io::fold::export_topology`, `fold_graph` | kernel | 3-4, 10 | Porting; FOLD topology and wireframe oracle |
 | `origami/crease_pattern/PointLineMap.java` | Point-to-line neighborhood lookup. | `model::topology` | kernel | 3 | Unsupported |
 | `origami/crease_pattern/FlatFoldabilityViolation.java` | Diagnostic payload. | `checks::diagnostic` | kernel | 9 | Oracle-tested |
 | `origami/crease_pattern/LittleBigLittleViolation.java` | Diagnostic payload. | `checks::diagnostic` | kernel | 9 | Oracle-tested |
 | `origami/crease_pattern/LassoInteractionMode.java` | Lasso selection mode. | `operations::selection::LassoInteractionMode` | kernel | 6 | Oracle-tested |
 | `origami/crease_pattern/FoldingException.java` | Folding error surface. | `folding::error` | kernel | 10 | Unsupported |
 | `origami/crease_pattern/util/CreasePattern_Worker_Toolbox.java` | Shared CP worker helpers. | `operations::*` | kernel | 5-9 | Unsupported |
-| `origami/crease_pattern/worker/WireFrame_Worker.java` | Face/topology/folding preparation. | `io::fold::export_topology`, `fold_graph`, `folding` | kernel | 4, 10 | Porting; FOLD topology oracle |
+| `origami/crease_pattern/worker/WireFrame_Worker.java` | Face/topology/folding preparation. | `io::fold::export_topology`, `fold_graph`, `folding` | kernel | 4, 10 | Porting; FOLD topology and wireframe oracle |
 | `origami/crease_pattern/worker/LineSegmentSetWorker.java` | Arrangement cleanup for folded subfaces. | `folding`, `operations::arrangement` | kernel | 5, 10 | Unsupported |
 | `origami/crease_pattern/worker/FoldedFigure_Worker.java` | Folded-model hierarchy and overlap solving. | `folding` | kernel | 10 | Unsupported |
 | `origami/crease_pattern/worker/FoldedFigure_Configurator.java` | Subface and hierarchy setup. | `folding` | kernel | 10 | Unsupported |

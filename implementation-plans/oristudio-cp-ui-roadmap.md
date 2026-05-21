@@ -53,10 +53,14 @@ The first complete product target is:
 
 The Crease Pattern pane should grow into three coordinated regions:
 
-- Canvas: pan, zoom, selection, snapping, command previews, diagnostics, and
-  live CP geometry.
-- Tool rail or compact toolbar: grouped Oriedita command families with
-  progressive disclosure for less common tools.
+- Canvas: the landed pane viewport already owns pan, zoom, fit, zoom presets,
+  1:1, keyboard zoom, and space-drag panning. The roadmap should preserve that
+  baseline while adding selection, snapping, command previews, diagnostics, and
+  live editable CP geometry.
+- Left tool rail: the main Oriedita-style command rail should live on the left
+  side of the CP pane. It should be icon-first, vertically grouped, and stable
+  while the viewport pans or zooms. Overflow, command search, and inspector
+  controls can supplement it, but they should not replace the primary left rail.
 - Inspector/status region: selected entity properties, active tool options,
   command prompts, validation messages, and operation results.
 
@@ -86,11 +90,11 @@ UX work:
   - Check and fix.
   - Fold estimate and folded figure.
   - File import/export.
-- Define icon, tooltip, keyboard shortcut, and command-palette labels for every
-  command, including disabled commands.
-- Decide which operations appear in the default toolbar versus overflow menus
-  or command search. Oriedita has too many modes to expose as a flat wall of
-  buttons without making the pane slower to use.
+- Define the left-rail placement, grouping, icon, tooltip, keyboard shortcut,
+  and command-palette label for every command, including disabled commands.
+- Decide which operations appear in the always-visible left rail versus
+  overflow menus or command search. Oriedita has too many modes to expose as a
+  single ungrouped wall of buttons without making the pane slower to use.
 
 Technical work:
 
@@ -160,12 +164,15 @@ Done when:
 
 Intent:
 
-- Replace the current static SVG viewer with an editing-grade viewport.
+- Extend the zoomable CP viewport that landed on `main` into an editing-grade
+  viewport. The current baseline already includes `react-zoom-pan-pinch`, fit,
+  zoom in/out, zoom presets, 1:1, keyboard shortcuts, auto-fit on loaded CPs,
+  and space-drag panning.
 
 UX work:
 
-- Add pan, zoom, fit-to-pattern, zoom-to-selection, reset view, grid visibility,
-  paper bounds, and optional rulers.
+- Preserve the landed pan/zoom/fit behavior and add zoom-to-selection, reset
+  view, grid visibility, editable paper bounds, and optional rulers.
 - Support selection for lines, vertices, facets/faces, circles, text, and
   folded-figure elements where applicable.
 - Support click, shift/meta multi-select, box select, lasso-ready gesture
@@ -178,7 +185,10 @@ UX work:
 
 Technical work:
 
-- Introduce a CP viewport model independent from the TreeMaker design viewport.
+- Build on the existing `CreasePatternPanel`, `ViewportToolbar`, and
+  `react-zoom-pan-pinch` wiring instead of replacing it.
+- Introduce editable CP viewport state independent from the TreeMaker design
+  viewport.
 - Add hit testing and spatial indexing for large patterns.
 - Decide rendering layers:
   - SVG is acceptable for small-to-medium editable documents and semantic hit
@@ -190,6 +200,8 @@ Technical work:
 
 Validation:
 
+- Keep the existing CP viewport tests for zoom controls, fit, keyboard
+  shortcuts, and space-pan behavior green.
 - Unit-test selection reducers and history granularity.
 - Add Playwright or browser-plugin visual checks for zoom, pan, fit, selection,
   hover, disabled commands, and grid toggles.
@@ -209,8 +221,14 @@ Intent:
 
 UX work:
 
+- Add the primary tool shell as a left-side vertical rail inside the CP pane,
+  following Oriedita's spatial convention while using Ori Studio's visual
+  language.
 - Add compact tool groups with icons and tooltips. Use text labels only where
   the command would otherwise be ambiguous.
+- Keep viewport zoom controls separate from the main command rail. The current
+  bottom viewport toolbar can remain focused on navigation unless later testing
+  shows it conflicts with editing handles.
 - Add a command search/palette entrypoint for rare Oriedita commands.
 - Add active-tool option controls in the inspector/status area:
   - line color,
@@ -448,7 +466,7 @@ UX work:
 - Add folded-figure session state with visible solution number, face count,
   subface count, warning status, and whether another solution is available.
 - Reuse or extend the existing Folded Base pane for folded-figure previews
-  rather than hiding results inside the CP toolbar.
+  rather than hiding results inside the CP command rail.
 - Make `Another solution` disabled only when the kernel says no next solution
   exists, not merely because the UI has lost session state.
 - Treat Save 100 carefully:
@@ -516,8 +534,8 @@ Validation:
 
 Done when:
 
-- CP editing works through toolbar, menu, keyboard, and desktop shell paths with
-  one shared command implementation.
+- CP editing works through the left rail, menu, keyboard, and desktop shell
+  paths with one shared command implementation.
 
 ### Stage 11: Visual And Oracle Validation Harness
 
@@ -566,9 +584,11 @@ Done when:
 - Rendering backend: begin with the current SVG mental model, but measure large
   documents early. Move to hybrid canvas/SVG if hit testing or repaint costs
   make SVG unsuitable.
+- Navigation controls: keep the landed bottom viewport toolbar as the navigation
+  surface. The left rail is for CP editing commands, not zoom presets.
 - Document mode: keep TreeMaker design documents and editable CP documents
   explicit. Avoid silently converting generated CPs into editable CP files.
-- Toolbar density: expose all commands, but use groups, overflow, command
+- Left-rail density: expose all commands, but use groups, overflow, command
   search, and disabled explanations so the pane remains usable.
 - Folding UI ownership: CP pane owns fold-estimate commands; Folded Base pane
   should own folded preview inspection when a folded result exists.
@@ -576,6 +596,7 @@ Done when:
 ## Affected Areas
 
 - `apps/web/src/components/panels/CreasePatternPanel.tsx`
+- `apps/web/src/components/panels/ViewportToolbar.tsx`
 - `apps/web/src/components/panels/FoldedBasePanel.tsx`
 - `apps/web/src/components/panels/InspectorPanel.tsx`
 - `apps/web/src/components/panels/DiagnosticsPanel.tsx`
@@ -587,6 +608,7 @@ Done when:
 - `apps/web/src/lib/creaseExport.ts`
 - `apps/web/src/lib/selection.ts`
 - `apps/web/src/lib/geometry.ts`
+- `apps/web/src/lib/designViewport.ts`
 - `apps/web/src/engine/*`
 - `apps/web/src/workers/*`
 - `apps/web/src/generated/*`
@@ -601,18 +623,20 @@ Done when:
 ## Checklist
 
 - [ ] Stage 0: Build the CP UI command matrix from the Oriedita source map.
-- [ ] Stage 0: Assign every upstream command a toolbar/menu/palette home or an
+- [ ] Stage 0: Assign every upstream command a left-rail/menu/palette home or an
       explicit UI-only/out-of-scope reason.
 - [ ] Stage 0: Add capability and disabled-state vocabulary for CP commands.
 - [ ] Stage 1: Add the `oristudio-cp` web runtime bridge.
 - [ ] Stage 1: Add editable CP document state separate from generated
       TreeMaker CP artifacts.
 - [ ] Stage 1: Add command-result and unsupported-operation mapping.
-- [ ] Stage 2: Replace static CP viewing with edit-grade viewport state.
+- [x] Stage 2 baseline: Rebase onto the landed CP pane pan/zoom/fit viewport
+      work from `main`.
+- [ ] Stage 2: Extend the landed viewport with edit-grade CP viewport state.
 - [ ] Stage 2: Add CP selection, hit testing, snapping, history, and status UI.
 - [ ] Stage 2: Validate viewport behavior with unit and visual tests.
-- [ ] Stage 3: Add the tool shell, command groups, active-tool prompts, and
-      Not-implemented presentation.
+- [ ] Stage 3: Add the left-side tool rail, command groups, active-tool
+      prompts, and Not-implemented presentation.
 - [ ] Stage 3: Add CP tool-state transitions for multi-step commands.
 - [ ] Stage 4: Add CP open/import/save/export workflows and dirty-state
       handling.
@@ -636,8 +660,8 @@ Done when:
 - [ ] Stage 9: Validate folded-session command sequences and visual previews.
 - [ ] Stage 10: Add menus, shortcuts, desktop parity, accessibility, responsive
       behavior, and performance polish.
-- [ ] Stage 10: Validate shared command dispatch across toolbar, keyboard, web
-      menus, and Tauri menus.
+- [ ] Stage 10: Validate shared command dispatch across left rail, keyboard,
+      web menus, and Tauri menus.
 - [ ] Stage 11: Add the fixture gallery or developer validation route.
 - [ ] Stage 11: Add scripted visual checks for canonical CP workflows.
 - [ ] Stage 11: Keep semantic oracle validation as the gate for marking any

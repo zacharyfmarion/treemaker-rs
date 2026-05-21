@@ -1,8 +1,9 @@
 use oristudio_cp::folding::{
     ChainPermutationGenerator, HierarchyRelation, InitialHierarchy, SubFacePermutationSearch,
-    SubFaceSwapper, additional_estimation_from_segments, configure_subfaces_from_segments,
-    equivalence_condition_candidates_from_segments, estimate_wireframe_from_segments,
-    folding_estimate_from_segments, initial_hierarchy_from_segments, overlap_search_from_segments,
+    SubFaceSwapper, WorkerOverlapEnumerator, additional_estimation_from_segments,
+    configure_subfaces_from_segments, equivalence_condition_candidates_from_segments,
+    estimate_wireframe_from_segments, folding_estimate_from_segments,
+    initial_hierarchy_from_segments, overlap_search_from_segments,
     overlap_search_from_segments_with_swap, possible_overlap_search_for_ordered_subfaces,
     possible_overlap_search_for_subfaces, possible_overlap_search_for_subfaces_with_swap,
     prepare_subface_segments, prioritize_subfaces, two_colored_subface_segments_from_segments,
@@ -373,6 +374,48 @@ fn worker_overlap_search_promotes_final_aea_error_subface() {
     assert!(search.found);
     assert_eq!(search.priority.valid_count, 3);
     assert_eq!(search.priority.ordered_subface_indices, vec![1, 2, 0]);
+}
+
+#[test]
+fn worker_overlap_enumerator_preserves_state_for_next_solution() {
+    let hierarchy = InitialHierarchy {
+        faces_total: 3,
+        relations: vec![HierarchyRelation {
+            upper_face: 2,
+            lower_face: 0,
+        }],
+    };
+    let subfaces = vec![
+        oristudio_cp::folding::SubFace {
+            face_ids: vec![0, 1],
+        },
+        oristudio_cp::folding::SubFace {
+            face_ids: vec![1, 2],
+        },
+        oristudio_cp::folding::SubFace {
+            face_ids: vec![0, 1, 2],
+        },
+    ];
+    let mut enumerator =
+        WorkerOverlapEnumerator::from_ordered_subfaces(&subfaces, &[0, 1, 2], 2, &hierarchy, None)
+            .expect("worker enumerator");
+
+    let first = enumerator
+        .possible_overlapping_search(true)
+        .expect("first overlap search");
+    assert!(first.found);
+    assert_eq!(first.priority.valid_count, 3);
+
+    let changed = enumerator
+        .next(enumerator.valid_count())
+        .expect("advance overlap search");
+    assert!(changed > 0);
+
+    let next = enumerator
+        .possible_overlapping_search(false)
+        .expect("next overlap search");
+    assert!(next.found);
+    assert_eq!(next.priority.valid_count, 3);
 }
 
 #[test]

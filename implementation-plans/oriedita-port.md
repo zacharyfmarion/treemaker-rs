@@ -1210,6 +1210,15 @@ Deliverables:
   `worker-overlap-search-swap-summary`, and
   `worker-overlap-ordered-summary` compare the resulting status, hierarchy,
   swap-order state, and final-recovery behavior.
+- Status: Worker overlap search state is now reusable across calls as
+  `folding::WorkerOverlapEnumerator`, matching the `FoldedFigure_Worker`
+  behavior required by `ORDER_6`, `foldAnother`, and save-100 enumeration. It
+  preserves SubFace permutation generators, swap-reordered valid subface order,
+  promoted valid counts, hierarchy guide maps, and Oriedita's `next(ss)`
+  advancement semantics. The oracle command
+  `worker-overlap-ordered-sequence-summary` compares a live Oriedita worker over
+  a search/next/search sequence rather than replaying independent one-shot
+  searches.
 - Status: The same worker searches are exposed from folded line segments as
   `folding::overlap_search_from_segments` and
   `folding::overlap_search_from_segments_with_swap`, running the folded
@@ -1234,7 +1243,8 @@ Deliverables:
   first order-5 overlap solution from a fresh folded figure. The oracle command
   `folding-estimate-summary` compares the task-level step, display style,
   discovered-case count, text result, and worker hierarchy snapshot. Stateful
-  `ORDER_6` "find another" enumeration and `FoldingEstimateSave100Task` batch
+  worker enumeration is available underneath this API, while `ORDER_6`
+  "find another" task/service wiring and `FoldingEstimateSave100Task` batch
   export remain separate command-layer stages.
 - Status: Oriedita's `SubFaceSwappingAlgorithm` support logic is ported as
   `folding::SubFaceSwapper`, including visited-subface tracking, dead-end

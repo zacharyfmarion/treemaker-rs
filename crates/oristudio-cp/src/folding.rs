@@ -11,8 +11,8 @@ use std::collections::HashMap;
 
 pub use permutation::{
     ChainPermutationGenerator, PermutationError, PermutationSnapshot, SubFacePermutationSearch,
-    SubFacePriority, SubFaceSearchError, SubFaceSwapper, WorkerOverlapSearch,
-    WorkerOverlapSearchError, possible_overlap_search_for_ordered_subfaces,
+    SubFacePriority, SubFaceSearchError, SubFaceSwapper, WorkerOverlapEnumerator,
+    WorkerOverlapSearch, WorkerOverlapSearchError, possible_overlap_search_for_ordered_subfaces,
     possible_overlap_search_for_subfaces, possible_overlap_search_for_subfaces_with_swap,
     prioritize_subfaces,
 };
@@ -478,8 +478,9 @@ pub fn additional_estimation_from_segments(
 
 /// Oriedita `FoldedFigure.folding_estimated(...)` stage summary for orders
 /// 0-5/51 from a fresh folded figure. This ports the non-UI stage transitions
-/// and the first overlap solution. Stateful "find another" enumeration for
-/// `ORDER_6` remains a separate command-layer stage.
+/// and the first overlap solution. Lower-level stateful overlap enumeration is
+/// available through `WorkerOverlapEnumerator`; `ORDER_6` remains a separate
+/// folded-figure command-layer stage.
 pub fn folding_estimate_from_segments(
     segments: &[LineSegment],
     starting_face_id: i32,

@@ -12,6 +12,7 @@ use oristudio_cp::operations::color::{
     change_crease_type, delete_line_type_for_indices, make_aux, make_edge, make_mountain,
     make_valley, replace_line_type_for_indices, set_line_color_for_indices, toggle_mountain_valley,
 };
+use oristudio_cp::operations::measure::{angle_between_three_points, length_between_points};
 use oristudio_cp::operations::point::{divide_segment_by_count, divide_segment_by_ratio};
 use oristudio_cp::operations::selection::{
     delete_selected_lines, select_all, select_box, select_connected_from_point, select_indices,
@@ -1129,6 +1130,37 @@ fn point_line_division_matches_oriedita_oracle() {
     assert_eq!(
         line_segment_set_summary(&zero_ratio_model),
         run_oracle(&oracle, &zero_ratio_args)
+    );
+}
+
+#[test]
+fn measure_commands_match_oriedita_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    let length_a = Point::new(0.0, 0.0);
+    let length_b = Point::new(3.0, 4.0);
+    let length = length_between_points(length_a, length_b);
+    let mut args = vec!["measure-length".to_string()];
+    push_points_args(&mut args, &[length_a, length_b]);
+    assert_eq!(
+        format!("length|{}\n", java_double_string(length)),
+        run_oracle(&oracle, &args)
+    );
+
+    let angle_a = Point::new(0.0, 1.0);
+    let angle_center = Point::new(0.0, 0.0);
+    let angle_b = Point::new(1.0, 0.0);
+    let angle = angle_between_three_points(angle_a, angle_center, angle_b);
+    let mut args = vec!["measure-angle".to_string()];
+    push_points_args(&mut args, &[angle_a, angle_center, angle_b]);
+    assert_eq!(
+        format!("angle|{}\n", java_double_string(angle)),
+        run_oracle(&oracle, &args)
     );
 }
 

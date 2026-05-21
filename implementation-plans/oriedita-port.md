@@ -924,6 +924,11 @@ Status:
   single-line delete-with-vertex-cleanup and box-resolved line deletion, but the
   handler remains `Porting` until circle deletion and separate aux-line storage
   deletion modes are covered.
+- The display measurement tools are ported as pure `operations::measure`
+  helpers. Both length slots share `length_between_points`; all three angle
+  slots share `angle_between_three_points`, preserving Oriedita's
+  `OritaCalc.angle(center, first, center, third)` orientation and 0-360 degree
+  range.
 - Full handler parity remains open for nearest-click line selection, Java2D
   path/lasso selection, operation-frame behavior, lengthen commands, and
   construction-handler `fix2` chaining that is not part of the selected color

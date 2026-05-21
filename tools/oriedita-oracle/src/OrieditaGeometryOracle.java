@@ -77,6 +77,8 @@ public class OrieditaGeometryOracle {
             case "foldline-extend-to-intersection" -> foldLineExtendToIntersection(args);
             case "foldline-divide-count" -> foldLineDivideCount(args);
             case "foldline-divide-ratio" -> foldLineDivideRatio(args);
+            case "measure-length" -> measureLength(args);
+            case "measure-angle" -> measureAngle(args);
             case "custom-line-type" -> customLineType(args);
             case "orh-import-summary" -> orhImportSummary(args);
             case "orh-export-fixture" -> orhExportFixture(args);
@@ -930,6 +932,27 @@ public class OrieditaGeometryOracle {
         printFoldLineSet(set);
     }
 
+    private static void measureLength(String[] args) {
+        if (args.length != 5) {
+            usage("measure-length expects two points");
+        }
+
+        Point a = new Point(parse(args[1]), parse(args[2]));
+        Point b = new Point(parse(args[3]), parse(args[4]));
+        System.out.println("length|" + a.distance(b));
+    }
+
+    private static void measureAngle(String[] args) {
+        if (args.length != 7) {
+            usage("measure-angle expects three points");
+        }
+
+        Point a = new Point(parse(args[1]), parse(args[2]));
+        Point center = new Point(parse(args[3]), parse(args[4]));
+        Point b = new Point(parse(args[5]), parse(args[6]));
+        System.out.println("angle|" + OritaCalc.angle(center, a, center, b));
+    }
+
     private static void orhImportSummary(String[] args) throws Exception {
         if (args.length != 2) {
             usage("orh-import-summary expects a file path");
@@ -1220,6 +1243,8 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle foldline-advance-type <index> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-alternate-mv <startColor> <guide ax ay bx by color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-alternate-mv-crossing <startColor> <guide ax ay bx by color> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle measure-length <ax> <ay> <bx> <by>");
+        System.err.println("   or: OrieditaGeometryOracle measure-angle <ax> <ay> <centerX> <centerY> <bx> <by>");
         System.err.println("   or: OrieditaGeometryOracle custom-line-type <customType> <lineColor>");
         System.err.println("   or: OrieditaGeometryOracle orh-import-summary <path>");
         System.err.println("   or: OrieditaGeometryOracle orh-export-fixture");

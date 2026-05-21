@@ -837,6 +837,11 @@ Status:
   oracle-tested. The point-based color-changing path preserves Oriedita's
   immutable-line stale-color quirk, while the direct pair/all variants use
   Oriedita's explicit color-combination matrix.
+- `Fix1.apply` and `Fix2.apply` are ported and oracle-tested for duplicate
+  repair, inaccurate-overlap selection marking, and near-T split insertion
+  order. The newer precision-data `FIX_INACCURATE_107` handler remains a
+  separate later task because it uses bundled binary correction tables and
+  selected-line box workflows rather than these `FoldLineSet` workers.
 - The current arrangement worker intentionally uses simple scans instead of
   Oriedita's quadtree acceleration. That keeps mutation parity visible first;
   spatial acceleration remains deferred until broader split/merge behavior is

@@ -3,8 +3,8 @@ use oristudio_cp::model::CreasePatternModel;
 use oristudio_cp::operations::arrangement::{
     branch_trim, del_v_all, del_v_all_color_change, del_v_at_point, del_v_at_point_color_change,
     del_v_pair, delete_intersecting_or_overlapping_lines_along, delete_overlapping_lines_along,
-    divide_intersections, divide_intersections_fast, divide_line_segment_with_new_lines,
-    intersect_divide_pair, remove_overlapping_lines, remove_overlapping_lines_with_precision,
+    divide_intersections, divide_intersections_fast, divide_line_segment_with_new_lines, fix1,
+    fix2, intersect_divide_pair, remove_overlapping_lines, remove_overlapping_lines_with_precision,
 };
 use std::collections::BTreeSet;
 
@@ -530,6 +530,72 @@ fn branch_trim_matches_oriedita_restart_quirk_for_dangling_chain() {
         &model.line_segments[0],
         Point::new(10.0, 0.0),
         Point::new(20.0, 0.0),
+        LineColor::Red1,
+    );
+}
+
+#[test]
+fn fix1_deletes_exact_duplicate_and_uses_later_color() {
+    let mut model = CreasePatternModel::default();
+    model.add_line(Point::new(0.0, 0.0), Point::new(10.0, 0.0), LineColor::Red1);
+    model.add_line(
+        Point::new(10.0, 0.0),
+        Point::new(0.0, 0.0),
+        LineColor::Blue2,
+    );
+
+    assert!(fix1(&mut model));
+
+    assert_eq!(model.line_segments.len(), 1);
+    assert_segment(
+        &model.line_segments[0],
+        Point::new(0.0, 0.0),
+        Point::new(10.0, 0.0),
+        LineColor::Blue2,
+    );
+}
+
+#[test]
+fn fix1_selects_partially_overlapping_non_cyan_lines() {
+    let mut model = CreasePatternModel::default();
+    model.add_line(Point::new(0.0, 0.0), Point::new(10.0, 0.0), LineColor::Red1);
+    model.add_line(
+        Point::new(5.0, 0.0),
+        Point::new(15.0, 0.0),
+        LineColor::Blue2,
+    );
+
+    assert!(!fix1(&mut model));
+
+    assert_eq!(model.line_segments[0].selected, 2);
+    assert_eq!(model.line_segments[1].selected, 2);
+}
+
+#[test]
+fn fix2_splits_near_t_intersections_and_appends_segments_like_oriedita() {
+    let mut model = CreasePatternModel::default();
+    model.add_line(Point::new(0.0, 0.0), Point::new(10.0, 0.0), LineColor::Red1);
+    model.add_line(Point::new(5.0, 0.0), Point::new(5.0, 5.0), LineColor::Blue2);
+
+    fix2(&mut model);
+
+    assert_eq!(model.line_segments.len(), 3);
+    assert_segment(
+        &model.line_segments[0],
+        Point::new(5.0, 0.0),
+        Point::new(5.0, 5.0),
+        LineColor::Blue2,
+    );
+    assert_segment(
+        &model.line_segments[1],
+        Point::new(0.0, 0.0),
+        Point::new(5.0, 0.0),
+        LineColor::Red1,
+    );
+    assert_segment(
+        &model.line_segments[2],
+        Point::new(5.0, 0.0),
+        Point::new(10.0, 0.0),
         LineColor::Red1,
     );
 }

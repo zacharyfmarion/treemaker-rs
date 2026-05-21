@@ -7,6 +7,8 @@ import origami.crease_pattern.element.LineColor;
 import origami.crease_pattern.element.LineSegment;
 import origami.crease_pattern.element.Point;
 import origami.crease_pattern.worker.foldlineset.BranchTrim;
+import origami.crease_pattern.worker.foldlineset.Fix1;
+import origami.crease_pattern.worker.foldlineset.Fix2;
 import origami.crease_pattern.worker.linesegmentset.IntersectDivide;
 
 import oriedita.editor.databinding.GridModel;
@@ -43,6 +45,8 @@ public class OrieditaGeometryOracle {
             case "foldline-del-v-pair" -> foldLineDelVPair(args);
             case "foldline-del-v-all" -> foldLineDelVAll(args);
             case "foldline-del-v-all-cc" -> foldLineDelVAllCc(args);
+            case "foldline-fix1" -> foldLineFix1(args);
+            case "foldline-fix2" -> foldLineFix2(args);
             case "custom-line-type" -> customLineType(args);
             case "orh-import-summary" -> orhImportSummary(args);
             case "orh-export-fixture" -> orhExportFixture(args);
@@ -270,6 +274,29 @@ public class OrieditaGeometryOracle {
         printFoldLineSet(set);
     }
 
+    private static void foldLineFix1(String[] args) {
+        if (args.length < 2) {
+            usage("foldline-fix1 expects count and segment payload");
+        }
+
+        int count = Integer.parseInt(args[1]);
+        FoldLineSet set = foldLineSet(args, 2, count);
+        boolean result = Fix1.apply(set);
+        System.out.println("result|" + result);
+        printFoldLineSetWithSelection(set);
+    }
+
+    private static void foldLineFix2(String[] args) {
+        if (args.length < 2) {
+            usage("foldline-fix2 expects count and segment payload");
+        }
+
+        int count = Integer.parseInt(args[1]);
+        FoldLineSet set = foldLineSet(args, 2, count);
+        Fix2.apply(set);
+        printFoldLineSetWithSelection(set);
+    }
+
     private static void orhImportSummary(String[] args) throws Exception {
         if (args.length != 2) {
             usage("orh-import-summary expects a file path");
@@ -395,6 +422,20 @@ public class OrieditaGeometryOracle {
         }
     }
 
+    private static void printFoldLineSetWithSelection(FoldLineSet set) {
+        System.out.println("lines|" + set.getTotal());
+        for (int index = 1; index <= set.getTotal(); index++) {
+            LineSegment segment = set.get(index);
+            System.out.println("line|"
+                    + segment.determineAX() + "|"
+                    + segment.determineAY() + "|"
+                    + segment.determineBX() + "|"
+                    + segment.determineBY() + "|"
+                    + segment.getColor().getNumber() + "|"
+                    + segment.getSelected());
+        }
+    }
+
     private static void printFoldLineSetDeleteSet(Set<Integer> toDelete) {
         System.out.print("delete");
         toDelete.stream().sorted().forEach(index -> System.out.print("|" + (index - 1)));
@@ -488,6 +529,8 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle foldline-del-v-pair <i> <j> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-del-v-all <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-del-v-all-cc <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-fix1 <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-fix2 <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle custom-line-type <customType> <lineColor>");
         System.err.println("   or: OrieditaGeometryOracle orh-import-summary <path>");
         System.err.println("   or: OrieditaGeometryOracle orh-export-fixture");

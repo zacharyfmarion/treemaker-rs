@@ -3,8 +3,8 @@ use oristudio_cp::model::CreasePatternModel;
 use oristudio_cp::operations::arrangement::{
     branch_trim, del_v_all, del_v_all_color_change, del_v_at_point, del_v_at_point_color_change,
     del_v_pair, delete_intersecting_or_overlapping_lines_along, delete_overlapping_lines_along,
-    divide_intersections, divide_intersections_fast, divide_line_segment_with_new_lines,
-    intersect_divide_pair,
+    divide_intersections, divide_intersections_fast, divide_line_segment_with_new_lines, fix1,
+    fix2, intersect_divide_pair,
 };
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -395,6 +395,50 @@ fn branch_trim_matches_oriedita_foldlineset_oracle() {
     assert_eq!(line_segment_set_summary(&model), run_oracle(&oracle, &args));
 }
 
+#[test]
+fn fix_workers_match_oriedita_foldlineset_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    for segments in [
+        vec![
+            segment(0.0, 0.0, 10.0, 0.0, LineColor::Red1),
+            segment(10.0, 0.0, 0.0, 0.0, LineColor::Blue2),
+        ],
+        vec![
+            segment(0.0, 0.0, 10.0, 0.0, LineColor::Red1),
+            segment(5.0, 0.0, 15.0, 0.0, LineColor::Blue2),
+        ],
+    ] {
+        let mut model = model_from_segments(&segments);
+        let result = fix1(&mut model);
+        let mut args = vec!["foldline-fix1".to_string(), segments.len().to_string()];
+        push_segment_args(&mut args, &segments);
+        let rust_summary = format!(
+            "result|{result}\n{}",
+            line_segment_set_with_selection_summary(&model)
+        );
+        assert_eq!(rust_summary, run_oracle(&oracle, &args));
+    }
+
+    let fix2_segments = vec![
+        segment(0.0, 0.0, 10.0, 0.0, LineColor::Red1),
+        segment(5.0, 0.0, 5.0, 5.0, LineColor::Blue2),
+    ];
+    let mut model = model_from_segments(&fix2_segments);
+    fix2(&mut model);
+    let mut args = vec!["foldline-fix2".to_string(), fix2_segments.len().to_string()];
+    push_segment_args(&mut args, &fix2_segments);
+    assert_eq!(
+        line_segment_set_with_selection_summary(&model),
+        run_oracle(&oracle, &args)
+    );
+}
+
 fn operations_oracle() -> Option<PathBuf> {
     std::env::var("ORIEDITA_OPERATIONS_ORACLE")
         .or_else(|_| std::env::var("ORIEDITA_GEOMETRY_ORACLE"))
@@ -466,6 +510,23 @@ fn line_segment_set_summary(model: &CreasePatternModel) -> String {
             java_double_string(segment.b.x),
             java_double_string(segment.b.y),
             segment.color.number()
+        ));
+    }
+    output
+}
+
+fn line_segment_set_with_selection_summary(model: &CreasePatternModel) -> String {
+    let mut output = String::new();
+    output.push_str(&format!("lines|{}\n", model.line_segments.len()));
+    for segment in &model.line_segments {
+        output.push_str(&format!(
+            "line|{}|{}|{}|{}|{}|{}\n",
+            java_double_string(segment.a.x),
+            java_double_string(segment.a.y),
+            java_double_string(segment.b.x),
+            java_double_string(segment.b.y),
+            segment.color.number(),
+            segment.selected
         ));
     }
     output

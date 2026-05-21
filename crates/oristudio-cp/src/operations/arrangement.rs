@@ -3,7 +3,9 @@
 use crate::geometry::{
     Epsilon, Intersection, LineColor, LineSegment, Point, StraightLine, StraightLineIntersection,
     determine_line_segment_intersection, determine_line_segment_intersection_sweet,
-    determine_line_segment_intersection_with_precision, find_intersection_segments,
+    determine_line_segment_intersection_sweet_with_tolerances,
+    determine_line_segment_intersection_with_precision,
+    determine_line_segment_intersection_with_tolerances, find_intersection_segments,
     find_intersection_straight_lines, find_projection, is_line_segment_overlapping,
     line_segment_to_straight_line, line_segment_x_kousa_decide,
 };
@@ -646,6 +648,106 @@ pub fn del_v_pair(
     Some(new_line)
 }
 
+/// Oriedita `Fix1.apply`: mark/fix inaccurate overlapping line pairs.
+pub fn fix1(model: &mut CreasePatternModel) -> bool {
+    unselect_all(model);
+
+    let len = model.line_segments.len();
+    for i in 0..len.saturating_sub(1) {
+        let si = model.line_segments[i].clone();
+        if si.color == LineColor::Cyan3 {
+            continue;
+        }
+
+        for j in (i + 1)..len {
+            if j >= model.line_segments.len() {
+                break;
+            }
+            let sj = model.line_segments[j].clone();
+            if sj.color == LineColor::Cyan3 {
+                continue;
+            }
+
+            let intersection = determine_line_segment_intersection_with_tolerances(
+                &si,
+                &sj,
+                Epsilon::UNKNOWN_0001,
+                Epsilon::PARALLEL_FOR_FIX,
+            );
+            match intersection {
+                Intersection::ParallelEqual31 => {
+                    set_color(model, i, sj.color);
+                    model.line_segments.remove(j);
+                    return true;
+                }
+                Intersection::ParallelStartOfS1ContainsStartOfS2_321
+                | Intersection::ParallelStartOfS2ContainsStartOfS1_322
+                | Intersection::ParallelStartOfS1ContainsEndOfS2_331
+                | Intersection::ParallelEndOfS2ContainsStartOfS1_332
+                | Intersection::ParallelEndOfS1ContainsStartOfS2_341
+                | Intersection::ParallelStartOfS2ContainsEndOfS1_342
+                | Intersection::ParallelEndOfS1ContainsEndOfS2_351
+                | Intersection::ParallelEndOfS2ContainsEndOfS1_352 => {
+                    select_pair(model, i, j);
+                }
+                _ => {}
+            }
+
+            if intersection.is_contained_inside() {
+                select_pair(model, i, j);
+            }
+        }
+    }
+
+    false
+}
+
+/// Oriedita `Fix2.apply`: split near-T intersections using sweet tolerances.
+pub fn fix2(model: &mut CreasePatternModel) {
+    unselect_all(model);
+
+    let mut i = 0;
+    while i + 1 < model.line_segments.len() {
+        let si = model.line_segments[i].clone();
+        if si.color != LineColor::Cyan3 {
+            let scan_len = model.line_segments.len();
+            for j in (i + 1)..scan_len {
+                if j >= model.line_segments.len() {
+                    break;
+                }
+                let current_si = model.line_segments[i].clone();
+                let sj = model.line_segments[j].clone();
+                if sj.color == LineColor::Cyan3 {
+                    continue;
+                }
+
+                let intersection = determine_line_segment_intersection_sweet_with_tolerances(
+                    &current_si,
+                    &sj,
+                    Epsilon::UNKNOWN_0001,
+                    Epsilon::PARALLEL_FOR_FIX,
+                );
+                match intersection {
+                    Intersection::IntersectsTShapeS1VerticalBar25 => {
+                        apply_line_segment_divide_for_fix2(model, current_si.a, j);
+                    }
+                    Intersection::IntersectsTShapeS1VerticalBar26 => {
+                        apply_line_segment_divide_for_fix2(model, current_si.b, j);
+                    }
+                    Intersection::IntersectsTShapeS2VerticalBar27 => {
+                        apply_line_segment_divide_for_fix2(model, sj.a, i);
+                    }
+                    Intersection::IntersectsTShapeS2VerticalBar28 => {
+                        apply_line_segment_divide_for_fix2(model, sj.b, i);
+                    }
+                    _ => {}
+                }
+            }
+        }
+        i += 1;
+    }
+}
+
 fn del_v_at_point_impl(
     model: &mut CreasePatternModel,
     point: Point,
@@ -688,6 +790,33 @@ fn del_v_at_point_impl(
     model.add_line_segment(LineSegment::with_color(a, b, lix.color));
 
     false
+}
+
+fn unselect_all(model: &mut CreasePatternModel) {
+    for segment in &mut model.line_segments {
+        *segment = segment.with_selected(0);
+    }
+}
+
+fn select_pair(model: &mut CreasePatternModel, i: usize, j: usize) {
+    model.line_segments[i] = model.line_segments[i].with_selected(2);
+    model.line_segments[j] = model.line_segments[j].with_selected(2);
+}
+
+fn apply_line_segment_divide_for_fix2(model: &mut CreasePatternModel, point: Point, index: usize) {
+    if index >= model.line_segments.len() {
+        return;
+    }
+
+    let segment = model.line_segments[index].clone();
+    let projection = find_projection(line_segment_to_straight_line(&segment), point);
+    model.line_segments.remove(index);
+    model.add_line_segment(segment.with_b(projection));
+    model.add_line_segment(LineSegment::with_color(
+        projection,
+        segment.b,
+        segment.color,
+    ));
 }
 
 fn del_v_all_impl(model: &mut CreasePatternModel, allow_color_change: bool) {

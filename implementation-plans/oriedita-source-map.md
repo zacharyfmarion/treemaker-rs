@@ -89,8 +89,8 @@ stage explicitly changes it.
 | `origami/crease_pattern/worker/foldlineset/Check2.java` | Diagnostic check. | `checks` | kernel | 9 | Unsupported |
 | `origami/crease_pattern/worker/foldlineset/Check3.java` | Diagnostic check. | `checks` | kernel | 9 | Unsupported |
 | `origami/crease_pattern/worker/foldlineset/Check4.java` | Diagnostic check. | `checks` | kernel | 9 | Unsupported |
-| `origami/crease_pattern/worker/foldlineset/Fix1.java` | Repair operation. | `checks`, `operations::arrangement` | kernel | 9 | Unsupported |
-| `origami/crease_pattern/worker/foldlineset/Fix2.java` | Repair operation. | `checks`, `operations::arrangement` | kernel | 9 | Unsupported |
+| `origami/crease_pattern/worker/foldlineset/Fix1.java` | Repair operation. | `checks`, `operations::arrangement` | kernel | 9 | Oracle-tested |
+| `origami/crease_pattern/worker/foldlineset/Fix2.java` | Repair operation. | `checks`, `operations::arrangement` | kernel | 9 | Oracle-tested |
 | `origami/crease_pattern/worker/foldlineset/OrganizeCircles.java` | Circle cleanup/organization. | `operations::circle` | kernel | 8 | Unsupported |
 | `origami/crease_pattern/worker/linesegmentset/GetBoundingBox.java` | Bounds helper. | `model::bounds` | kernel | 3 | Unsupported |
 | `origami/crease_pattern/worker/linesegmentset/IntersectDivide.java` | Segment arrangement split helper. | `operations::arrangement` | kernel | 5 | Oracle-tested |

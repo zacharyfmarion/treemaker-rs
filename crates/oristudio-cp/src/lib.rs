@@ -597,7 +597,7 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
         "operations::circle::draw",
         Kernel,
         8,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         CircleDrawThreePoint,
@@ -605,7 +605,7 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
         "operations::circle::through_three_points",
         Kernel,
         8,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         CircleDrawSeparate,
@@ -637,7 +637,7 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
         "operations::circle::free",
         Kernel,
         8,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         CircleDrawConcentric,
@@ -1211,14 +1211,19 @@ mod tests {
     }
 
     #[test]
-    fn stage_one_registry_has_no_claimed_implementation() {
+    fn registry_uses_dispatchable_status_values() {
         for descriptor in operation_descriptors() {
             assert!(
                 matches!(
                     descriptor.status,
-                    OperationStatus::Unsupported | OperationStatus::OutOfScopeUi
+                    OperationStatus::Unsupported
+                        | OperationStatus::Porting
+                        | OperationStatus::UnitTested
+                        | OperationStatus::OracleTested
+                        | OperationStatus::DocumentedDifference
+                        | OperationStatus::OutOfScopeUi
                 ),
-                "{:?} should not claim implementation before its stage",
+                "{:?} uses a status marker that command dispatch does not handle",
                 descriptor.id
             );
         }

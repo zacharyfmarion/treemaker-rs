@@ -1,6 +1,7 @@
 //! Oriedita-compatible non-UI crease-pattern mutations.
 
 pub mod arrangement;
+pub mod circle;
 pub mod color;
 pub mod construction;
 pub mod measure;

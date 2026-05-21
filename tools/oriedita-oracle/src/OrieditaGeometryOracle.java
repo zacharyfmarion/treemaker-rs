@@ -8,6 +8,7 @@ import origami.crease_pattern.element.LineColor;
 import origami.crease_pattern.element.LineSegment;
 import origami.crease_pattern.element.Point;
 import origami.crease_pattern.element.Polygon;
+import origami.crease_pattern.element.StraightLine;
 import origami.crease_pattern.worker.foldlineset.BranchTrim;
 import origami.crease_pattern.worker.foldlineset.Fix1;
 import origami.crease_pattern.worker.foldlineset.Fix2;
@@ -78,6 +79,9 @@ public class OrieditaGeometryOracle {
             case "foldline-draw-crease" -> foldLineDrawCrease(args);
             case "foldline-draw-symmetric" -> foldLineDrawSymmetric(args);
             case "foldline-draw-point" -> foldLineDrawPoint(args);
+            case "foldline-circle-draw" -> foldLineCircleDraw(args);
+            case "foldline-circle-draw-free" -> foldLineCircleDrawFree(args);
+            case "foldline-circle-three-point" -> foldLineCircleThreePoint(args);
             case "foldline-divide-count" -> foldLineDivideCount(args);
             case "foldline-divide-ratio" -> foldLineDivideRatio(args);
             case "measure-length" -> measureLength(args);
@@ -948,6 +952,73 @@ public class OrieditaGeometryOracle {
         printFoldLineSet(set);
     }
 
+    private static void foldLineCircleDraw(String[] args) {
+        if (args.length != 5) {
+            usage("foldline-circle-draw expects center and radius point");
+        }
+
+        Point center = new Point(parse(args[1]), parse(args[2]));
+        Point radiusPoint = new Point(parse(args[3]), parse(args[4]));
+        FoldLineSet set = new FoldLineSet();
+        set.addCircle(center.getX(), center.getY(), OritaCalc.distance(center, radiusPoint), LineColor.CYAN_3);
+        System.out.println("changed|true");
+        printCircleSet(set);
+    }
+
+    private static void foldLineCircleDrawFree(String[] args) {
+        if (args.length != 5) {
+            usage("foldline-circle-draw-free expects center and radius point");
+        }
+
+        Point center = new Point(parse(args[1]), parse(args[2]));
+        Point radiusPoint = new Point(parse(args[3]), parse(args[4]));
+        FoldLineSet set = new FoldLineSet();
+        boolean changed = false;
+        if (!center.equals(radiusPoint)) {
+            set.addCircle(center.getX(), center.getY(), OritaCalc.distance(center, radiusPoint), LineColor.CYAN_3);
+            changed = true;
+        }
+        System.out.println("changed|" + changed);
+        printCircleSet(set);
+    }
+
+    private static void foldLineCircleThreePoint(String[] args) {
+        if (args.length != 7) {
+            usage("foldline-circle-three-point expects three points");
+        }
+
+        Point p1 = new Point(parse(args[1]), parse(args[2]));
+        Point p2 = new Point(parse(args[3]), parse(args[4]));
+        Point p3 = new Point(parse(args[5]), parse(args[6]));
+        FoldLineSet set = new FoldLineSet();
+        boolean changed = false;
+
+        LineSegment sen1 = new LineSegment(p1, p2);
+        LineSegment sen2 = new LineSegment(p2, p3);
+        LineSegment sen3 = new LineSegment(p3, p1);
+
+        if (!isFlatAngle(OritaCalc.angle(sen1, sen2))
+                && !isFlatAngle(OritaCalc.angle(sen2, sen3))
+                && !isFlatAngle(OritaCalc.angle(sen3, sen1))) {
+            StraightLine t1 = new StraightLine(sen1)
+                    .orthogonalize(OritaCalc.internalDivisionRatio(sen1.getA(), sen1.getB(), 1.0, 1.0));
+            StraightLine t2 = new StraightLine(sen2)
+                    .orthogonalize(OritaCalc.internalDivisionRatio(sen2.getA(), sen2.getB(), 1.0, 1.0));
+            Point center = OritaCalc.findIntersection(t1, t2);
+            set.addCircle(center.getX(), center.getY(), OritaCalc.distance(p1, center), LineColor.CYAN_3);
+            changed = true;
+        }
+
+        System.out.println("changed|" + changed);
+        printCircleSet(set);
+    }
+
+    private static boolean isFlatAngle(double angle) {
+        return Math.abs(angle) < Epsilon.UNKNOWN_1EN6
+                || Math.abs(angle - 180.0) < Epsilon.UNKNOWN_1EN6
+                || Math.abs(angle - 360.0) < Epsilon.UNKNOWN_1EN6;
+    }
+
     private static void foldLineDivideCount(String[] args) {
         if (args.length < 8) {
             usage("foldline-divide-count expects division count, segment, count, and segment payload");
@@ -1215,6 +1286,21 @@ public class OrieditaGeometryOracle {
         }
     }
 
+    private static void printCircleSet(FoldLineSet set) {
+        System.out.println("circles|" + set.getCircles().size());
+        for (Circle circle : set.getCircles()) {
+            System.out.println("circle|"
+                    + circle.getX() + "|"
+                    + circle.getY() + "|"
+                    + circle.getR() + "|"
+                    + circle.getColor().getNumber() + "|"
+                    + circle.getCustomized() + "|"
+                    + circle.getCustomizedColor().getRed() + "|"
+                    + circle.getCustomizedColor().getGreen() + "|"
+                    + circle.getCustomizedColor().getBlue());
+        }
+    }
+
     private static void printFoldLineSetWithSelection(FoldLineSet set) {
         System.out.println("lines|" + set.getTotal());
         for (int index = 1; index <= set.getTotal(); index++) {
@@ -1348,6 +1434,9 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle foldline-draw-crease <fold|aux> <segment ax ay bx by color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-draw-symmetric <axis ax ay bx by color> <preselected> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-draw-point <index> <targetX> <targetY> <selectionDistance> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-circle-draw <centerX> <centerY> <radiusX> <radiusY>");
+        System.err.println("   or: OrieditaGeometryOracle foldline-circle-draw-free <centerX> <centerY> <radiusX> <radiusY>");
+        System.err.println("   or: OrieditaGeometryOracle foldline-circle-three-point <ax> <ay> <bx> <by> <cx> <cy>");
         System.err.println("   or: OrieditaGeometryOracle measure-length <ax> <ay> <bx> <by>");
         System.err.println("   or: OrieditaGeometryOracle measure-angle <ax> <ay> <centerX> <centerY> <bx> <by>");
         System.err.println("   or: OrieditaGeometryOracle custom-line-type <customType> <lineColor>");

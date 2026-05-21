@@ -7,6 +7,9 @@ use oristudio_cp::operations::arrangement::{
     delete_overlapping_lines_along, divide_intersections, divide_intersections_fast,
     divide_line_segment_with_new_lines, fix1, fix2, intersect_divide_pair,
 };
+use oristudio_cp::operations::circle::{
+    draw as draw_circle, free as draw_circle_free, through_three_points,
+};
 use oristudio_cp::operations::color::{
     advance_line_type, alternate_mountain_valley_along, alternate_mountain_valley_crossing,
     change_crease_type, delete_line_type_for_indices, make_aux, make_edge, make_mountain,
@@ -1166,6 +1169,75 @@ fn draw_point_matches_oriedita_oracle() {
 }
 
 #[test]
+fn basic_circle_draw_modes_match_oriedita_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    let center = Point::new(1.0, 2.0);
+    let radius_point = Point::new(4.0, 6.0);
+    let mut model = CreasePatternModel::default();
+    let changed = draw_circle(&mut model, center, radius_point);
+    let mut args = vec!["foldline-circle-draw".to_string()];
+    push_points_args(&mut args, &[center, radius_point]);
+    let rust_summary = format!("changed|{changed}\n{}", circle_set_summary(&model));
+    assert_eq!(rust_summary, run_oracle(&oracle, &args));
+
+    let mut zero_model = CreasePatternModel::default();
+    let zero_changed = draw_circle(&mut zero_model, center, center);
+    let mut zero_args = vec!["foldline-circle-draw".to_string()];
+    push_points_args(&mut zero_args, &[center, center]);
+    let rust_summary = format!(
+        "changed|{zero_changed}\n{}",
+        circle_set_summary(&zero_model)
+    );
+    assert_eq!(rust_summary, run_oracle(&oracle, &zero_args));
+
+    let mut free_model = CreasePatternModel::default();
+    let free_changed = draw_circle_free(&mut free_model, center, center);
+    let mut free_args = vec!["foldline-circle-draw-free".to_string()];
+    push_points_args(&mut free_args, &[center, center]);
+    let rust_summary = format!(
+        "changed|{free_changed}\n{}",
+        circle_set_summary(&free_model)
+    );
+    assert_eq!(rust_summary, run_oracle(&oracle, &free_args));
+}
+
+#[test]
+fn circle_three_point_matches_oriedita_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    for points in [
+        [
+            Point::new(1.0, 0.0),
+            Point::new(0.0, 1.0),
+            Point::new(-1.0, 0.0),
+        ],
+        [
+            Point::new(0.0, 0.0),
+            Point::new(1.0, 0.0),
+            Point::new(2.0, 0.0),
+        ],
+    ] {
+        let mut model = CreasePatternModel::default();
+        let changed = through_three_points(&mut model, points[0], points[1], points[2]);
+        let mut args = vec!["foldline-circle-three-point".to_string()];
+        push_points_args(&mut args, &points);
+        let rust_summary = format!("changed|{changed}\n{}", circle_set_summary(&model));
+        assert_eq!(rust_summary, run_oracle(&oracle, &args));
+    }
+}
+
+#[test]
 fn draw_crease_segment_matches_oriedita_oracle() {
     let Some(oracle) = operations_oracle() else {
         eprintln!(
@@ -1375,6 +1447,25 @@ fn aux_line_segment_set_summary(model: &CreasePatternModel) -> String {
             java_double_string(segment.b.x),
             java_double_string(segment.b.y),
             segment.color.number()
+        ));
+    }
+    output
+}
+
+fn circle_set_summary(model: &CreasePatternModel) -> String {
+    let mut output = String::new();
+    output.push_str(&format!("circles|{}\n", model.circles.len()));
+    for circle in &model.circles {
+        output.push_str(&format!(
+            "circle|{}|{}|{}|{}|{}|{}|{}|{}\n",
+            java_double_string(circle.x),
+            java_double_string(circle.y),
+            java_double_string(circle.r),
+            circle.color.number(),
+            circle.customized,
+            circle.customized_color.red,
+            circle.customized_color.green,
+            circle.customized_color.blue
         ));
     }
     output

@@ -160,12 +160,12 @@ stage explicitly changes it.
 | `FOLDABLE_LINE_INPUT_39` | `MouseHandlerFoldableLineInput` | `operations::construction::foldable_line_input` | kernel | 7 | Unsupported |
 | `PARALLEL_DRAW_40` | `MouseHandlerParallelDraw` | `operations::construction::parallel` | kernel | 7 | Unsupported |
 | `VERTEX_DELETE_ON_CREASE_41` | `MouseHandlerVertexDeleteOnCrease` | `operations::point::delete_vertex_on_crease` | kernel | 5 | Oracle-tested |
-| `CIRCLE_DRAW_42` | `MouseHandlerCircleDraw` | `operations::circle::draw` | kernel | 8 | Unsupported |
-| `CIRCLE_DRAW_THREE_POINT_43` | `MouseHandlerCircleDrawThreePoint` | `operations::circle::through_three_points` | kernel | 8 | Unsupported |
+| `CIRCLE_DRAW_42` | `MouseHandlerCircleDraw` | `operations::circle::draw` | kernel | 8 | Oracle-tested |
+| `CIRCLE_DRAW_THREE_POINT_43` | `MouseHandlerCircleDrawThreePoint` | `operations::circle::through_three_points` | kernel | 8 | Oracle-tested |
 | `CIRCLE_DRAW_SEPARATE_44` | `MouseHandlerCircleDrawSeparate` | `operations::circle::separate` | kernel | 8 | Unsupported |
 | `CIRCLE_DRAW_TANGENT_LINE_45` | `MouseHandlerCircleDrawTangentLine` | `operations::circle::tangent_line` | kernel | 8 | Unsupported |
 | `CIRCLE_DRAW_INVERTED_46` | `MouseHandlerCircleDrawInverted` | `operations::circle::inverted` | kernel | 8 | Unsupported |
-| `CIRCLE_DRAW_FREE_47` | `MouseHandlerCircleDrawFree` | `operations::circle::free` | kernel | 8 | Unsupported |
+| `CIRCLE_DRAW_FREE_47` | `MouseHandlerCircleDrawFree` | `operations::circle::free` | kernel | 8 | Oracle-tested |
 | `CIRCLE_DRAW_CONCENTRIC_48` | `MouseHandlerCircleDrawConcentric` | `operations::circle::concentric` | kernel | 8 | Unsupported |
 | `CIRCLE_DRAW_CONCENTRIC_SELECT_49` | `MouseHandlerCircleDrawConcentricSelect` | `operations::circle::concentric_select` | kernel | 8 | Unsupported |
 | `CIRCLE_DRAW_CONCENTRIC_TWO_CIRCLE_SELECT_50` | `MouseHandlerCircleDrawConcentricTwoCircleSelect` | `operations::circle::concentric_two_circle_select` | kernel | 8 | Unsupported |

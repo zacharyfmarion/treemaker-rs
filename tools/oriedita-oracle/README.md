@@ -20,7 +20,9 @@ three-point angle handlers. Point-tool coverage includes `DRAW_POINT_14`'s
 segment-splitting behavior after the target point and segment are resolved.
 Construction coverage has started with free/restricted draw-crease line
 insertion for fold-line and aux-line targets, plus symmetric drawing of
-selected lines across a resolved axis.
+selected lines across a resolved axis. Circle coverage has started with
+restricted, free, and three-point circle creation after input points have been
+resolved to model coordinates.
 The first selection commands cover select/unselect all, index selection, box
 selection via `lineSegmentsInside`, polygon selection via `select_Takakukei`,
 line-overlap/intersection selection via `select_lX`, and

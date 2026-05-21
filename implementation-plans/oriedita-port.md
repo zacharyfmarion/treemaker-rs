@@ -973,7 +973,8 @@ Validation:
 
 Deliverables:
 
-- Port all circle tools.
+- Port all circle tools. Basic restricted/free/three-point circle creation is
+  now ported and oracle-tested for resolved model-space points.
 - Port regular polygon creation.
 - Port Blintz, fish, dove, bird, and frog base generators.
 - Port Voronoi creation.

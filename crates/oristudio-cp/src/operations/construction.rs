@@ -6,7 +6,8 @@ use crate::geometry::{
     determine_line_segment_intersection_sweet_with_tolerances, distance,
     find_intersection_segments, find_intersection_straight_lines, find_line_symmetry_line_segment,
     find_line_symmetry_point, find_projection, get_segment_with_length, is_line_segment_parallel,
-    is_line_segment_parallel_with_precision, is_point_within_line_span, mid_point, move_parallel,
+    is_line_segment_parallel_with_precision, is_point_within_line_span, line_segment_rotate,
+    mid_point, move_parallel,
 };
 use crate::model::CreasePatternModel;
 use crate::operations::arrangement::{
@@ -139,6 +140,68 @@ pub fn snap_to_close_point_in_active_angle_system(
     } else {
         closest_point
     }
+}
+
+/// Oriedita `ANGLE_SYSTEM_16` preview candidates from two resolved points.
+pub fn angle_system_candidates(
+    start: Point,
+    end: Point,
+    angle_system_divider: i32,
+    angles: [f64; 6],
+) -> Vec<LineSegment> {
+    let mut candidates = Vec::new();
+    let count = if angle_system_divider != 0 {
+        angle_system_divider * 2 - 1
+    } else {
+        6
+    };
+    let starting_segment = LineSegment::with_color(end, start, LineColor::Green6);
+    candidates.push(starting_segment.clone());
+
+    if angle_system_divider != 0 {
+        let mut angle = 0.0;
+        let angle_step = 180.0 / angle_system_divider as f64;
+        for i in 0..count {
+            angle += angle_step;
+            let color = if i % 2 == 0 {
+                LineColor::Orange4
+            } else {
+                LineColor::Green6
+            };
+            candidates.push(line_segment_rotate(&starting_segment, angle).with_line_color(color));
+        }
+    } else {
+        for (index, angle) in angles.into_iter().enumerate() {
+            let color = match index % 3 {
+                0 => LineColor::Orange4,
+                1 => LineColor::Green6,
+                _ => LineColor::Purple8,
+            };
+            candidates.push(line_segment_rotate(&starting_segment, angle).with_line_color(color));
+        }
+    }
+
+    candidates
+}
+
+/// Oriedita `ANGLE_SYSTEM_16` final add after a candidate direction and destination are resolved.
+pub fn angle_system_draw_to_destination(
+    model: &mut CreasePatternModel,
+    release_point: Point,
+    selected_segment: &LineSegment,
+    destination: &LineSegment,
+    color: LineColor,
+) -> bool {
+    let result = LineSegment::with_color(
+        find_intersection_segments(destination, selected_segment),
+        release_point,
+        color,
+    );
+    if !Epsilon::HIGH.gt0(result.determine_length()) {
+        return false;
+    }
+    add_line_segment_like_worker(model, &result);
+    true
 }
 
 /// Oriedita `DRAW_CREASE_SYMMETRIC_12` mutation after the mirror axis is known.

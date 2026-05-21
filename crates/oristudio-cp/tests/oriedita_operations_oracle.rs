@@ -19,7 +19,8 @@ use oristudio_cp::operations::color::{
     make_valley, replace_line_type_for_indices, set_line_color_for_indices, toggle_mountain_valley,
 };
 use oristudio_cp::operations::construction::{
-    DrawCreaseTarget, axiom7_draw_to_destination, axiom7_indicator, commit_axiom7_indicator,
+    DrawCreaseTarget, angle_system_candidates, angle_system_draw_to_destination,
+    axiom7_draw_to_destination, axiom7_indicator, commit_axiom7_indicator,
     commit_parallel_width_indicator, commit_square_bisector_parallel_indicator,
     double_symmetric_draw, draw_crease_angle_restricted_5, draw_crease_segment, fishbone_draw,
     inward, mirror_selected_lines, parallel_draw, parallel_width_indicators,
@@ -2130,6 +2131,64 @@ fn angle_restricted_5_matches_oriedita_oracle() {
         &run_oracle(&oracle, &args),
         1e-12,
         "angle-restricted-5",
+    );
+}
+
+#[test]
+fn angle_system_modes_match_oriedita_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    let angles = [40.0, 60.0, 80.0, 30.0, 50.0, 100.0];
+    let candidates = angle_system_candidates(Point::new(0.0, 0.0), Point::new(1.0, 0.0), 4, angles);
+    let mut args = vec![
+        "foldline-angle-system-candidates".to_string(),
+        "0.0".to_string(),
+        "0.0".to_string(),
+        "1.0".to_string(),
+        "0.0".to_string(),
+        "4".to_string(),
+    ];
+    for angle in angles {
+        args.push(angle.to_string());
+    }
+    assert_line_summary_close(
+        &line_segment_list_summary(&candidates),
+        &run_oracle(&oracle, &args),
+        1e-12,
+        "angle-system-candidates",
+    );
+
+    let destination = segment(0.0, 1.0, 2.0, 1.0, LineColor::Black0);
+    let segments = vec![destination.clone()];
+    let mut model = model_from_segments(&segments);
+    let added = angle_system_draw_to_destination(
+        &mut model,
+        Point::new(1.0, 0.0),
+        &candidates[1],
+        &destination,
+        LineColor::Blue2,
+    );
+    let mut args = vec![
+        "foldline-angle-system-draw".to_string(),
+        "1.0".to_string(),
+        "0.0".to_string(),
+    ];
+    push_one_segment_args(&mut args, &candidates[1]);
+    push_one_segment_args(&mut args, &destination);
+    args.push(LineColor::Blue2.number().to_string());
+    args.push(segments.len().to_string());
+    push_segment_args(&mut args, &segments);
+    let rust_summary = format!("added|{added}\n{}", line_segment_set_summary(&model));
+    assert_line_summary_close(
+        &rust_summary,
+        &run_oracle(&oracle, &args),
+        1e-12,
+        "angle-system-draw",
     );
 }
 

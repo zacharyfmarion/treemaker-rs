@@ -135,7 +135,7 @@ stage explicitly changes it.
 | `DRAW_CREASE_ANGLE_RESTRICTED_13` | `MouseHandlerDrawCreaseAngleRestricted` | `operations::construction::angle_restricted` | kernel | 7 | Unsupported |
 | `DRAW_POINT_14` | `MouseHandlerDrawPoint` | `operations::point::draw_point_on_segment` | kernel | 7 | Oracle-tested |
 | `DELETE_POINT_15` | `MouseHandlerDeletePoint` | `operations::point::delete_point` | kernel | 5 | Oracle-tested |
-| `ANGLE_SYSTEM_16` | `MouseHandlerAngleSystem` | `operations::construction::angle_system` | kernel | 7 | Unsupported |
+| `ANGLE_SYSTEM_16` | `MouseHandlerAngleSystem` | `operations::construction::angle_system_candidates`, `operations::construction::angle_system_draw_to_destination` | kernel | 7 | Oracle-tested |
 | `DRAW_CREASE_ANGLE_RESTRICTED_3_18` | `MouseHandlerDrawCreaseAngleRestricted3_2` | `operations::construction::angle_restricted_3` | kernel | 7 | Unsupported |
 | `CREASE_SELECT_19` | `MouseHandlerCreaseSelect` | `operations::selection::select_indices`, `operations::selection::select_box` | kernel | 6 | Porting |
 | `CREASE_UNSELECT_20` | `MouseHandlerCreaseUnselect` | `operations::selection::unselect_indices`, `operations::selection::unselect_box` | kernel | 6 | Porting |

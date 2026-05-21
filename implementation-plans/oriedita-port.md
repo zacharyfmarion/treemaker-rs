@@ -399,6 +399,10 @@ Port all command behavior for:
 - Symmetric line drawing.
 - Angle-restricted line drawing.
 - 3-angle and 5-angle restricted variants.
+- `ANGLE_SYSTEM_16` is ported and oracle-tested for resolved two-point
+  candidate generation and destination commit. It preserves divider/custom
+  angle preview candidates, alternating indicator colors, and worker-style
+  insertion after a chosen candidate/destination are resolved.
 - Square bisector construction.
 - Inward construction.
 - Perpendicular construction.

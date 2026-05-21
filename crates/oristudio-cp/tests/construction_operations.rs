@@ -1,13 +1,13 @@
 use oristudio_cp::geometry::{LineColor, LineSegment, Point};
 use oristudio_cp::model::CreasePatternModel;
 use oristudio_cp::operations::construction::{
-    DrawCreaseTarget, axiom7_draw_to_destination, axiom7_indicator,
-    commit_parallel_width_indicator, double_symmetric_draw, draw_crease_angle_restricted_5,
-    draw_crease_segment, fishbone_draw, inward, mirror_selected_lines, parallel_draw,
-    parallel_width_indicators, perpendicular_indicator, perpendicular_projection,
-    square_bisector_from_lines_to_destination, square_bisector_from_points_to_destination,
-    square_bisector_parallel_between_destinations, square_bisector_parallel_indicator,
-    symmetric_draw,
+    DrawCreaseTarget, angle_system_candidates, angle_system_draw_to_destination,
+    axiom7_draw_to_destination, axiom7_indicator, commit_parallel_width_indicator,
+    double_symmetric_draw, draw_crease_angle_restricted_5, draw_crease_segment, fishbone_draw,
+    inward, mirror_selected_lines, parallel_draw, parallel_width_indicators,
+    perpendicular_indicator, perpendicular_projection, square_bisector_from_lines_to_destination,
+    square_bisector_from_points_to_destination, square_bisector_parallel_between_destinations,
+    square_bisector_parallel_indicator, symmetric_draw,
 };
 
 #[test]
@@ -412,6 +412,35 @@ fn angle_restricted_5_snaps_to_angle_system_and_nearby_line() {
         Point::new(0.0, 0.0),
         Point::new(2.0, 0.0),
         LineColor::Red1,
+    ));
+}
+
+#[test]
+fn angle_system_candidates_and_destination_draw_match_expected_geometry() {
+    let candidates = angle_system_candidates(
+        Point::new(0.0, 0.0),
+        Point::new(1.0, 0.0),
+        4,
+        [40.0, 60.0, 80.0, 30.0, 50.0, 100.0],
+    );
+    assert_eq!(candidates.len(), 8);
+    assert_eq!(candidates[0].color, LineColor::Green6);
+    assert_eq!(candidates[1].color, LineColor::Orange4);
+
+    let destination = segment(0.0, 1.0, 2.0, 1.0, LineColor::Black0);
+    let mut model = model_from_segments(std::slice::from_ref(&destination));
+    assert!(angle_system_draw_to_destination(
+        &mut model,
+        Point::new(1.0, 0.0),
+        &candidates[1],
+        &destination,
+        LineColor::Blue2,
+    ));
+    assert!(contains_segment_close(
+        &model.line_segments,
+        Point::new(2.0, 1.0),
+        Point::new(1.0, 0.0),
+        LineColor::Blue2,
     ));
 }
 

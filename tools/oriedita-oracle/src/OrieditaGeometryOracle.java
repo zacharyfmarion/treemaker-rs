@@ -98,6 +98,8 @@ public class OrieditaGeometryOracle {
             case "foldline-inward" -> foldLineInward(args);
             case "foldline-fishbone" -> foldLineFishbone(args);
             case "foldline-angle-restricted5" -> foldLineAngleRestricted5(args);
+            case "foldline-angle-system-candidates" -> foldLineAngleSystemCandidates(args);
+            case "foldline-angle-system-draw" -> foldLineAngleSystemDraw(args);
             case "foldline-square-bisector-3p" -> foldLineSquareBisector3p(args);
             case "foldline-square-bisector-2l-np" -> foldLineSquareBisector2lNp(args);
             case "foldline-square-bisector-parallel-indicator" -> foldLineSquareBisectorParallelIndicator(args);
@@ -1553,6 +1555,79 @@ public class OrieditaGeometryOracle {
         return closestPoint;
     }
 
+    private static void foldLineAngleSystemCandidates(String[] args) {
+        if (args.length != 12) {
+            usage("foldline-angle-system-candidates expects start, end, divider, and six angles");
+        }
+
+        Point start = new Point(parse(args[1]), parse(args[2]));
+        Point end = new Point(parse(args[3]), parse(args[4]));
+        int divider = Integer.parseInt(args[5]);
+        double[] angles = new double[] {
+                parse(args[6]),
+                parse(args[7]),
+                parse(args[8]),
+                parse(args[9]),
+                parse(args[10]),
+                parse(args[11]),
+        };
+        printLineSegmentsList(angleSystemCandidates(start, end, divider, angles));
+    }
+
+    private static void foldLineAngleSystemDraw(String[] args) {
+        if (args.length < 15) {
+            usage("foldline-angle-system-draw expects release point, selected segment, destination segment, color, count, and segment payload");
+        }
+
+        Point release = new Point(parse(args[1]), parse(args[2]));
+        LineSegment selected = segment(args, 3);
+        LineSegment destination = segment(args, 8);
+        LineColor color = LineColor.fromNumber(Integer.parseInt(args[13]));
+        int count = Integer.parseInt(args[14]);
+        FoldLineSet set = foldLineSet(args, 15, count);
+
+        LineSegment result = new LineSegment(OritaCalc.findIntersection(destination, selected), release, color);
+        boolean added = Epsilon.high.gt0(result.determineLength());
+        if (added) {
+            addLineSegmentLikeWorker(set, result);
+        }
+
+        System.out.println("added|" + added);
+        printFoldLineSet(set);
+    }
+
+    private static List<LineSegment> angleSystemCandidates(Point start, Point end, int divider, double[] angles) {
+        List<LineSegment> candidates = new ArrayList<>();
+        int count = divider != 0 ? divider * 2 - 1 : 6;
+        LineSegment startingSegment = new LineSegment(end, start, LineColor.GREEN_6);
+        candidates.add(startingSegment);
+
+        if (divider != 0) {
+            double angle = 0.0;
+            double angleStep = 180.0 / (double) divider;
+            for (int i = 0; i < count; i++) {
+                angle += angleStep;
+                LineSegment segment = OritaCalc.lineSegment_rotate(startingSegment, angle, 1.0);
+                if (i % 2 == 0) {
+                    segment = segment.withColor(LineColor.ORANGE_4);
+                } else {
+                    segment = segment.withColor(LineColor.GREEN_6);
+                }
+                candidates.add(segment);
+            }
+        } else {
+            LineColor[] colors = new LineColor[] {
+                    LineColor.ORANGE_4,
+                    LineColor.GREEN_6,
+                    LineColor.PURPLE_8
+            };
+            for (int i = 0; i < 6; i++) {
+                candidates.add(OritaCalc.lineSegment_rotate(startingSegment, angles[i], 1.0).withColor(colors[i % 3]));
+            }
+        }
+        return candidates;
+    }
+
     private static void foldLineSquareBisector3p(String[] args) {
         if (args.length < 14) {
             usage("foldline-square-bisector-3p expects three points, destination segment, color, count, and segment payload");
@@ -2883,6 +2958,8 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle foldline-inward <p1x> <p1y> <p2x> <p2y> <p3x> <p3y> <color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-fishbone <drag ax ay bx by color> <gridWidth> <color> <selectionDistance> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-angle-restricted5 <anchorX> <anchorY> <pointerX> <pointerY> <divider> <angle1> <angle2> <angle3> <angle4> <angle5> <angle6> <selectionDistance> <color> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-angle-system-candidates <startX> <startY> <endX> <endY> <divider> <angle1> <angle2> <angle3> <angle4> <angle5> <angle6>");
+        System.err.println("   or: OrieditaGeometryOracle foldline-angle-system-draw <releaseX> <releaseY> <selected ax ay bx by color> <destination ax ay bx by color> <color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-square-bisector-3p <p1x> <p1y> <p2x> <p2y> <p3x> <p3y> <destination ax ay bx by color> <color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-square-bisector-2l-np <first ax ay bx by color> <second ax ay bx by color> <destination ax ay bx by color> <color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-square-bisector-parallel-indicator <first ax ay bx by color> <second ax ay bx by color> <count> [ax ay bx by color]...");

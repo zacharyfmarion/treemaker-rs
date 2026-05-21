@@ -394,10 +394,10 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
     descriptor!(
         AngleSystem,
         "MouseHandlerAngleSystem",
-        "operations::construction::angle_system",
+        "operations::construction::angle_system_candidates",
         Kernel,
         7,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         DrawCreaseAngleRestricted3,

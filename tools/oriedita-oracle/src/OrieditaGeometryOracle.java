@@ -1,6 +1,7 @@
 import origami.crease_pattern.CustomLineTypes;
 import origami.Epsilon;
 import origami.crease_pattern.FoldLineSet;
+import origami.crease_pattern.LassoInteractionMode;
 import origami.crease_pattern.LineSegmentSet;
 import origami.crease_pattern.OritaCalc;
 import origami.crease_pattern.element.Circle;
@@ -14,6 +15,7 @@ import origami.crease_pattern.worker.foldlineset.Fix1;
 import origami.crease_pattern.worker.foldlineset.Fix2;
 import origami.crease_pattern.worker.foldlineset.OrganizeCircles;
 import origami.crease_pattern.worker.linesegmentset.IntersectDivide;
+import origami.crease_pattern.worker.SelectMode;
 import origami.folding.util.SortingBox;
 
 import oriedita.editor.databinding.GridModel;
@@ -25,6 +27,7 @@ import oriedita.editor.save.Save;
 import oriedita.editor.save.SaveProvider;
 
 import java.awt.Color;
+import java.awt.geom.Path2D;
 import java.io.File;
 import java.lang.reflect.Method;
 import java.nio.file.Files;
@@ -72,6 +75,7 @@ public class OrieditaGeometryOracle {
             case "foldline-select-indices" -> foldLineSelectIndices(args);
             case "foldline-select-box" -> foldLineSelectBox(args);
             case "foldline-select-polygon" -> foldLineSelectPolygon(args);
+            case "foldline-select-lasso" -> foldLineSelectLasso(args);
             case "foldline-select-lx" -> foldLineSelectLx(args);
             case "foldline-select-connected" -> foldLineSelectConnected(args);
             case "foldline-delete-selected" -> foldLineDeleteSelected(args);
@@ -680,6 +684,28 @@ public class OrieditaGeometryOracle {
             case "select" -> set.select_Takakukei(polygon, "select");
             case "unselect" -> set.select_Takakukei(polygon, "unselectAction");
             default -> usage("unknown select-polygon action: " + action);
+        }
+
+        printFoldLineSetWithSelection(set);
+    }
+
+    private static void foldLineSelectLasso(String[] args) {
+        if (args.length < 5) {
+            usage("foldline-select-lasso expects action, preselected indices, vertex count, vertices, count, and segment payload");
+        }
+
+        String action = args[1];
+        int vertexCount = Integer.parseInt(args[3]);
+        int countOffset = 4 + vertexCount * 2;
+        int count = Integer.parseInt(args[countOffset]);
+        FoldLineSet set = foldLineSet(args, countOffset + 1, count);
+        applySelectedIndices(set, args[2], 2);
+        Path2D path = path(args, 4, vertexCount);
+
+        switch (action) {
+            case "select" -> set.select_lasso(path, SelectMode.SELECT, LassoInteractionMode.INTERSECT_CONTAIN);
+            case "unselect" -> set.select_lasso(path, SelectMode.UNSELECT, LassoInteractionMode.INTERSECT_CONTAIN);
+            default -> usage("unknown select-lasso action: " + action);
         }
 
         printFoldLineSetWithSelection(set);
@@ -1805,6 +1831,21 @@ public class OrieditaGeometryOracle {
         return new Polygon(points);
     }
 
+    private static Path2D path(String[] args, int offset, int count) {
+        Path2D path = new Path2D.Double();
+        if (count <= 0) {
+            return path;
+        }
+
+        path.moveTo(parse(args[offset]), parse(args[offset + 1]));
+        for (int index = 1; index < count; index++) {
+            int base = offset + index * 2;
+            path.lineTo(parse(args[base]), parse(args[base + 1]));
+        }
+        path.closePath();
+        return path;
+    }
+
     private static void applySelectedIndices(FoldLineSet set, String indices, int selected) {
         for (int index : parseIndices(indices)) {
             set.get(index + 1).setSelected(selected);
@@ -2038,6 +2079,7 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle foldline-advance-type <index> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-alternate-mv <startColor> <guide ax ay bx by color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-alternate-mv-crossing <startColor> <guide ax ay bx by color> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-select-lasso <select|unselect> <preselected indices> <vertexCount> [x y]... <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-draw-crease <fold|aux> <segment ax ay bx by color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-draw-symmetric <axis ax ay bx by color> <preselected> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-draw-point <index> <targetX> <targetY> <selectionDistance> <count> [ax ay bx by color]...");

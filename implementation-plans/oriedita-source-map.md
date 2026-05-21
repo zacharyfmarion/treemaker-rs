@@ -76,7 +76,7 @@ stage explicitly changes it.
 | `origami/crease_pattern/PointLineMap.java` | Point-to-line neighborhood lookup. | `model::topology` | kernel | 3 | Unsupported |
 | `origami/crease_pattern/FlatFoldabilityViolation.java` | Diagnostic payload. | `checks::diagnostic` | kernel | 9 | Unsupported |
 | `origami/crease_pattern/LittleBigLittleViolation.java` | Diagnostic payload. | `checks::diagnostic` | kernel | 9 | Unsupported |
-| `origami/crease_pattern/LassoInteractionMode.java` | Lasso selection mode. | `operations::selection` | kernel | 6 | Unsupported |
+| `origami/crease_pattern/LassoInteractionMode.java` | Lasso selection mode. | `operations::selection::LassoInteractionMode` | kernel | 6 | Oracle-tested |
 | `origami/crease_pattern/FoldingException.java` | Folding error surface. | `folding::error` | kernel | 10 | Unsupported |
 | `origami/crease_pattern/util/CreasePattern_Worker_Toolbox.java` | Shared CP worker helpers. | `operations::*` | kernel | 5-9 | Unsupported |
 | `origami/crease_pattern/worker/WireFrame_Worker.java` | Face/topology/folding preparation. | `fold_graph`, `folding` | kernel | 4, 10 | Unsupported |
@@ -192,8 +192,8 @@ stage explicitly changes it.
 | `FOLDABLE_LINE_DRAW_71` | `MouseHandlerFoldableLineDraw` | `operations::construction::foldable_line_draw` | kernel | 7 | Unsupported |
 | `REPLACE_LINE_TYPE_SELECT_72` | `MouseHandlerReplaceTypeSelect` | `operations::color::replace_line_type_for_indices` | kernel | 6 | Oracle-tested |
 | `DELETE_LINE_TYPE_SELECT_73` | `MouseHandlerDeleteTypeSelect` | `operations::color::delete_line_type_for_indices` | kernel | 6 | Oracle-tested |
-| `SELECT_LASSO_74` | `MouseHandlerSelectLasso` | `operations::selection::select_lasso` | kernel | 6 | Unsupported |
-| `UNSELECT_LASSO_75` | `MouseHandlerUnselectLasso` | `operations::selection::unselect_lasso` | kernel | 6 | Unsupported |
+| `SELECT_LASSO_74` | `MouseHandlerSelectLasso` | `operations::selection::select_lasso` | kernel | 6 | Oracle-tested |
+| `UNSELECT_LASSO_75` | `MouseHandlerUnselectLasso` | `operations::selection::unselect_lasso` | kernel | 6 | Oracle-tested |
 | `TEXT` | `MouseHandlerText` | `model::text`, `operations::text` | kernel | 3, 4 | Unsupported |
 | `DRAW_BLINTZ` | `MouseHandlerDrawBlintz` | `operations::generators::default_molecule` | kernel | 8 | Oracle-tested |
 | `DRAW_FISH_BASE` | `MouseHandlerDrawFishBase` | `operations::generators::default_molecule` | kernel | 8 | Oracle-tested |

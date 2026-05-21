@@ -30,8 +30,8 @@ use oristudio_cp::operations::point::{
 };
 use oristudio_cp::operations::selection::{
     delete_selected_lines, select_all, select_box, select_connected_from_point, select_indices,
-    select_intersecting_line, select_polygon, unselect_all, unselect_indices,
-    unselect_intersecting_line, unselect_polygon,
+    select_intersecting_line, select_lasso, select_polygon, unselect_all, unselect_indices,
+    unselect_intersecting_line, unselect_lasso, unselect_polygon,
 };
 use oristudio_cp::operations::transform::{
     copy_selected_lines, copy_selected_lines_by_points, extend_to_intersection_point_2,
@@ -885,6 +885,48 @@ fn polygon_and_intersection_selection_match_oriedita_foldlineset_oracle() {
     push_segment_args(&mut args, &polygon_segments);
     assert_eq!(
         line_segment_set_with_selection_summary(&box_model),
+        run_oracle(&oracle, &args)
+    );
+
+    let lasso_segments = vec![
+        segment(0.25, 0.25, 0.75, 0.75, LineColor::Red1),
+        segment(-0.5, 0.5, 0.5, 0.5, LineColor::Blue2),
+        segment(2.0, 2.0, 3.0, 3.0, LineColor::Black0),
+    ];
+    let mut lasso_model = model_from_segments(&lasso_segments);
+    select_lasso(
+        &mut lasso_model,
+        &oristudio_cp::geometry::Polygon::new(polygon.clone()),
+    );
+    let mut args = vec![
+        "foldline-select-lasso".to_string(),
+        "select".to_string(),
+        "-".to_string(),
+        polygon.len().to_string(),
+    ];
+    push_points_args(&mut args, &polygon);
+    args.push(lasso_segments.len().to_string());
+    push_segment_args(&mut args, &lasso_segments);
+    assert_eq!(
+        line_segment_set_with_selection_summary(&lasso_model),
+        run_oracle(&oracle, &args)
+    );
+
+    unselect_lasso(
+        &mut lasso_model,
+        &oristudio_cp::geometry::Polygon::new(polygon.clone()),
+    );
+    let mut args = vec![
+        "foldline-select-lasso".to_string(),
+        "unselect".to_string(),
+        "0,1".to_string(),
+        polygon.len().to_string(),
+    ];
+    push_points_args(&mut args, &polygon);
+    args.push(lasso_segments.len().to_string());
+    push_segment_args(&mut args, &lasso_segments);
+    assert_eq!(
+        line_segment_set_with_selection_summary(&lasso_model),
         run_oracle(&oracle, &args)
     );
 

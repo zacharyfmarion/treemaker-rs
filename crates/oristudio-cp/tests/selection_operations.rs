@@ -2,8 +2,8 @@ use oristudio_cp::geometry::{LineColor, LineSegment, Point, Polygon};
 use oristudio_cp::model::CreasePatternModel;
 use oristudio_cp::operations::selection::{
     delete_selected_lines, select_all, select_box, select_connected_from_point, select_indices,
-    select_intersecting_line, select_polygon, unselect_all, unselect_box, unselect_indices,
-    unselect_intersecting_line, unselect_polygon,
+    select_intersecting_line, select_lasso, select_polygon, unselect_all, unselect_box,
+    unselect_indices, unselect_intersecting_line, unselect_lasso, unselect_polygon,
 };
 
 #[test]
@@ -77,6 +77,21 @@ fn intersecting_line_selection_selects_overlaps_and_x_crossings() {
     assert_eq!(select_intersecting_line(&mut model, &selection), 2);
     assert_eq!(selected_flags(&model), vec![2, 2, 0]);
     assert_eq!(unselect_intersecting_line(&mut model, &selection), 2);
+    assert_eq!(selected_flags(&model), vec![0, 0, 0]);
+}
+
+#[test]
+fn lasso_selection_selects_intersecting_or_contained_lines() {
+    let mut model = model_from_segments(&[
+        segment(0.25, 0.25, 0.75, 0.75, LineColor::Red1),
+        segment(-0.5, 0.5, 0.5, 0.5, LineColor::Blue2),
+        segment(2.0, 2.0, 3.0, 3.0, LineColor::Black0),
+    ]);
+    let lasso = unit_square();
+
+    assert_eq!(select_lasso(&mut model, &lasso), 2);
+    assert_eq!(selected_flags(&model), vec![2, 2, 0]);
+    assert_eq!(unselect_lasso(&mut model, &lasso), 2);
     assert_eq!(selected_flags(&model), vec![0, 0, 0]);
 }
 

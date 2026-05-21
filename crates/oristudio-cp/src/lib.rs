@@ -853,7 +853,7 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
         "operations::selection::select_lasso",
         Kernel,
         6,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         UnselectLasso,
@@ -861,7 +861,7 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
         "operations::selection::unselect_lasso",
         Kernel,
         6,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         Text,

@@ -879,12 +879,14 @@ Status:
 - `operations::selection` now ports the FoldLineSet-level selection primitives:
   select/unselect all, index-based line select/unselect, box selection using
   `lineSegmentsInside`, polygon select/unselect using `select_Takakukei`, line
-  intersection/overlap selection using `select_lX`, and
-  `selectProbablyConnected`. These paths have Rust unit coverage and Oriedita
-  oracle coverage. The tests preserve Oriedita's distinction between box
-  selection, which selects any line touching a box boundary or interior, and
-  polygon selection, which ignores outside-to-outside lines that merely pass
-  through the polygon.
+  intersection/overlap selection using `select_lX`, lasso selection/unselection
+  with `INTERSECT_CONTAIN`, and `selectProbablyConnected`. These paths have
+  Rust unit coverage and Oriedita oracle coverage. The tests preserve
+  Oriedita's distinction between box selection, which selects any line touching
+  a box boundary or interior, polygon selection, which ignores
+  outside-to-outside lines that merely pass through the polygon, and lasso
+  selection, which uses Java `Line2D`-style boundary intersection plus strict
+  endpoint containment.
 - Selected-line make mountain/valley/edge/aux, `CREASE_ADVANCE_TYPE_30`, the
   overlapping-line alternation used by `CREASE_MAKE_MV_34`, and the
   crossing-line alternation used by `CREASES_ALTERNATE_MV_36` now have Rust

@@ -9,6 +9,13 @@ use crate::model::CreasePatternModel;
 const SELECTED: i32 = 2;
 const UNSELECTED: i32 = 0;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LassoInteractionMode {
+    Intersect,
+    Contain,
+    IntersectContain,
+}
+
 /// Oriedita `FoldLineSet.select_all`.
 pub fn select_all(model: &mut CreasePatternModel) -> usize {
     set_all(model, SELECTED)
@@ -47,6 +54,26 @@ pub fn select_polygon(model: &mut CreasePatternModel, polygon: &Polygon) -> usiz
 /// Oriedita `FoldLineSet.select_Takakukei(polygon, "unselectAction")`.
 pub fn unselect_polygon(model: &mut CreasePatternModel, polygon: &Polygon) -> usize {
     select_by_polygon_intersection(model, polygon, UNSELECTED)
+}
+
+/// Oriedita `FoldLineSet.select_lasso(..., SELECT, INTERSECT_CONTAIN)`.
+pub fn select_lasso(model: &mut CreasePatternModel, path: &Polygon) -> usize {
+    select_by_lasso(
+        model,
+        path,
+        SELECTED,
+        LassoInteractionMode::IntersectContain,
+    )
+}
+
+/// Oriedita `FoldLineSet.select_lasso(..., UNSELECT, INTERSECT_CONTAIN)`.
+pub fn unselect_lasso(model: &mut CreasePatternModel, path: &Polygon) -> usize {
+    select_by_lasso(
+        model,
+        path,
+        UNSELECTED,
+        LassoInteractionMode::IntersectContain,
+    )
 }
 
 /// Oriedita `FoldLineSet.select_lX(selection, "select_lX")`.
@@ -184,6 +211,79 @@ fn select_by_intersecting_line(
         .map(|(index, _)| index)
         .collect();
     set_indices(model, &indices, selected)
+}
+
+fn select_by_lasso(
+    model: &mut CreasePatternModel,
+    path: &Polygon,
+    selected: i32,
+    mode: LassoInteractionMode,
+) -> usize {
+    let mut changed = 0;
+    for segment in &mut model.line_segments {
+        if segment.selected == selected {
+            continue;
+        }
+
+        let is_valid = match mode {
+            LassoInteractionMode::Intersect => is_line_segment_intersecting_path(path, segment),
+            LassoInteractionMode::Contain => is_line_segment_contained_in_path(path, segment),
+            LassoInteractionMode::IntersectContain => {
+                is_line_segment_intersecting_path(path, segment)
+                    || is_line_segment_contained_in_path(path, segment)
+            }
+        };
+
+        if is_valid {
+            *segment = segment.with_selected(selected);
+            changed += 1;
+        }
+    }
+    changed
+}
+
+fn is_line_segment_intersecting_path(path: &Polygon, segment: &LineSegment) -> bool {
+    path.line_segments()
+        .iter()
+        .any(|path_segment| line2d_intersects_line(segment, path_segment))
+}
+
+fn is_line_segment_contained_in_path(path: &Polygon, segment: &LineSegment) -> bool {
+    path.inside(segment.a) == PolygonIntersection::Inside
+        && path.inside(segment.b) == PolygonIntersection::Inside
+        && !is_line_segment_intersecting_path(path, segment)
+}
+
+fn line2d_intersects_line(a: &LineSegment, b: &LineSegment) -> bool {
+    relative_ccw(a.a, a.b, b.a) * relative_ccw(a.a, a.b, b.b) <= 0
+        && relative_ccw(b.a, b.b, a.a) * relative_ccw(b.a, b.b, a.b) <= 0
+}
+
+fn relative_ccw(a: Point, b: Point, p: Point) -> i32 {
+    let x2 = b.x - a.x;
+    let y2 = b.y - a.y;
+    let mut px = p.x - a.x;
+    let mut py = p.y - a.y;
+    let mut ccw = px * y2 - py * x2;
+    if ccw == 0.0 {
+        ccw = px * x2 + py * y2;
+        if ccw > 0.0 {
+            px -= x2;
+            py -= y2;
+            ccw = px * x2 + py * y2;
+            if ccw < 0.0 {
+                ccw = 0.0;
+            }
+        }
+    }
+
+    if ccw < 0.0 {
+        -1
+    } else if ccw > 0.0 {
+        1
+    } else {
+        0
+    }
 }
 
 fn push_unique_usize(values: &mut Vec<usize>, value: usize) {

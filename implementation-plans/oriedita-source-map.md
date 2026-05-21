@@ -258,7 +258,7 @@ mutation.
 | `FoldingEstimateTask.java` | Folding estimate execution. | `folding::estimate` | 10 | Unsupported |
 | `FoldingEstimateSpecificTask.java` | Refold with selected starting face/state. | `folding::estimate_specific` | 10 | Unsupported |
 | `FoldingEstimateSave100Task.java` | Batch/export folding estimates. | `folding::estimate_batch` | 10 | Unsupported |
-| `TwoColoredTask.java` | Two-colored CP generation. | `folding::two_colored` | 10 | Unsupported |
+| `TwoColoredTask.java` | Two-colored CP generation. | `folding::two_colored_subface_segments_from_segments` | 10 | Porting; stage 02col/03 subface arrangement oracle |
 | `FoldingServiceImpl.fold` | Determine fold scope and start folding. | `folding::commands::fold` | 10 | Unsupported |
 | `FoldingServiceImpl.folding_estimated` | Reuse existing fold input for selected figure. | `folding::commands::estimate` | 10 | Unsupported |
 | `FoldingServiceImpl.createTwoColoredCp` | Generate two-colored CP from selected lines. | `folding::commands::two_colored` | 10 | Unsupported |

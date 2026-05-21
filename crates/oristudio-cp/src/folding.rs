@@ -181,6 +181,20 @@ pub fn prepare_subface_segments(segments: &[LineSegment]) -> Vec<LineSegment> {
     model.line_segments
 }
 
+/// Oriedita two-color CP preparation through
+/// `FoldedFigure.folding_estimated_02col()` and stage 03. Unlike normal folding
+/// estimation, this keeps the original development-view coordinates and uses
+/// only face-position topology before generating the subdivided subface
+/// arrangement.
+pub fn two_colored_subface_segments_from_segments(
+    segments: &[LineSegment],
+    starting_face_id: i32,
+) -> Option<Vec<LineSegment>> {
+    let wireframe = face_position_wireframe_from_segments(segments, starting_face_id)?;
+    let wireframe_segments = folded_wireframe_segments(&wireframe);
+    Some(prepare_subface_segments(&wireframe_segments))
+}
+
 /// Oriedita `FoldedFigure_Configurator.configureSubFaces()` for the folded
 /// wireframe and its subdivided subface arrangement, without hierarchy solving.
 pub fn configure_subfaces_from_segments(

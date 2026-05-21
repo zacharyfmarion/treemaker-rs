@@ -5,7 +5,7 @@ use oristudio_cp::folding::{
     initial_hierarchy_from_segments, overlap_search_from_segments,
     overlap_search_from_segments_with_swap, possible_overlap_search_for_ordered_subfaces,
     possible_overlap_search_for_subfaces, possible_overlap_search_for_subfaces_with_swap,
-    prepare_subface_segments, prioritize_subfaces,
+    prepare_subface_segments, prioritize_subfaces, two_colored_subface_segments_from_segments,
 };
 use oristudio_cp::geometry::{LineColor, LineSegment, Point};
 
@@ -397,6 +397,19 @@ fn overlap_search_from_segments_with_swap_runs_initial_worker_pipeline() {
     assert!(!search.hierarchy.relations.is_empty());
 }
 
+#[test]
+fn two_colored_subface_segments_keep_development_coordinates() {
+    let prepared = two_colored_subface_segments_from_segments(&two_square_strip(), 1)
+        .expect("two-colored subface preparation");
+
+    assert!(!prepared.is_empty());
+    assert!(
+        prepared
+            .iter()
+            .any(|segment| segment.a.x == 10.0 || segment.b.x == 10.0)
+    );
+}
+
 fn square_with_diagonal() -> Vec<LineSegment> {
     vec![
         LineSegment::with_color(
@@ -420,6 +433,18 @@ fn square_with_diagonal() -> Vec<LineSegment> {
             LineColor::Black0,
         ),
         LineSegment::with_color(Point::new(0.0, 0.0), Point::new(1.0, 1.0), LineColor::Red1),
+    ]
+}
+
+fn two_square_strip() -> Vec<LineSegment> {
+    vec![
+        segment(0.0, 0.0, 10.0, 0.0, LineColor::Black0),
+        segment(10.0, 0.0, 20.0, 0.0, LineColor::Black0),
+        segment(20.0, 0.0, 20.0, 10.0, LineColor::Black0),
+        segment(20.0, 10.0, 10.0, 10.0, LineColor::Black0),
+        segment(10.0, 10.0, 0.0, 10.0, LineColor::Black0),
+        segment(0.0, 10.0, 0.0, 0.0, LineColor::Black0),
+        segment(10.0, 0.0, 10.0, 10.0, LineColor::Red1),
     ]
 }
 
@@ -482,4 +507,8 @@ fn position(permutation: &[usize], value: usize) -> usize {
         .iter()
         .position(|digit| *digit == value)
         .expect("value should be present")
+}
+
+fn segment(ax: f64, ay: f64, bx: f64, by: f64, color: LineColor) -> LineSegment {
+    LineSegment::with_color(Point::new(ax, ay), Point::new(bx, by), color)
 }

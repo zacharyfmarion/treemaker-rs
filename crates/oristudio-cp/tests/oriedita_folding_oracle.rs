@@ -7,6 +7,7 @@ use oristudio_cp::folding::{
     overlap_search_from_segments, overlap_search_from_segments_with_swap,
     possible_overlap_search_for_ordered_subfaces, possible_overlap_search_for_subfaces,
     possible_overlap_search_for_subfaces_with_swap, prepare_subface_segments, prioritize_subfaces,
+    two_colored_subface_segments_from_segments,
 };
 use oristudio_cp::geometry::{LineColor, LineSegment, Point};
 use std::path::{Path, PathBuf};
@@ -65,6 +66,32 @@ fn subface_arrangement_preparation_matches_oriedita_oracle() {
         let prepared = prepare_subface_segments(&segments);
         let mut args = vec![
             "split-subface-arrangement".to_string(),
+            segments.len().to_string(),
+        ];
+        push_segment_args(&mut args, &segments);
+        let oracle_args = args.iter().map(String::as_str).collect::<Vec<_>>();
+
+        assert_eq!(
+            line_segment_summary(&prepared),
+            run_oracle(&oracle, &oracle_args)
+        );
+    }
+}
+
+#[test]
+fn two_colored_subface_arrangement_matches_oriedita_oracle() {
+    let Some(oracle) = folding_oracle() else {
+        eprintln!("skipping Oriedita folding oracle test: ORIEDITA_GEOMETRY_ORACLE is not set");
+        return;
+    };
+
+    for starting_face in [1, 0] {
+        let segments = two_square_strip();
+        let prepared = two_colored_subface_segments_from_segments(&segments, starting_face)
+            .expect("two-colored subface arrangement");
+        let mut args = vec![
+            "two-colored-subface-arrangement".to_string(),
+            starting_face.to_string(),
             segments.len().to_string(),
         ];
         push_segment_args(&mut args, &segments);
@@ -1364,6 +1391,18 @@ fn square_with_blue_diagonal() -> Vec<LineSegment> {
         *diagonal = diagonal.with_line_color(LineColor::Blue2);
     }
     segments
+}
+
+fn two_square_strip() -> Vec<LineSegment> {
+    vec![
+        segment(0.0, 0.0, 10.0, 0.0, LineColor::Black0),
+        segment(10.0, 0.0, 20.0, 0.0, LineColor::Black0),
+        segment(20.0, 0.0, 20.0, 10.0, LineColor::Black0),
+        segment(20.0, 10.0, 10.0, 10.0, LineColor::Black0),
+        segment(10.0, 10.0, 0.0, 10.0, LineColor::Black0),
+        segment(0.0, 10.0, 0.0, 0.0, LineColor::Black0),
+        segment(10.0, 0.0, 10.0, 10.0, LineColor::Red1),
+    ]
 }
 
 fn quartered_square() -> Vec<LineSegment> {

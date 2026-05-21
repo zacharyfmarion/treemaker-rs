@@ -318,6 +318,7 @@ public class OrieditaGeometryOracle {
             case "fold-topology-summary" -> foldTopologySummary(args);
             case "wireframe-folding-summary" -> wireframeFoldingSummary(args);
             case "split-subface-arrangement" -> splitSubfaceArrangement(args);
+            case "two-colored-subface-arrangement" -> twoColoredSubfaceArrangement(args);
             case "subface-configuration-summary" -> subfaceConfigurationSummary(args);
             case "initial-hierarchy-summary" -> initialHierarchySummary(args);
             case "equivalence-candidates-summary" -> equivalenceCandidatesSummary(args);
@@ -411,6 +412,25 @@ public class OrieditaGeometryOracle {
         LineSegmentSet set = lineSegmentSet(args, 2, count);
         LineSegmentSetWorker worker = new LineSegmentSetWorker();
         worker.set(set);
+        printLineSegmentSet(worker.split_arrangement_for_SubFace_generation());
+    }
+
+    private static void twoColoredSubfaceArrangement(String[] args) throws Exception {
+        if (args.length < 3) {
+            usage("two-colored-subface-arrangement expects starting face, count, and segment payload");
+        }
+
+        int startingFace = Integer.parseInt(args[1]);
+        int count = Integer.parseInt(args[2]);
+        LineSegmentSet set = lineSegmentSet(args, 3, count);
+
+        WireFrame_Worker flat = new WireFrame_Worker(3.0);
+        flat.setLineSegmentSet(set);
+        flat.setStartingFaceId(startingFace);
+        PointSet facePositions = flat.getFacePositions();
+
+        LineSegmentSetWorker worker = new LineSegmentSetWorker();
+        worker.set(new LineSegmentSet(facePositions));
         printLineSegmentSet(worker.split_arrangement_for_SubFace_generation());
     }
 
@@ -6354,6 +6374,7 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle fold-topology-summary <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle wireframe-folding-summary <startingFace> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle split-subface-arrangement <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle two-colored-subface-arrangement <startingFace> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle subface-configuration-summary <startingFace> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle initial-hierarchy-summary <startingFace> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle equivalence-candidates-summary <startingFace> <count> [ax ay bx by color]...");

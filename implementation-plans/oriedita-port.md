@@ -1219,6 +1219,15 @@ Deliverables:
   `worker-overlap-from-segments-swap-summary` compare this against actual
   Oriedita `FoldedFigure_Configurator.HierarchyList_configure` setups followed
   by `FoldedFigure_Worker.possible_overlapping_search(false|true)`.
+- Status: The two-color folding preparation branch through
+  `FoldedFigure.folding_estimated_02col()` and stage 03 is ported as
+  `folding::two_colored_subface_segments_from_segments`. This keeps the
+  development-view coordinates, uses face-position topology rather than folded
+  point coordinates, and then runs the same subface-arrangement cleanup as
+  Oriedita. The oracle command `two-colored-subface-arrangement` compares the
+  resulting subdivided line set. Full `TwoColoredTask` command semantics,
+  selected-range preconditions, and folded-figure state updates remain tracked
+  until the command/service layer is ported.
 - Status: Oriedita's `SubFaceSwappingAlgorithm` support logic is ported as
   `folding::SubFaceSwapper`, including visited-subface tracking, dead-end
   recording, repeated-prefix history detection, swap-counter-driven reverse

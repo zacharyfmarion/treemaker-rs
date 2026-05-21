@@ -973,6 +973,14 @@ Validation:
 - `cargo test -p oristudio-cp construction`
 - `ORIEDITA_ORACLE=... cargo test -p oracle-tests --test oriedita_oracle construction`
 
+Status:
+
+- `PARALLEL_DRAW_40` and `PARALLEL_DRAW_WIDTH_51` are ported and
+  oracle-tested for resolved model-space selections. The port preserves
+  Oriedita's `s_step_additional_intersection` behavior, fixed-distance
+  `moveParallel` indicators, selected indicator recoloring, and worker-style
+  insertion splitting.
+
 ### Stage 8: Circle, Polygon, Base, and Generator Tools
 
 Deliverables:

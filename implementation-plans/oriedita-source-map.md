@@ -158,7 +158,7 @@ stage explicitly changes it.
 | `DRAW_CREASE_ANGLE_RESTRICTED_5_37` | `MouseHandlerDrawCreaseAngleRestricted5` | `operations::construction::angle_restricted_5` | kernel | 7 | Unsupported |
 | `VERTEX_MAKE_ANGULARLY_FLAT_FOLDABLE_38` | `MouseHandlerVertexMakeAngularlyFlatFoldable` | `operations::construction::make_vertex_flat_foldable` | kernel | 7, 9 | Unsupported |
 | `FOLDABLE_LINE_INPUT_39` | `MouseHandlerFoldableLineInput` | `operations::construction::foldable_line_input` | kernel | 7 | Unsupported |
-| `PARALLEL_DRAW_40` | `MouseHandlerParallelDraw` | `operations::construction::parallel` | kernel | 7 | Unsupported |
+| `PARALLEL_DRAW_40` | `MouseHandlerParallelDraw` | `operations::construction::parallel_draw` | kernel | 7 | Oracle-tested |
 | `VERTEX_DELETE_ON_CREASE_41` | `MouseHandlerVertexDeleteOnCrease` | `operations::point::delete_vertex_on_crease` | kernel | 5 | Oracle-tested |
 | `CIRCLE_DRAW_42` | `MouseHandlerCircleDraw` | `operations::circle::draw` | kernel | 8 | Oracle-tested |
 | `CIRCLE_DRAW_THREE_POINT_43` | `MouseHandlerCircleDrawThreePoint` | `operations::circle::through_three_points` | kernel | 8 | Oracle-tested |
@@ -169,7 +169,7 @@ stage explicitly changes it.
 | `CIRCLE_DRAW_CONCENTRIC_48` | `MouseHandlerCircleDrawConcentric` | `operations::circle::concentric` | kernel | 8 | Oracle-tested |
 | `CIRCLE_DRAW_CONCENTRIC_SELECT_49` | `MouseHandlerCircleDrawConcentricSelect` | `operations::circle::concentric_select` | kernel | 8 | Oracle-tested |
 | `CIRCLE_DRAW_CONCENTRIC_TWO_CIRCLE_SELECT_50` | `MouseHandlerCircleDrawConcentricTwoCircleSelect` | `operations::circle::concentric_two_circle_select` | kernel | 8 | Oracle-tested |
-| `PARALLEL_DRAW_WIDTH_51` | `MouseHandlerParallelDrawWidth` | `operations::construction::parallel_width` | kernel | 7 | Unsupported |
+| `PARALLEL_DRAW_WIDTH_51` | `MouseHandlerParallelDrawWidth` | `operations::construction::parallel_width_indicators` | kernel | 7 | Oracle-tested |
 | `CONTINUOUS_SYMMETRIC_DRAW_52` | `MouseHandlerContinuousSymmetricDraw` | `operations::construction::continuous_symmetric` | kernel | 7 | Unsupported |
 | `DISPLAY_LENGTH_BETWEEN_POINTS_1_53` | `MouseHandlerDisplayLengthBetweenPoints` variant | `operations::measure::length_between_points` | kernel | 7 | Oracle-tested |
 | `DISPLAY_LENGTH_BETWEEN_POINTS_2_54` | `MouseHandlerDisplayLengthBetweenPoints` variant | `operations::measure::length_between_points` | kernel | 7 | Oracle-tested |

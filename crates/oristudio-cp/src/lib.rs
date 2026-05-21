@@ -578,10 +578,10 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
     descriptor!(
         ParallelDraw,
         "MouseHandlerParallelDraw",
-        "operations::construction::parallel",
+        "operations::construction::parallel_draw",
         Kernel,
         7,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         VertexDeleteOnCrease,
@@ -666,10 +666,10 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
     descriptor!(
         ParallelDrawWidth,
         "MouseHandlerParallelDrawWidth",
-        "operations::construction::parallel_width",
+        "operations::construction::parallel_width_indicators",
         Kernel,
         7,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         ContinuousSymmetricDraw,

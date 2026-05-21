@@ -19,7 +19,8 @@ use oristudio_cp::operations::color::{
     make_valley, replace_line_type_for_indices, set_line_color_for_indices, toggle_mountain_valley,
 };
 use oristudio_cp::operations::construction::{
-    DrawCreaseTarget, draw_crease_segment, mirror_selected_lines,
+    DrawCreaseTarget, commit_parallel_width_indicator, draw_crease_segment, mirror_selected_lines,
+    parallel_draw, parallel_width_indicators,
 };
 use oristudio_cp::operations::generators::{
     DefaultMolecule, default_molecule, regular_polygon_no_corners,
@@ -1182,6 +1183,51 @@ fn lengthen_crease_matches_oriedita_oracle() {
         let rust_summary = format!("added|{added}\n{}", line_segment_set_summary(&model));
         assert_eq!(rust_summary, run_oracle(&oracle, &args), "{mode_name}");
     }
+}
+
+#[test]
+fn parallel_draw_modes_match_oriedita_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    let existing_segments = vec![segment(2.0, -1.0, 2.0, 1.0, LineColor::Black0)];
+    let target = Point::new(0.0, 0.5);
+    let parallel = segment(0.0, 0.0, 1.0, 0.0, LineColor::Red1);
+    let destination = segment(2.0, -1.0, 2.0, 1.0, LineColor::Black0);
+    let mut model = model_from_segments(&existing_segments);
+    let added = parallel_draw(
+        &mut model,
+        target,
+        &parallel,
+        &destination,
+        LineColor::Blue2,
+    );
+    let mut args = vec!["foldline-parallel-draw".to_string()];
+    push_points_args(&mut args, &[target]);
+    push_one_segment_args(&mut args, &parallel);
+    push_one_segment_args(&mut args, &destination);
+    args.push(LineColor::Blue2.number().to_string());
+    args.push(existing_segments.len().to_string());
+    push_segment_args(&mut args, &existing_segments);
+    let rust_summary = format!("added|{added}\n{}", line_segment_set_summary(&model));
+    assert_eq!(rust_summary, run_oracle(&oracle, &args));
+
+    let selected = segment(0.0, 0.0, 2.0, 0.0, LineColor::Red1);
+    let indicators = parallel_width_indicators(&selected, 1.0);
+    let mut model = CreasePatternModel::default();
+    let added = commit_parallel_width_indicator(&mut model, &indicators[0], LineColor::Blue2);
+    let mut args = vec!["foldline-parallel-width".to_string()];
+    push_one_segment_args(&mut args, &selected);
+    args.push("1.0".to_string());
+    args.push("0".to_string());
+    args.push(LineColor::Blue2.number().to_string());
+    args.push("0".to_string());
+    let rust_summary = format!("added|{added}\n{}", line_segment_set_summary(&model));
+    assert_eq!(rust_summary, run_oracle(&oracle, &args));
 }
 
 #[test]

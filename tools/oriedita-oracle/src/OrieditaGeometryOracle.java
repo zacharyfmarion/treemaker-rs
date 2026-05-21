@@ -86,6 +86,8 @@ public class OrieditaGeometryOracle {
             case "foldline-transform-selected-4p" -> foldLineTransformSelected4p(args);
             case "foldline-extend-to-intersection" -> foldLineExtendToIntersection(args);
             case "foldline-lengthen" -> foldLineLengthen(args);
+            case "foldline-parallel-draw" -> foldLineParallelDraw(args);
+            case "foldline-parallel-width" -> foldLineParallelWidth(args);
             case "foldline-draw-crease" -> foldLineDrawCrease(args);
             case "foldline-draw-symmetric" -> foldLineDrawSymmetric(args);
             case "foldline-draw-point" -> foldLineDrawPoint(args);
@@ -1036,6 +1038,83 @@ public class OrieditaGeometryOracle {
         set.addLine(addLineSegment);
         set.divideLineSegmentWithNewLines(set.getTotal() - 1, set.getTotal());
         return true;
+    }
+
+    private static void foldLineParallelDraw(String[] args) {
+        if (args.length < 15) {
+            usage("foldline-parallel-draw expects target point, parallel segment, destination segment, color, count, and segment payload");
+        }
+
+        Point targetPoint = new Point(parse(args[1]), parse(args[2]));
+        LineSegment parallelSegment = segment(args, 3);
+        LineSegment destinationSegment = segment(args, 8);
+        LineColor color = LineColor.fromNumber(Integer.parseInt(args[13]));
+        int count = Integer.parseInt(args[14]);
+        FoldLineSet set = foldLineSet(args, 15, count);
+        LineSegment guide = new LineSegment(targetPoint, new Point(
+                targetPoint.getX() + parallelSegment.determineBX() - parallelSegment.determineAX(),
+                targetPoint.getY() + parallelSegment.determineBY() - parallelSegment.determineAY()));
+        LineSegment result = additionalIntersection(guide, destinationSegment, color);
+        boolean added = result != null;
+        if (added) {
+            addLineSegmentLikeWorker(set, result);
+        }
+
+        System.out.println("added|" + added);
+        printFoldLineSet(set);
+    }
+
+    private static void foldLineParallelWidth(String[] args) {
+        if (args.length < 10) {
+            usage("foldline-parallel-width expects selected segment, width, choice, color, count, and segment payload");
+        }
+
+        LineSegment selectedSegment = segment(args, 1);
+        double width = parse(args[6]);
+        int choice = Integer.parseInt(args[7]);
+        LineColor color = LineColor.fromNumber(Integer.parseInt(args[8]));
+        int count = Integer.parseInt(args[9]);
+        FoldLineSet set = foldLineSet(args, 10, count);
+        List<LineSegment> indicators = List.of(
+                OritaCalc.moveParallel(selectedSegment, width).withColor(LineColor.PURPLE_8),
+                OritaCalc.moveParallel(selectedSegment, -width).withColor(LineColor.PURPLE_8));
+        LineSegment selected = indicators.get(choice).withColor(color);
+        boolean added = Epsilon.high.gt0(selected.determineLength());
+        if (added) {
+            addLineSegmentLikeWorker(set, selected);
+        }
+
+        System.out.println("added|" + added);
+        printFoldLineSet(set);
+    }
+
+    private static LineSegment additionalIntersection(
+            LineSegment guide,
+            LineSegment destination,
+            LineColor color) {
+        Point crossPoint;
+        OritaCalc.ParallelJudgement parallel = OritaCalc.isLineSegmentParallel(
+                guide,
+                destination,
+                Epsilon.UNKNOWN_1EN7);
+        if (parallel == OritaCalc.ParallelJudgement.PARALLEL_NOT_EQUAL) {
+            return null;
+        }
+        if (parallel == OritaCalc.ParallelJudgement.PARALLEL_EQUAL) {
+            crossPoint = destination.getA();
+            if (OritaCalc.distance(guide.getA(), destination.getA())
+                    > OritaCalc.distance(guide.getA(), destination.getB())) {
+                crossPoint = destination.getB();
+            }
+        } else {
+            crossPoint = OritaCalc.findIntersection(guide, destination);
+        }
+
+        LineSegment result = new LineSegment(crossPoint, guide.getA(), color);
+        if (Epsilon.high.gt0(result.determineLength())) {
+            return result;
+        }
+        return null;
     }
 
     private static void foldLineDrawCrease(String[] args) {
@@ -2210,6 +2289,8 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle foldline-alternate-mv-crossing <startColor> <guide ax ay bx by color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-select-lasso <select|unselect> <preselected indices> <vertexCount> [x y]... <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-lengthen <current|same> <lineColor> <selectionDistance> <selection ax ay bx by color> <extensionX> <extensionY> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-parallel-draw <targetX> <targetY> <parallel ax ay bx by color> <destination ax ay bx by color> <color> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-parallel-width <selected ax ay bx by color> <width> <choice> <color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-draw-crease <fold|aux> <segment ax ay bx by color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-draw-symmetric <axis ax ay bx by color> <preselected> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-draw-point <index> <targetX> <targetY> <selectionDistance> <count> [ax ay bx by color]...");

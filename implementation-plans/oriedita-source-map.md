@@ -81,7 +81,7 @@ stage explicitly changes it.
 | `origami/crease_pattern/util/CreasePattern_Worker_Toolbox.java` | Shared CP worker helpers. | `operations::*` | kernel | 5-9 | Unsupported |
 | `origami/crease_pattern/worker/WireFrame_Worker.java` | Face/topology/folding preparation. | `io::fold::export_topology`, `fold_graph`, `folding` | kernel | 4, 10 | Porting; FOLD topology and wireframe oracle |
 | `origami/crease_pattern/worker/LineSegmentSetWorker.java` | Arrangement cleanup for folded subfaces. | `folding::prepare_subface_segments`, `operations::arrangement` | kernel | 5, 10 | Oracle-tested for split-arrangement preprocessing |
-| `origami/crease_pattern/worker/FoldedFigure_Worker.java` | Folded-model hierarchy and overlap solving. | `folding` | kernel | 10 | Unsupported |
+| `origami/crease_pattern/worker/FoldedFigure_Worker.java` | Folded-model hierarchy and overlap solving. | `folding` | kernel | 10 | Porting; worker no-swap overlap-search oracle |
 | `origami/crease_pattern/worker/FoldedFigure_Configurator.java` | Subface and hierarchy setup. | `folding::configure_subfaces_from_segments` | kernel | 10 | Porting; configureSubFaces oracle |
 | `origami/crease_pattern/worker/SelectMode.java` | Select/unselect mode enum. | `operations::selection` | kernel | 6 | Unsupported |
 | `origami/crease_pattern/worker/foldlineset/BranchTrim.java` | Branch trimming cleanup. | `operations::arrangement` | kernel | 5 | Oracle-tested |

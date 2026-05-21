@@ -1193,6 +1193,13 @@ Deliverables:
   selection by new information count, face-count tie-breaking, and valid
   subface count calculation. The oracle command `subface-priority-summary`
   compares ordered subface indices and valid counts.
+- Status: Oriedita's worker-level no-swap overlap search is ported as
+  `folding::possible_overlap_search_for_subfaces`, composing the priority pass,
+  valid subface guide-map setup, per-subface consistency search, permutation
+  carry/rollback, and hierarchy stacking insertion. Realtime AEA, subface
+  swapping, and final recovery when non-valid reduced subfaces still contradict
+  the solution remain explicit unsupported paths. The oracle command
+  `worker-overlap-search-summary` compares the resulting status and hierarchy.
 
 Oracle:
 

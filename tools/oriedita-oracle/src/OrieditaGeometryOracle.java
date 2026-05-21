@@ -326,6 +326,7 @@ public class OrieditaGeometryOracle {
             case "subface-guide-permutation-summary" -> subfaceGuidePermutationSummary(args);
             case "subface-overlap-search-summary" -> subfaceOverlapSearchSummary(args);
             case "subface-priority-summary" -> subfacePrioritySummary(args);
+            case "worker-overlap-search-summary" -> workerOverlapSearchSummary(args);
             default -> usage("unknown command: " + args[0]);
         }
     }
@@ -794,6 +795,94 @@ public class OrieditaGeometryOracle {
                     + (ordered[i] - 1) + "|"
                     + oracleSubfaceFaceIds(subfaces[ordered[i]]));
         }
+    }
+
+    private static void workerOverlapSearchSummary(String[] args) throws Exception {
+        if (args.length < 7) {
+            usage("worker-overlap-search-summary expects faces total, subface count, subfaces, relation count, relation pairs, 3EC count, 3EC entries, 4EC count, and 4EC entries");
+        }
+
+        int facesTotal = Integer.parseInt(args[1]);
+        int subfaceCount = Integer.parseInt(args[2]);
+        int offset = 3;
+        SubFace[] subfaces = new SubFace[subfaceCount + 1];
+        subfaces[0] = new SubFace(new NoopBulletinBoard());
+        for (int i = 1; i <= subfaceCount; i++) {
+            int faceCount = Integer.parseInt(args[offset++]);
+            subfaces[i] = new SubFace(new NoopBulletinBoard());
+            subfaces[i].setNumDigits(faceCount);
+            for (int j = 1; j <= faceCount; j++) {
+                subfaces[i].setFaceId(j, Integer.parseInt(args[offset++]) + 1);
+            }
+        }
+
+        NoopBulletinBoard bulletinBoard = new NoopBulletinBoard();
+        FoldedFigure_Worker worker = new FoldedFigure_Worker(bulletinBoard);
+        worker.hierarchyList.setFacesTotal(facesTotal);
+        int relationCount = Integer.parseInt(args[offset++]);
+        for (int i = 0; i < relationCount; i++) {
+            int upper = Integer.parseInt(args[offset++]) + 1;
+            int lower = Integer.parseInt(args[offset++]) + 1;
+            worker.hierarchyList.set(upper, lower, HierarchyList.ABOVE_1);
+        }
+
+        int tripleCount = Integer.parseInt(args[offset++]);
+        for (int i = 0; i < tripleCount; i++) {
+            worker.hierarchyList.addEquivalenceCondition(new origami.folding.util.EquivalenceCondition(
+                    Integer.parseInt(args[offset++]) + 1,
+                    Integer.parseInt(args[offset++]) + 1,
+                    Integer.parseInt(args[offset++]) + 1,
+                    Integer.parseInt(args[offset++]) + 1));
+        }
+
+        int quadrupleCount = Integer.parseInt(args[offset++]);
+        for (int i = 0; i < quadrupleCount; i++) {
+            worker.hierarchyList.addUEquivalenceCondition(new origami.folding.util.EquivalenceCondition(
+                    Integer.parseInt(args[offset++]) + 1,
+                    Integer.parseInt(args[offset++]) + 1,
+                    Integer.parseInt(args[offset++]) + 1,
+                    Integer.parseInt(args[offset++]) + 1));
+        }
+
+        worker.hierarchyList.save();
+        worker.SubFaceTotal = subfaceCount;
+        worker.s0 = subfaces;
+        worker.s = new SubFace[subfaceCount + 1];
+        worker.s[0] = subfaces[0];
+
+        SubFacePriority priority = new SubFacePriority(facesTotal, subfaceCount);
+        for (int i = 1; i <= subfaceCount; i++) {
+            priority.addSubFace(subfaces[i], i, worker.hierarchyList);
+        }
+
+        int validCount = 0;
+        SubFace[] reduced = new SubFace[subfaceCount + 1];
+        reduced[0] = subfaces[0];
+        for (int i = 1; i <= subfaceCount; i++) {
+            long result = priority.getMaxSubFace(subfaces);
+            int selected = (int) (result & SubFacePriority.mask);
+            int max = (int) (result >>> 32);
+            worker.s[i] = subfaces[selected];
+            reduced[i] = subfaces[selected];
+            if (max > 0) {
+                validCount++;
+            }
+            priority.processSubFace(subfaces[selected], selected, worker.hierarchyList);
+        }
+
+        Field s1Field = FoldedFigure_Worker.class.getDeclaredField("s1");
+        s1Field.setAccessible(true);
+        s1Field.set(worker, reduced);
+        Field validField = FoldedFigure_Worker.class.getDeclaredField("SubFace_valid_number");
+        validField.setAccessible(true);
+        validField.setInt(worker, validCount);
+
+        for (int i = 1; i <= validCount; i++) {
+            worker.s[i].setGuideMap(worker.hierarchyList);
+        }
+
+        int result = worker.possible_overlapping_search(false);
+        printWorkerOverlapSearch(result, validCount, subfaceCount, worker.hierarchyList);
     }
 
     private static void intersectDividePair(String[] args) throws Exception {
@@ -5123,6 +5212,29 @@ public class OrieditaGeometryOracle {
                 + permutation);
     }
 
+    private static void printWorkerOverlapSearch(
+            int result,
+            int validCount,
+            int subfaceCount,
+            HierarchyList hierarchyList) {
+        List<int[]> relations = new ArrayList<>();
+        for (int i = 1; i <= hierarchyList.getFacesTotal(); i++) {
+            for (int j = 1; j <= hierarchyList.getFacesTotal(); j++) {
+                if (i != j && hierarchyList.get(i, j) == HierarchyList.ABOVE_1) {
+                    relations.add(new int[] {i - 1, j - 1});
+                }
+            }
+        }
+        System.out.println("worker_overlap|"
+                + result + "|"
+                + validCount + "|"
+                + subfaceCount + "|"
+                + relations.size());
+        for (int[] relation : relations) {
+            System.out.println("relation|" + relation[0] + "|" + relation[1]);
+        }
+    }
+
     private static FoldedFigure_Worker configuredSubfaceWorker(PointSet folded) throws Exception {
         LineSegmentSetWorker lineWorker = new LineSegmentSetWorker();
         lineWorker.set(new LineSegmentSet(folded));
@@ -6046,6 +6158,7 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle subface-guide-permutation-summary <facesTotal> <faceCount> [faceId]... <relationCount> [upper lower]... <limit>");
         System.err.println("   or: OrieditaGeometryOracle subface-overlap-search-summary <facesTotal> <faceCount> [faceId]... <relationCount> [upper lower]... <tripleCount> [a b c d]... <quadCount> [a b c d]...");
         System.err.println("   or: OrieditaGeometryOracle subface-priority-summary <facesTotal> <subfaceCount> [faceCount faceIds...]... <relationCount> [upper lower]...");
+        System.err.println("   or: OrieditaGeometryOracle worker-overlap-search-summary <facesTotal> <subfaceCount> [faceCount faceIds...]... <relationCount> [upper lower]... <tripleCount> [a b c d]... <quadCount> [a b c d]...");
         System.exit(2);
     }
 }

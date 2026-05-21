@@ -2,7 +2,8 @@ use oristudio_cp::folding::{
     ChainPermutationGenerator, HierarchyRelation, InitialHierarchy, SubFacePermutationSearch,
     additional_estimation_from_segments, configure_subfaces_from_segments,
     equivalence_condition_candidates_from_segments, estimate_wireframe_from_segments,
-    initial_hierarchy_from_segments, prepare_subface_segments, prioritize_subfaces,
+    initial_hierarchy_from_segments, possible_overlap_search_for_subfaces,
+    prepare_subface_segments, prioritize_subfaces,
 };
 use oristudio_cp::geometry::{LineColor, LineSegment, Point};
 
@@ -250,6 +251,33 @@ fn subface_priority_prefers_new_pair_information_then_face_count() {
 
     assert_eq!(priority.ordered_subface_indices, vec![2, 1, 0]);
     assert_eq!(priority.valid_count, 1);
+}
+
+#[test]
+fn worker_overlap_search_composes_valid_subface_orders() {
+    let hierarchy = InitialHierarchy {
+        faces_total: 3,
+        relations: vec![HierarchyRelation {
+            upper_face: 2,
+            lower_face: 0,
+        }],
+    };
+    let subfaces = vec![oristudio_cp::folding::SubFace {
+        face_ids: vec![0, 1, 2],
+    }];
+
+    let search = possible_overlap_search_for_subfaces(&subfaces, &[0], &hierarchy, None)
+        .expect("worker search should be supported");
+
+    assert!(search.found);
+    assert_eq!(search.priority.valid_count, 1);
+    assert!(
+        search
+            .hierarchy
+            .relations
+            .iter()
+            .any(|relation| relation.upper_face == 2 && relation.lower_face == 0)
+    );
 }
 
 fn square_with_diagonal() -> Vec<LineSegment> {

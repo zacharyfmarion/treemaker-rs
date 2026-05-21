@@ -3,8 +3,8 @@ use oristudio_cp::folding::{
     EquivalenceConditionSet, HierarchyRelation, InitialHierarchy, InitialHierarchyError, SubFace,
     SubFaceConfiguration, SubFacePermutationSearch, additional_estimation_from_segments,
     configure_subfaces_from_segments, equivalence_condition_candidates_from_segments,
-    estimate_wireframe_from_segments, initial_hierarchy_from_segments, prepare_subface_segments,
-    prioritize_subfaces,
+    estimate_wireframe_from_segments, initial_hierarchy_from_segments,
+    possible_overlap_search_for_subfaces, prepare_subface_segments, prioritize_subfaces,
 };
 use oristudio_cp::geometry::{LineColor, LineSegment, Point};
 use std::path::{Path, PathBuf};
@@ -499,6 +499,73 @@ fn subface_priority_matches_oriedita_oracle() {
     }
 }
 
+#[test]
+fn worker_overlap_search_matches_oriedita_no_swap_oracle() {
+    let Some(oracle) = folding_oracle() else {
+        eprintln!("skipping Oriedita folding oracle test: ORIEDITA_GEOMETRY_ORACLE is not set");
+        return;
+    };
+
+    let case = WorkerOverlapCase {
+        faces_total: 3,
+        subfaces: &[&[0usize, 1, 2]],
+        relations: &[(2, 0)],
+        triple_conditions: &[],
+        quadruple_conditions: &[],
+    };
+    let hierarchy = InitialHierarchy {
+        faces_total: case.faces_total,
+        relations: case
+            .relations
+            .iter()
+            .map(|(upper_face, lower_face)| HierarchyRelation {
+                upper_face: *upper_face,
+                lower_face: *lower_face,
+            })
+            .collect(),
+    };
+    let conditions = EquivalenceConditionSet {
+        triple_conditions: Vec::new(),
+        quadruple_conditions: Vec::new(),
+    };
+    let subfaces = case
+        .subfaces
+        .iter()
+        .map(|face_ids| SubFace {
+            face_ids: face_ids.to_vec(),
+        })
+        .collect::<Vec<_>>();
+    let reduced = (0..subfaces.len()).collect::<Vec<_>>();
+    let search =
+        possible_overlap_search_for_subfaces(&subfaces, &reduced, &hierarchy, Some(&conditions))
+            .expect("worker overlap search");
+
+    let mut args = vec![
+        "worker-overlap-search-summary".to_string(),
+        case.faces_total.to_string(),
+        case.subfaces.len().to_string(),
+    ];
+    for face_ids in case.subfaces {
+        args.push(face_ids.len().to_string());
+        for face_id in *face_ids {
+            args.push(face_id.to_string());
+        }
+    }
+    args.push(case.relations.len().to_string());
+    for (upper_face, lower_face) in case.relations {
+        args.push(upper_face.to_string());
+        args.push(lower_face.to_string());
+    }
+    args.push(case.triple_conditions.len().to_string());
+    args.push(case.quadruple_conditions.len().to_string());
+    let oracle_args = args.iter().map(String::as_str).collect::<Vec<_>>();
+
+    assert_eq!(
+        worker_overlap_summary(&search),
+        run_oracle(&oracle, &oracle_args)
+    );
+}
+
 fn folding_oracle() -> Option<PathBuf> {
     std::env::var("ORIEDITA_GEOMETRY_ORACLE")
         .or_else(|_| std::env::var("ORIEDITA_ORACLE"))
@@ -730,6 +797,14 @@ struct SubFacePriorityCase<'a> {
     relations: &'a [(usize, usize)],
 }
 
+struct WorkerOverlapCase<'a> {
+    faces_total: usize,
+    subfaces: &'a [&'a [usize]],
+    relations: &'a [(usize, usize)],
+    triple_conditions: &'a [(usize, usize, usize, usize)],
+    quadruple_conditions: &'a [(usize, usize, usize, usize)],
+}
+
 fn chain_permutation_summary(mut generator: ChainPermutationGenerator, limit: usize) -> String {
     let mut output = String::new();
     output.push_str(&format!("permutations|{}\n", generator.count()));
@@ -884,6 +959,24 @@ fn subface_priority_summary(
             rank,
             subface_index,
             joined_ids(&subfaces[*subface_index].face_ids)
+        ));
+    }
+    output
+}
+
+fn worker_overlap_summary(search: &oristudio_cp::folding::WorkerOverlapSearch) -> String {
+    let mut output = String::new();
+    output.push_str(&format!(
+        "worker_overlap|{}|{}|{}|{}\n",
+        if search.found { 1000 } else { 0 },
+        search.priority.valid_count,
+        search.priority.ordered_subface_indices.len(),
+        search.hierarchy.relations.len()
+    ));
+    for relation in &search.hierarchy.relations {
+        output.push_str(&format!(
+            "relation|{}|{}\n",
+            relation.upper_face, relation.lower_face
         ));
     }
     output

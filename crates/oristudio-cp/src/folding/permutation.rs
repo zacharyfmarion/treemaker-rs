@@ -1,6 +1,6 @@
 use super::{
-    EquivalenceCondition, EquivalenceConditionSet, FaceOrder, HierarchyTable, InitialHierarchy,
-    SubFace,
+    AdditionalEstimationError, EquivalenceCondition, EquivalenceConditionSet, FaceOrder,
+    HierarchyTable, InitialHierarchy, SubFace,
 };
 use std::collections::{HashMap, HashSet};
 
@@ -26,6 +26,41 @@ pub enum SubFaceSearchError {
 pub struct SubFacePriority {
     pub ordered_subface_indices: Vec<usize>,
     pub valid_count: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WorkerOverlapSearch {
+    pub found: bool,
+    pub hierarchy: InitialHierarchy,
+    pub priority: SubFacePriority,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WorkerOverlapSearchError {
+    SubFace(SubFaceSearchError),
+    AdditionalEstimation(AdditionalEstimationError),
+    FinalAdditionalEstimationRequired {
+        valid_count: usize,
+        reduced_subface_count: usize,
+    },
+}
+
+impl From<SubFaceSearchError> for WorkerOverlapSearchError {
+    fn from(error: SubFaceSearchError) -> Self {
+        Self::SubFace(error)
+    }
+}
+
+impl From<PermutationError> for WorkerOverlapSearchError {
+    fn from(error: PermutationError) -> Self {
+        Self::SubFace(SubFaceSearchError::Permutation(error))
+    }
+}
+
+impl From<AdditionalEstimationError> for WorkerOverlapSearchError {
+    fn from(error: AdditionalEstimationError) -> Self {
+        Self::AdditionalEstimation(error)
+    }
 }
 
 pub fn prioritize_subfaces(
@@ -93,6 +128,55 @@ pub fn prioritize_subfaces(
     }
 }
 
+pub fn possible_overlap_search_for_subfaces(
+    subfaces: &[SubFace],
+    reduced_subface_indices: &[usize],
+    hierarchy: &InitialHierarchy,
+    conditions: Option<&EquivalenceConditionSet>,
+) -> Result<WorkerOverlapSearch, WorkerOverlapSearchError> {
+    let priority = prioritize_subfaces(subfaces, reduced_subface_indices, hierarchy);
+    if priority.valid_count < priority.ordered_subface_indices.len() {
+        return Err(
+            WorkerOverlapSearchError::FinalAdditionalEstimationRequired {
+                valid_count: priority.valid_count,
+                reduced_subface_count: priority.ordered_subface_indices.len(),
+            },
+        );
+    }
+
+    let mut searches = Vec::with_capacity(priority.ordered_subface_indices.len());
+    for subface_index in &priority.ordered_subface_indices {
+        let Some(subface) = subfaces.get(*subface_index) else {
+            continue;
+        };
+        let mut search = SubFacePermutationSearch::new(subface.face_ids.clone());
+        search.set_guide_map(hierarchy, conditions)?;
+        searches.push(search);
+    }
+
+    let mut changed_subface = 1usize;
+    while changed_subface != 0 {
+        match inconsistent_subface_request(&mut searches, priority.valid_count, hierarchy)? {
+            WorkerSearchStep::Consistent(table) => {
+                return Ok(WorkerOverlapSearch {
+                    found: true,
+                    hierarchy: table.into_initial_hierarchy(hierarchy.faces_total),
+                    priority,
+                });
+            }
+            WorkerSearchStep::Inconsistent(subface_id) => {
+                changed_subface = advance_subface_permutations(&mut searches, subface_id - 1)?;
+            }
+        }
+    }
+
+    Ok(WorkerOverlapSearch {
+        found: false,
+        hierarchy: hierarchy.clone(),
+        priority,
+    })
+}
+
 impl From<PermutationError> for SubFaceSearchError {
     fn from(error: PermutationError) -> Self {
         Self::Permutation(error)
@@ -144,6 +228,10 @@ impl SubFacePermutationSearch {
         self.generator.next(digit)
     }
 
+    pub fn reset_permutation_generator(&mut self) {
+        self.generator.reset();
+    }
+
     /// Oriedita `SubFace.possible_overlapping_search()` without the
     /// CombinationGenerator accelerator. If that accelerator would be entered,
     /// this returns a typed unsupported error instead of approximating it.
@@ -152,6 +240,13 @@ impl SubFacePermutationSearch {
         hierarchy: &InitialHierarchy,
     ) -> Result<bool, SubFaceSearchError> {
         let table = HierarchyTable::from_initial(hierarchy);
+        self.possible_overlapping_search_with_table(&table)
+    }
+
+    fn possible_overlapping_search_with_table(
+        &mut self,
+        table: &HierarchyTable,
+    ) -> Result<bool, SubFaceSearchError> {
         let mut changed = 1usize;
         while changed != 0 {
             if self.generator.count() > 2000 {
@@ -160,13 +255,26 @@ impl SubFacePermutationSearch {
                 });
             }
 
-            let inconsistent_digit = self.inconsistent_digits_request(&table)?;
+            let inconsistent_digit = self.inconsistent_digits_request(table)?;
             if inconsistent_digit == 1000 {
                 return Ok(true);
             }
             changed = self.generator.next(inconsistent_digit)?;
         }
         Ok(false)
+    }
+
+    fn enter_stacking_into(
+        &self,
+        table: &mut HierarchyTable,
+    ) -> Result<(), AdditionalEstimationError> {
+        let ordering = self.current_ordering();
+        for i in 0..ordering.len().saturating_sub(1) {
+            for j in (i + 1)..ordering.len() {
+                table.infer_above(ordering[i], ordering[j])?;
+            }
+        }
+        Ok(())
     }
 
     /// Oriedita `SubFace.setGuideMap()`: derive permutation guides from the
@@ -366,6 +474,50 @@ impl SubFacePermutationSearch {
         let local = self.face_id_map.get(&face_id)?;
         self.generator.locate(*local)
     }
+}
+
+enum WorkerSearchStep {
+    Consistent(HierarchyTable),
+    Inconsistent(usize),
+}
+
+fn inconsistent_subface_request(
+    searches: &mut [SubFacePermutationSearch],
+    valid_count: usize,
+    hierarchy: &InitialHierarchy,
+) -> Result<WorkerSearchStep, WorkerOverlapSearchError> {
+    let mut table = HierarchyTable::from_initial(hierarchy);
+    for index in 0..valid_count {
+        let Some(search) = searches.get_mut(index) else {
+            continue;
+        };
+        if !search.possible_overlapping_search_with_table(&table)? {
+            return Ok(WorkerSearchStep::Inconsistent(index + 1));
+        }
+        search.enter_stacking_into(&mut table)?;
+    }
+    Ok(WorkerSearchStep::Consistent(table))
+}
+
+fn advance_subface_permutations(
+    searches: &mut [SubFacePermutationSearch],
+    subface_count: usize,
+) -> Result<usize, PermutationError> {
+    for search in searches.iter_mut().skip(subface_count) {
+        search.reset_permutation_generator();
+    }
+
+    let mut advanced = 0usize;
+    let mut subface_id = subface_count;
+    for index in (0..subface_count).rev() {
+        let digit_count = searches[index].face_ids.len();
+        advanced = searches[index].next(digit_count)?;
+        subface_id = index + 1;
+        if advanced != 0 {
+            break;
+        }
+    }
+    if advanced == 0 { Ok(0) } else { Ok(subface_id) }
 }
 
 /// Oriedita `ChainPermutationGenerator`, including persistent and temporary

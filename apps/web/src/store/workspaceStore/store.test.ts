@@ -18,6 +18,10 @@ import type { OristudioCpOperationDescriptor } from '../../engine/oristudioCpTyp
 import { projectFromSnapshot } from '../../engine/snapshotMapper';
 import type { FileService, SaveBinaryFileOptions, SaveTextFileOptions } from '../../platform/fileService';
 import { DEFAULT_CREASE_COLOR_MODE } from '../../lib/sampleProject';
+import {
+  DEFAULT_ORISTUDIO_CP_VIEWPORT_OPTIONS,
+  emptyOristudioCpSelection,
+} from '../../lib/creasePatternViewport';
 import { useLayoutStore } from '../layoutStore';
 
 const engineMocks = vi.hoisted(() => ({
@@ -811,6 +815,8 @@ function loadSnapshotIntoStore(snapshot: TreeSnapshot, title = 'Seed project') {
     oristudioCpDocument: null,
     oristudioCpOperationDescriptors: [],
     oristudioCpError: null,
+    oristudioCpHistoryPast: [],
+    oristudioCpHistoryFuture: [],
     projectLoadId: useWorkspaceStore.getState().projectLoadId + 1,
     currentFileName: 'seed.tmd5',
     currentFilePath: null,
@@ -830,6 +836,8 @@ function loadSnapshotIntoStore(snapshot: TreeSnapshot, title = 'Seed project') {
     clipboard: null,
     clipboardPasteCount: 0,
     creaseColorMode: DEFAULT_CREASE_COLOR_MODE,
+    oristudioCpSelection: emptyOristudioCpSelection(),
+    oristudioCpViewport: DEFAULT_ORISTUDIO_CP_VIEWPORT_OPTIONS,
     foldArtifacts: null,
     foldArtifactError: null,
     sequenceTarget: null,
@@ -952,11 +960,15 @@ describe('workspace store slices', () => {
     expect(state.oristudioCpDocument).toBeNull();
     expect(state.oristudioCpOperationDescriptors).toEqual([]);
     expect(state.oristudioCpError).toBeNull();
+    expect(state.oristudioCpHistoryPast).toEqual([]);
+    expect(state.oristudioCpHistoryFuture).toEqual([]);
     expect(state.status).toBe('loading_engine');
     expect(state.selection).toEqual({ kind: 'tree' });
     expect(state.toolMode).toBe('select');
     expect(state.symmetryAuthoringPairs).toEqual([]);
     expect(state.creaseColorMode).toBe(DEFAULT_CREASE_COLOR_MODE);
+    expect(state.oristudioCpSelection).toEqual(emptyOristudioCpSelection());
+    expect(state.oristudioCpViewport).toEqual(DEFAULT_ORISTUDIO_CP_VIEWPORT_OPTIONS);
     expect(state.foldArtifacts).toBeNull();
     expect(state.designViewportFitRequestId).toBe(0);
     expect(state.historyPast).toEqual([]);
@@ -977,6 +989,7 @@ describe('workspace store slices', () => {
     expect(state.addNodeWithSymmetry).toBeTypeOf('function');
     expect(state.optimizeEdges).toBeTypeOf('function');
     expect(state.buildCreasePattern).toBeTypeOf('function');
+    expect(state.toggleOristudioCpLineSelection).toBeTypeOf('function');
   });
 
   it('initializes projects, loads text, saves, exports, and maintains recents', async () => {
@@ -1158,6 +1171,31 @@ describe('workspace store slices', () => {
     expect(useWorkspaceStore.getState().error).toMatchObject({
       code: 'not_implemented',
     });
+  });
+
+  it('tracks editable CP viewport options and selection independently from tree selection', () => {
+    resetStores(seedSnapshot());
+
+    useWorkspaceStore.getState().toggleOristudioCpLineSelection(2);
+    expect(useWorkspaceStore.getState().oristudioCpSelection).toMatchObject({ lines: [2] });
+    expect(useWorkspaceStore.getState().selection).toEqual({ kind: 'tree' });
+
+    useWorkspaceStore.getState().toggleOristudioCpPointSelection(1, true);
+    expect(useWorkspaceStore.getState().oristudioCpSelection).toMatchObject({
+      lines: [2],
+      points: [1],
+    });
+
+    useWorkspaceStore.getState().setOristudioCpViewportOption('snapToGrid', false);
+    expect(useWorkspaceStore.getState().oristudioCpViewport).toMatchObject({
+      snapToGrid: false,
+      snapToVertices: true,
+    });
+
+    useWorkspaceStore.getState().clearOristudioCpSelection();
+    expect(useWorkspaceStore.getState().oristudioCpSelection).toEqual(
+      emptyOristudioCpSelection()
+    );
   });
 
   it('applies editing and condition actions through the engine', async () => {

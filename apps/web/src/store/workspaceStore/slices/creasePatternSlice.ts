@@ -1,5 +1,10 @@
 import { projectFromSnapshot } from '../../../engine/snapshotMapper';
 import type { FoldArtifacts, OptimizationReport } from '../../../engine/types';
+import {
+  DEFAULT_ORISTUDIO_CP_VIEWPORT_OPTIONS,
+  emptyOristudioCpSelection,
+  toggleCpSelectionList,
+} from '../../../lib/creasePatternViewport';
 import { DEFAULT_CREASE_COLOR_MODE } from '../../../lib/sampleProject';
 import { useLayoutStore } from '../../layoutStore';
 import { selectWorkspaceCapabilities } from '../capabilities';
@@ -107,6 +112,8 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
 
   return {
     creaseColorMode: DEFAULT_CREASE_COLOR_MODE,
+    oristudioCpSelection: emptyOristudioCpSelection(),
+    oristudioCpViewport: DEFAULT_ORISTUDIO_CP_VIEWPORT_OPTIONS,
     foldArtifacts: null,
     foldArtifactError: null,
     sequenceTarget: null,
@@ -258,6 +265,55 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
     },
 
     setCreaseColorMode: (creaseColorMode) => set({ creaseColorMode }),
+
     setSequenceSimulationFocus: (sequenceSimulationFocus) => set({ sequenceSimulationFocus }),
+
+    setOristudioCpViewportOption: (key, value) =>
+      set({ oristudioCpViewport: { ...get().oristudioCpViewport, [key]: value } }),
+
+    setOristudioCpSelection: (oristudioCpSelection) => set({ oristudioCpSelection }),
+
+    clearOristudioCpSelection: () =>
+      set({ oristudioCpSelection: emptyOristudioCpSelection() }),
+
+    toggleOristudioCpLineSelection: (id, additive = false) =>
+      set({
+        oristudioCpSelection: additive
+          ? {
+              ...get().oristudioCpSelection,
+              lines: toggleCpSelectionList(get().oristudioCpSelection.lines, id),
+            }
+          : { ...emptyOristudioCpSelection(), lines: [id] },
+      }),
+
+    toggleOristudioCpPointSelection: (id, additive = false) =>
+      set({
+        oristudioCpSelection: additive
+          ? {
+              ...get().oristudioCpSelection,
+              points: toggleCpSelectionList(get().oristudioCpSelection.points, id),
+            }
+          : { ...emptyOristudioCpSelection(), points: [id] },
+      }),
+
+    toggleOristudioCpCircleSelection: (id, additive = false) =>
+      set({
+        oristudioCpSelection: additive
+          ? {
+              ...get().oristudioCpSelection,
+              circles: toggleCpSelectionList(get().oristudioCpSelection.circles, id),
+            }
+          : { ...emptyOristudioCpSelection(), circles: [id] },
+      }),
+
+    toggleOristudioCpTextSelection: (id, additive = false) =>
+      set({
+        oristudioCpSelection: additive
+          ? {
+              ...get().oristudioCpSelection,
+              texts: toggleCpSelectionList(get().oristudioCpSelection.texts, id),
+            }
+          : { ...emptyOristudioCpSelection(), texts: [id] },
+      }),
   };
 };

@@ -1614,6 +1614,58 @@
   user-select: none;
 }
 
+.cp-grid-line {
+  stroke: color-mix(in srgb, var(--border-subtle) 72%, transparent);
+  stroke-width: 0.65;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+.cp-grid-line--major {
+  stroke: color-mix(in srgb, var(--border-default) 82%, transparent);
+  stroke-width: 0.95;
+}
+
+.cp-point {
+  fill: var(--accent-primary);
+  stroke: var(--bg-primary);
+  stroke-width: 1.4;
+  cursor: pointer;
+  vector-effect: non-scaling-stroke;
+}
+
+.cp-point--selected,
+.cp-circle--selected,
+.cp-text--selected {
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--accent-primary) 80%, transparent));
+}
+
+.cp-circle {
+  fill: transparent;
+  stroke: var(--accent-secondary);
+  stroke-width: 1.4;
+  cursor: pointer;
+  vector-effect: non-scaling-stroke;
+}
+
+.cp-text {
+  fill: var(--text-primary);
+  font: 600 12px Inter, system-ui, sans-serif;
+  paint-order: stroke;
+  stroke: var(--bg-primary);
+  stroke-width: 3px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.cp-snap-target {
+  fill: transparent;
+  stroke: var(--accent-primary);
+  stroke-width: 1.4;
+  pointer-events: none;
+  vector-effect: non-scaling-stroke;
+}
+
 .design-empty-state {
   overflow: visible;
   pointer-events: none;

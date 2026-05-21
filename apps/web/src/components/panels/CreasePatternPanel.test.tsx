@@ -7,6 +7,8 @@ import {
   type AppStatus,
   type TreeProject,
 } from '../../lib/sampleProject';
+import type { ImportedCreasePatternDocument } from '../../lib/creasePatternImport';
+import type { OristudioCpDocumentState } from '../../engine/oristudioCpTypes';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { TooltipProvider } from '../ui/Tooltip';
 import { CreasePatternPanel } from './CreasePatternPanel';
@@ -103,6 +105,112 @@ function renderPanel(
   transformMocks.zoomIn.mockClear();
   transformMocks.zoomOut.mockClear();
   return { container, buildCreasePattern, optimizeScale };
+}
+
+function importedCpDocument(): ImportedCreasePatternDocument {
+  return {
+    source: { format: 'cp', filename: 'editable.cp', path: null },
+    title: 'editable',
+    selectedFrame: null,
+    fold: {
+      file_spec: 1.2,
+      file_creator: 'test',
+      frame_title: 'editable',
+      vertices_coords: [
+        [0, 0],
+        [1, 0],
+      ],
+      edges_vertices: [[0, 1]],
+      edges_assignment: ['B'],
+      faces_vertices: [],
+    },
+    lineOnly: true,
+    simulationModelError: null,
+    diagnostics: { warnings: [], errors: [] },
+    stats: {
+      vertices: 2,
+      edges: 1,
+      faces: 0,
+      mountains: 0,
+      valleys: 0,
+      boundaries: 1,
+      flats: 0,
+      unassigned: 0,
+    },
+  };
+}
+
+function editableCpState(): OristudioCpDocumentState {
+  return {
+    handle: 1,
+    source: { format: 'cp', filename: 'editable.cp', path: null },
+    operationDescriptors: [],
+    lastCommandResult: null,
+    summary: {
+      title: 'editable',
+      line_segments: 2,
+      circles: 1,
+      points: 1,
+      aux_line_segments: 0,
+      texts: 1,
+      can_save_as_cp: false,
+      is_empty: false,
+    },
+    document: {
+      title: 'editable',
+      metadata: {},
+      crease_pattern: {
+        line_segments: [
+          {
+            a: { x: 0, y: 0 },
+            b: { x: 1, y: 0 },
+            active: 'Inactive0',
+            color: 'Red1',
+            selected: 0,
+            customized: 0,
+            customized_color: { red: 100, green: 200, blue: 200 },
+          },
+          {
+            a: { x: 0, y: 0 },
+            b: { x: 0, y: 1 },
+            active: 'Inactive0',
+            color: 'Blue2',
+            selected: 0,
+            customized: 0,
+            customized_color: { red: 100, green: 200, blue: 200 },
+          },
+        ],
+        circles: [
+          {
+            x: 0.5,
+            y: 0.5,
+            r: 0.25,
+            color: 'Cyan3',
+            customized: 0,
+            customized_color: { red: 100, green: 200, blue: 200 },
+          },
+        ],
+        points: [{ x: 0.5, y: 0.5 }],
+        aux_line_segments: [],
+        texts: [{ x: 0.2, y: 0.8, text: 'note' }],
+        grid: {
+          interval_grid_size: 2,
+          grid_size: 8,
+          grid_xa: 1,
+          grid_xb: 0,
+          grid_xc: 1,
+          grid_ya: 1,
+          grid_yb: 0,
+          grid_yc: 1,
+          grid_angle: 90,
+          base_state: 'WithinPaper',
+          vertical_scale_position: 0,
+          horizontal_scale_position: 0,
+          draw_diagonal_gridlines: false,
+        },
+      },
+    },
+  };
 }
 
 afterEach(() => {
@@ -340,5 +448,42 @@ describe('CreasePatternPanel', () => {
     expect(container.textContent).toContain('No imported crease pattern');
     expect(container.textContent).not.toContain('Optimize Scale');
     expect(container.textContent).not.toContain('Build CP');
+  });
+
+  it('renders editable CP kernel geometry with grid, selection, and viewport toggles', () => {
+    const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
+      documentMode: 'crease-pattern',
+      importedCreasePattern: importedCpDocument(),
+      oristudioCpDocument: editableCpState(),
+    });
+
+    expect(container.textContent).toContain('Editable kernel: 2 lines');
+    expect(container.querySelectorAll('[data-cp-line-id]')).toHaveLength(2);
+    expect(container.querySelector('.cp-grid-line')).not.toBeNull();
+    expect(container.querySelector('.cp-circle')).not.toBeNull();
+    expect(container.querySelector('.cp-point')).not.toBeNull();
+    expect(container.querySelector('.cp-text')?.textContent).toBe('note');
+    expect(container.textContent).toContain('2 lines');
+
+    act(() => {
+      container.querySelector<SVGLineElement>('[data-cp-line-id="1"]')?.dispatchEvent(
+        new MouseEvent('click', { bubbles: true })
+      );
+    });
+
+    expect(useWorkspaceStore.getState().oristudioCpSelection.lines).toEqual([1]);
+    expect(container.textContent).toContain('1 selected');
+
+    act(() => {
+      container.querySelector<HTMLButtonElement>('button[aria-label="Grid"]')?.click();
+    });
+    expect(useWorkspaceStore.getState().oristudioCpViewport.gridVisible).toBe(false);
+
+    act(() => {
+      container.querySelector<HTMLButtonElement>('button[aria-label="Snap"]')?.click();
+    });
+    expect(useWorkspaceStore.getState().oristudioCpViewport.snapToGrid).toBe(false);
+    expect(useWorkspaceStore.getState().oristudioCpViewport.snapToVertices).toBe(false);
+    expect(useWorkspaceStore.getState().oristudioCpViewport.snapToLines).toBe(false);
   });
 });

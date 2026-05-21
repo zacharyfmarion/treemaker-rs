@@ -7,6 +7,7 @@ import {
   withFlatFoldArtifacts,
   withFlatFoldError,
 } from '../../../lib/creasePatternImport';
+import { emptyOristudioCpSelection } from '../../../lib/creasePatternViewport';
 import { createEmptyProject, DEFAULT_CREASE_COLOR_MODE } from '../../../lib/sampleProject';
 import {
   getWorkspaceCapabilities,
@@ -41,6 +42,17 @@ const MAX_RECENTS = 8;
 
 function nowIso(): string {
   return new Date().toISOString();
+}
+
+function cpHistoryEntry(
+  document: Awaited<ReturnType<typeof loadOristudioCpDocumentFromText>>['document'],
+  label: string
+) {
+  return {
+    document,
+    label,
+    timestamp: nowIso(),
+  };
 }
 
 function basenameWithoutTreeMakerExtension(filename: string): string {
@@ -137,11 +149,14 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
       importedCreasePattern: null,
       oristudioCpDocument: null,
       oristudioCpError: null,
+      oristudioCpHistoryPast: [],
+      oristudioCpHistoryFuture: [],
       projectLoadId: get().projectLoadId + 1,
       currentFileName: filename,
       currentFilePath: source.path ?? null,
       projectMessage: `Loaded ${filename}`,
       selection: { kind: 'tree' },
+      oristudioCpSelection: emptyOristudioCpSelection(),
       toolMode: 'select',
       symmetryAuthoringPairs: [],
       creaseColorMode: DEFAULT_CREASE_COLOR_MODE,
@@ -211,11 +226,14 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
         ? oristudioCpDocument.operationDescriptors
         : get().oristudioCpOperationDescriptors,
       oristudioCpError: oristudioCpRuntimeError,
+      oristudioCpHistoryPast: [],
+      oristudioCpHistoryFuture: [],
       projectLoadId: get().projectLoadId + 1,
       currentFileName: filename,
       currentFilePath: source.path ?? null,
       projectMessage: `Loaded ${filename}`,
       selection: { kind: 'tree' },
+      oristudioCpSelection: emptyOristudioCpSelection(),
       toolMode: 'select',
       creaseColorMode: DEFAULT_CREASE_COLOR_MODE,
       foldArtifacts: result.foldArtifacts,
@@ -282,6 +300,8 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
     oristudioCpDocument: null,
     oristudioCpOperationDescriptors: [],
     oristudioCpError: null,
+    oristudioCpHistoryPast: [],
+    oristudioCpHistoryFuture: [],
     projectLoadId: 0,
     currentFilePath: null,
     currentFileName: 'Untitled.tmd5',
@@ -312,8 +332,11 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
           oristudioCpDocument: null,
           oristudioCpOperationDescriptors: operationDescriptors,
           oristudioCpError: null,
+          oristudioCpHistoryPast: [],
+          oristudioCpHistoryFuture: [],
           projectLoadId: get().projectLoadId + 1,
           selection: { kind: 'tree' },
+          oristudioCpSelection: emptyOristudioCpSelection(),
           symmetryAuthoringPairs: [],
           dirty: false,
           lastOptimization: null,
@@ -341,11 +364,14 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
           importedCreasePattern: null,
           oristudioCpDocument: null,
           oristudioCpError: null,
+          oristudioCpHistoryPast: [],
+          oristudioCpHistoryFuture: [],
           projectLoadId: get().projectLoadId + 1,
           currentFileName: 'Untitled.tmd5',
           currentFilePath: null,
           projectMessage: null,
           selection: { kind: 'tree' },
+          oristudioCpSelection: emptyOristudioCpSelection(),
           toolMode: 'select',
           symmetryAuthoringPairs: [],
           creaseColorMode: DEFAULT_CREASE_COLOR_MODE,
@@ -376,11 +402,14 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
           importedCreasePattern: null,
           oristudioCpDocument: null,
           oristudioCpError: null,
+          oristudioCpHistoryPast: [],
+          oristudioCpHistoryFuture: [],
           projectLoadId: get().projectLoadId + 1,
           currentFileName: 'three-terminal-flaps.tmd5',
           currentFilePath: null,
           projectMessage: 'Loaded starter project',
           selection: { kind: 'tree' },
+          oristudioCpSelection: emptyOristudioCpSelection(),
           toolMode: 'select',
           symmetryAuthoringPairs: [],
           creaseColorMode: DEFAULT_CREASE_COLOR_MODE,
@@ -426,11 +455,16 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
         return false;
       }
       try {
+        const previousDocument = get().oristudioCpDocument?.document ?? null;
         const nextDocument = await executeRuntimeOristudioCpCommand(operationId);
         set({
           oristudioCpDocument: nextDocument,
           oristudioCpOperationDescriptors: nextDocument.operationDescriptors,
           oristudioCpError: null,
+          oristudioCpHistoryPast: previousDocument
+            ? [...get().oristudioCpHistoryPast, cpHistoryEntry(previousDocument, String(operationId))]
+            : get().oristudioCpHistoryPast,
+          oristudioCpHistoryFuture: [],
           error: null,
           dirty: true,
         });
@@ -447,7 +481,12 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
 
     clearOristudioCpDocument: async () => {
       await releaseOristudioCpDocument();
-      set({ oristudioCpDocument: null, oristudioCpError: null });
+      set({
+        oristudioCpDocument: null,
+        oristudioCpError: null,
+        oristudioCpHistoryPast: [],
+        oristudioCpHistoryFuture: [],
+      });
     },
 
     openProject: async (fileService = getFileService()) => {

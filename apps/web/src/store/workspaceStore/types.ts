@@ -17,11 +17,17 @@ import type {
   ToolMode,
   TreeProject,
 } from '../../lib/sampleProject';
+import type {
+  OristudioCpSelection,
+  OristudioCpViewportOptionKey,
+  OristudioCpViewportOptions,
+} from '../../lib/creasePatternViewport';
 import type { SelectablePartKind } from '../../lib/selection';
 import type { SymmetryAuthoringPair } from '../../lib/symmetryAuthoring';
 import type { FileService } from '../../platform/fileService';
 import type { ImportedCreasePatternDocument } from '../../lib/creasePatternImport';
 import type {
+  OristudioCpDocumentSnapshot,
   OristudioCpDocumentState,
   OristudioCpOperationDescriptor,
 } from '../../engine/oristudioCpTypes';
@@ -35,6 +41,12 @@ export interface RecentProject {
   text: string;
 }
 
+export interface OristudioCpHistoryEntry {
+  document: OristudioCpDocumentSnapshot;
+  label: string;
+  timestamp: string;
+}
+
 export interface ProjectSliceState {
   project: TreeProject;
   documentMode: DocumentMode;
@@ -42,6 +54,8 @@ export interface ProjectSliceState {
   oristudioCpDocument: OristudioCpDocumentState | null;
   oristudioCpOperationDescriptors: OristudioCpOperationDescriptor[];
   oristudioCpError: string | null;
+  oristudioCpHistoryPast: OristudioCpHistoryEntry[];
+  oristudioCpHistoryFuture: OristudioCpHistoryEntry[];
   projectLoadId: number;
   currentFilePath: string | null;
   currentFileName: string;
@@ -207,6 +221,8 @@ export type ClipboardSlice = ClipboardSliceState & ClipboardSliceActions;
 
 export interface CreasePatternSliceState {
   creaseColorMode: CreaseColorMode;
+  oristudioCpSelection: OristudioCpSelection;
+  oristudioCpViewport: OristudioCpViewportOptions;
   foldArtifacts: FoldArtifacts | null;
   foldArtifactError: string | null;
   sequenceTarget: SequenceTargetState | null;
@@ -230,6 +246,16 @@ export interface CreasePatternSliceActions {
   planFoldingSequence: () => Promise<SequencePlan | null>;
   setCreaseColorMode: (mode: CreaseColorMode) => void;
   setSequenceSimulationFocus: (focus: SequenceSimulationFocus) => void;
+  setOristudioCpViewportOption: (
+    key: OristudioCpViewportOptionKey,
+    value: boolean
+  ) => void;
+  setOristudioCpSelection: (selection: OristudioCpSelection) => void;
+  clearOristudioCpSelection: () => void;
+  toggleOristudioCpLineSelection: (id: number, additive?: boolean) => void;
+  toggleOristudioCpPointSelection: (id: number, additive?: boolean) => void;
+  toggleOristudioCpCircleSelection: (id: number, additive?: boolean) => void;
+  toggleOristudioCpTextSelection: (id: number, additive?: boolean) => void;
 }
 
 export type CreasePatternSlice = CreasePatternSliceState & CreasePatternSliceActions;

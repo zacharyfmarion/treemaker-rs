@@ -632,9 +632,9 @@ Done when:
 - [x] Stage 1: Add command-result and unsupported-operation mapping.
 - [x] Stage 2 baseline: Rebase onto the landed CP pane pan/zoom/fit viewport
       work from `main`.
-- [ ] Stage 2: Extend the landed viewport with edit-grade CP viewport state.
-- [ ] Stage 2: Add CP selection, hit testing, snapping, history, and status UI.
-- [ ] Stage 2: Validate viewport behavior with unit and visual tests.
+- [x] Stage 2: Extend the landed viewport with edit-grade CP viewport state.
+- [x] Stage 2: Add CP selection, hit testing, snapping, history, and status UI.
+- [x] Stage 2: Validate viewport behavior with unit and visual tests.
 - [ ] Stage 3: Add the left-side tool rail, command groups, active-tool
       prompts, and Not-implemented presentation.
 - [ ] Stage 3: Add CP tool-state transitions for multi-step commands.

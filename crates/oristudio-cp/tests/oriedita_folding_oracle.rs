@@ -1,7 +1,7 @@
 use oristudio_cp::folding::{
-    InitialHierarchy, InitialHierarchyError, SubFaceConfiguration,
-    configure_subfaces_from_segments, estimate_wireframe_from_segments,
-    initial_hierarchy_from_segments, prepare_subface_segments,
+    EquivalenceConditionSet, InitialHierarchy, InitialHierarchyError, SubFaceConfiguration,
+    configure_subfaces_from_segments, equivalence_condition_candidates_from_segments,
+    estimate_wireframe_from_segments, initial_hierarchy_from_segments, prepare_subface_segments,
 };
 use oristudio_cp::geometry::{LineColor, LineSegment, Point};
 use std::path::{Path, PathBuf};
@@ -123,6 +123,32 @@ fn initial_hierarchy_matches_oriedita_oracle() {
 
         assert_eq!(
             initial_hierarchy_summary(Ok(&hierarchy)),
+            run_oracle(&oracle, &oracle_args)
+        );
+    }
+}
+
+#[test]
+fn equivalence_condition_candidates_match_oriedita_oracle() {
+    let Some(oracle) = folding_oracle() else {
+        eprintln!("skipping Oriedita folding oracle test: ORIEDITA_GEOMETRY_ORACLE is not set");
+        return;
+    };
+
+    for (starting_face, segments) in [(1, quartered_square()), (0, quartered_square())] {
+        let conditions = equivalence_condition_candidates_from_segments(&segments, starting_face)
+            .expect("Rust equivalence condition generation should not have a parity error")
+            .expect("Rust equivalence condition generation should succeed");
+        let mut args = vec![
+            "equivalence-candidates-summary".to_string(),
+            starting_face.to_string(),
+            segments.len().to_string(),
+        ];
+        push_segment_args(&mut args, &segments);
+        let oracle_args = args.iter().map(String::as_str).collect::<Vec<_>>();
+
+        assert_eq!(
+            equivalence_condition_summary(&conditions),
             run_oracle(&oracle, &oracle_args)
         );
     }
@@ -285,6 +311,28 @@ fn initial_hierarchy_summary(
     }
 }
 
+fn equivalence_condition_summary(conditions: &EquivalenceConditionSet) -> String {
+    let mut output = String::new();
+    output.push_str(&format!(
+        "equivalence|{}|{}\n",
+        conditions.triple_conditions.len(),
+        conditions.quadruple_conditions.len()
+    ));
+    for condition in &conditions.triple_conditions {
+        output.push_str(&format!(
+            "triple|{}|{}|{}|{}\n",
+            condition.a, condition.b, condition.c, condition.d
+        ));
+    }
+    for condition in &conditions.quadruple_conditions {
+        output.push_str(&format!(
+            "quad|{}|{}|{}|{}\n",
+            condition.a, condition.b, condition.c, condition.d
+        ));
+    }
+    output
+}
+
 fn joined_ids(ids: &[usize]) -> String {
     ids.iter()
         .map(|id| id.to_string())
@@ -328,6 +376,19 @@ fn square_with_blue_diagonal() -> Vec<LineSegment> {
         *diagonal = diagonal.with_line_color(LineColor::Blue2);
     }
     segments
+}
+
+fn quartered_square() -> Vec<LineSegment> {
+    vec![
+        segment(0.0, 0.0, 1.0, 0.0, LineColor::Black0),
+        segment(1.0, 0.0, 1.0, 1.0, LineColor::Black0),
+        segment(1.0, 1.0, 0.0, 1.0, LineColor::Black0),
+        segment(0.0, 1.0, 0.0, 0.0, LineColor::Black0),
+        segment(0.5, 0.5, 0.0, 0.0, LineColor::Red1),
+        segment(0.5, 0.5, 1.0, 0.0, LineColor::Blue2),
+        segment(0.5, 0.5, 1.0, 1.0, LineColor::Red1),
+        segment(0.5, 0.5, 0.0, 1.0, LineColor::Blue2),
+    ]
 }
 
 fn java_double_string(value: f64) -> String {

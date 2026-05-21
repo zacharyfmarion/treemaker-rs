@@ -1,5 +1,6 @@
 use oristudio_cp::folding::{
-    HierarchyRelation, configure_subfaces_from_segments, estimate_wireframe_from_segments,
+    HierarchyRelation, configure_subfaces_from_segments,
+    equivalence_condition_candidates_from_segments, estimate_wireframe_from_segments,
     initial_hierarchy_from_segments, prepare_subface_segments,
 };
 use oristudio_cp::geometry::{LineColor, LineSegment, Point};
@@ -102,6 +103,19 @@ fn initial_hierarchy_uses_mountain_valley_and_face_parity() {
     );
 }
 
+#[test]
+fn equivalence_condition_candidates_are_exposed() {
+    let segments = quartered_square();
+
+    let conditions = equivalence_condition_candidates_from_segments(&segments, 1)
+        .expect("condition generation should not fail")
+        .expect("condition set");
+
+    assert!(
+        !conditions.triple_conditions.is_empty() || !conditions.quadruple_conditions.is_empty()
+    );
+}
+
 fn square_with_diagonal() -> Vec<LineSegment> {
     vec![
         LineSegment::with_color(
@@ -125,5 +139,34 @@ fn square_with_diagonal() -> Vec<LineSegment> {
             LineColor::Black0,
         ),
         LineSegment::with_color(Point::new(0.0, 0.0), Point::new(1.0, 1.0), LineColor::Red1),
+    ]
+}
+
+fn quartered_square() -> Vec<LineSegment> {
+    vec![
+        LineSegment::with_color(
+            Point::new(0.0, 0.0),
+            Point::new(1.0, 0.0),
+            LineColor::Black0,
+        ),
+        LineSegment::with_color(
+            Point::new(1.0, 0.0),
+            Point::new(1.0, 1.0),
+            LineColor::Black0,
+        ),
+        LineSegment::with_color(
+            Point::new(1.0, 1.0),
+            Point::new(0.0, 1.0),
+            LineColor::Black0,
+        ),
+        LineSegment::with_color(
+            Point::new(0.0, 1.0),
+            Point::new(0.0, 0.0),
+            LineColor::Black0,
+        ),
+        LineSegment::with_color(Point::new(0.5, 0.5), Point::new(0.0, 0.0), LineColor::Red1),
+        LineSegment::with_color(Point::new(0.5, 0.5), Point::new(1.0, 0.0), LineColor::Blue2),
+        LineSegment::with_color(Point::new(0.5, 0.5), Point::new(1.0, 1.0), LineColor::Red1),
+        LineSegment::with_color(Point::new(0.5, 0.5), Point::new(0.0, 1.0), LineColor::Blue2),
     ]
 }

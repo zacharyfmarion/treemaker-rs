@@ -1161,9 +1161,12 @@ Deliverables:
   pruning. The first `HierarchyList_configure` step is ported as
   `folding::initial_hierarchy_from_segments`, covering mountain/valley-derived
   face-above-face relations and Oriedita's same-parity adjacent-face error.
-  Equivalence conditions, custom constraints, overlap ordering, full
-  `FoldingEstimateTask`, full `TwoColoredTask`, and folded-model mutation
-  commands remain intentionally unsupported until their stages are ported.
+  The 3-face and 4-face equivalence-condition discovery passes are ported as
+  `folding::equivalence_condition_candidates_from_segments`; this covers
+  condition discovery and pair normalization, but not AEA inference/removal.
+  Custom constraints, overlap ordering, full `FoldingEstimateTask`, full
+  `TwoColoredTask`, and folded-model mutation commands remain intentionally
+  unsupported until their stages are ported.
 
 Oracle:
 

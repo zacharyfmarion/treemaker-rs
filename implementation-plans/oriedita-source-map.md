@@ -110,7 +110,7 @@ stage explicitly changes it.
 | `origami/folding/constraint/CustomConstraint.java` | User folding constraints. | `folding::constraints` | kernel | 10 | Unsupported |
 | `origami/folding/algorithm/*` | Inference, priority, Italiano, swapping algorithms. | `folding::solver` | kernel | 10 | Unsupported |
 | `origami/folding/permutation/*` | Permutation and constraint combinatorics. | `folding::solver` | kernel | 10 | Unsupported |
-| `origami/folding/util/*` | Folding utility data structures. | `folding::util` | kernel | 10 | Unsupported |
+| `origami/folding/util/*` | Folding utility data structures. | `folding::EquivalenceCondition` | kernel | 10 | Porting; equivalence condition candidates oracle |
 | `oriedita-data/export/*` | Import/export implementations. | `io` | io | 4 | Unsupported |
 | `oriedita-data/save/*` | Oriedita save models and version conversion. | `io::save` | io | 4 | Unsupported |
 | `oriedita/src/main/java/oriedita/editor/task/*` | Non-UI task semantics. | `checks`, `folding` | kernel | 9-10 | Unsupported |

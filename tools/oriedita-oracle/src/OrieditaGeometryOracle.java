@@ -317,6 +317,7 @@ public class OrieditaGeometryOracle {
             case "split-subface-arrangement" -> splitSubfaceArrangement(args);
             case "subface-configuration-summary" -> subfaceConfigurationSummary(args);
             case "initial-hierarchy-summary" -> initialHierarchySummary(args);
+            case "equivalence-candidates-summary" -> equivalenceCandidatesSummary(args);
             default -> usage("unknown command: " + args[0]);
         }
     }
@@ -474,6 +475,75 @@ public class OrieditaGeometryOracle {
         System.out.println("hierarchy|" + folded.getNumFaces() + "|" + relations.size());
         for (int[] relation : relations) {
             System.out.println("relation|" + relation[0] + "|" + relation[1]);
+        }
+    }
+
+    private static void equivalenceCandidatesSummary(String[] args) throws Exception {
+        if (args.length < 3) {
+            usage("equivalence-candidates-summary expects starting face, count, and segment payload");
+        }
+
+        int startingFace = Integer.parseInt(args[1]);
+        int count = Integer.parseInt(args[2]);
+        LineSegmentSet set = lineSegmentSet(args, 3, count);
+
+        WireFrame_Worker flat = new WireFrame_Worker(3.0);
+        flat.setLineSegmentSet(set);
+        flat.setStartingFaceId(startingFace);
+        PointSet folded = flat.folding();
+        HierarchyList hierarchyList = initialHierarchyList(flat, folded);
+        if (hierarchyList == null) {
+            return;
+        }
+
+        FoldedFigure_Worker foldedWorker = configuredSubfaceWorker(folded);
+        SubFace[] reduced = reflectedReducedSubfaces(foldedWorker);
+
+        List<int[]> triples = new ArrayList<>();
+        for (int line = 1; line <= flat.getNumLines(); line++) {
+            int min = flat.lineInFaceBorder_min_request(line);
+            int max = flat.lineInFaceBorder_max_request(line);
+            if (min != max) {
+                for (int face = 1; face <= folded.getNumFaces(); face++) {
+                    if (face != min && face != max && folded.convex_inside(line, face)) {
+                        int[] pair = normalizedOraclePair(hierarchyList, min, max);
+                        triples.add(new int[] {face - 1, pair[0] - 1, face - 1, pair[1] - 1});
+                    }
+                }
+            }
+        }
+
+        List<int[]> quadruples = new ArrayList<>();
+        for (int first = 1; first < flat.getNumLines(); first++) {
+            int firstMin = flat.lineInFaceBorder_min_request(first);
+            int firstMax = flat.lineInFaceBorder_max_request(first);
+            if (firstMin == firstMax || firstMin == 0) {
+                continue;
+            }
+            for (int second = first + 1; second <= flat.getNumLines(); second++) {
+                int secondMin = flat.lineInFaceBorder_min_request(second);
+                int secondMax = flat.lineInFaceBorder_max_request(second);
+                if (secondMin != secondMax
+                        && secondMin != 0
+                        && folded.parallel_overlap(first, second)
+                        && oracleSubfacesContainAll(reduced, firstMin, firstMax, secondMin, secondMax)) {
+                    int[] firstPair = normalizedOraclePair(hierarchyList, firstMin, firstMax);
+                    int[] secondPair = normalizedOraclePair(hierarchyList, secondMin, secondMax);
+                    quadruples.add(new int[] {
+                            firstPair[0] - 1,
+                            firstPair[1] - 1,
+                            secondPair[0] - 1,
+                            secondPair[1] - 1});
+                }
+            }
+        }
+
+        System.out.println("equivalence|" + triples.size() + "|" + quadruples.size());
+        for (int[] condition : triples) {
+            System.out.println("triple|" + condition[0] + "|" + condition[1] + "|" + condition[2] + "|" + condition[3]);
+        }
+        for (int[] condition : quadruples) {
+            System.out.println("quad|" + condition[0] + "|" + condition[1] + "|" + condition[2] + "|" + condition[3]);
         }
     }
 
@@ -4689,6 +4759,72 @@ public class OrieditaGeometryOracle {
         }
     }
 
+    private static FoldedFigure_Worker configuredSubfaceWorker(PointSet folded) throws Exception {
+        LineSegmentSetWorker lineWorker = new LineSegmentSetWorker();
+        lineWorker.set(new LineSegmentSet(folded));
+        lineWorker.split_arrangement_for_SubFace_generation();
+
+        WireFrame_Worker subdivided = new WireFrame_Worker(3.0);
+        subdivided.setLineSegmentSet(lineWorker.get());
+
+        NoopBulletinBoard bulletinBoard = new NoopBulletinBoard();
+        FoldedFigure_Worker foldedWorker = new FoldedFigure_Worker(bulletinBoard);
+        FoldedFigure_Configurator configurator =
+                new FoldedFigure_Configurator(bulletinBoard, foldedWorker);
+        configurator.configureSubFaces(folded, subdivided.get());
+        return foldedWorker;
+    }
+
+    private static HierarchyList initialHierarchyList(WireFrame_Worker flat, PointSet folded) {
+        HierarchyList hierarchyList = new HierarchyList();
+        hierarchyList.setFacesTotal(folded.getNumFaces());
+        for (int i = 1; i <= flat.getNumLines(); i++) {
+            int faceIdMin = flat.lineInFaceBorder_min_request(i);
+            int faceIdMax = flat.lineInFaceBorder_max_request(i);
+            if (faceIdMin != faceIdMax) {
+                int minPos = flat.getIFacePosition(faceIdMin);
+                int maxPos = flat.getIFacePosition(faceIdMax);
+                if (minPos % 2 == maxPos % 2) {
+                    System.out.println("hierarchy_error|same_parity|"
+                            + (i - 1) + "|"
+                            + (faceIdMin - 1) + "|"
+                            + (faceIdMax - 1));
+                    return null;
+                }
+
+                int value;
+                if (folded.getColor(i) == LineColor.RED_1) {
+                    value = minPos % 2 == 1 ? HierarchyList.ABOVE_1 : HierarchyList.BELOW_0;
+                } else {
+                    value = minPos % 2 == 1 ? HierarchyList.BELOW_0 : HierarchyList.ABOVE_1;
+                }
+                hierarchyList.set(faceIdMin, faceIdMax, value);
+            }
+        }
+        return hierarchyList;
+    }
+
+    private static int[] normalizedOraclePair(HierarchyList hierarchyList, int first, int second) {
+        if (hierarchyList.get(first, second) == HierarchyList.BELOW_0) {
+            return new int[] {second, first};
+        }
+        return new int[] {first, second};
+    }
+
+    private static boolean oracleSubfacesContainAll(
+            SubFace[] subfaces,
+            int first,
+            int second,
+            int third,
+            int fourth) {
+        for (int i = 1; i < subfaces.length; i++) {
+            if (subfaces[i].contains(first, second, third, fourth)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static SubFace[] reflectedReducedSubfaces(FoldedFigure_Worker worker) throws Exception {
         Field field = FoldedFigure_Worker.class.getDeclaredField("s1");
         field.setAccessible(true);
@@ -5526,6 +5662,7 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle split-subface-arrangement <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle subface-configuration-summary <startingFace> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle initial-hierarchy-summary <startingFace> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle equivalence-candidates-summary <startingFace> <count> [ax ay bx by color]...");
         System.exit(2);
     }
 }

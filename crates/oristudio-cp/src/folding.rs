@@ -1,6 +1,7 @@
 use crate::fold_graph::{FacePositions, FoldGraph};
 use crate::geometry::{
-    Epsilon, LineColor, LineSegment, Point, Polygon, PolygonIntersection, equal, equal_with_radius,
+    Epsilon, LineColor, LineSegment, Point, Polygon, PolygonIntersection,
+    determine_line_segment_intersection, equal, equal_with_radius,
 };
 use crate::model::CreasePatternModel;
 use crate::operations::arrangement::divide_intersections;
@@ -55,6 +56,20 @@ pub enum InitialHierarchyError {
         first_face: usize,
         second_face: usize,
     },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EquivalenceConditionSet {
+    pub triple_conditions: Vec<EquivalenceCondition>,
+    pub quadruple_conditions: Vec<EquivalenceCondition>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EquivalenceCondition {
+    pub a: usize,
+    pub b: usize,
+    pub c: usize,
+    pub d: usize,
 }
 
 /// Oriedita `WireFrame_Worker.folding()`: fold the line-set topology around a
@@ -167,6 +182,111 @@ pub fn initial_hierarchy_from_segments(
     }
 
     let positions = graph.face_positions(starting_face_id);
+    initial_hierarchy_from_graph(&graph, &positions).map(Some)
+}
+
+/// Oriedita equivalence-condition discovery from
+/// `FoldedFigure_Configurator.setupEquivalenceConditions()` and
+/// `setupUEquivalenceConditions()`, before AEA inference consumes conditions.
+pub fn equivalence_condition_candidates_from_segments(
+    segments: &[LineSegment],
+    starting_face_id: i32,
+) -> Result<Option<EquivalenceConditionSet>, InitialHierarchyError> {
+    if segments.is_empty() {
+        return Ok(None);
+    }
+
+    let graph = FoldGraph::from_segments(segments, true);
+    if graph.faces.is_empty() {
+        return Ok(None);
+    }
+
+    let positions = graph.face_positions(starting_face_id);
+    let hierarchy = initial_hierarchy_from_graph(&graph, &positions)?;
+    let folded = wireframe_from_graph(&graph, &positions, graph.folded_points(&positions));
+    let folded_segments = folded_wireframe_segments(&folded);
+    let prepared_segments = prepare_subface_segments(&folded_segments);
+    let subface_graph = FoldGraph::from_segments(&prepared_segments, true);
+    let subfaces = if subface_graph.faces.is_empty() {
+        SubFaceConfiguration {
+            subfaces: Vec::new(),
+            reduced_subface_indices: Vec::new(),
+            face_id_count_max: 0,
+        }
+    } else {
+        configure_subfaces(&folded, &subface_graph)
+    };
+
+    let face_polygons = folded_face_polygons(&folded);
+    let mut triple_conditions = Vec::new();
+    for line_index in 0..graph.lines.len() {
+        let Some((first_face, second_face)) = graph.line_face_border(line_index) else {
+            continue;
+        };
+        if first_face == second_face {
+            continue;
+        }
+        let Some(segment) = folded_segments.get(line_index) else {
+            continue;
+        };
+        for (face_index, polygon) in face_polygons.iter().enumerate() {
+            if face_index != first_face
+                && face_index != second_face
+                && polygon.convex_inside(segment)
+            {
+                let (above, below) = normalized_pair(&hierarchy, first_face, second_face);
+                triple_conditions.push(EquivalenceCondition {
+                    a: face_index,
+                    b: above,
+                    c: face_index,
+                    d: below,
+                });
+            }
+        }
+    }
+
+    let mut quadruple_conditions = Vec::new();
+    for first_line in 0..graph.lines.len().saturating_sub(1) {
+        let Some((first_a, first_b)) = graph.line_face_border(first_line) else {
+            continue;
+        };
+        if first_a == first_b {
+            continue;
+        }
+        let Some(first_segment) = folded_segments.get(first_line) else {
+            continue;
+        };
+        for second_line in (first_line + 1)..graph.lines.len() {
+            let Some((second_a, second_b)) = graph.line_face_border(second_line) else {
+                continue;
+            };
+            if second_a == second_b {
+                continue;
+            }
+            let Some(second_segment) = folded_segments.get(second_line) else {
+                continue;
+            };
+            if determine_line_segment_intersection(first_segment, second_segment)
+                .is_segment_overlapping()
+                && subfaces_contain_all(&subfaces, [first_a, first_b, second_a, second_b])
+            {
+                let (a, b) = normalized_pair(&hierarchy, first_a, first_b);
+                let (c, d) = normalized_pair(&hierarchy, second_a, second_b);
+                quadruple_conditions.push(EquivalenceCondition { a, b, c, d });
+            }
+        }
+    }
+
+    Ok(Some(EquivalenceConditionSet {
+        triple_conditions,
+        quadruple_conditions,
+    }))
+}
+
+fn initial_hierarchy_from_graph(
+    graph: &FoldGraph,
+    positions: &FacePositions,
+) -> Result<InitialHierarchy, InitialHierarchyError> {
     let mut relations = Vec::new();
     for (line_index, line) in graph.lines.iter().enumerate() {
         let Some((first_face, second_face)) = graph.line_face_border(line_index) else {
@@ -206,10 +326,10 @@ pub fn initial_hierarchy_from_segments(
         });
     }
 
-    Ok(Some(InitialHierarchy {
+    Ok(InitialHierarchy {
         faces_total: graph.faces.len(),
         relations,
-    }))
+    })
 }
 
 fn wireframe_from_graph(
@@ -237,17 +357,7 @@ fn wireframe_from_graph(
 }
 
 fn configure_subfaces(folded: &FoldedWireframe, subface_graph: &FoldGraph) -> SubFaceConfiguration {
-    let face_polygons = folded
-        .faces
-        .iter()
-        .map(|face| {
-            Polygon::new(
-                face.iter()
-                    .filter_map(|point| folded.points.get(*point).copied())
-                    .collect(),
-            )
-        })
-        .collect::<Vec<_>>();
+    let face_polygons = folded_face_polygons(folded);
 
     let mut frequency = vec![0usize; face_polygons.len()];
     let mut subfaces = Vec::with_capacity(subface_graph.faces.len());
@@ -277,6 +387,20 @@ fn configure_subfaces(folded: &FoldedWireframe, subface_graph: &FoldGraph) -> Su
     }
 }
 
+fn folded_face_polygons(folded: &FoldedWireframe) -> Vec<Polygon> {
+    folded
+        .faces
+        .iter()
+        .map(|face| {
+            Polygon::new(
+                face.iter()
+                    .filter_map(|point| folded.points.get(*point).copied())
+                    .collect(),
+            )
+        })
+        .collect()
+}
+
 fn folded_wireframe_segments(folded: &FoldedWireframe) -> Vec<LineSegment> {
     folded
         .lines
@@ -295,6 +419,27 @@ fn subface_polygon(graph: &FoldGraph, face: &[usize]) -> Polygon {
             .filter_map(|point| graph.points.get(*point).copied())
             .collect(),
     )
+}
+
+fn normalized_pair(hierarchy: &InitialHierarchy, first: usize, second: usize) -> (usize, usize) {
+    for relation in &hierarchy.relations {
+        if relation.upper_face == first && relation.lower_face == second {
+            return (first, second);
+        }
+        if relation.upper_face == second && relation.lower_face == first {
+            return (second, first);
+        }
+    }
+    (first, second)
+}
+
+fn subfaces_contain_all(configuration: &SubFaceConfiguration, faces: [usize; 4]) -> bool {
+    configuration.reduced_subface_indices.iter().any(|index| {
+        configuration
+            .subfaces
+            .get(*index)
+            .is_some_and(|subface| faces.iter().all(|face| subface.face_ids.contains(face)))
+    })
 }
 
 fn reduce_subface_set(subfaces: &[SubFace], frequency: &[usize]) -> Vec<usize> {

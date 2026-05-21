@@ -75,6 +75,7 @@ public class OrieditaGeometryOracle {
             case "foldline-transform-selected" -> foldLineTransformSelected(args);
             case "foldline-transform-selected-4p" -> foldLineTransformSelected4p(args);
             case "foldline-extend-to-intersection" -> foldLineExtendToIntersection(args);
+            case "foldline-draw-point" -> foldLineDrawPoint(args);
             case "foldline-divide-count" -> foldLineDivideCount(args);
             case "foldline-divide-ratio" -> foldLineDivideRatio(args);
             case "measure-length" -> measureLength(args);
@@ -859,6 +860,32 @@ public class OrieditaGeometryOracle {
                 + result.getColor().getNumber());
     }
 
+    private static void foldLineDrawPoint(String[] args) {
+        if (args.length < 6) {
+            usage("foldline-draw-point expects index, target point, selection distance, count, and segment payload");
+        }
+
+        int index = Integer.parseInt(args[1]);
+        Point target = new Point(parse(args[2]), parse(args[3]));
+        double selectionDistance = parse(args[4]);
+        int count = Integer.parseInt(args[5]);
+        FoldLineSet set = foldLineSet(args, 6, count);
+        boolean changed = false;
+        if (index >= 0 && index < set.getTotal()) {
+            LineSegment segment = new LineSegment(set.get(index + 1));
+            if (OritaCalc.determineLineSegmentDistance(target, segment) <= selectionDistance) {
+                Point projection = OritaCalc.findProjection(OritaCalc.lineSegmentToStraightLine(segment), target);
+                if (OritaCalc.isInside(segment.getA(), projection, segment.getB()) == 2) {
+                    set.applyLineSegmentDivide(segment, projection);
+                    changed = true;
+                }
+            }
+        }
+
+        System.out.println("changed|" + changed);
+        printFoldLineSet(set);
+    }
+
     private static void foldLineDivideCount(String[] args) {
         if (args.length < 8) {
             usage("foldline-divide-count expects division count, segment, count, and segment payload");
@@ -1243,6 +1270,7 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle foldline-advance-type <index> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-alternate-mv <startColor> <guide ax ay bx by color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-alternate-mv-crossing <startColor> <guide ax ay bx by color> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-draw-point <index> <targetX> <targetY> <selectionDistance> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle measure-length <ax> <ay> <bx> <by>");
         System.err.println("   or: OrieditaGeometryOracle measure-angle <ax> <ay> <centerX> <centerY> <bx> <by>");
         System.err.println("   or: OrieditaGeometryOracle custom-line-type <customType> <lineColor>");

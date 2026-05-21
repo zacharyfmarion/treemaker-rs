@@ -13,7 +13,9 @@ use oristudio_cp::operations::color::{
     make_valley, replace_line_type_for_indices, set_line_color_for_indices, toggle_mountain_valley,
 };
 use oristudio_cp::operations::measure::{angle_between_three_points, length_between_points};
-use oristudio_cp::operations::point::{divide_segment_by_count, divide_segment_by_ratio};
+use oristudio_cp::operations::point::{
+    divide_segment_by_count, divide_segment_by_ratio, draw_point_on_segment,
+};
 use oristudio_cp::operations::selection::{
     delete_selected_lines, select_all, select_box, select_connected_from_point, select_indices,
     select_intersecting_line, select_polygon, unselect_all, unselect_indices,
@@ -1131,6 +1133,33 @@ fn point_line_division_matches_oriedita_oracle() {
         line_segment_set_summary(&zero_ratio_model),
         run_oracle(&oracle, &zero_ratio_args)
     );
+}
+
+#[test]
+fn draw_point_matches_oriedita_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    let segments = vec![segment(0.0, 0.0, 10.0, 0.0, LineColor::Red1)];
+    for (target, selection_distance) in [(Point::new(4.0, 0.2), 1.0), (Point::new(4.0, 2.0), 1.0)] {
+        let mut model = model_from_segments(&segments);
+        let changed = draw_point_on_segment(&mut model, 0, target, selection_distance);
+        let mut args = vec![
+            "foldline-draw-point".to_string(),
+            "0".to_string(),
+            target.x.to_string(),
+            target.y.to_string(),
+            selection_distance.to_string(),
+            segments.len().to_string(),
+        ];
+        push_segment_args(&mut args, &segments);
+        let rust_summary = format!("changed|{changed}\n{}", line_segment_set_summary(&model));
+        assert_eq!(rust_summary, run_oracle(&oracle, &args));
+    }
 }
 
 #[test]

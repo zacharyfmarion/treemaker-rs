@@ -1,8 +1,43 @@
 //! Point and line-division commands ported from Oriedita handlers.
 
-use crate::geometry::{Epsilon, LineSegment, Point};
+use crate::geometry::{
+    Epsilon, LineSegment, Point, determine_line_segment_distance, find_projection, is_inside,
+    line_segment_to_straight_line,
+};
 use crate::model::CreasePatternModel;
 use crate::operations::arrangement::divide_line_segment_with_new_lines;
+
+/// Oriedita `DRAW_POINT_14` mutation after the target segment is known.
+pub fn draw_point_on_segment(
+    model: &mut CreasePatternModel,
+    index: usize,
+    target: Point,
+    selection_distance: f64,
+) -> bool {
+    let Some(segment) = model.line_segments.get(index).cloned() else {
+        return false;
+    };
+    if determine_line_segment_distance(target, &segment) > selection_distance {
+        return false;
+    }
+
+    let projection = find_projection(line_segment_to_straight_line(&segment), target);
+    if is_inside(segment.a, projection, segment.b) != 2 {
+        return false;
+    }
+
+    let Some(index) = model
+        .line_segments
+        .iter()
+        .position(|candidate| candidate == &segment)
+    else {
+        return false;
+    };
+    model.line_segments.remove(index);
+    model.add_line_segment(segment.with_a(projection));
+    model.add_line_segment(segment.with_b(projection));
+    true
+}
 
 /// Oriedita `LINE_SEGMENT_DIVISION_27` mutation after endpoints are known.
 pub fn divide_segment_by_count(

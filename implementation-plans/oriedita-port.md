@@ -929,6 +929,11 @@ Status:
   slots share `angle_between_three_points`, preserving Oriedita's
   `OritaCalc.angle(center, first, center, third)` orientation and 0-360 degree
   range.
+- `DRAW_POINT_14` is ported as `draw_point_on_segment`: after the UI has
+  resolved/snapped the target point and target segment, the kernel projects the
+  target onto the segment and calls Oriedita's `applyLineSegmentDivide` behavior
+  only for strict interior projections within the selection distance. This tool
+  does not add an Oriedita save-model point.
 - Full handler parity remains open for nearest-click line selection, Java2D
   path/lasso selection, operation-frame behavior, lengthen commands, and
   construction-handler `fix2` chaining that is not part of the selected color

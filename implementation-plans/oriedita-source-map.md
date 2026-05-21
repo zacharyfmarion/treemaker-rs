@@ -133,7 +133,7 @@ stage explicitly changes it.
 | `DRAW_CREASE_RESTRICTED_11` | `MouseHandlerDrawCreaseRestricted` | `operations::construction::draw_restricted` | kernel | 7 | Unsupported |
 | `DRAW_CREASE_SYMMETRIC_12` | `MouseHandlerDrawCreaseSymmetric` | `operations::construction::draw_symmetric` | kernel | 7 | Unsupported |
 | `DRAW_CREASE_ANGLE_RESTRICTED_13` | `MouseHandlerDrawCreaseAngleRestricted` | `operations::construction::angle_restricted` | kernel | 7 | Unsupported |
-| `DRAW_POINT_14` | `MouseHandlerDrawPoint` | `operations::point::draw_point` | kernel | 7 | Unsupported |
+| `DRAW_POINT_14` | `MouseHandlerDrawPoint` | `operations::point::draw_point_on_segment` | kernel | 7 | Oracle-tested |
 | `DELETE_POINT_15` | `MouseHandlerDeletePoint` | `operations::point::delete_point` | kernel | 5 | Oracle-tested |
 | `ANGLE_SYSTEM_16` | `MouseHandlerAngleSystem` | `operations::construction::angle_system` | kernel | 7 | Unsupported |
 | `DRAW_CREASE_ANGLE_RESTRICTED_3_18` | `MouseHandlerDrawCreaseAngleRestricted3_2` | `operations::construction::angle_restricted_3` | kernel | 7 | Unsupported |

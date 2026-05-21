@@ -6,6 +6,7 @@ use oristudio_cp::operations::arrangement::{
     divide_intersections, divide_intersections_fast, divide_line_segment_with_new_lines, fix1,
     fix2, intersect_divide_pair,
 };
+use oristudio_cp::operations::color::{set_line_color_for_indices, toggle_mountain_valley};
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -437,6 +438,47 @@ fn fix_workers_match_oriedita_foldlineset_oracle() {
         line_segment_set_with_selection_summary(&model),
         run_oracle(&oracle, &args)
     );
+}
+
+#[test]
+fn color_operations_match_oriedita_foldlineset_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    let aux_segments = vec![
+        segment(0.0, 0.0, 10.0, 0.0, LineColor::Red1),
+        segment(5.0, -5.0, 5.0, 5.0, LineColor::Cyan3),
+    ];
+    let mut model = model_from_segments(&aux_segments);
+    let changed = set_line_color_for_indices(&mut model, &[1], LineColor::Red1);
+    let mut args = vec![
+        "foldline-set-color".to_string(),
+        LineColor::Red1.number().to_string(),
+        "1".to_string(),
+        aux_segments.len().to_string(),
+    ];
+    push_segment_args(&mut args, &aux_segments);
+    let rust_summary = format!("changed|{changed}\n{}", line_segment_set_summary(&model));
+    assert_eq!(rust_summary, run_oracle(&oracle, &args));
+
+    let mv_segments = vec![
+        segment(0.0, 0.0, 1.0, 0.0, LineColor::Red1),
+        segment(0.0, 1.0, 1.0, 1.0, LineColor::Blue2),
+        segment(0.0, 2.0, 1.0, 2.0, LineColor::Black0),
+    ];
+    let mut model = model_from_segments(&mv_segments);
+    toggle_mountain_valley(&mut model, &[0, 1, 2]);
+    let mut args = vec![
+        "foldline-change-mv".to_string(),
+        "0,1,2".to_string(),
+        mv_segments.len().to_string(),
+    ];
+    push_segment_args(&mut args, &mv_segments);
+    assert_eq!(line_segment_set_summary(&model), run_oracle(&oracle, &args));
 }
 
 fn operations_oracle() -> Option<PathBuf> {

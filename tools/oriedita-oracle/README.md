@@ -8,7 +8,8 @@ delete-inside-line modes, and `BranchTrim`/`del_V` cleanup. Later stages should
 extend the same pattern for documents, operations, checks, and folding
 snapshots. The vertex cleanup commands include the same-color, color-changing,
 single-pair, and all-vertex variants. The arrangement repair commands include
-the legacy `Fix1`/`Fix2` workers.
+the legacy `Fix1`/`Fix2` workers. The first color commands cover
+`FoldLineSet.setColor(Collection, LineColor)` and mountain/valley toggling.
 
 The oracle intentionally compiles against a pinned Oriedita source checkout
 instead of reimplementing the behavior in Rust.

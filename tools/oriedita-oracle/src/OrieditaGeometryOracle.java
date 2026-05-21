@@ -24,6 +24,8 @@ import java.io.File;
 import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.util.HashSet;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 
 public class OrieditaGeometryOracle {
@@ -47,6 +49,8 @@ public class OrieditaGeometryOracle {
             case "foldline-del-v-all-cc" -> foldLineDelVAllCc(args);
             case "foldline-fix1" -> foldLineFix1(args);
             case "foldline-fix2" -> foldLineFix2(args);
+            case "foldline-set-color" -> foldLineSetColor(args);
+            case "foldline-change-mv" -> foldLineChangeMv(args);
             case "custom-line-type" -> customLineType(args);
             case "orh-import-summary" -> orhImportSummary(args);
             case "orh-export-fixture" -> orhExportFixture(args);
@@ -297,6 +301,33 @@ public class OrieditaGeometryOracle {
         printFoldLineSetWithSelection(set);
     }
 
+    private static void foldLineSetColor(String[] args) {
+        if (args.length < 4) {
+            usage("foldline-set-color expects color, comma-separated indices, count, and segment payload");
+        }
+
+        LineColor color = LineColor.fromNumber(Integer.parseInt(args[1]));
+        int count = Integer.parseInt(args[3]);
+        FoldLineSet set = foldLineSet(args, 4, count);
+        List<LineSegment> lines = selectedFoldLines(set, args[2]);
+        int changed = set.setColor(lines, color);
+        System.out.println("changed|" + changed);
+        printFoldLineSet(set);
+    }
+
+    private static void foldLineChangeMv(String[] args) {
+        if (args.length < 3) {
+            usage("foldline-change-mv expects comma-separated indices, count, and segment payload");
+        }
+
+        int count = Integer.parseInt(args[2]);
+        FoldLineSet set = foldLineSet(args, 3, count);
+        for (LineSegment line : selectedFoldLines(set, args[1])) {
+            set.setColor(line, line.getColor().changeMV());
+        }
+        printFoldLineSet(set);
+    }
+
     private static void orhImportSummary(String[] args) throws Exception {
         if (args.length != 2) {
             usage("orh-import-summary expects a file path");
@@ -442,6 +473,17 @@ public class OrieditaGeometryOracle {
         System.out.println();
     }
 
+    private static List<LineSegment> selectedFoldLines(FoldLineSet set, String indices) {
+        List<LineSegment> lines = new ArrayList<>();
+        if (indices.isEmpty()) {
+            return lines;
+        }
+        for (String index : indices.split(",")) {
+            lines.add(set.get(Integer.parseInt(index) + 1));
+        }
+        return lines;
+    }
+
     private static void printSaveSummary(Save save) {
         System.out.println("title|" + nullToEmpty(save.getTitle()));
         System.out.println("lines|" + save.getLineSegments().size());
@@ -531,6 +573,8 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle foldline-del-v-all-cc <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-fix1 <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-fix2 <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-set-color <color> <indices> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-change-mv <indices> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle custom-line-type <customType> <lineColor>");
         System.err.println("   or: OrieditaGeometryOracle orh-import-summary <path>");
         System.err.println("   or: OrieditaGeometryOracle orh-export-fixture");

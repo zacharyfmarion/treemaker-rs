@@ -31,6 +31,7 @@ import origami.crease_pattern.worker.linesegmentset.IntersectDivide;
 import origami.crease_pattern.worker.SelectMode;
 import origami.folding.HierarchyList;
 import origami.folding.algorithm.SubFacePriority;
+import origami.folding.algorithm.swapping.SubFaceSwappingAlgorithm;
 import origami.folding.element.SubFace;
 import origami.folding.permutation.ChainPermutationGenerator;
 import origami.folding.util.IBulletinBoard;
@@ -328,6 +329,7 @@ public class OrieditaGeometryOracle {
             case "subface-priority-summary" -> subfacePrioritySummary(args);
             case "worker-overlap-search-summary" -> workerOverlapSearchSummary(args);
             case "worker-overlap-from-segments-summary" -> workerOverlapFromSegmentsSummary(args);
+            case "subface-swapper-summary" -> subfaceSwapperSummary(args);
             default -> usage("unknown command: " + args[0]);
         }
     }
@@ -925,6 +927,53 @@ public class OrieditaGeometryOracle {
                 foldedWorker.getSubFace_valid_number(),
                 Math.max(0, reduced.length - 1),
                 foldedWorker.hierarchyList);
+    }
+
+    private static void subfaceSwapperSummary(String[] args) {
+        if (args.length < 4) {
+            usage("subface-swapper-summary expects subface count, swap counters, and actions");
+        }
+
+        int count = Integer.parseInt(args[1]);
+        int offset = 2;
+        SubFace[] subfaces = new SubFace[count + 1];
+        subfaces[0] = new SubFace(new NoopBulletinBoard());
+        for (int i = 1; i <= count; i++) {
+            subfaces[i] = new SubFace(new NoopBulletinBoard());
+            subfaces[i].setNumDigits(1);
+            subfaces[i].setFaceId(1, i);
+            subfaces[i].swapCounter = Integer.parseInt(args[offset++]);
+        }
+
+        SubFaceSwappingAlgorithm swapper = new SubFaceSwappingAlgorithm();
+        int actionCount = Integer.parseInt(args[offset++]);
+        printSubfaceSwapper("initial", subfaces, count, swapper);
+        for (int i = 0; i < actionCount; i++) {
+            String action = args[offset++];
+            switch (action) {
+                case "visit" -> {
+                    int index = Integer.parseInt(args[offset++]) + 1;
+                    swapper.visit(subfaces[index]);
+                    printSubfaceSwapper("visit|" + (index - 1), subfaces, count, swapper);
+                }
+                case "record" -> {
+                    int index = Integer.parseInt(args[offset++]) + 1;
+                    swapper.record(index);
+                    printSubfaceSwapper("record|" + (index - 1), subfaces, count, swapper);
+                }
+                case "process" -> {
+                    int max = Integer.parseInt(args[offset++]);
+                    swapper.process(subfaces, max);
+                    printSubfaceSwapper("process|" + max, subfaces, count, swapper);
+                }
+                case "estimate" -> {
+                    int index = Integer.parseInt(args[offset++]) + 1;
+                    System.out.println("estimate|" + (index - 1) + "|" + swapper.shouldEstimate(index));
+                    printSubfaceSwapper("after_estimate|" + (index - 1), subfaces, count, swapper);
+                }
+                default -> usage("unknown subface-swapper action: " + action);
+            }
+        }
     }
 
     private static void intersectDividePair(String[] args) throws Exception {
@@ -5277,6 +5326,21 @@ public class OrieditaGeometryOracle {
         }
     }
 
+    private static void printSubfaceSwapper(
+            String label,
+            SubFace[] subfaces,
+            int count,
+            SubFaceSwappingAlgorithm swapper) {
+        StringBuilder order = new StringBuilder();
+        for (int i = 1; i <= count; i++) {
+            if (i > 1) {
+                order.append(",");
+            }
+            order.append(subfaces[i].getFaceId(1) - 1);
+        }
+        System.out.println("swapper|" + label + "|" + swapper.getVisitedCount() + "|" + order);
+    }
+
     private static FoldedFigure_Worker configuredSubfaceWorker(PointSet folded) throws Exception {
         LineSegmentSetWorker lineWorker = new LineSegmentSetWorker();
         lineWorker.set(new LineSegmentSet(folded));
@@ -6202,6 +6266,7 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle subface-priority-summary <facesTotal> <subfaceCount> [faceCount faceIds...]... <relationCount> [upper lower]...");
         System.err.println("   or: OrieditaGeometryOracle worker-overlap-search-summary <facesTotal> <subfaceCount> [faceCount faceIds...]... <relationCount> [upper lower]... <tripleCount> [a b c d]... <quadCount> [a b c d]...");
         System.err.println("   or: OrieditaGeometryOracle worker-overlap-from-segments-summary <startingFace> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle subface-swapper-summary <subfaceCount> [swapCounter]... <actionCount> [visit|record|process|estimate value]...");
         System.exit(2);
     }
 }

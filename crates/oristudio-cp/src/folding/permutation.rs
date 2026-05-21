@@ -36,6 +36,97 @@ pub struct WorkerOverlapSearch {
     pub priority: SubFacePriority,
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct SubFaceSwapper {
+    high: usize,
+    history: HashSet<Vec<usize>>,
+    visited: HashSet<usize>,
+    last_low: usize,
+}
+
+impl SubFaceSwapper {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn record(&mut self, index: usize) {
+        self.high = index;
+    }
+
+    pub fn visit(&mut self, item: usize) {
+        self.visited.insert(item);
+    }
+
+    pub fn visited_count(&self) -> usize {
+        self.visited.len()
+    }
+
+    pub fn should_estimate(&mut self, index: usize) -> bool {
+        if self.last_low == 0 {
+            return true;
+        }
+        if index == self.last_low {
+            self.last_low = 0;
+            return true;
+        }
+        false
+    }
+
+    pub fn process(&mut self, order: &mut [usize], max: usize, swap_counters: &[usize]) {
+        if self.high < 2 {
+            return;
+        }
+
+        let mut hash = order_prefix(order, self.high);
+        if self.history.contains(&hash) {
+            let reverse_result = self.reverse_swap(order, 1, self.high, max, 1);
+            if reverse_result == self.high {
+                return;
+            }
+            self.high = reverse_result;
+            hash = order_prefix(order, self.high);
+        }
+        self.history.insert(hash);
+
+        let low = self.high / 2;
+        swap_order(order, self.high, low);
+        self.high = 0;
+
+        self.last_low = low;
+        let reverse_count = order
+            .get(low.saturating_sub(1))
+            .and_then(|item| swap_counters.get(*item))
+            .copied()
+            .unwrap_or(0)
+            .saturating_sub(1);
+        self.reverse_swap(order, low, low, max, reverse_count);
+    }
+
+    fn reverse_swap(
+        &mut self,
+        order: &mut [usize],
+        index: usize,
+        mut high: usize,
+        max: usize,
+        mut remaining: usize,
+    ) -> usize {
+        let mut i = index + 1;
+        while i <= max && remaining > 0 {
+            let Some(item) = order.get(i.saturating_sub(1)).copied() else {
+                break;
+            };
+            if !self.visited.contains(&item) {
+                self.visited.insert(item);
+                swap_order(order, i, index);
+                high += 1;
+                remaining -= 1;
+            }
+            i += 1;
+        }
+        high
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WorkerOverlapSearchError {
     SubFace(SubFaceSearchError),
@@ -1011,6 +1102,21 @@ fn pair_key(first: usize, second: usize) -> (usize, usize) {
     } else {
         (second, first)
     }
+}
+
+fn order_prefix(order: &[usize], high: usize) -> Vec<usize> {
+    order.iter().take(high).copied().collect()
+}
+
+fn swap_order(order: &mut [usize], high: usize, low: usize) {
+    if high == 0 || low == 0 || high > order.len() || low > order.len() || high <= low {
+        return;
+    }
+    let temp = order[high - 1];
+    for index in (low..high).rev() {
+        order[index] = order[index - 1];
+    }
+    order[low - 1] = temp;
 }
 
 #[derive(Debug, Clone)]

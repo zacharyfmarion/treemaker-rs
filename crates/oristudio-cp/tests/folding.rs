@@ -1,6 +1,6 @@
 use oristudio_cp::folding::{
     ChainPermutationGenerator, HierarchyRelation, InitialHierarchy, SubFacePermutationSearch,
-    additional_estimation_from_segments, configure_subfaces_from_segments,
+    SubFaceSwapper, additional_estimation_from_segments, configure_subfaces_from_segments,
     equivalence_condition_candidates_from_segments, estimate_wireframe_from_segments,
     initial_hierarchy_from_segments, overlap_search_from_segments,
     possible_overlap_search_for_subfaces, prepare_subface_segments, prioritize_subfaces,
@@ -278,6 +278,20 @@ fn worker_overlap_search_composes_valid_subface_orders() {
             .iter()
             .any(|relation| relation.upper_face == 2 && relation.lower_face == 0)
     );
+}
+
+#[test]
+fn subface_swapper_moves_recorded_dead_end_toward_front() {
+    let mut swapper = SubFaceSwapper::new();
+    let mut order = vec![0, 1, 2, 3];
+    let counters = vec![0, 0, 0, 0];
+
+    swapper.visit(order[0]);
+    swapper.record(4);
+    swapper.process(&mut order, 4, &counters);
+
+    assert_eq!(order, vec![0, 3, 1, 2]);
+    assert!(swapper.should_estimate(2));
 }
 
 #[test]

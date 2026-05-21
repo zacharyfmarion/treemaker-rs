@@ -594,6 +594,58 @@ fn worker_overlap_from_segments_matches_oriedita_no_swap_oracle() {
     }
 }
 
+#[test]
+fn subface_swapper_matches_oriedita_oracle() {
+    let Some(oracle) = folding_oracle() else {
+        eprintln!("skipping Oriedita folding oracle test: ORIEDITA_GEOMETRY_ORACLE is not set");
+        return;
+    };
+
+    let counters = [0usize, 0, 2, 0];
+    let actions = [
+        SwapperAction::Visit(0),
+        SwapperAction::Record(3),
+        SwapperAction::Process(4),
+        SwapperAction::Estimate(1),
+        SwapperAction::Record(2),
+        SwapperAction::Process(4),
+    ];
+    let mut args = vec![
+        "subface-swapper-summary".to_string(),
+        counters.len().to_string(),
+    ];
+    for counter in counters {
+        args.push(counter.to_string());
+    }
+    args.push(actions.len().to_string());
+    for action in actions {
+        match action {
+            SwapperAction::Visit(index) => {
+                args.push("visit".to_string());
+                args.push(index.to_string());
+            }
+            SwapperAction::Record(index) => {
+                args.push("record".to_string());
+                args.push(index.to_string());
+            }
+            SwapperAction::Process(max) => {
+                args.push("process".to_string());
+                args.push(max.to_string());
+            }
+            SwapperAction::Estimate(index) => {
+                args.push("estimate".to_string());
+                args.push(index.to_string());
+            }
+        }
+    }
+    let oracle_args = args.iter().map(String::as_str).collect::<Vec<_>>();
+
+    assert_eq!(
+        subface_swapper_summary(&[0, 0, 2, 0], &actions),
+        run_oracle(&oracle, &oracle_args)
+    );
+}
+
 fn folding_oracle() -> Option<PathBuf> {
     std::env::var("ORIEDITA_GEOMETRY_ORACLE")
         .or_else(|_| std::env::var("ORIEDITA_ORACLE"))
@@ -833,6 +885,14 @@ struct WorkerOverlapCase<'a> {
     quadruple_conditions: &'a [(usize, usize, usize, usize)],
 }
 
+#[derive(Clone, Copy)]
+enum SwapperAction {
+    Visit(usize),
+    Record(usize),
+    Process(usize),
+    Estimate(usize),
+}
+
 fn chain_permutation_summary(mut generator: ChainPermutationGenerator, limit: usize) -> String {
     let mut output = String::new();
     output.push_str(&format!("permutations|{}\n", generator.count()));
@@ -1008,6 +1068,56 @@ fn worker_overlap_summary(search: &oristudio_cp::folding::WorkerOverlapSearch) -
         ));
     }
     output
+}
+
+fn subface_swapper_summary(counters: &[usize], actions: &[SwapperAction]) -> String {
+    let mut swapper = oristudio_cp::folding::SubFaceSwapper::new();
+    let mut order = (0..counters.len()).collect::<Vec<_>>();
+    let mut output = String::new();
+    push_swapper_summary(&mut output, "initial", &swapper, &order);
+    for action in actions {
+        match *action {
+            SwapperAction::Visit(index) => {
+                if let Some(item) = order.get(index).copied() {
+                    swapper.visit(item);
+                }
+                push_swapper_summary(&mut output, &format!("visit|{index}"), &swapper, &order);
+            }
+            SwapperAction::Record(index) => {
+                swapper.record(index + 1);
+                push_swapper_summary(&mut output, &format!("record|{index}"), &swapper, &order);
+            }
+            SwapperAction::Process(max) => {
+                swapper.process(&mut order, max, counters);
+                push_swapper_summary(&mut output, &format!("process|{max}"), &swapper, &order);
+            }
+            SwapperAction::Estimate(index) => {
+                let estimate = swapper.should_estimate(index + 1);
+                output.push_str(&format!("estimate|{}|{}\n", index, estimate));
+                push_swapper_summary(
+                    &mut output,
+                    &format!("after_estimate|{index}"),
+                    &swapper,
+                    &order,
+                );
+            }
+        }
+    }
+    output
+}
+
+fn push_swapper_summary(
+    output: &mut String,
+    label: &str,
+    swapper: &oristudio_cp::folding::SubFaceSwapper,
+    order: &[usize],
+) {
+    output.push_str(&format!(
+        "swapper|{}|{}|{}\n",
+        label,
+        swapper.visited_count(),
+        joined_ids(order)
+    ));
 }
 
 fn joined_ids(ids: &[usize]) -> String {

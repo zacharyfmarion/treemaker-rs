@@ -978,7 +978,8 @@ Deliverables:
   now ported and oracle-tested for resolved model-space inputs. Custom circle
   and cyan auxiliary-line color changes are also oracle-tested for resolved
   targets. Tangent-line candidate generation is in progress with point-circle
-  and common two-circle candidate fixtures covered.
+  and common two-circle candidate fixtures covered. Regular polygon generation
+  is oracle-tested for resolved point pairs.
 - Port regular polygon creation.
 - Port Blintz, fish, dove, bird, and frog base generators.
 - Port Voronoi creation.

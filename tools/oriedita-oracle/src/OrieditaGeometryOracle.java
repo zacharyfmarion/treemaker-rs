@@ -93,6 +93,7 @@ public class OrieditaGeometryOracle {
             case "foldline-circle-change-color" -> foldLineCircleChangeColor(args);
             case "foldline-circle-tangent-point" -> foldLineCircleTangentPoint(args);
             case "foldline-circle-tangent-two" -> foldLineCircleTangentTwo(args);
+            case "foldline-regular-polygon" -> foldLineRegularPolygon(args);
             case "foldline-divide-count" -> foldLineDivideCount(args);
             case "foldline-divide-ratio" -> foldLineDivideRatio(args);
             case "measure-length" -> measureLength(args);
@@ -1381,6 +1382,37 @@ public class OrieditaGeometryOracle {
         return indicators;
     }
 
+    private static void foldLineRegularPolygon(String[] args) {
+        if (args.length < 8) {
+            usage("foldline-regular-polygon expects corners, color, points, count, and fold lines");
+        }
+
+        int corners = Integer.parseInt(args[1]);
+        LineColor color = LineColor.fromNumber(Integer.parseInt(args[2]));
+        Point p1 = new Point(parse(args[3]), parse(args[4]));
+        Point p2 = new Point(parse(args[5]), parse(args[6]));
+        int count = Integer.parseInt(args[7]);
+        FoldLineSet set = foldLineSet(args, 8, count);
+        int added = 0;
+
+        LineSegment seed = new LineSegment(p1, p2, color);
+        addLineSegmentLikeWorker(set, seed);
+        added++;
+        if (corners >= 2) {
+            for (int i = 2; i <= corners; i++) {
+                LineSegment rotated = OritaCalc.lineSegment_rotate(
+                        seed,
+                        (double) (corners - 2) * 180.0 / (double) corners);
+                seed = new LineSegment(rotated.getB(), rotated.getA(), color);
+                addLineSegmentLikeWorker(set, seed);
+                added++;
+            }
+        }
+
+        System.out.println("added|" + added);
+        printFoldLineSet(set);
+    }
+
     private static void foldLineDivideCount(String[] args) {
         if (args.length < 8) {
             usage("foldline-divide-count expects division count, segment, count, and segment payload");
@@ -1853,6 +1885,7 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle foldline-circle-change-color <circleIndices> <auxLineIndices> <r> <g> <b> <circleCount> [x y r color]... <lineCount> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-circle-tangent-point <pointX> <pointY> <circle x y r color> <lineCount> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-circle-tangent-two <circle1 x y r color> <circle2 x y r color>");
+        System.err.println("   or: OrieditaGeometryOracle foldline-regular-polygon <corners> <color> <p1x> <p1y> <p2x> <p2y> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle measure-length <ax> <ay> <bx> <by>");
         System.err.println("   or: OrieditaGeometryOracle measure-angle <ax> <ay> <centerX> <centerY> <bx> <by>");
         System.err.println("   or: OrieditaGeometryOracle custom-line-type <customType> <lineColor>");

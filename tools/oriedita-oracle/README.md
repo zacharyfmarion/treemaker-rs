@@ -27,7 +27,8 @@ circle variants, inversion of circles/segments through circles, and
 Circle custom-color coverage includes resolved circle targets and cyan
 auxiliary-line targets, including Oriedita's value-based duplicate lookup.
 Tangent-line coverage has started with point-circle and common two-circle
-indicator generation.
+indicator generation. Generator coverage has started with regular polygon
+creation from two resolved points and the polygon corner setting.
 The first selection commands cover select/unselect all, index selection, box
 selection via `lineSegmentsInside`, polygon selection via `select_Takakukei`,
 line-overlap/intersection selection via `select_lX`, and

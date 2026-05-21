@@ -147,7 +147,7 @@ stage explicitly changes it.
 | `BACKGROUND_CHANGE_POSITION_26` | `MouseHandlerBackgroundChangePosition` | none | ui-preview-only | later UI | Out-of-scope-ui |
 | `LINE_SEGMENT_DIVISION_27` | `MouseHandlerLineSegmentDivision` | `operations::point::divide_segment_by_count` | kernel | 7 | Oracle-tested |
 | `LINE_SEGMENT_RATIO_SET_28` | `MouseHandlerLineSegmentRatioSet` | `operations::point::divide_segment_by_ratio` | kernel | 7 | Oracle-tested |
-| `POLYGON_SET_NO_CORNERS_29` | `MouseHandlerPolygonSetNoCorners` | `operations::generators::regular_polygon` | kernel | 8 | Unsupported |
+| `POLYGON_SET_NO_CORNERS_29` | `MouseHandlerPolygonSetNoCorners` | `operations::generators::regular_polygon` | kernel | 8 | Oracle-tested |
 | `CREASE_ADVANCE_TYPE_30` | `MouseHandlerCreaseAdvanceType` | `operations::color::advance_line_type` | kernel | 6 | Oracle-tested |
 | `CREASE_MOVE_4P_31` | `MouseHandlerCreaseMove4p` | `operations::transform::move_selected_lines_by_points` | kernel | 6 | Oracle-tested |
 | `CREASE_COPY_4P_32` | `MouseHandlerCreaseCopy4p` | `operations::transform::copy_selected_lines_by_points` | kernel | 6 | Oracle-tested |

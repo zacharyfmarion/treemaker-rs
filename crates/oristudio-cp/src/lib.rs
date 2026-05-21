@@ -493,7 +493,7 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
         "operations::generators::regular_polygon",
         Kernel,
         8,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         CreaseAdvanceType,

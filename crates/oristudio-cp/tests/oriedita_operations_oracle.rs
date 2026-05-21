@@ -21,6 +21,7 @@ use oristudio_cp::operations::color::{
 use oristudio_cp::operations::construction::{
     DrawCreaseTarget, draw_crease_segment, mirror_selected_lines,
 };
+use oristudio_cp::operations::generators::regular_polygon_no_corners;
 use oristudio_cp::operations::measure::{angle_between_three_points, length_between_points};
 use oristudio_cp::operations::point::{
     divide_segment_by_count, divide_segment_by_ratio, draw_point_on_segment,
@@ -1480,6 +1481,33 @@ fn circle_tangent_candidates_match_oriedita_oracle() {
 }
 
 #[test]
+fn regular_polygon_no_corners_matches_oriedita_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    let existing_segments = vec![segment(0.5, -1.0, 0.5, 1.0, LineColor::Black0)];
+    let p1 = Point::new(0.0, 0.0);
+    let p2 = Point::new(1.0, 0.0);
+    let mut model = model_from_segments(&existing_segments);
+    let added = regular_polygon_no_corners(&mut model, p1, p2, 4, LineColor::Red1);
+
+    let mut args = vec![
+        "foldline-regular-polygon".to_string(),
+        "4".to_string(),
+        LineColor::Red1.number().to_string(),
+    ];
+    push_points_args(&mut args, &[p1, p2]);
+    args.push(existing_segments.len().to_string());
+    push_segment_args(&mut args, &existing_segments);
+    let rust_summary = format!("added|{added}\n{}", line_segment_set_summary(&model));
+    assert_eq!(rust_summary, run_oracle(&oracle, &args));
+}
+
+#[test]
 fn draw_crease_segment_matches_oriedita_oracle() {
     let Some(oracle) = operations_oracle() else {
         eprintln!(
@@ -1780,6 +1808,9 @@ fn circle_inversion_output(output: CircleInversionOutput) -> &'static str {
 }
 
 fn java_double_string(value: f64) -> String {
+    if value != 0.0 && value.abs() < 1e-3 {
+        return format!("{value:E}");
+    }
     if value.is_finite() && value.fract() == 0.0 {
         format!("{value:.1}")
     } else {

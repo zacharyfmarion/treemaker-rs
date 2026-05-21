@@ -418,7 +418,9 @@ Port all command behavior for:
 - Fishbone construction.
 - Foldable-line input.
 - Foldable-line draw mode.
-- Vertex make angularly flat-foldable.
+- `VERTEX_MAKE_ANGULARLY_FLAT_FOLDABLE_38` is ported and oracle-tested for the
+  resolved invalid-vertex kernel: odd-degree candidate generation, single-line
+  color preservation, and destination commit.
 - `AXIOM_5` is ported and oracle-tested for indicator generation, direct
   indicator commit, and destination-intersection commit after the target point,
   target line, and pivot point are resolved.

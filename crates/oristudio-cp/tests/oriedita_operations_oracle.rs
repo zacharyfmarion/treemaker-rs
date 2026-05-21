@@ -26,10 +26,12 @@ use oristudio_cp::operations::construction::{
     commit_square_bisector_parallel_indicator, double_symmetric_draw,
     draw_crease_angle_restricted_3_candidates, draw_crease_angle_restricted_3_to_point,
     draw_crease_angle_restricted_5, draw_crease_angle_restricted_converging, draw_crease_segment,
-    fishbone_draw, inward, mirror_selected_lines, parallel_draw, parallel_width_indicators,
-    perpendicular_indicator, perpendicular_projection, square_bisector_from_lines_to_destination,
-    square_bisector_from_points_to_destination, square_bisector_parallel_between_destinations,
-    square_bisector_parallel_indicator, symmetric_draw,
+    fishbone_draw, inward, make_vertex_flat_foldable_candidates,
+    make_vertex_flat_foldable_to_destination, mirror_selected_lines, parallel_draw,
+    parallel_width_indicators, perpendicular_indicator, perpendicular_projection,
+    square_bisector_from_lines_to_destination, square_bisector_from_points_to_destination,
+    square_bisector_parallel_between_destinations, square_bisector_parallel_indicator,
+    symmetric_draw,
 };
 use oristudio_cp::operations::generators::{
     DefaultMolecule, default_molecule, regular_polygon_no_corners,
@@ -1357,6 +1359,69 @@ fn axiom5_modes_match_oriedita_oracle() {
         &run_oracle(&oracle, &args),
         1e-9,
         "axiom5-destination",
+    );
+}
+
+#[test]
+fn make_vertex_flat_foldable_matches_oriedita_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    let vertex = Point::new(0.0, 0.0);
+    let destination = segment(-1.0, -1.0, -1.0, 1.0, LineColor::Black0);
+    let segments = vec![
+        segment(0.0, 0.0, 1.0, 0.0, LineColor::Red1),
+        destination.clone(),
+    ];
+    let candidates = make_vertex_flat_foldable_candidates(
+        &model_from_segments(&segments),
+        vertex,
+        1.0,
+        LineColor::Blue2,
+    );
+    let mut args = vec!["foldline-make-vertex-flat-foldable-candidates".to_string()];
+    push_points_args(&mut args, &[vertex]);
+    args.push("1.0".to_string());
+    args.push(LineColor::Blue2.number().to_string());
+    args.push(segments.len().to_string());
+    push_segment_args(&mut args, &segments);
+    let rust_summary = format!(
+        "color|{}\n{}",
+        candidates.commit_color.number(),
+        line_segment_list_summary(&candidates.candidates)
+    );
+    assert_line_summary_close(
+        &rust_summary,
+        &run_oracle(&oracle, &args),
+        1e-9,
+        "make-vertex-flat-foldable-candidates",
+    );
+
+    let mut model = model_from_segments(&segments);
+    let added = make_vertex_flat_foldable_to_destination(
+        &mut model,
+        vertex,
+        &candidates.candidates[0],
+        &destination,
+        candidates.commit_color,
+    );
+    let mut args = vec!["foldline-make-vertex-flat-foldable-destination".to_string()];
+    push_points_args(&mut args, &[vertex]);
+    push_one_segment_args(&mut args, &candidates.candidates[0]);
+    push_one_segment_args(&mut args, &destination);
+    args.push(candidates.commit_color.number().to_string());
+    args.push(segments.len().to_string());
+    push_segment_args(&mut args, &segments);
+    let rust_summary = format!("added|{added}\n{}", line_segment_set_summary(&model));
+    assert_line_summary_close(
+        &rust_summary,
+        &run_oracle(&oracle, &args),
+        1e-9,
+        "make-vertex-flat-foldable-destination",
     );
 }
 

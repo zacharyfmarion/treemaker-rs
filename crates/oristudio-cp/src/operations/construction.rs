@@ -1,8 +1,8 @@
 //! Construction/drawing commands ported from Oriedita handlers.
 
 use crate::geometry::{
-    Epsilon, Intersection, LineColor, LineSegment, ParallelJudgement, Point, StraightLine, angle,
-    angle_between_0_360, center, determine_line_segment_distance,
+    ActiveState, Epsilon, Intersection, LineColor, LineSegment, ParallelJudgement, Point,
+    StraightLine, angle, angle_between_0_360, center, determine_line_segment_distance,
     determine_line_segment_intersection, determine_line_segment_intersection_sweet_with_tolerances,
     distance, find_intersection_segments, find_intersection_straight_lines,
     find_line_symmetry_line_segment, find_line_symmetry_point, find_projection,
@@ -29,6 +29,12 @@ pub struct AngleRestrictedConvergingCandidates {
     pub intersections: Vec<Point>,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct FlatFoldableVertexCandidates {
+    pub candidates: Vec<LineSegment>,
+    pub commit_color: LineColor,
+}
+
 struct Axiom5IndicatorDecision<'a> {
     base: &'a LineSegment,
     first_projected: &'a LineSegment,
@@ -38,6 +44,12 @@ struct Axiom5IndicatorDecision<'a> {
     center2: Point,
     target: Point,
     target_segment: &'a LineSegment,
+}
+
+#[derive(Debug, Clone)]
+struct WeightedVertexLine {
+    segment: LineSegment,
+    angle: f64,
 }
 
 /// Oriedita free/restricted draw-crease insertion after endpoints are resolved.
@@ -217,6 +229,48 @@ pub fn draw_crease_angle_restricted_converging(
     add_line_segment_like_worker(model, &first);
     add_line_segment_like_worker(model, &second);
     2
+}
+
+/// Oriedita `VERTEX_MAKE_ANGULARLY_FLAT_FOLDABLE_38` candidate generation after an invalid vertex is resolved.
+pub fn make_vertex_flat_foldable_candidates(
+    model: &CreasePatternModel,
+    invalid_point: Point,
+    grid_width: f64,
+    color: LineColor,
+) -> FlatFoldableVertexCandidates {
+    let vertex_lines = sorted_vertex_folding_lines(model, invalid_point);
+    let commit_color = if vertex_lines.len() == 1 {
+        vertex_lines[0].segment.color
+    } else {
+        color
+    };
+    let candidates = odd_vertex_foldable_candidates(
+        &vertex_lines,
+        invalid_point,
+        grid_width,
+        ActiveState::Inactive0,
+    );
+    FlatFoldableVertexCandidates {
+        candidates,
+        commit_color,
+    }
+}
+
+/// Oriedita `VERTEX_MAKE_ANGULARLY_FLAT_FOLDABLE_38` final add after candidate and destination are resolved.
+pub fn make_vertex_flat_foldable_to_destination(
+    model: &mut CreasePatternModel,
+    invalid_point: Point,
+    selected_candidate: &LineSegment,
+    destination: &LineSegment,
+    color: LineColor,
+) -> bool {
+    let cross_point = find_intersection_segments(selected_candidate, destination);
+    let result = LineSegment::with_color(cross_point, invalid_point, color);
+    if !Epsilon::HIGH.gt0(result.determine_length()) {
+        return false;
+    }
+    add_line_segment_like_worker(model, &result);
+    true
 }
 
 /// Oriedita `SnappingUtil.snapToActiveAngleSystem` without UI grid candidates.
@@ -1065,6 +1119,102 @@ fn angle_restricted_converging_intersections(
         }
     }
     intersections
+}
+
+fn sorted_vertex_folding_lines(
+    model: &CreasePatternModel,
+    vertex: Point,
+) -> Vec<WeightedVertexLine> {
+    let mut lines = Vec::new();
+    for segment in &model.line_segments {
+        if !segment.color.is_folding_line() {
+            continue;
+        }
+        if vertex.distance(segment.a) < Epsilon::UNKNOWN_1EN6 {
+            lines.push(WeightedVertexLine {
+                segment: segment.clone(),
+                angle: angle((segment.a, segment.b)),
+            });
+        } else if vertex.distance(segment.b) < Epsilon::UNKNOWN_1EN6 {
+            lines.push(WeightedVertexLine {
+                segment: segment.clone(),
+                angle: angle((segment.b, segment.a)),
+            });
+        }
+    }
+    lines.sort_by(|left, right| {
+        left.angle
+            .partial_cmp(&right.angle)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    lines
+}
+
+fn odd_vertex_foldable_candidates(
+    vertex_lines: &[WeightedVertexLine],
+    vertex: Point,
+    grid_width: f64,
+    active: ActiveState,
+) -> Vec<LineSegment> {
+    if vertex_lines.len() % 2 != 1 {
+        return Vec::new();
+    }
+
+    let total = vertex_lines.len();
+    let mut candidates = Vec::new();
+    for i in 0..total {
+        let mut angle_delta = 0.0;
+        for k in 0..total {
+            let near = (i + k) % total;
+            let far = (i + k + 1) % total;
+            let add_angle = angle_between_0_360(vertex_lines[far].angle - vertex_lines[near].angle);
+            if k % 2 == 0 {
+                angle_delta += add_angle;
+            } else {
+                angle_delta -= add_angle;
+            }
+        }
+
+        if total == 1 {
+            angle_delta = 360.0;
+        }
+
+        let next = (i + 1) % total;
+        let mut first_wedge_angle =
+            angle_between_0_360(vertex_lines[next].angle - vertex_lines[i].angle);
+        if total == 1 {
+            first_wedge_angle = 360.0;
+        }
+
+        let half_delta = angle_delta / 2.0;
+        if half_delta <= Epsilon::UNKNOWN_1EN6
+            || half_delta >= first_wedge_angle - Epsilon::UNKNOWN_1EN6
+        {
+            continue;
+        }
+
+        let base_line = base_line_from_vertex(&vertex_lines[i].segment, vertex);
+        let base_length = base_line.determine_length();
+        if !Epsilon::HIGH.gt0(base_length) {
+            continue;
+        }
+        let candidate =
+            line_segment_rotate_scaled(&base_line, half_delta, grid_width / base_length)
+                .with_line_color(LineColor::Purple8)
+                .with_active(active);
+        candidates.push(candidate);
+    }
+    candidates
+}
+
+fn base_line_from_vertex(segment: &LineSegment, vertex: Point) -> LineSegment {
+    if vertex.distance(segment.a) < Epsilon::UNKNOWN_1EN6 {
+        LineSegment::new(segment.a, segment.b)
+    } else if vertex.distance(segment.b) < Epsilon::UNKNOWN_1EN6 {
+        LineSegment::new(segment.b, segment.a)
+    } else {
+        LineSegment::new(vertex, vertex)
+    }
 }
 
 fn axiom5_tangent_indicators(

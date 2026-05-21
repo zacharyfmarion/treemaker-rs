@@ -127,6 +127,8 @@ public class OrieditaGeometryOracle {
             case "foldline-angle-restricted-converging-draw" -> foldLineAngleRestrictedConvergingDraw(args);
             case "foldline-angle-system-candidates" -> foldLineAngleSystemCandidates(args);
             case "foldline-angle-system-draw" -> foldLineAngleSystemDraw(args);
+            case "foldline-make-vertex-flat-foldable-candidates" -> foldLineMakeVertexFlatFoldableCandidates(args);
+            case "foldline-make-vertex-flat-foldable-destination" -> foldLineMakeVertexFlatFoldableDestination(args);
             case "foldline-square-bisector-3p" -> foldLineSquareBisector3p(args);
             case "foldline-square-bisector-2l-np" -> foldLineSquareBisector2lNp(args);
             case "foldline-square-bisector-parallel-indicator" -> foldLineSquareBisectorParallelIndicator(args);
@@ -2108,6 +2110,130 @@ public class OrieditaGeometryOracle {
         return candidates;
     }
 
+    private static void foldLineMakeVertexFlatFoldableCandidates(String[] args) {
+        if (args.length < 6) {
+            usage("foldline-make-vertex-flat-foldable-candidates expects vertex, grid width, color, count, and segment payload");
+        }
+
+        Point vertex = new Point(parse(args[1]), parse(args[2]));
+        double gridWidth = parse(args[3]);
+        LineColor color = LineColor.fromNumber(Integer.parseInt(args[4]));
+        int count = Integer.parseInt(args[5]);
+        FoldLineSet set = foldLineSet(args, 6, count);
+        SortingBox<LineSegment> nbox = vertexSortingBox(set, vertex);
+        LineColor commitColor = nbox.getTotal() == 1 ? nbox.getValue(1).getColor() : color;
+        System.out.println("color|" + commitColor.getNumber());
+        printLineSegmentsList(oddVertexFoldableCandidates(nbox, vertex, gridWidth, LineSegment.ActiveState.INACTIVE_0));
+    }
+
+    private static void foldLineMakeVertexFlatFoldableDestination(String[] args) {
+        if (args.length < 15) {
+            usage("foldline-make-vertex-flat-foldable-destination expects vertex, candidate, destination, color, count, and segment payload");
+        }
+
+        Point vertex = new Point(parse(args[1]), parse(args[2]));
+        LineSegment candidate = segment(args, 3);
+        LineSegment destination = segment(args, 8);
+        LineColor color = LineColor.fromNumber(Integer.parseInt(args[13]));
+        int count = Integer.parseInt(args[14]);
+        FoldLineSet set = foldLineSet(args, 15, count);
+        Point crossPoint = OritaCalc.findIntersection(candidate, destination);
+        LineSegment result = new LineSegment(crossPoint, vertex, color);
+        boolean added = Epsilon.high.gt0(result.determineLength());
+        if (added) {
+            addLineSegmentLikeWorker(set, result);
+        }
+
+        System.out.println("added|" + added);
+        printFoldLineSet(set);
+    }
+
+    private static SortingBox<LineSegment> vertexSortingBox(FoldLineSet set, Point vertex) {
+        SortingBox<LineSegment> nbox = new SortingBox<>();
+        for (LineSegment segment : set.getLineSegmentsIterable()) {
+            if (segment.getColor().isFoldingLine()) {
+                if (vertex.distance(segment.getA()) < Epsilon.UNKNOWN_1EN6) {
+                    nbox.addByWeight(segment, OritaCalc.angle(segment.getA(), segment.getB()));
+                } else if (vertex.distance(segment.getB()) < Epsilon.UNKNOWN_1EN6) {
+                    nbox.addByWeight(segment, OritaCalc.angle(segment.getB(), segment.getA()));
+                }
+            }
+        }
+        return nbox;
+    }
+
+    private static List<LineSegment> oddVertexFoldableCandidates(
+            SortingBox<LineSegment> nbox,
+            Point vertex,
+            double gridWidth,
+            LineSegment.ActiveState activeState) {
+        List<LineSegment> candidates = new ArrayList<>();
+        if (nbox.getTotal() % 2 != 1) {
+            return candidates;
+        }
+
+        for (int i = 1; i <= nbox.getTotal(); i++) {
+            double angleDelta = 0.0;
+            int near;
+            int far;
+            for (int k = 1; k <= nbox.getTotal(); k++) {
+                near = i + k - 1;
+                if (near > nbox.getTotal()) {
+                    near = near - nbox.getTotal();
+                }
+                far = i + k;
+                if (far > nbox.getTotal()) {
+                    far = far - nbox.getTotal();
+                }
+
+                double addAngle = OritaCalc.angle_between_0_360(nbox.getWeight(far) - nbox.getWeight(near));
+                if (k % 2 == 1) {
+                    angleDelta = angleDelta + addAngle;
+                } else {
+                    angleDelta = angleDelta - addAngle;
+                }
+            }
+
+            if (nbox.getTotal() == 1) {
+                angleDelta = 360.0;
+            }
+
+            near = i;
+            if (near > nbox.getTotal()) {
+                near = near - nbox.getTotal();
+            }
+            far = i + 1;
+            if (far > nbox.getTotal()) {
+                far = far - nbox.getTotal();
+            }
+
+            double firstWedgeAngle = OritaCalc.angle_between_0_360(nbox.getWeight(far) - nbox.getWeight(near));
+            if (nbox.getTotal() == 1) {
+                firstWedgeAngle = 360.0;
+            }
+
+            if ((angleDelta / 2.0 > Epsilon.UNKNOWN_1EN6)
+                    && (angleDelta / 2.0 < firstWedgeAngle - Epsilon.UNKNOWN_1EN6)) {
+                LineSegment base = new LineSegment();
+                LineSegment nboxLineSegment = nbox.getValue(i);
+                if (vertex.distance(nboxLineSegment.getA()) < Epsilon.UNKNOWN_1EN6) {
+                    base = new LineSegment(nboxLineSegment.getA(), nboxLineSegment.getB());
+                } else if (vertex.distance(nboxLineSegment.getB()) < Epsilon.UNKNOWN_1EN6) {
+                    base = new LineSegment(nboxLineSegment.getB(), nboxLineSegment.getA());
+                }
+
+                double baseLength = base.determineLength();
+                LineSegment candidate = OritaCalc.lineSegment_rotate(
+                        base,
+                        angleDelta / 2.0,
+                        gridWidth / baseLength).withColor(LineColor.PURPLE_8);
+                candidate = candidate.withActive(activeState);
+                candidates.add(candidate);
+            }
+        }
+        return candidates;
+    }
+
     private static void foldLineSquareBisector3p(String[] args) {
         if (args.length < 14) {
             usage("foldline-square-bisector-3p expects three points, destination segment, color, count, and segment payload");
@@ -3454,6 +3580,8 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle foldline-angle-restricted-converging-draw <segment ax ay bx by color> <convergeX> <convergeY> <color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-angle-system-candidates <startX> <startY> <endX> <endY> <divider> <angle1> <angle2> <angle3> <angle4> <angle5> <angle6>");
         System.err.println("   or: OrieditaGeometryOracle foldline-angle-system-draw <releaseX> <releaseY> <selected ax ay bx by color> <destination ax ay bx by color> <color> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-make-vertex-flat-foldable-candidates <vertexX> <vertexY> <gridWidth> <color> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-make-vertex-flat-foldable-destination <vertexX> <vertexY> <candidate ax ay bx by color> <destination ax ay bx by color> <color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-square-bisector-3p <p1x> <p1y> <p2x> <p2y> <p3x> <p3y> <destination ax ay bx by color> <color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-square-bisector-2l-np <first ax ay bx by color> <second ax ay bx by color> <destination ax ay bx by color> <color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-square-bisector-parallel-indicator <first ax ay bx by color> <second ax ay bx by color> <count> [ax ay bx by color]...");

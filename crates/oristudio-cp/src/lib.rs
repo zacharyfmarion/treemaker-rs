@@ -562,10 +562,10 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
     descriptor!(
         VertexMakeAngularlyFlatFoldable,
         "MouseHandlerVertexMakeAngularlyFlatFoldable",
-        "operations::construction::make_vertex_flat_foldable",
+        "operations::construction::make_vertex_flat_foldable_candidates",
         Kernel,
         7,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         FoldableLineInput,

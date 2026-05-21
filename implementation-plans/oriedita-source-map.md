@@ -156,7 +156,7 @@ stage explicitly changes it.
 | `DOUBLE_SYMMETRIC_DRAW_35` | `MouseHandlerDoubleSymmetricDraw` | `operations::construction::double_symmetric_draw` | kernel | 7 | Oracle-tested |
 | `CREASES_ALTERNATE_MV_36` | `MouseHandlerCreasesAlternateMV` | `operations::color::alternate_mountain_valley_crossing` | kernel | 6 | Oracle-tested |
 | `DRAW_CREASE_ANGLE_RESTRICTED_5_37` | `MouseHandlerDrawCreaseAngleRestricted5` | `operations::construction::draw_crease_angle_restricted_5`, `operations::construction::snap_to_active_angle_system`, `operations::construction::snap_to_close_point_in_active_angle_system` | kernel | 7 | Oracle-tested |
-| `VERTEX_MAKE_ANGULARLY_FLAT_FOLDABLE_38` | `MouseHandlerVertexMakeAngularlyFlatFoldable` | `operations::construction::make_vertex_flat_foldable` | kernel | 7, 9 | Unsupported |
+| `VERTEX_MAKE_ANGULARLY_FLAT_FOLDABLE_38` | `MouseHandlerVertexMakeAngularlyFlatFoldable` | `operations::construction::make_vertex_flat_foldable_candidates`, `operations::construction::make_vertex_flat_foldable_to_destination` | kernel | 7, 9 | Oracle-tested |
 | `FOLDABLE_LINE_INPUT_39` | `MouseHandlerFoldableLineInput` | `operations::construction::foldable_line_input` | kernel | 7 | Unsupported |
 | `PARALLEL_DRAW_40` | `MouseHandlerParallelDraw` | `operations::construction::parallel_draw` | kernel | 7 | Oracle-tested |
 | `VERTEX_DELETE_ON_CREASE_41` | `MouseHandlerVertexDeleteOnCrease` | `operations::point::delete_vertex_on_crease` | kernel | 5 | Oracle-tested |

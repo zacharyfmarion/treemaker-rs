@@ -1001,6 +1001,9 @@ Status:
   including grid-station stepping, parallel-excluded proximity skips, forward
   hit detection, `extendToIntersectionPoint_2` rib placement, red/blue
   alternation, and Oriedita's `del_V` call when both ribs are added.
+- `AXIOM_7` is ported and oracle-tested for resolved inputs, including purple
+  indicator construction, direct indicator commit, and destination clipping via
+  the same extended-segment helper used by the parallel/perpendicular tools.
 
 ### Stage 8: Circle, Polygon, Base, and Generator Tools
 

@@ -954,10 +954,10 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
     descriptor!(
         Axiom7,
         "MouseHandlerAxiom7",
-        "operations::construction::axiom7",
+        "operations::construction::axiom7_*",
         Kernel,
         7,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         FixInaccurate,

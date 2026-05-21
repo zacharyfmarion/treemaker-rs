@@ -90,6 +90,9 @@ public class OrieditaGeometryOracle {
             case "foldline-parallel-width" -> foldLineParallelWidth(args);
             case "foldline-perpendicular-projection" -> foldLinePerpendicularProjection(args);
             case "foldline-perpendicular-indicator" -> foldLinePerpendicularIndicator(args);
+            case "foldline-axiom7-indicator" -> foldLineAxiom7Indicator(args);
+            case "foldline-axiom7-commit" -> foldLineAxiom7Commit(args);
+            case "foldline-axiom7-destination" -> foldLineAxiom7Destination(args);
             case "foldline-symmetric-draw" -> foldLineSymmetricDraw(args);
             case "foldline-double-symmetric-draw" -> foldLineDoubleSymmetricDraw(args);
             case "foldline-inward" -> foldLineInward(args);
@@ -1181,6 +1184,78 @@ public class OrieditaGeometryOracle {
                     + result.determineBY() + "|"
                     + result.getColor().getNumber());
         }
+    }
+
+    private static void foldLineAxiom7Indicator(String[] args) {
+        if (args.length < 14) {
+            usage("foldline-axiom7-indicator expects target point, target segment, perpendicular segment, count, and segment payload");
+        }
+
+        Point targetPoint = new Point(parse(args[1]), parse(args[2]));
+        LineSegment targetSegment = segment(args, 3);
+        LineSegment perpendicularSegment = segment(args, 8);
+        int count = Integer.parseInt(args[13]);
+        FoldLineSet set = foldLineSet(args, 14, count);
+        LineSegment result = axiom7Indicator(set, targetPoint, targetSegment, perpendicularSegment);
+        printSegmentResult(result);
+    }
+
+    private static void foldLineAxiom7Commit(String[] args) {
+        if (args.length < 8) {
+            usage("foldline-axiom7-commit expects indicator segment, color, count, and segment payload");
+        }
+
+        LineSegment indicator = segment(args, 1);
+        LineColor color = LineColor.fromNumber(Integer.parseInt(args[6]));
+        int count = Integer.parseInt(args[7]);
+        FoldLineSet set = foldLineSet(args, 8, count);
+        LineSegment result = indicator.withColor(color);
+        boolean added = Epsilon.high.gt0(result.determineLength());
+        if (added) {
+            addLineSegmentLikeWorker(set, result);
+        }
+
+        System.out.println("added|" + added);
+        printFoldLineSet(set);
+    }
+
+    private static void foldLineAxiom7Destination(String[] args) {
+        if (args.length < 13) {
+            usage("foldline-axiom7-destination expects indicator segment, destination segment, color, count, and segment payload");
+        }
+
+        LineSegment indicator = segment(args, 1);
+        LineSegment destination = segment(args, 6);
+        LineColor color = LineColor.fromNumber(Integer.parseInt(args[11]));
+        int count = Integer.parseInt(args[12]);
+        FoldLineSet set = foldLineSet(args, 13, count);
+        LineSegment result = additionalIntersection(indicator, destination, color);
+        boolean added = result != null;
+        if (added) {
+            addLineSegmentLikeWorker(set, result);
+        }
+
+        System.out.println("added|" + added);
+        printFoldLineSet(set);
+    }
+
+    private static LineSegment axiom7Indicator(
+            FoldLineSet set,
+            Point targetPoint,
+            LineSegment targetSegment,
+            LineSegment perpendicularSegment) {
+        LineSegment temp = new LineSegment(targetPoint, new Point(
+                targetPoint.getX() + perpendicularSegment.determineBX() - perpendicularSegment.determineAX(),
+                targetPoint.getY() + perpendicularSegment.determineBY() - perpendicularSegment.determineAY()));
+        LineSegment extendLine = additionalIntersection(temp, targetSegment, LineColor.PURPLE_8);
+        if (extendLine == null) {
+            return null;
+        }
+
+        Point mid = OritaCalc.midPoint(targetPoint, OritaCalc.findIntersection(extendLine, targetSegment));
+        LineSegment indicator = OritaCalc.fullExtendUntilHit(set, new LineSegment(mid,
+                OritaCalc.findProjection(OritaCalc.moveParallel(extendLine, 1.0), mid), LineColor.PURPLE_8));
+        return OritaCalc.fullExtendUntilHit(set, indicator.withCoordinates(indicator.getB(), indicator.getA()));
     }
 
     private static void foldLineSymmetricDraw(String[] args) {
@@ -2707,6 +2782,9 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle foldline-parallel-width <selected ax ay bx by color> <width> <choice> <color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-perpendicular-projection <targetX> <targetY> <base ax ay bx by color> <color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-perpendicular-indicator <targetX> <targetY> <base ax ay bx by color> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-axiom7-indicator <targetX> <targetY> <target ax ay bx by color> <perpendicular ax ay bx by color> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-axiom7-commit <indicator ax ay bx by color> <color> <count> [ax ay bx by color]...");
+        System.err.println("   or: OrieditaGeometryOracle foldline-axiom7-destination <indicator ax ay bx by color> <destination ax ay bx by color> <color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-symmetric-draw <source ax ay bx by color> <mirror ax ay bx by color> <color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-double-symmetric-draw <drag ax ay bx by color> <count> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle foldline-inward <p1x> <p1y> <p2x> <p2y> <p3x> <p3y> <color> <count> [ax ay bx by color]...");

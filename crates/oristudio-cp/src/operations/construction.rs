@@ -187,6 +187,70 @@ pub fn perpendicular_draw_to_destination(
     true
 }
 
+/// Oriedita `AXIOM_7` purple indicator generation after target inputs are resolved.
+pub fn axiom7_indicator(
+    model: &CreasePatternModel,
+    target_point: Point,
+    target_segment: &LineSegment,
+    perpendicular_segment: &LineSegment,
+) -> Option<LineSegment> {
+    let guide = LineSegment::new(
+        target_point,
+        Point::new(
+            target_point.x + perpendicular_segment.determine_bx()
+                - perpendicular_segment.determine_ax(),
+            target_point.y + perpendicular_segment.determine_by()
+                - perpendicular_segment.determine_ay(),
+        ),
+    );
+    let extend_line = additional_intersection(&guide, target_segment, LineColor::Purple8)?;
+    let midpoint = mid_point(
+        target_point,
+        find_intersection_segments(&extend_line, target_segment),
+    );
+    let moved = move_parallel(&extend_line, 1.0);
+    let indicator = full_extend_until_hit(
+        model,
+        &LineSegment::with_color(
+            midpoint,
+            find_projection(StraightLine::from_segment(&moved), midpoint),
+            LineColor::Purple8,
+        ),
+    );
+    Some(full_extend_until_hit(
+        model,
+        &indicator.with_coordinates(indicator.b, indicator.a),
+    ))
+}
+
+/// Add the chosen Axiom 7 indicator itself.
+pub fn commit_axiom7_indicator(
+    model: &mut CreasePatternModel,
+    indicator: &LineSegment,
+    color: LineColor,
+) -> bool {
+    let result = indicator.with_line_color(color);
+    if !Epsilon::HIGH.gt0(result.determine_length()) {
+        return false;
+    }
+    add_line_segment_like_worker(model, &result);
+    true
+}
+
+/// Oriedita `AXIOM_7` destination branch after its indicator is resolved.
+pub fn axiom7_draw_to_destination(
+    model: &mut CreasePatternModel,
+    indicator: &LineSegment,
+    destination: &LineSegment,
+    color: LineColor,
+) -> bool {
+    let Some(result) = additional_intersection(indicator, destination, color) else {
+        return false;
+    };
+    add_line_segment_like_worker(model, &result);
+    true
+}
+
 /// Oriedita `SYMMETRIC_DRAW_10` final mutation after two construction lines are resolved.
 pub fn symmetric_draw(
     model: &mut CreasePatternModel,

@@ -205,7 +205,7 @@ stage explicitly changes it.
 | `CHANGE_STANDARD_FACE_103` | `MouseHandlerChangeStandardFace` | `folding::change_standard_face` | kernel | 10 | Unsupported |
 | `ADD_FOLDING_CONSTRAINT` | `MouseHandlerAddFoldingConstraints` | `folding::constraints` | kernel | 10 | Unsupported |
 | `AXIOM_5` | `MouseHandlerAxiom5` | `operations::construction::axiom5` | kernel | 7 | Unsupported |
-| `AXIOM_7` | `MouseHandlerAxiom7` | `operations::construction::axiom7` | kernel | 7 | Unsupported |
+| `AXIOM_7` | `MouseHandlerAxiom7` | `operations::construction::axiom7_indicator`, `operations::construction::commit_axiom7_indicator`, `operations::construction::axiom7_draw_to_destination` | kernel | 7 | Oracle-tested |
 | `FIX_INACCURATE_107` | `MouseHandlerCreaseFixInaccurate` | `checks::fix_inaccurate`, `operations::arrangement` | kernel | 5, 9 | Unsupported |
 
 ## Step Handler Infrastructure

@@ -19,7 +19,8 @@ use oristudio_cp::operations::color::{
     make_valley, replace_line_type_for_indices, set_line_color_for_indices, toggle_mountain_valley,
 };
 use oristudio_cp::operations::construction::{
-    DrawCreaseTarget, commit_parallel_width_indicator, commit_square_bisector_parallel_indicator,
+    DrawCreaseTarget, axiom7_draw_to_destination, axiom7_indicator, commit_axiom7_indicator,
+    commit_parallel_width_indicator, commit_square_bisector_parallel_indicator,
     double_symmetric_draw, draw_crease_segment, fishbone_draw, inward, mirror_selected_lines,
     parallel_draw, parallel_width_indicators, perpendicular_indicator, perpendicular_projection,
     square_bisector_from_lines_to_destination, square_bisector_from_points_to_destination,
@@ -1272,6 +1273,66 @@ fn perpendicular_draw_modes_match_oriedita_oracle() {
         optional_segment_result_summary(indicator.as_ref()),
         run_oracle(&oracle, &args)
     );
+}
+
+#[test]
+fn axiom7_modes_match_oriedita_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    let target_segment = segment(4.0, -2.0, 4.0, 2.0, LineColor::Black0);
+    let perpendicular_segment = segment(0.0, 0.0, 1.0, 0.0, LineColor::Black0);
+    let top = segment(0.0, 3.0, 4.0, 3.0, LineColor::Black0);
+    let bottom = segment(0.0, -3.0, 4.0, -3.0, LineColor::Black0);
+    let segments = vec![target_segment.clone(), top, bottom];
+    let model = model_from_segments(&segments);
+    let indicator = axiom7_indicator(
+        &model,
+        Point::new(0.0, 0.0),
+        &target_segment,
+        &perpendicular_segment,
+    );
+
+    let mut args = vec![
+        "foldline-axiom7-indicator".to_string(),
+        "0.0".to_string(),
+        "0.0".to_string(),
+    ];
+    push_one_segment_args(&mut args, &target_segment);
+    push_one_segment_args(&mut args, &perpendicular_segment);
+    args.push(segments.len().to_string());
+    push_segment_args(&mut args, &segments);
+    assert_eq!(
+        optional_segment_result_summary(indicator.as_ref()),
+        run_oracle(&oracle, &args)
+    );
+    let indicator = indicator.expect("oracle-tested fixture should produce an indicator");
+
+    let mut model = model_from_segments(&segments);
+    let added = commit_axiom7_indicator(&mut model, &indicator, LineColor::Red1);
+    let mut args = vec!["foldline-axiom7-commit".to_string()];
+    push_one_segment_args(&mut args, &indicator);
+    args.push(LineColor::Red1.number().to_string());
+    args.push(segments.len().to_string());
+    push_segment_args(&mut args, &segments);
+    let rust_summary = format!("added|{added}\n{}", line_segment_set_summary(&model));
+    assert_eq!(rust_summary, run_oracle(&oracle, &args));
+
+    let destination = segment(0.0, 1.0, 4.0, 1.0, LineColor::Black0);
+    let mut model = model_from_segments(&segments);
+    let added = axiom7_draw_to_destination(&mut model, &indicator, &destination, LineColor::Blue2);
+    let mut args = vec!["foldline-axiom7-destination".to_string()];
+    push_one_segment_args(&mut args, &indicator);
+    push_one_segment_args(&mut args, &destination);
+    args.push(LineColor::Blue2.number().to_string());
+    args.push(segments.len().to_string());
+    push_segment_args(&mut args, &segments);
+    let rust_summary = format!("added|{added}\n{}", line_segment_set_summary(&model));
+    assert_eq!(rust_summary, run_oracle(&oracle, &args));
 }
 
 #[test]

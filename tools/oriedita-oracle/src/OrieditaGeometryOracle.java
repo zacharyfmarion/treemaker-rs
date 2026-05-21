@@ -12,6 +12,7 @@ import origami.crease_pattern.element.StraightLine;
 import origami.crease_pattern.worker.foldlineset.BranchTrim;
 import origami.crease_pattern.worker.foldlineset.Fix1;
 import origami.crease_pattern.worker.foldlineset.Fix2;
+import origami.crease_pattern.worker.foldlineset.OrganizeCircles;
 import origami.crease_pattern.worker.linesegmentset.IntersectDivide;
 import origami.folding.util.SortingBox;
 
@@ -82,6 +83,13 @@ public class OrieditaGeometryOracle {
             case "foldline-circle-draw" -> foldLineCircleDraw(args);
             case "foldline-circle-draw-free" -> foldLineCircleDrawFree(args);
             case "foldline-circle-three-point" -> foldLineCircleThreePoint(args);
+            case "foldline-circle-separate" -> foldLineCircleSeparate(args);
+            case "foldline-circle-concentric" -> foldLineCircleConcentric(args);
+            case "foldline-circle-concentric-select" -> foldLineCircleConcentricSelect(args);
+            case "foldline-circle-concentric-two" -> foldLineCircleConcentricTwo(args);
+            case "foldline-circle-invert-circle" -> foldLineCircleInvertCircle(args);
+            case "foldline-circle-invert-line" -> foldLineCircleInvertLine(args);
+            case "foldline-circle-organize" -> foldLineCircleOrganize(args);
             case "foldline-divide-count" -> foldLineDivideCount(args);
             case "foldline-divide-ratio" -> foldLineDivideRatio(args);
             case "measure-length" -> measureLength(args);
@@ -1019,6 +1027,182 @@ public class OrieditaGeometryOracle {
                 || Math.abs(angle - 360.0) < Epsilon.UNKNOWN_1EN6;
     }
 
+    private static void foldLineCircleSeparate(String[] args) {
+        if (args.length != 7) {
+            usage("foldline-circle-separate expects center and radius segment endpoints");
+        }
+
+        Point center = new Point(parse(args[1]), parse(args[2]));
+        Point a = new Point(parse(args[3]), parse(args[4]));
+        Point b = new Point(parse(args[5]), parse(args[6]));
+        FoldLineSet set = new FoldLineSet();
+        set.addCircle(center.getX(), center.getY(), OritaCalc.distance(a, b), LineColor.CYAN_3);
+        System.out.println("changed|true");
+        printCircleSet(set);
+    }
+
+    private static void foldLineCircleConcentric(String[] args) {
+        if (args.length != 9) {
+            usage("foldline-circle-concentric expects circle and radius segment endpoints");
+        }
+
+        Circle original = circle(args, 1);
+        Point a = new Point(parse(args[5]), parse(args[6]));
+        Point b = new Point(parse(args[7]), parse(args[8]));
+        FoldLineSet set = new FoldLineSet();
+        set.addCircle(
+                original.getX(),
+                original.getY(),
+                original.getR() + OritaCalc.distance(a, b),
+                LineColor.CYAN_3);
+        System.out.println("changed|true");
+        printCircleSet(set);
+    }
+
+    private static void foldLineCircleConcentricSelect(String[] args) {
+        if (args.length != 14) {
+            usage("foldline-circle-concentric-select expects candidate index, target circle, and two reference circles");
+        }
+
+        int candidateIndex = Integer.parseInt(args[1]);
+        Circle target = circle(args, 2);
+        Circle reference1 = circle(args, 6);
+        Circle reference2 = circle(args, 10);
+        List<Circle> candidates = concentricSelectCandidates(target, reference1, reference2);
+        FoldLineSet set = new FoldLineSet();
+        boolean changed = false;
+        if (candidateIndex >= 0 && candidateIndex < candidates.size()) {
+            Circle selected = new Circle(candidates.get(candidateIndex));
+            selected.setColor(LineColor.CYAN_3);
+            set.getCircles().add(selected);
+            changed = true;
+        }
+        System.out.println("changed|" + changed);
+        printCircleSet(set);
+    }
+
+    private static List<Circle> concentricSelectCandidates(Circle target, Circle reference1, Circle reference2) {
+        List<Circle> candidates = new ArrayList<>();
+        double deltaR = Math.abs(reference2.getR() - reference1.getR());
+        if (Epsilon.high.eq0(deltaR)) {
+            return candidates;
+        }
+
+        double outerR = target.getR() + deltaR;
+        double innerR = target.getR() - deltaR;
+        candidates.add(new Circle(target.determineCenter(), outerR, LineColor.MAGENTA_5));
+        if (Epsilon.high.gt0(innerR)) {
+            candidates.add(new Circle(target.determineCenter(), innerR, LineColor.MAGENTA_5));
+        }
+        return candidates;
+    }
+
+    private static void foldLineCircleConcentricTwo(String[] args) {
+        if (args.length != 9) {
+            usage("foldline-circle-concentric-two expects two circles");
+        }
+
+        Circle circle1 = circle(args, 1);
+        Circle circle2 = circle(args, 5);
+        FoldLineSet set = new FoldLineSet();
+        int added = 0;
+        if (OritaCalc.circle_to_circle_intersection(circle1, circle2) != Circle.Intersection.TANGENT) {
+            double centerLineLength = OritaCalc.distance(circle1.determineCenter(), circle2.determineCenter());
+            double concentricOffset = (centerLineLength - circle1.getR() - circle2.getR()) / 2.0;
+            set.addCircle(circle1.getX(), circle1.getY(), circle1.getR() + concentricOffset, LineColor.CYAN_3);
+            set.addCircle(circle2.getX(), circle2.getY(), circle2.getR() + concentricOffset, LineColor.CYAN_3);
+            added = 2;
+        }
+        System.out.println("added|" + added);
+        printCircleSet(set);
+    }
+
+    private static void foldLineCircleInvertCircle(String[] args) {
+        if (args.length != 9) {
+            usage("foldline-circle-invert-circle expects subject circle and inversion circle");
+        }
+
+        Circle subject = circle(args, 1);
+        Circle inversion = circle(args, 5);
+        FoldLineSet set = new FoldLineSet();
+        String outcome = invertCircle(set, subject, inversion);
+        System.out.println("outcome|" + outcome);
+        printFoldLineSet(set);
+        printCircleSet(set);
+    }
+
+    private static String invertCircle(FoldLineSet set, Circle subject, Circle inversion) {
+        if (Math.abs(OritaCalc.distance(subject.determineCenter(), inversion.determineCenter())
+                - subject.getR()) < Epsilon.UNKNOWN_1EN7) {
+            set.addLine(inversion.turnAround_CircleToLineSegment(subject));
+            return "line";
+        }
+
+        Circle added = new Circle();
+        added.set(inversion.turnAround(subject));
+        added.setColor(LineColor.CYAN_3);
+        set.getCircles().add(added);
+        return "circle";
+    }
+
+    private static void foldLineCircleInvertLine(String[] args) {
+        if (args.length != 10) {
+            usage("foldline-circle-invert-line expects line segment and inversion circle");
+        }
+
+        LineSegment subject = segment(args, 1);
+        Circle inversion = circle(args, 6);
+        FoldLineSet set = new FoldLineSet();
+        String outcome = invertLineSegment(set, subject, inversion);
+        System.out.println("outcome|" + outcome);
+        printFoldLineSet(set);
+        printCircleSet(set);
+    }
+
+    private static String invertLineSegment(FoldLineSet set, LineSegment subject, Circle inversion) {
+        StraightLine ty = new StraightLine(subject);
+        if (ty.calculateDistance(inversion.determineCenter()) < Epsilon.UNKNOWN_1EN7) {
+            return "none";
+        }
+
+        Circle added = new Circle();
+        added.set(inversion.turnAround_LineSegmentToCircle(subject));
+        added.setColor(LineColor.CYAN_3);
+        set.getCircles().add(added);
+        return "circle";
+    }
+
+    private static void foldLineCircleOrganize(String[] args) {
+        if (args.length < 3) {
+            usage("foldline-circle-organize expects circles followed by fold lines");
+        }
+
+        int circleCount = Integer.parseInt(args[1]);
+        int lineCountOffset = 2 + circleCount * 4;
+        if (args.length < lineCountOffset + 1) {
+            usage("foldline-circle-organize missing line count");
+        }
+        int lineCount = Integer.parseInt(args[lineCountOffset]);
+        int expectedLength = lineCountOffset + 1 + lineCount * 5;
+        if (args.length != expectedLength) {
+            usage("foldline-circle-organize payload length mismatch");
+        }
+
+        FoldLineSet set = new FoldLineSet();
+        for (int i = 0; i < circleCount; i++) {
+            set.getCircles().add(circle(args, 2 + i * 4));
+        }
+        for (int i = 0; i < lineCount; i++) {
+            LineSegment line = segment(args, lineCountOffset + 1 + i * 5);
+            set.addLine(line);
+        }
+
+        int before = set.getCircles().size();
+        OrganizeCircles.apply(set);
+        System.out.println("deleted|" + (before - set.getCircles().size()));
+        printCircleSet(set);
+    }
+
     private static void foldLineDivideCount(String[] args) {
         if (args.length < 8) {
             usage("foldline-divide-count expects division count, segment, count, and segment payload");
@@ -1210,6 +1394,21 @@ public class OrieditaGeometryOracle {
                     LineColor.fromNumber(Integer.parseInt(args[base + 4])));
         }
         return set;
+    }
+
+    private static LineSegment segment(String[] args, int offset) {
+        return new LineSegment(
+                new Point(parse(args[offset]), parse(args[offset + 1])),
+                new Point(parse(args[offset + 2]), parse(args[offset + 3])),
+                LineColor.fromNumber(Integer.parseInt(args[offset + 4])));
+    }
+
+    private static Circle circle(String[] args, int offset) {
+        return new Circle(
+                parse(args[offset]),
+                parse(args[offset + 1]),
+                parse(args[offset + 2]),
+                LineColor.fromNumber(Integer.parseInt(args[offset + 3])));
     }
 
     private static void addLineSegmentLikeWorker(FoldLineSet set, LineSegment segment) {
@@ -1437,6 +1636,13 @@ public class OrieditaGeometryOracle {
         System.err.println("   or: OrieditaGeometryOracle foldline-circle-draw <centerX> <centerY> <radiusX> <radiusY>");
         System.err.println("   or: OrieditaGeometryOracle foldline-circle-draw-free <centerX> <centerY> <radiusX> <radiusY>");
         System.err.println("   or: OrieditaGeometryOracle foldline-circle-three-point <ax> <ay> <bx> <by> <cx> <cy>");
+        System.err.println("   or: OrieditaGeometryOracle foldline-circle-separate <centerX> <centerY> <ax> <ay> <bx> <by>");
+        System.err.println("   or: OrieditaGeometryOracle foldline-circle-concentric <circle x y r color> <ax> <ay> <bx> <by>");
+        System.err.println("   or: OrieditaGeometryOracle foldline-circle-concentric-select <candidateIndex> <target x y r color> <ref1 x y r color> <ref2 x y r color>");
+        System.err.println("   or: OrieditaGeometryOracle foldline-circle-concentric-two <circle1 x y r color> <circle2 x y r color>");
+        System.err.println("   or: OrieditaGeometryOracle foldline-circle-invert-circle <subject x y r color> <inversion x y r color>");
+        System.err.println("   or: OrieditaGeometryOracle foldline-circle-invert-line <segment ax ay bx by color> <inversion x y r color>");
+        System.err.println("   or: OrieditaGeometryOracle foldline-circle-organize <circleCount> [x y r color]... <lineCount> [ax ay bx by color]...");
         System.err.println("   or: OrieditaGeometryOracle measure-length <ax> <ay> <bx> <by>");
         System.err.println("   or: OrieditaGeometryOracle measure-angle <ax> <ay> <centerX> <centerY> <bx> <by>");
         System.err.println("   or: OrieditaGeometryOracle custom-line-type <customType> <lineColor>");

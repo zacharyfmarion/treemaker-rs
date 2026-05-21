@@ -1,4 +1,4 @@
-use oristudio_cp::geometry::{Intersection, LineColor, LineSegment, Point};
+use oristudio_cp::geometry::{Circle, Intersection, LineColor, LineSegment, Point};
 use oristudio_cp::model::{CreasePatternModel, CustomLineType};
 use oristudio_cp::operations::arrangement::{
     branch_trim, del_v_all, del_v_all_color_change, del_v_at_point, del_v_at_point_color_change,
@@ -8,7 +8,9 @@ use oristudio_cp::operations::arrangement::{
     divide_line_segment_with_new_lines, fix1, fix2, intersect_divide_pair,
 };
 use oristudio_cp::operations::circle::{
-    draw as draw_circle, free as draw_circle_free, through_three_points,
+    CircleInversionOutput, concentric, concentric_select, concentric_two_circle_select,
+    draw as draw_circle, free as draw_circle_free, invert_circle, invert_line_segment, organize,
+    separate, through_three_points,
 };
 use oristudio_cp::operations::color::{
     advance_line_type, alternate_mountain_valley_along, alternate_mountain_valley_crossing,
@@ -1238,6 +1240,162 @@ fn circle_three_point_matches_oriedita_oracle() {
 }
 
 #[test]
+fn circle_separate_and_concentric_modes_match_oriedita_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    let center = Point::new(10.0, 10.0);
+    let radius_a = Point::new(1.0, 1.0);
+    let radius_b = Point::new(4.0, 5.0);
+    let mut model = CreasePatternModel::default();
+    let changed = separate(&mut model, center, radius_a, radius_b);
+    let mut args = vec!["foldline-circle-separate".to_string()];
+    push_points_args(&mut args, &[center, radius_a, radius_b]);
+    let rust_summary = format!("changed|{changed}\n{}", circle_set_summary(&model));
+    assert_eq!(rust_summary, run_oracle(&oracle, &args));
+
+    let original = Circle::new(2.0, 3.0, 7.0, LineColor::Magenta5);
+    let mut model = CreasePatternModel::default();
+    let changed = concentric(&mut model, original, radius_a, radius_b);
+    let mut args = vec!["foldline-circle-concentric".to_string()];
+    push_circle_args(&mut args, original);
+    push_points_args(&mut args, &[radius_a, radius_b]);
+    let rust_summary = format!("changed|{changed}\n{}", circle_set_summary(&model));
+    assert_eq!(rust_summary, run_oracle(&oracle, &args));
+}
+
+#[test]
+fn circle_concentric_selection_modes_match_oriedita_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    let target = Circle::new(0.0, 0.0, 5.0, LineColor::Cyan3);
+    let reference1 = Circle::new(10.0, 0.0, 2.0, LineColor::Cyan3);
+    let reference2 = Circle::new(12.0, 0.0, 4.0, LineColor::Cyan3);
+    for candidate_index in [0, 1, 2] {
+        let mut model = CreasePatternModel::default();
+        let changed =
+            concentric_select(&mut model, target, reference1, reference2, candidate_index);
+        let mut args = vec![
+            "foldline-circle-concentric-select".to_string(),
+            candidate_index.to_string(),
+        ];
+        push_circle_args(&mut args, target);
+        push_circle_args(&mut args, reference1);
+        push_circle_args(&mut args, reference2);
+        let rust_summary = format!("changed|{changed}\n{}", circle_set_summary(&model));
+        assert_eq!(rust_summary, run_oracle(&oracle, &args));
+    }
+
+    for (circle2, expected_added) in [
+        (Circle::new(5.0, 0.0, 1.0, LineColor::Cyan3), 2),
+        (Circle::new(2.0, 0.0, 1.0, LineColor::Cyan3), 0),
+    ] {
+        let circle1 = Circle::new(0.0, 0.0, 1.0, LineColor::Cyan3);
+        let mut model = CreasePatternModel::default();
+        let added = concentric_two_circle_select(&mut model, circle1, circle2);
+        assert_eq!(added, expected_added);
+        let mut args = vec!["foldline-circle-concentric-two".to_string()];
+        push_circle_args(&mut args, circle1);
+        push_circle_args(&mut args, circle2);
+        let rust_summary = format!("added|{added}\n{}", circle_set_summary(&model));
+        assert_eq!(rust_summary, run_oracle(&oracle, &args));
+    }
+}
+
+#[test]
+fn circle_inversion_modes_match_oriedita_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    let inversion = Circle::new(0.0, 0.0, 1.0, LineColor::Cyan3);
+    for subject in [
+        Circle::new(2.0, 0.0, 0.5, LineColor::Magenta5),
+        Circle::new(1.0, 0.0, 1.0, LineColor::Magenta5),
+    ] {
+        let mut model = CreasePatternModel::default();
+        let output = invert_circle(&mut model, subject, inversion);
+        let mut args = vec!["foldline-circle-invert-circle".to_string()];
+        push_circle_args(&mut args, subject);
+        push_circle_args(&mut args, inversion);
+        let rust_summary = format!(
+            "outcome|{}\n{}{}",
+            circle_inversion_output(output),
+            line_segment_set_summary(&model),
+            circle_set_summary(&model)
+        );
+        assert_eq!(rust_summary, run_oracle(&oracle, &args));
+    }
+
+    for subject in [
+        segment(2.0, -1.0, 2.0, 1.0, LineColor::Black0),
+        segment(-1.0, 0.0, 1.0, 0.0, LineColor::Black0),
+    ] {
+        let mut model = CreasePatternModel::default();
+        let output = invert_line_segment(&mut model, &subject, inversion);
+        let mut args = vec!["foldline-circle-invert-line".to_string()];
+        push_one_segment_args(&mut args, &subject);
+        push_circle_args(&mut args, inversion);
+        let rust_summary = format!(
+            "outcome|{}\n{}{}",
+            circle_inversion_output(output),
+            line_segment_set_summary(&model),
+            circle_set_summary(&model)
+        );
+        assert_eq!(rust_summary, run_oracle(&oracle, &args));
+    }
+}
+
+#[test]
+fn organize_circles_matches_oriedita_oracle() {
+    let Some(oracle) = operations_oracle() else {
+        eprintln!(
+            "skipping Oriedita operations oracle test: ORIEDITA_OPERATIONS_ORACLE is not set"
+        );
+        return;
+    };
+
+    let circles = vec![
+        Circle::new(0.0, 0.0, 2.0, LineColor::Cyan3),
+        Circle::new(2.0, 0.0, 0.0, LineColor::Cyan3),
+        Circle::new(9.0, 9.0, 0.0, LineColor::Cyan3),
+    ];
+    let segments = vec![segment(2.0, -1.0, 2.0, 1.0, LineColor::Black0)];
+    let mut model = CreasePatternModel::default();
+    for circle in &circles {
+        model.add_circle(*circle);
+    }
+    for segment in &segments {
+        model.add_line_segment(segment.clone());
+    }
+    let deleted = organize(&mut model);
+
+    let mut args = vec![
+        "foldline-circle-organize".to_string(),
+        circles.len().to_string(),
+    ];
+    for circle in &circles {
+        push_circle_args(&mut args, *circle);
+    }
+    args.push(segments.len().to_string());
+    push_segment_args(&mut args, &segments);
+    let rust_summary = format!("deleted|{deleted}\n{}", circle_set_summary(&model));
+    assert_eq!(rust_summary, run_oracle(&oracle, &args));
+}
+
+#[test]
 fn draw_crease_segment_matches_oriedita_oracle() {
     let Some(oracle) = operations_oracle() else {
         eprintln!(
@@ -1396,6 +1554,13 @@ fn push_one_segment_args(args: &mut Vec<String>, segment: &LineSegment) {
     args.push(segment.color.number().to_string());
 }
 
+fn push_circle_args(args: &mut Vec<String>, circle: Circle) {
+    args.push(circle.x.to_string());
+    args.push(circle.y.to_string());
+    args.push(circle.r.to_string());
+    args.push(circle.color.number().to_string());
+}
+
 fn push_points_args(args: &mut Vec<String>, points: &[Point]) {
     for point in points {
         args.push(point.x.to_string());
@@ -1496,6 +1661,14 @@ fn delete_summary(to_delete: &BTreeSet<usize>) -> String {
 
 fn intersection_state(intersection: Intersection) -> i32 {
     intersection.state()
+}
+
+fn circle_inversion_output(output: CircleInversionOutput) -> &'static str {
+    match output {
+        CircleInversionOutput::None => "none",
+        CircleInversionOutput::Circle => "circle",
+        CircleInversionOutput::LineSegment => "line",
+    }
 }
 
 fn java_double_string(value: f64) -> String {

@@ -91,7 +91,7 @@ stage explicitly changes it.
 | `origami/crease_pattern/worker/foldlineset/Check4.java` | Diagnostic check. | `checks` | kernel | 9 | Unsupported |
 | `origami/crease_pattern/worker/foldlineset/Fix1.java` | Repair operation. | `checks`, `operations::arrangement` | kernel | 9 | Oracle-tested |
 | `origami/crease_pattern/worker/foldlineset/Fix2.java` | Repair operation. | `checks`, `operations::arrangement` | kernel | 9 | Oracle-tested |
-| `origami/crease_pattern/worker/foldlineset/OrganizeCircles.java` | Circle cleanup/organization. | `operations::circle` | kernel | 8 | Unsupported |
+| `origami/crease_pattern/worker/foldlineset/OrganizeCircles.java` | Circle cleanup/organization. | `operations::circle` | kernel | 8 | Oracle-tested |
 | `origami/crease_pattern/worker/linesegmentset/GetBoundingBox.java` | Bounds helper. | `model::bounds` | kernel | 3 | Unsupported |
 | `origami/crease_pattern/worker/linesegmentset/IntersectDivide.java` | Segment arrangement split helper. | `operations::arrangement` | kernel | 5 | Oracle-tested |
 | `origami/crease_pattern/worker/linesegmentset/OverlappingLineRemoval.java` | Overlap cleanup helper. | `operations::arrangement` | kernel | 5 | Unit-tested |
@@ -162,13 +162,13 @@ stage explicitly changes it.
 | `VERTEX_DELETE_ON_CREASE_41` | `MouseHandlerVertexDeleteOnCrease` | `operations::point::delete_vertex_on_crease` | kernel | 5 | Oracle-tested |
 | `CIRCLE_DRAW_42` | `MouseHandlerCircleDraw` | `operations::circle::draw` | kernel | 8 | Oracle-tested |
 | `CIRCLE_DRAW_THREE_POINT_43` | `MouseHandlerCircleDrawThreePoint` | `operations::circle::through_three_points` | kernel | 8 | Oracle-tested |
-| `CIRCLE_DRAW_SEPARATE_44` | `MouseHandlerCircleDrawSeparate` | `operations::circle::separate` | kernel | 8 | Unsupported |
+| `CIRCLE_DRAW_SEPARATE_44` | `MouseHandlerCircleDrawSeparate` | `operations::circle::separate` | kernel | 8 | Oracle-tested |
 | `CIRCLE_DRAW_TANGENT_LINE_45` | `MouseHandlerCircleDrawTangentLine` | `operations::circle::tangent_line` | kernel | 8 | Unsupported |
-| `CIRCLE_DRAW_INVERTED_46` | `MouseHandlerCircleDrawInverted` | `operations::circle::inverted` | kernel | 8 | Unsupported |
+| `CIRCLE_DRAW_INVERTED_46` | `MouseHandlerCircleDrawInverted` | `operations::circle::inverted` | kernel | 8 | Oracle-tested |
 | `CIRCLE_DRAW_FREE_47` | `MouseHandlerCircleDrawFree` | `operations::circle::free` | kernel | 8 | Oracle-tested |
-| `CIRCLE_DRAW_CONCENTRIC_48` | `MouseHandlerCircleDrawConcentric` | `operations::circle::concentric` | kernel | 8 | Unsupported |
-| `CIRCLE_DRAW_CONCENTRIC_SELECT_49` | `MouseHandlerCircleDrawConcentricSelect` | `operations::circle::concentric_select` | kernel | 8 | Unsupported |
-| `CIRCLE_DRAW_CONCENTRIC_TWO_CIRCLE_SELECT_50` | `MouseHandlerCircleDrawConcentricTwoCircleSelect` | `operations::circle::concentric_two_circle_select` | kernel | 8 | Unsupported |
+| `CIRCLE_DRAW_CONCENTRIC_48` | `MouseHandlerCircleDrawConcentric` | `operations::circle::concentric` | kernel | 8 | Oracle-tested |
+| `CIRCLE_DRAW_CONCENTRIC_SELECT_49` | `MouseHandlerCircleDrawConcentricSelect` | `operations::circle::concentric_select` | kernel | 8 | Oracle-tested |
+| `CIRCLE_DRAW_CONCENTRIC_TWO_CIRCLE_SELECT_50` | `MouseHandlerCircleDrawConcentricTwoCircleSelect` | `operations::circle::concentric_two_circle_select` | kernel | 8 | Oracle-tested |
 | `PARALLEL_DRAW_WIDTH_51` | `MouseHandlerParallelDrawWidth` | `operations::construction::parallel_width` | kernel | 7 | Unsupported |
 | `CONTINUOUS_SYMMETRIC_DRAW_52` | `MouseHandlerContinuousSymmetricDraw` | `operations::construction::continuous_symmetric` | kernel | 7 | Unsupported |
 | `DISPLAY_LENGTH_BETWEEN_POINTS_1_53` | `MouseHandlerDisplayLengthBetweenPoints` variant | `operations::measure::length_between_points` | kernel | 7 | Oracle-tested |

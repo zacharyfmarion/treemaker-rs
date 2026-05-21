@@ -613,7 +613,7 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
         "operations::circle::separate",
         Kernel,
         8,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         CircleDrawTangentLine,
@@ -629,7 +629,7 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
         "operations::circle::inverted",
         Kernel,
         8,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         CircleDrawFree,
@@ -645,7 +645,7 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
         "operations::circle::concentric",
         Kernel,
         8,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         CircleDrawConcentricSelect,
@@ -653,7 +653,7 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
         "operations::circle::concentric_select",
         Kernel,
         8,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         CircleDrawConcentricTwoCircleSelect,
@@ -661,7 +661,7 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
         "operations::circle::concentric_two_circle_select",
         Kernel,
         8,
-        Unsupported
+        OracleTested
     ),
     descriptor!(
         ParallelDrawWidth,
@@ -1125,7 +1125,7 @@ const OPERATION_DESCRIPTORS: &[OperationDescriptor] = &[
         "operations::circle::organize",
         Kernel,
         8,
-        Unsupported
+        OracleTested
     ),
 ];
 

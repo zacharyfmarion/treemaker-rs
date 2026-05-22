@@ -5,6 +5,8 @@
 //! roadmap: resolve a deterministic target folded state and expose enough
 //! diagnostics for later planning stages.
 
+use std::collections::{HashMap, HashSet};
+
 use serde::{Deserialize, Serialize};
 use treemaker_flatfold::{
     ConstraintSummary, FlatFoldError, OverlapGraph, SolveOptions, solve_flat_fold,
@@ -255,84 +257,53 @@ pub fn plan_folding_sequence_with_options(
     let target_state = SequenceState::from_target("target", target);
     target_state.validate()?;
 
-    let mut reverse_states = vec![target_state.clone()];
-    let mut reverse_steps = Vec::new();
-    let mut current = target_state;
+    let mut frontier = vec![SearchNode::initial(target_state.clone())];
+    let mut best_node = frontier[0].clone();
+    let mut seen = HashSet::from([sequence_state_key(&target_state)]);
     let mut explored_states = 1usize;
-    let mut applied_steps = 0usize;
     let mut branches_pruned = 0usize;
+    let mut repeated_states = 0usize;
     let mut budget_exhausted = false;
-    let mut transform_diagnostics = Vec::new();
+    let mut next_state_serial = 0usize;
 
-    loop {
-        if current.active_creases.is_empty() {
+    'search: while let Some(node) = frontier.pop() {
+        if search_node_is_better(&node, &best_node) {
+            best_node = node.clone();
+        }
+        if node.state.active_creases.is_empty() {
+            best_node = node;
             break;
         }
-        if applied_steps >= options.max_steps {
+        if node.reverse_steps.len() >= options.max_steps {
             budget_exhausted = true;
-            break;
-        }
-        if explored_states >= options.max_states {
-            budget_exhausted = true;
-            break;
-        }
-        let simple_folds = detect_simple_folds(&current)?;
-        let pruned = simple_folds.len().saturating_sub(1);
-        if let Some(simple_fold) = choose_simple_fold(simple_folds) {
-            branches_pruned += pruned;
-            let next_state_id = format!("state-{}", reverse_states.len());
-            let before_reverse = current.id.clone();
-            let next = apply_reverse_simple_fold(&current, &next_state_id, &simple_fold)?;
-            next.validate()?;
-            reverse_steps.push(simple_fold.to_forward_step(
-                applied_steps,
-                next.id.clone(),
-                before_reverse,
-            ));
-            reverse_states.push(next.clone());
-            current = next;
-            explored_states += 1;
-            applied_steps += 1;
             continue;
         }
-
-        let complex_candidates = recognize_complex_moves(&current)?;
-        let mut applied_complex = None;
-        let mut unsupported_complex_candidates = 0usize;
-        for candidate in &complex_candidates {
-            let next_state_id = format!("state-{}", reverse_states.len());
-            let result = apply_complex_transform(&current, &next_state_id, candidate)?;
-            if result.status == ComplexTransformStatus::Applied {
-                if let (Some(next), Some(step)) = (result.after_state, result.step) {
-                    applied_complex = Some((next, step, result.diagnostics));
-                    break;
-                }
-            } else {
-                unsupported_complex_candidates += 1;
+        let transitions = reverse_transitions_for_state(&node.state, &mut next_state_serial)?;
+        branches_pruned += transitions.len().saturating_sub(1);
+        for transition in transitions.into_iter().rev() {
+            if explored_states >= options.max_states {
+                budget_exhausted = true;
+                break 'search;
             }
-        }
-        if let Some((next, step, diagnostics)) = applied_complex {
-            branches_pruned += unsupported_complex_candidates;
-            transform_diagnostics.extend(diagnostics);
-            next.validate()?;
-            reverse_steps.push(step);
-            reverse_states.push(next.clone());
-            current = next;
+            let key = sequence_state_key(&transition.state);
+            if !seen.insert(key) {
+                repeated_states += 1;
+                continue;
+            }
+            transition.state.validate()?;
             explored_states += 1;
-            applied_steps += 1;
-            continue;
+            frontier.push(node.extend(transition));
         }
-
-        break;
     }
 
+    let current = best_node.state.clone();
     let complex_candidates = recognize_complex_moves(&current)?;
     let complex_transform_results = complex_candidates
         .iter()
         .map(|candidate| {
             apply_complex_transform(
                 &current,
-                &format!("state-{}", reverse_states.len()),
+                &format!("diagnostic-state-{}", next_state_serial + 1),
                 candidate,
             )
         })
@@ -348,13 +319,16 @@ pub fn plan_folding_sequence_with_options(
     } else {
         PlanStatus::Partial
     };
+    if unresolved_regions.is_empty() {
+        budget_exhausted = false;
+    }
 
     let mut diagnostics = target.diagnostics.clone();
-    diagnostics.extend(transform_diagnostics);
+    diagnostics.extend(best_node.transform_diagnostics.clone());
     if !unresolved_regions.is_empty() {
         diagnostics.push(SequenceDiagnostic::warning(
-            "unsupported_region",
-            "planner stopped with crease groups outside the Phase 3 simple-fold rule set",
+            "manual_collapse_required",
+            "planner could not derive validated folds from the flat crease pattern into the first solved state; manual collapse is required before the generated steps",
         ));
     }
     if budget_exhausted {
@@ -367,26 +341,27 @@ pub fn plan_folding_sequence_with_options(
         diagnostics.extend(transform.diagnostics.clone());
     }
 
-    let mut steps = reverse_steps.into_iter().rev().collect::<Vec<_>>();
-    for (index, step) in steps.iter_mut().enumerate() {
-        set_step_id(step, format!("step-{}", index + 1));
-    }
-    if let Some(region) = unresolved_regions.first() {
-        let mut step_diagnostics = Vec::new();
-        if let Some(transform) = complex_transform_results.first() {
-            step_diagnostics.extend(transform.diagnostics.clone());
-        }
-        steps.push(InstructionStep::UnsupportedRegion(UnsupportedRegionStep {
-            id: format!("step-{}", steps.len() + 1),
-            label: "Unsupported collapse region".to_string(),
-            before_state: current.id.clone(),
-            region: region.clone(),
-            diagnostics: step_diagnostics,
-        }));
-    }
-
-    let mut states = reverse_states;
+    let mut steps = best_node
+        .reverse_steps
+        .into_iter()
+        .rev()
+        .collect::<Vec<_>>();
+    let mut states = best_node.reverse_states;
     states.reverse();
+    if !unresolved_regions.is_empty() {
+        let manual_before = flat_cp_state("flat-cp", target);
+        let manual_after = states
+            .first()
+            .map(|state| state.id.clone())
+            .unwrap_or_else(|| current.id.clone());
+        steps.insert(
+            0,
+            manual_collapse_step(manual_before.id.clone(), manual_after, &unresolved_regions),
+        );
+        states.insert(0, manual_before);
+    }
+    normalize_sequence_ids(&mut states, &mut steps);
+
     Ok(SequencePlan {
         status,
         steps,
@@ -396,12 +371,248 @@ pub fn plan_folding_sequence_with_options(
         search: SearchStats {
             states_explored: explored_states,
             branches_pruned,
-            repeated_states: 0,
+            repeated_states,
             timed_out: budget_exhausted,
             budget_exhausted,
             best_unresolved_creases: current.active_creases.len(),
         },
     })
+}
+
+#[derive(Debug, Clone)]
+struct SearchNode {
+    state: SequenceState,
+    reverse_states: Vec<SequenceState>,
+    reverse_steps: Vec<InstructionStep>,
+    transform_diagnostics: Vec<SequenceDiagnostic>,
+}
+
+impl SearchNode {
+    fn initial(state: SequenceState) -> Self {
+        Self {
+            state: state.clone(),
+            reverse_states: vec![state],
+            reverse_steps: Vec::new(),
+            transform_diagnostics: Vec::new(),
+        }
+    }
+
+    fn extend(&self, transition: ReverseTransition) -> Self {
+        let mut reverse_states = self.reverse_states.clone();
+        reverse_states.push(transition.state.clone());
+        let mut reverse_steps = self.reverse_steps.clone();
+        reverse_steps.push(transition.step);
+        let mut transform_diagnostics = self.transform_diagnostics.clone();
+        transform_diagnostics.extend(transition.diagnostics);
+        Self {
+            state: transition.state,
+            reverse_states,
+            reverse_steps,
+            transform_diagnostics,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct ReverseTransition {
+    state: SequenceState,
+    step: InstructionStep,
+    diagnostics: Vec<SequenceDiagnostic>,
+}
+
+fn reverse_transitions_for_state(
+    state: &SequenceState,
+    next_state_serial: &mut usize,
+) -> Result<Vec<ReverseTransition>> {
+    let mut transitions = Vec::new();
+    for simple_fold in detect_simple_folds(state)? {
+        *next_state_serial += 1;
+        let next_state_id = format!("search-state-{}", *next_state_serial);
+        if let Ok(next) = apply_reverse_simple_fold(state, &next_state_id, &simple_fold) {
+            transitions.push(ReverseTransition {
+                step: simple_fold.to_forward_step(0, next.id.clone(), state.id.clone()),
+                state: next,
+                diagnostics: Vec::new(),
+            });
+        }
+    }
+
+    for candidate in recognize_complex_moves(state)? {
+        *next_state_serial += 1;
+        let next_state_id = format!("search-state-{}", *next_state_serial);
+        let result = apply_complex_transform(state, &next_state_id, &candidate)?;
+        if result.status == ComplexTransformStatus::Applied
+            && let (Some(next), Some(step)) = (result.after_state, result.step)
+        {
+            transitions.push(ReverseTransition {
+                state: next,
+                step,
+                diagnostics: result.diagnostics,
+            });
+        }
+    }
+    Ok(transitions)
+}
+
+fn search_node_is_better(candidate: &SearchNode, incumbent: &SearchNode) -> bool {
+    search_node_score(candidate) < search_node_score(incumbent)
+}
+
+fn search_node_score(node: &SearchNode) -> (usize, usize, usize) {
+    (
+        node.state.active_creases.len(),
+        unresolved_regions_for_state(&node.state).len(),
+        node.reverse_steps.len(),
+    )
+}
+
+fn sequence_state_key(state: &SequenceState) -> String {
+    let mut active_creases = state.active_creases.clone();
+    active_creases.sort_unstable();
+    let assignments = state
+        .document
+        .edges_assignment
+        .iter()
+        .map(|assignment| assignment.as_str())
+        .collect::<Vec<_>>()
+        .join("");
+    format!("{active_creases:?}|{assignments}")
+}
+
+fn flat_cp_state(id: impl Into<String>, target: &TargetState) -> SequenceState {
+    let document = target.normalized.clone();
+    let folded_vertices = document
+        .vertices_coords
+        .iter()
+        .map(|coord| {
+            [
+                coord.first().copied().unwrap_or(0.0),
+                coord.get(1).copied().unwrap_or(0.0),
+            ]
+        })
+        .collect();
+    let active_creases = document
+        .edges_assignment
+        .iter()
+        .enumerate()
+        .filter_map(|(edge, assignment)| {
+            matches!(assignment, Assignment::Mountain | Assignment::Valley).then_some(edge)
+        })
+        .collect();
+    SequenceState {
+        id: id.into(),
+        document,
+        active_creases,
+        face_orders: Vec::new(),
+        folded_vertices,
+        unresolved_regions: Vec::new(),
+        provenance: StateProvenance::input(),
+        layer_order_policy: LayerOrderPolicy::Preserved,
+        diagnostics: Vec::new(),
+    }
+}
+
+fn manual_collapse_step(
+    before_state: String,
+    after_state: String,
+    unresolved_regions: &[UnresolvedRegion],
+) -> InstructionStep {
+    let mut affected_creases = unresolved_regions
+        .iter()
+        .flat_map(|region| region.creases.iter().copied())
+        .collect::<Vec<_>>();
+    affected_creases.sort_unstable();
+    affected_creases.dedup();
+    let mut affected_faces = unresolved_regions
+        .iter()
+        .flat_map(|region| region.faces.iter().copied())
+        .collect::<Vec<_>>();
+    affected_faces.sort_unstable();
+    affected_faces.dedup();
+    let mut details = StepDetails::new(
+        "manual-collapse",
+        "Collapse up until this point",
+        before_state,
+        after_state,
+    );
+    details.affected_creases = affected_creases;
+    details.affected_faces = affected_faces;
+    details.metadata = MoveMetadata {
+        difficulty: MoveDifficulty::Complex,
+        layer_mode: LayerMode::Simultaneous,
+        confidence: 0.0,
+        notes: vec![
+            "not decomposed into validated folds; this marks an explicit planner boundary"
+                .to_string(),
+        ],
+    };
+    details.diagnostics = vec![SequenceDiagnostic::warning(
+        "manual_collapse_required",
+        "planner could not solve this highlighted region from the flat crease pattern",
+    )];
+    InstructionStep::ManualCollapse(details)
+}
+
+fn normalize_sequence_ids(states: &mut [SequenceState], steps: &mut [InstructionStep]) {
+    let mut id_map = HashMap::new();
+    let last_index = states.len().saturating_sub(1);
+    let has_flat_start = states.first().is_some_and(|state| state.id == "flat-cp");
+    for (index, state) in states.iter_mut().enumerate() {
+        let old_id = state.id.clone();
+        let new_id = if index == 0 && has_flat_start {
+            "flat-cp".to_string()
+        } else if index == last_index {
+            "target".to_string()
+        } else {
+            let state_number = if has_flat_start { index } else { index + 1 };
+            format!("state-{state_number}")
+        };
+        state.id = new_id.clone();
+        id_map.insert(old_id, new_id);
+    }
+
+    for state in states {
+        if let Some(predecessor) = &mut state.provenance.predecessor
+            && let Some(mapped) = id_map.get(predecessor)
+        {
+            *predecessor = mapped.clone();
+        }
+    }
+    for (index, step) in steps.iter_mut().enumerate() {
+        rewrite_step_state_ids(step, &id_map);
+        set_step_id(step, format!("step-{}", index + 1));
+    }
+}
+
+fn rewrite_step_state_ids(step: &mut InstructionStep, id_map: &HashMap<String, String>) {
+    match step {
+        InstructionStep::PrecreaseRegion(details)
+        | InstructionStep::SimpleFold(details)
+        | InstructionStep::ReverseFold(details)
+        | InstructionStep::SquashFold(details)
+        | InstructionStep::RabbitEar(details)
+        | InstructionStep::MoleculeCollapse(details)
+        | InstructionStep::SimultaneousCollapse(details)
+        | InstructionStep::ManualCollapse(details) => {
+            rewrite_state_reference(&mut details.before_state, id_map);
+            rewrite_state_reference(&mut details.after_state, id_map);
+        }
+        InstructionStep::ManualChoice(step) => {
+            rewrite_state_reference(&mut step.before_state, id_map);
+        }
+        InstructionStep::UnsupportedRegion(step) => {
+            rewrite_state_reference(&mut step.before_state, id_map);
+            if let Some(after_state) = &mut step.after_state {
+                rewrite_state_reference(after_state, id_map);
+            }
+        }
+    }
+}
+
+fn rewrite_state_reference(value: &mut String, id_map: &HashMap<String, String>) {
+    if let Some(mapped) = id_map.get(value) {
+        *value = mapped.clone();
+    }
 }
 
 pub fn plan_reference_precreases(document: &FoldDocument) -> Result<ReferencePlan> {
@@ -498,7 +709,12 @@ impl SequencePlan {
             unsupported_steps: self
                 .steps
                 .iter()
-                .filter(|step| matches!(step, InstructionStep::UnsupportedRegion(_)))
+                .filter(|step| {
+                    matches!(
+                        step,
+                        InstructionStep::ManualCollapse(_) | InstructionStep::UnsupportedRegion(_)
+                    )
+                })
                 .count(),
             total_steps: self.steps.len(),
             layer_order_ambiguity: self
@@ -743,6 +959,15 @@ pub struct StateProvenance {
 }
 
 impl StateProvenance {
+    pub fn input() -> Self {
+        Self {
+            source: StateSource::Input,
+            selected_solution_index: None,
+            predecessor: None,
+            step_id: None,
+        }
+    }
+
     pub fn target_state(selected_solution_index: usize) -> Self {
         Self {
             source: StateSource::TargetState,
@@ -796,6 +1021,7 @@ pub enum InstructionStep {
     RabbitEar(StepDetails),
     MoleculeCollapse(StepDetails),
     SimultaneousCollapse(StepDetails),
+    ManualCollapse(StepDetails),
     ManualChoice(ManualChoiceStep),
     UnsupportedRegion(UnsupportedRegionStep),
 }
@@ -809,7 +1035,8 @@ impl InstructionStep {
             | InstructionStep::SquashFold(details)
             | InstructionStep::RabbitEar(details)
             | InstructionStep::MoleculeCollapse(details)
-            | InstructionStep::SimultaneousCollapse(details) => &details.id,
+            | InstructionStep::SimultaneousCollapse(details)
+            | InstructionStep::ManualCollapse(details) => &details.id,
             InstructionStep::ManualChoice(step) => &step.id,
             InstructionStep::UnsupportedRegion(step) => &step.id,
         }
@@ -898,6 +1125,8 @@ pub struct UnsupportedRegionStep {
     pub id: String,
     pub label: String,
     pub before_state: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub after_state: Option<String>,
     pub region: UnresolvedRegion,
     pub diagnostics: Vec<SequenceDiagnostic>,
 }
@@ -1532,7 +1761,8 @@ fn set_step_id(step: &mut InstructionStep, id: String) {
         | InstructionStep::SquashFold(details)
         | InstructionStep::RabbitEar(details)
         | InstructionStep::MoleculeCollapse(details)
-        | InstructionStep::SimultaneousCollapse(details) => details.id = id,
+        | InstructionStep::SimultaneousCollapse(details)
+        | InstructionStep::ManualCollapse(details) => details.id = id,
         InstructionStep::ManualChoice(step) => step.id = id,
         InstructionStep::UnsupportedRegion(step) => step.id = id,
     }
@@ -1560,6 +1790,13 @@ fn trace_candidate_for_step(
             kind: instruction_kind(step).to_string(),
             affected_creases: details.affected_creases.clone(),
             accepted: true,
+            unresolved_after,
+        },
+        InstructionStep::ManualCollapse(details) => TraceCandidate {
+            step_id: details.id.clone(),
+            kind: "manual_collapse".to_string(),
+            affected_creases: details.affected_creases.clone(),
+            accepted: false,
             unresolved_after,
         },
         InstructionStep::ManualChoice(step) => TraceCandidate {
@@ -1592,6 +1829,7 @@ fn instruction_kind(step: &InstructionStep) -> &'static str {
         InstructionStep::RabbitEar(_) => "rabbit_ear",
         InstructionStep::MoleculeCollapse(_) => "molecule_collapse",
         InstructionStep::SimultaneousCollapse(_) => "simultaneous_collapse",
+        InstructionStep::ManualCollapse(_) => "manual_collapse",
         InstructionStep::ManualChoice(_) => "manual_choice",
         InstructionStep::UnsupportedRegion(_) => "unsupported_region",
     }
@@ -2236,6 +2474,18 @@ mod tests {
         assert!(plan.search.budget_exhausted);
         assert_eq!(plan.search.best_unresolved_creases, 1);
         assert!(plan.score().unresolved_creases > 0);
+        assert!(matches!(
+            plan.steps.first(),
+            Some(InstructionStep::ManualCollapse(details))
+                if details.label == "Collapse up until this point"
+                    && details.before_state == "flat-cp"
+                    && details.after_state == "target"
+        ));
+        assert!(
+            plan.states
+                .first()
+                .is_some_and(|state| state.id == "flat-cp")
+        );
     }
 
     #[test]

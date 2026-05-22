@@ -134,12 +134,24 @@ fn phase0_complex_fixtures_are_recognized_but_not_faked() {
                 "{fixture}: completed complex fixture should not leave unresolved regions"
             );
         } else {
+            match plan.steps.first() {
+                Some(treemaker_sequence::InstructionStep::ManualCollapse(details)) => {
+                    assert_eq!(details.label, "Collapse up until this point", "{fixture}");
+                    assert_eq!(details.before_state, "flat-cp", "{fixture}");
+                    assert!(
+                        matches!(details.after_state.as_str(), "state-1" | "target"),
+                        "{fixture}: {}",
+                        details.after_state
+                    );
+                }
+                other => panic!("{fixture}: expected leading manual collapse step, got {other:?}"),
+            }
             assert!(
-                plan.steps.iter().any(|step| matches!(
+                !plan.steps.iter().any(|step| matches!(
                     step,
                     treemaker_sequence::InstructionStep::UnsupportedRegion(_)
                 )),
-                "{fixture}"
+                "{fixture}: unsupported region should be represented by a leading manual collapse step"
             );
             assert!(
                 !plan.unresolved_regions.is_empty(),

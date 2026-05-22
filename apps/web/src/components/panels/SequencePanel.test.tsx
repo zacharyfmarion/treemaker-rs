@@ -44,29 +44,32 @@ describe('SequencePanel', () => {
     expect(rendered.textContent).toContain('Make a valley fold on crease 6');
   });
 
-  it('highlights unsupported regions instead of hiding missing transforms', () => {
+  it('renders partial plans as a leading manual collapse step', () => {
     const plan = simplePlan();
     plan.status = 'partial';
+    plan.states = [
+      sequenceState('flat-cp', simpleFold(), [6]),
+      sequenceState('target', simpleFold(), [6]),
+    ];
     plan.steps = [
       {
-        kind: 'unsupported_region',
+        kind: 'manual_collapse',
         id: 'step-1',
-        label: 'Unsupported collapse region',
-        before_state: 'target',
-        region: {
-          id: 'unresolved-1',
-          creases: [1, 2],
-          faces: [0],
-          reason: 'complex transform not implemented',
-        },
+        label: 'Collapse up until this point',
+        affected_creases: [1, 2],
+        affected_faces: [0],
+        before_state: 'flat-cp',
+        after_state: 'target',
       },
     ];
 
     const rendered = renderPanel(plan);
 
-    expect(rendered.textContent).toContain('Unsupported collapse region');
-    expect(rendered.querySelector('[aria-label="Step 1 Before folded state target"]')).not.toBeNull();
-    expect(rendered.querySelectorAll('.sequence-preview-crease--highlight')).toHaveLength(2);
+    expect(rendered.textContent).toContain('Collapse up until this point');
+    expect(rendered.textContent).not.toContain('Unsupported collapse region');
+    expect(rendered.querySelector('[aria-label="Step 1 Before folded state flat-cp"]')).not.toBeNull();
+    expect(rendered.querySelector('[aria-label="Step 1 After folded state target"]')).not.toBeNull();
+    expect(rendered.querySelectorAll('.sequence-preview-crease--highlight')).toHaveLength(4);
     expect(rendered.querySelector('.sequence-preview-face--highlight')).not.toBeNull();
   });
 });

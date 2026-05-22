@@ -504,12 +504,17 @@ describe('CreasePatternPanel', () => {
     const moveButton = container.querySelector<HTMLButtonElement>(
       'button[aria-label="Move selected creases"]'
     );
+    const deleteIntersectingButton = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Delete intersecting creases"]'
+    );
     expect(drawCreaseButton?.getAttribute('aria-disabled')).toBe('true');
     expect(drawCreaseButton?.getAttribute('data-ui-status')).toBe('not-implemented');
     expect(makeMountainButton?.getAttribute('aria-disabled')).toBe('false');
     expect(makeMountainButton?.getAttribute('data-ui-status')).toBe('ready');
     expect(moveButton?.getAttribute('aria-disabled')).toBe('false');
     expect(moveButton?.getAttribute('data-ui-status')).toBe('ready');
+    expect(deleteIntersectingButton?.getAttribute('aria-disabled')).toBe('false');
+    expect(deleteIntersectingButton?.getAttribute('data-ui-status')).toBe('ready');
     expect(foldEstimateButton?.getAttribute('aria-disabled')).toBe('true');
     expect(foldEstimateButton?.getAttribute('data-ui-status')).toBe('porting');
 
@@ -653,5 +658,67 @@ describe('CreasePatternPanel', () => {
     expect(points[0].y).toBeCloseTo(0);
     expect(points[1].x).toBeCloseTo(0);
     expect(points[1].y).toBeCloseTo(80);
+  });
+
+  it('runs ready drag-line CP delete commands without requiring selected lines', async () => {
+    const executeOristudioCpCommand = vi.fn(
+      async (_operationId: string, _payload?: OristudioCpCommandPayload) => true
+    );
+    const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
+      documentMode: 'crease-pattern',
+      importedCreasePattern: importedCpDocument(),
+      oristudioCpDocument: editableCpState(),
+      oristudioCpViewport: {
+        gridVisible: true,
+        snapToGrid: false,
+        snapToVertices: false,
+        snapToLines: false,
+      },
+      executeOristudioCpCommand,
+    });
+    const canvas = setCanvasClientRect(container);
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>('button[aria-label="Delete intersecting creases"]')
+        ?.click();
+      await Promise.resolve();
+    });
+    expect(container.textContent).toContain(
+      'Delete intersecting creases: Pick drag start point'
+    );
+
+    act(() => {
+      canvas.dispatchEvent(
+        new MouseEvent('pointerdown', {
+          bubbles: true,
+          button: 0,
+          clientX: 360,
+          clientY: 348,
+        })
+      );
+    });
+
+    await act(async () => {
+      canvas.dispatchEvent(
+        new MouseEvent('pointerdown', {
+          bubbles: true,
+          button: 0,
+          clientX: 477.6,
+          clientY: 348,
+        })
+      );
+      await Promise.resolve();
+    });
+
+    expect(executeOristudioCpCommand).toHaveBeenCalledOnce();
+    const [operation, payload] = executeOristudioCpCommand.mock.calls[0] ?? [];
+    const points = payload?.points ?? [];
+    expect(operation).toBe('CreaseDeleteIntersecting');
+    expect(payload?.line_ids).toEqual([]);
+    expect(points[0].x).toBeCloseTo(0);
+    expect(points[0].y).toBeCloseTo(0);
+    expect(points[1].x).toBeCloseTo(80);
+    expect(points[1].y).toBeCloseTo(0);
   });
 });

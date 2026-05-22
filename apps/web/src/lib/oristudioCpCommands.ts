@@ -344,8 +344,14 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
   }),
   notImplemented('VoronoiCreate', 'Voronoi', 'generators', 'network', 'MouseHandlerVoronoiCreate'),
   notImplemented('FlatFoldableCheck', 'Flat-foldable boundary check', 'check-fix', 'shield-check', 'MouseHandlerFlatFoldableCheck'),
-  notImplemented('CreaseDeleteOverlapping', 'Delete overlapping creases', 'select-edit', 'combine', 'MouseHandlerCreaseDeleteOverlapping'),
-  notImplemented('CreaseDeleteIntersecting', 'Delete intersecting creases', 'select-edit', 'unlink', 'MouseHandlerCreaseDeleteIntersecting'),
+  ready('CreaseDeleteOverlapping', 'Delete overlapping creases', 'select-edit', 'combine', 'MouseHandlerCreaseDeleteOverlapping', {
+    toolSteps: ['Pick drag start point', 'Pick drag end point'],
+    tooltip: 'Delete crease segments overlapping a dragged line',
+  }),
+  ready('CreaseDeleteIntersecting', 'Delete intersecting creases', 'select-edit', 'unlink', 'MouseHandlerCreaseDeleteIntersecting', {
+    toolSteps: ['Pick drag start point', 'Pick drag end point'],
+    tooltip: 'Delete crease segments intersecting or overlapping a dragged line',
+  }),
   notImplemented('SelectPolygon', 'Select polygon', 'select-edit', 'lasso-select', 'MouseHandlerSelectPolygon'),
   notImplemented('UnselectPolygon', 'Unselect polygon', 'select-edit', 'lasso', 'MouseHandlerUnselectPolygon'),
   notImplemented('SelectLineIntersecting', 'Select intersecting line', 'select-edit', 'scan-search', 'MouseHandlerSelectLineIntersecting'),

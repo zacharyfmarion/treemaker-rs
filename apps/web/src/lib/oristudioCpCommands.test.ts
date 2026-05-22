@@ -50,6 +50,10 @@ describe('oristudio CP command registry', () => {
         'Pick target second point',
       ],
     });
+    expect(cpCommandByOperation('CreaseDeleteIntersecting')).toMatchObject({
+      uiStatus: 'ready',
+      toolSteps: ['Pick drag start point', 'Pick drag end point'],
+    });
   });
 
   it('keeps the left rail populated by ordered command groups', () => {

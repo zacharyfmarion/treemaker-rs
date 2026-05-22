@@ -647,6 +647,8 @@ Done when:
       and toggle-M/V commands through oracle-tested kernel dispatch.
 - [x] Stage 5 slice: Enable selected-line two-point and four-point move/copy
       commands through oracle-tested transform dispatch.
+- [x] Stage 5 slice: Enable two-point overlapping/intersecting crease deletion
+      commands through oracle-tested drag-line dispatch.
 - [ ] Stage 5: Enable core selection, deletion, color, assignment, move, copy,
       lengthen, and operation-frame commands.
 - [ ] Stage 5: Add web command tests and visual workflows for each enabled

@@ -68,6 +68,8 @@ const CLEAR_CP_SELECTION_AFTER_OPERATIONS = new Set<OristudioCpOperationId>([
   'CreaseCopy',
   'CreaseMove4p',
   'CreaseCopy4p',
+  'CreaseDeleteOverlapping',
+  'CreaseDeleteIntersecting',
 ]);
 
 function oristudioCpSelectionAfterCommand(

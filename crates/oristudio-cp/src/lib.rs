@@ -1276,6 +1276,14 @@ pub fn execute_command(
                 points[3],
             )
         }
+        OperationId::CreaseDeleteOverlapping => {
+            let points = required_points(&command, 2)?;
+            delete_lines_along(document, &points, false)
+        }
+        OperationId::CreaseDeleteIntersecting => {
+            let points = required_points(&command, 2)?;
+            delete_lines_along(document, &points, true)
+        }
         _ => {
             return Err(CommandError::NotImplemented {
                 operation: command.operation,
@@ -1326,6 +1334,32 @@ fn required_points(command: &CreasePatternCommand, count: usize) -> Result<Vec<g
 fn set_selected_line_flags(model: &mut CreasePatternModel, line_indices: &[usize]) {
     operations::selection::unselect_all(model);
     operations::selection::select_indices(model, line_indices);
+}
+
+fn delete_lines_along(
+    document: &mut CreasePatternDocument,
+    points: &[geometry::Point],
+    include_intersections: bool,
+) -> usize {
+    let before = document.crease_pattern.line_segments.len();
+    let selection = geometry::LineSegment::new(points[0], points[1]);
+    let deleted = if include_intersections {
+        operations::arrangement::delete_intersecting_or_overlapping_lines_along(
+            &mut document.crease_pattern,
+            &selection,
+        )
+    } else {
+        operations::arrangement::delete_overlapping_lines_along(
+            &mut document.crease_pattern,
+            &selection,
+        )
+    };
+
+    if deleted {
+        before.saturating_sub(document.crease_pattern.line_segments.len())
+    } else {
+        0
+    }
 }
 
 #[cfg(test)]
@@ -1584,6 +1618,58 @@ mod tests {
     }
 
     #[test]
+    fn command_dispatch_deletes_lines_overlapping_resolved_drag_segment() {
+        let mut document = delete_along_fixture();
+
+        let result = execute_command(
+            &mut document,
+            CreasePatternCommand::new(OperationId::CreaseDeleteOverlapping).with_payload(
+                CreasePatternCommandPayload {
+                    points: vec![Point::new(2.0, 0.0), Point::new(8.0, 0.0)],
+                    ..CreasePatternCommandPayload::default()
+                },
+            ),
+        )
+        .expect("overlapping-line delete command should execute");
+
+        assert_eq!(result.status, OperationStatus::OracleTested);
+        assert_eq!(result.diagnostics, vec!["Changed 1 line(s)"]);
+        assert_eq!(document.crease_pattern.line_segments.len(), 2);
+        assert_eq!(
+            document.crease_pattern.line_segments[0].a,
+            Point::new(5.0, -5.0)
+        );
+        assert_eq!(
+            document.crease_pattern.line_segments[1].a,
+            Point::new(0.0, 1.0)
+        );
+    }
+
+    #[test]
+    fn command_dispatch_deletes_lines_intersecting_resolved_drag_segment() {
+        let mut document = delete_along_fixture();
+
+        let result = execute_command(
+            &mut document,
+            CreasePatternCommand::new(OperationId::CreaseDeleteIntersecting).with_payload(
+                CreasePatternCommandPayload {
+                    points: vec![Point::new(2.0, 0.0), Point::new(8.0, 0.0)],
+                    ..CreasePatternCommandPayload::default()
+                },
+            ),
+        )
+        .expect("intersecting-line delete command should execute");
+
+        assert_eq!(result.status, OperationStatus::OracleTested);
+        assert_eq!(result.diagnostics, vec!["Changed 2 line(s)"]);
+        assert_eq!(document.crease_pattern.line_segments.len(), 1);
+        assert_eq!(
+            document.crease_pattern.line_segments[0].a,
+            Point::new(0.0, 1.0)
+        );
+    }
+
+    #[test]
     fn command_dispatch_requires_resolved_line_targets() {
         let mut document = CreasePatternDocument::default();
 
@@ -1629,6 +1715,45 @@ mod tests {
                 message: "expected 2 resolved point(s)".to_string(),
             }
         );
+    }
+
+    #[test]
+    fn command_dispatch_requires_resolved_points_for_drag_delete_commands() {
+        let mut document = delete_along_fixture();
+
+        let error = execute_command(
+            &mut document,
+            CreasePatternCommand::new(OperationId::CreaseDeleteOverlapping),
+        )
+        .expect_err("drag-delete commands require a drag segment");
+
+        assert_eq!(
+            error,
+            CommandError::InvalidInput {
+                operation: OperationId::CreaseDeleteOverlapping,
+                message: "expected 2 resolved point(s)".to_string(),
+            }
+        );
+    }
+
+    fn delete_along_fixture() -> CreasePatternDocument {
+        let mut document = CreasePatternDocument::default();
+        document.crease_pattern.add_line(
+            Point::new(0.0, 0.0),
+            Point::new(10.0, 0.0),
+            LineColor::Red1,
+        );
+        document.crease_pattern.add_line(
+            Point::new(5.0, -5.0),
+            Point::new(5.0, 5.0),
+            LineColor::Blue2,
+        );
+        document.crease_pattern.add_line(
+            Point::new(0.0, 1.0),
+            Point::new(10.0, 1.0),
+            LineColor::Cyan3,
+        );
+        document
     }
 
     fn assert_close(actual: f64, expected: f64) {

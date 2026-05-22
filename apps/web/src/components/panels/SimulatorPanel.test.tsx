@@ -53,6 +53,12 @@ describe('SimulatorPanel', () => {
     expect(putImageDataMock).toHaveBeenCalled();
   });
 
+  it('triangulates polygonal fold faces before rendering', () => {
+    const rendered = renderPanel({ foldArtifacts: { fold: quadFold() } });
+
+    expect(rendered.textContent).toContain('4 vertices | 2 triangles');
+  });
+
   it('renders step-mode labels and manual-collapse warning copy when focused', () => {
     const plan = manualCollapsePlan();
     const rendered = renderPanel({
@@ -161,6 +167,28 @@ function simpleFold(
       [0, 1, 2],
       [0, 2, 3],
     ],
+  };
+}
+
+function quadFold(): FoldDocument {
+  return {
+    file_spec: 1.2,
+    frame_classes: ['creasePattern'],
+    vertices_coords: [
+      [0, 0],
+      [1, 0],
+      [1, 1],
+      [0, 1],
+    ],
+    edges_vertices: [
+      [0, 1],
+      [1, 2],
+      [2, 3],
+      [3, 0],
+    ],
+    edges_assignment: ['B', 'B', 'B', 'B'],
+    edges_foldAngle: [null, null, null, null],
+    faces_vertices: [[0, 1, 2, 3]],
   };
 }
 

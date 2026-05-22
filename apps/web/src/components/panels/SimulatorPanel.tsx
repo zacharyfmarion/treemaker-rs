@@ -328,7 +328,7 @@ export function SimulatorPanel() {
       }
       const model = prepareFoldModel(
         simulationFold as SimulatorFoldDocument,
-        { triangulate: false }
+        { triangulate: foldNeedsTriangulation(simulationFold) }
       );
       const controller = createOrigamiSimulator({
         model,
@@ -712,6 +712,10 @@ function shortStatus(message: string): string {
 
 function formatKind(kind: string): string {
   return kind.replaceAll('_', ' ');
+}
+
+function foldNeedsTriangulation(fold: SimulatorFoldDocument): boolean {
+  return fold.faces_vertices.some((face) => face.length !== 3);
 }
 
 function drawFrame(

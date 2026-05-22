@@ -33,6 +33,10 @@ describe('oristudio CP command registry', () => {
       uiStatus: 'porting',
       group: 'folding',
     });
+    expect(cpCommandByOperation('CreaseMakeMountain')).toMatchObject({
+      uiStatus: 'ready',
+      selectionRequirement: 'selected lines',
+    });
   });
 
   it('keeps the left rail populated by ordered command groups', () => {

@@ -24,6 +24,7 @@ fn command_dispatch_returns_typed_not_implemented_error() {
     let error = oristudio_cp_wasm::execute_cp_command(
         handle,
         serde_wasm_bindgen::to_value("DrawCreaseFree").expect("operation id should serialize"),
+        serde_wasm_bindgen::to_value(&serde_json::json!({})).expect("payload should serialize"),
     )
     .expect_err("registered commands should stay disabled until UI wiring exists");
     let error: serde_json::Value =
@@ -35,5 +36,27 @@ fn command_dispatch_returns_typed_not_implemented_error() {
             .as_str()
             .is_some_and(|message| message.contains("DrawCreaseFree"))
     );
+    oristudio_cp_wasm::free_document(handle).expect("document handle should free");
+}
+
+#[wasm_bindgen_test]
+fn command_dispatch_accepts_resolved_line_payloads() {
+    let handle = oristudio_cp_wasm::load_cp("2 0 0 1 0\n3 0 0 0 1\n", "sample")
+        .expect("cp import should succeed");
+    let result = oristudio_cp_wasm::execute_cp_command(
+        handle,
+        serde_wasm_bindgen::to_value("CreaseMakeMountain").expect("operation id should serialize"),
+        serde_wasm_bindgen::to_value(&oristudio_cp::CreasePatternCommandPayload {
+            line_ids: vec![1, 2],
+        })
+        .expect("payload should serialize"),
+    )
+    .expect("selected line command should execute");
+    let result: serde_json::Value =
+        serde_wasm_bindgen::from_value(result).expect("result should deserialize");
+    let exported = oristudio_cp_wasm::export_cp(handle).expect("cp export should succeed");
+
+    assert_eq!(result["operation"], "CreaseMakeMountain");
+    assert!(exported.lines().all(|line| line.starts_with("3 ")));
     oristudio_cp_wasm::free_document(handle).expect("document handle should free");
 }

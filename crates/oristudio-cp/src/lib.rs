@@ -49,17 +49,37 @@ impl CreasePatternDocument {
 }
 
 /// A command request against a crease-pattern document.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CreasePatternCommand {
     /// Oriedita operation represented by this command.
     pub operation: OperationId,
+    /// Resolved model-space inputs for the operation.
+    #[serde(default)]
+    pub payload: CreasePatternCommandPayload,
 }
 
 impl CreasePatternCommand {
     /// Create a command for an Oriedita operation.
-    pub const fn new(operation: OperationId) -> Self {
-        Self { operation }
+    pub fn new(operation: OperationId) -> Self {
+        Self {
+            operation,
+            payload: CreasePatternCommandPayload::default(),
+        }
     }
+
+    /// Attach resolved model-space inputs.
+    pub fn with_payload(mut self, payload: CreasePatternCommandPayload) -> Self {
+        self.payload = payload;
+        self
+    }
+}
+
+/// Resolved command inputs supplied by the UI after hit testing and selection.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct CreasePatternCommandPayload {
+    /// One-based Oriedita line IDs resolved by the UI.
+    #[serde(default)]
+    pub line_ids: Vec<usize>,
 }
 
 /// Result returned by a successfully executed command.
@@ -1166,32 +1186,92 @@ pub fn operation_status(operation: OperationId) -> OperationStatus {
 }
 
 /// Dispatch a command against a crease-pattern document.
-///
-/// Stage 1 deliberately refuses all registered operations. Later stages replace
-/// individual registry entries and dispatch branches only after unit and oracle
-/// coverage exists.
 pub fn execute_command(
-    _document: &mut CreasePatternDocument,
+    document: &mut CreasePatternDocument,
     command: CreasePatternCommand,
 ) -> Result<CommandResult> {
-    match operation_status(command.operation) {
+    let status = operation_status(command.operation);
+    match status {
         OperationStatus::Unsupported | OperationStatus::OutOfScopeUi => {
-            Err(CommandError::UnsupportedOperation {
+            return Err(CommandError::UnsupportedOperation {
                 operation: command.operation,
-            })
+            });
         }
         OperationStatus::Porting
         | OperationStatus::UnitTested
         | OperationStatus::OracleTested
-        | OperationStatus::DocumentedDifference => Err(CommandError::NotImplemented {
-            operation: command.operation,
-        }),
+        | OperationStatus::DocumentedDifference => {}
     }
+
+    let changed = match command.operation {
+        OperationId::LineSegmentDelete => {
+            let line_indices = required_line_indices(&command)?;
+            operations::arrangement::delete_line_segments_for_indices(
+                &mut document.crease_pattern,
+                &line_indices,
+            )
+        }
+        OperationId::CreaseMakeMountain => {
+            let line_indices = required_line_indices(&command)?;
+            operations::color::make_mountain(&mut document.crease_pattern, &line_indices)
+        }
+        OperationId::CreaseMakeValley => {
+            let line_indices = required_line_indices(&command)?;
+            operations::color::make_valley(&mut document.crease_pattern, &line_indices)
+        }
+        OperationId::CreaseMakeEdge => {
+            let line_indices = required_line_indices(&command)?;
+            operations::color::make_edge(&mut document.crease_pattern, &line_indices)
+        }
+        OperationId::CreaseMakeAux => {
+            let line_indices = required_line_indices(&command)?;
+            operations::color::make_aux(&mut document.crease_pattern, &line_indices)
+        }
+        OperationId::CreaseToggleMv => {
+            let line_indices = required_line_indices(&command)?;
+            operations::color::toggle_mountain_valley(&mut document.crease_pattern, &line_indices)
+        }
+        _ => {
+            return Err(CommandError::NotImplemented {
+                operation: command.operation,
+            });
+        }
+    };
+
+    Ok(CommandResult {
+        operation: command.operation,
+        status,
+        diagnostics: vec![format!("Changed {changed} line(s)")],
+    })
+}
+
+fn required_line_indices(command: &CreasePatternCommand) -> Result<Vec<usize>> {
+    if command.payload.line_ids.is_empty() {
+        return Err(CommandError::InvalidInput {
+            operation: command.operation,
+            message: "select at least one line".to_string(),
+        });
+    }
+
+    command
+        .payload
+        .line_ids
+        .iter()
+        .map(|line_id| {
+            line_id
+                .checked_sub(1)
+                .ok_or_else(|| CommandError::InvalidInput {
+                    operation: command.operation,
+                    message: "line IDs are one-based".to_string(),
+                })
+        })
+        .collect()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::geometry::{LineColor, Point};
     use std::collections::HashSet;
 
     #[test]
@@ -1265,5 +1345,87 @@ mod tests {
             }
         );
         assert_eq!(document, original);
+    }
+
+    #[test]
+    fn command_dispatch_applies_oracle_tested_line_color_mutations() {
+        let mut document = CreasePatternDocument::default();
+        document.crease_pattern.add_line(
+            Point::new(0.0, 0.0),
+            Point::new(1.0, 0.0),
+            LineColor::Blue2,
+        );
+        document.crease_pattern.add_line(
+            Point::new(0.0, 0.0),
+            Point::new(0.0, 1.0),
+            LineColor::Red1,
+        );
+
+        let result = execute_command(
+            &mut document,
+            CreasePatternCommand::new(OperationId::CreaseMakeMountain).with_payload(
+                CreasePatternCommandPayload {
+                    line_ids: vec![1, 2],
+                },
+            ),
+        )
+        .expect("selected line color command should execute");
+
+        assert_eq!(result.operation, OperationId::CreaseMakeMountain);
+        assert_eq!(result.status, OperationStatus::OracleTested);
+        assert_eq!(result.diagnostics, vec!["Changed 1 line(s)"]);
+        assert_eq!(
+            document.crease_pattern.line_segments[0].color,
+            LineColor::Red1
+        );
+        assert_eq!(
+            document.crease_pattern.line_segments[1].color,
+            LineColor::Red1
+        );
+    }
+
+    #[test]
+    fn command_dispatch_deletes_resolved_line_targets() {
+        let mut document = CreasePatternDocument::default();
+        for x in [0.0, 1.0, 2.0] {
+            document.crease_pattern.add_line(
+                Point::new(x, 0.0),
+                Point::new(x, 1.0),
+                LineColor::Black0,
+            );
+        }
+
+        let result = execute_command(
+            &mut document,
+            CreasePatternCommand::new(OperationId::LineSegmentDelete).with_payload(
+                CreasePatternCommandPayload {
+                    line_ids: vec![1, 3],
+                },
+            ),
+        )
+        .expect("delete command should execute");
+
+        assert_eq!(result.diagnostics, vec!["Changed 2 line(s)"]);
+        assert_eq!(document.crease_pattern.line_segments.len(), 1);
+        assert_eq!(document.crease_pattern.line_segments[0].a.x, 1.0);
+    }
+
+    #[test]
+    fn command_dispatch_requires_resolved_line_targets() {
+        let mut document = CreasePatternDocument::default();
+
+        let error = execute_command(
+            &mut document,
+            CreasePatternCommand::new(OperationId::CreaseMakeValley),
+        )
+        .expect_err("selected line commands require line IDs");
+
+        assert_eq!(
+            error,
+            CommandError::InvalidInput {
+                operation: OperationId::CreaseMakeValley,
+                message: "select at least one line".to_string(),
+            }
+        );
     }
 }

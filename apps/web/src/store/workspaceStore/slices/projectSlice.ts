@@ -8,6 +8,8 @@ import {
   withFlatFoldError,
 } from '../../../lib/creasePatternImport';
 import { emptyOristudioCpSelection } from '../../../lib/creasePatternViewport';
+import type { OristudioCpSelection } from '../../../lib/creasePatternViewport';
+import type { OristudioCpOperationId } from '../../../lib/oristudioCpCommands';
 import { createEmptyProject, DEFAULT_CREASE_COLOR_MODE } from '../../../lib/sampleProject';
 import {
   getWorkspaceCapabilities,
@@ -38,6 +40,7 @@ import {
   setOristudioCpDocumentSource,
 } from '../oristudioCpRuntime';
 import type { ProjectSlice, RecentProject, WorkspaceSliceCreator } from '../types';
+import type { OristudioCpDocumentSnapshot } from '../../../engine/oristudioCpTypes';
 
 const RECENTS_STORAGE_KEY = 'treemaker.recentProjects.v1';
 const AUTOSAVE_STORAGE_KEY = 'treemaker.autosave.v1';
@@ -55,6 +58,33 @@ function cpHistoryEntry(
     document,
     label,
     timestamp: nowIso(),
+  };
+}
+
+const CLEAR_CP_SELECTION_AFTER_OPERATIONS = new Set<OristudioCpOperationId>([
+  'LineSegmentDelete',
+  'CreaseMakeAux',
+  'CreaseMove',
+  'CreaseCopy',
+  'CreaseMove4p',
+  'CreaseCopy4p',
+]);
+
+function oristudioCpSelectionAfterCommand(
+  operationId: OristudioCpOperationId,
+  selection: OristudioCpSelection,
+  document: OristudioCpDocumentSnapshot
+): OristudioCpSelection {
+  if (CLEAR_CP_SELECTION_AFTER_OPERATIONS.has(operationId)) {
+    return emptyOristudioCpSelection();
+  }
+
+  return {
+    lines: selection.lines.filter((id) => id >= 1 && id <= document.crease_pattern.line_segments.length),
+    points: selection.points.filter((id) => id >= 1 && id <= document.crease_pattern.points.length),
+    circles: selection.circles.filter((id) => id >= 1 && id <= document.crease_pattern.circles.length),
+    texts: selection.texts.filter((id) => id >= 1 && id <= document.crease_pattern.texts.length),
+    faces: selection.faces,
   };
 }
 
@@ -511,7 +541,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
       }
     },
 
-    executeOristudioCpCommand: async (operationId) => {
+    executeOristudioCpCommand: async (operationId, payload = {}) => {
       if (!get().oristudioCpDocument) {
         set({
           oristudioCpError: 'No editable crease-pattern document is loaded',
@@ -524,11 +554,17 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
       }
       try {
         const previousDocument = get().oristudioCpDocument?.document ?? null;
-        const nextDocument = await executeRuntimeOristudioCpCommand(operationId);
+        const previousSelection = get().oristudioCpSelection;
+        const nextDocument = await executeRuntimeOristudioCpCommand(operationId, payload);
         set({
           oristudioCpDocument: nextDocument,
           oristudioCpOperationDescriptors: nextDocument.operationDescriptors,
           oristudioCpError: null,
+          oristudioCpSelection: oristudioCpSelectionAfterCommand(
+            operationId,
+            previousSelection,
+            nextDocument.document
+          ),
           oristudioCpHistoryPast: previousDocument
             ? [...get().oristudioCpHistoryPast, cpHistoryEntry(previousDocument, String(operationId))]
             : get().oristudioCpHistoryPast,

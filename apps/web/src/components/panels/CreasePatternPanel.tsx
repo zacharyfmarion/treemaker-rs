@@ -103,6 +103,9 @@ export function CreasePatternPanel() {
     (state) => state.toggleOristudioCpTextSelection
   );
   const clearOristudioCpSelection = useWorkspaceStore((state) => state.clearOristudioCpSelection);
+  const executeOristudioCpCommand = useWorkspaceStore(
+    (state) => state.executeOristudioCpCommand
+  );
 
   const editableCp = documentMode === 'crease-pattern' ? oristudioCpDocument?.document : null;
   const editableCpSummary = oristudioCpDocument?.summary ?? null;
@@ -137,8 +140,31 @@ export function CreasePatternPanel() {
           editable: !!editableCp,
         })
       );
+
+      if (!editableCp || command.uiStatus !== 'ready' || (command.toolSteps?.length ?? 0) > 0) {
+        return;
+      }
+
+      void (async () => {
+        const succeeded = await executeOristudioCpCommand(command.operationId, {
+          line_ids: oristudioCpSelection.lines,
+        });
+        setCpToolState((state) =>
+          state.activeOperationId === command.operationId
+            ? transitionOristudioCpToolState(
+                state,
+                succeeded
+                  ? { type: 'commit' }
+                  : {
+                      type: 'commandError',
+                      message: useWorkspaceStore.getState().oristudioCpError ?? 'Command failed',
+                    }
+              )
+            : state
+        );
+      })();
     },
-    [editableCp]
+    [editableCp, executeOristudioCpCommand, oristudioCpSelection.lines]
   );
 
   const clearSelectionOnBackgroundPointerDown = (event: PointerEvent<SVGElement>) => {

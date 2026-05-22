@@ -38,10 +38,11 @@ export function document_summary(handle) {
 /**
  * @param {number} handle
  * @param {any} operation
+ * @param {any} payload
  * @returns {any}
  */
-export function execute_cp_command(handle, operation) {
-    const ret = wasm.execute_cp_command(handle, operation);
+export function execute_cp_command(handle, operation, payload) {
+    const ret = wasm.execute_cp_command(handle, operation, payload);
     if (ret[2]) {
         throw takeFromExternrefTable0(ret[1]);
     }

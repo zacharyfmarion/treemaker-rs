@@ -4,8 +4,9 @@
 //! handles so the web worker can keep command calls cheap and explicit.
 
 use oristudio_cp::{
-    CommandError, CreasePatternCommand, CreasePatternDocument, OperationCategory,
-    OperationDescriptor, OperationId, OperationStatus, execute_command, io, operation_descriptors,
+    CommandError, CreasePatternCommand, CreasePatternCommandPayload, CreasePatternDocument,
+    OperationCategory, OperationDescriptor, OperationId, OperationStatus, execute_command, io,
+    operation_descriptors,
 };
 use serde::Serialize;
 use std::cell::RefCell;
@@ -115,12 +116,21 @@ pub fn document_summary(handle: u32) -> Result<JsValue, JsValue> {
 }
 
 #[wasm_bindgen]
-pub fn execute_cp_command(handle: u32, operation: JsValue) -> Result<JsValue, JsValue> {
+pub fn execute_cp_command(
+    handle: u32,
+    operation: JsValue,
+    payload: JsValue,
+) -> Result<JsValue, JsValue> {
     let operation: OperationId =
         serde_wasm_bindgen::from_value(operation).map_err(to_js_value_error)?;
+    let payload: CreasePatternCommandPayload =
+        serde_wasm_bindgen::from_value(payload).map_err(to_js_value_error)?;
     with_document_mut(handle, |document| {
-        let result = execute_command(document, CreasePatternCommand::new(operation))
-            .map_err(to_js_command_error)?;
+        let result = execute_command(
+            document,
+            CreasePatternCommand::new(operation).with_payload(payload),
+        )
+        .map_err(to_js_command_error)?;
         to_js_value(&result)
     })
 }

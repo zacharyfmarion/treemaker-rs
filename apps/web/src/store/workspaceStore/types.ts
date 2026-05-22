@@ -27,6 +27,7 @@ import type { SymmetryAuthoringPair } from '../../lib/symmetryAuthoring';
 import type { FileService } from '../../platform/fileService';
 import type { ImportedCreasePatternDocument } from '../../lib/creasePatternImport';
 import type {
+  OristudioCpCommandPayload,
   OristudioCpDocumentSnapshot,
   OristudioCpDocumentState,
   OristudioCpOperationDescriptor,
@@ -81,7 +82,10 @@ export interface ProjectSliceActions {
     text: string,
     source: { filename: string; path?: string | null }
   ) => Promise<void>;
-  executeOristudioCpCommand: (operationId: OristudioCpOperationId) => Promise<boolean>;
+  executeOristudioCpCommand: (
+    operationId: OristudioCpOperationId,
+    payload?: OristudioCpCommandPayload
+  ) => Promise<boolean>;
   clearOristudioCpDocument: () => Promise<void>;
   openProject: (fileService?: FileService) => Promise<boolean>;
   saveProject: (fileService?: FileService) => Promise<boolean>;

@@ -7,7 +7,7 @@ export function document_snapshot(handle: number): any;
 
 export function document_summary(handle: number): any;
 
-export function execute_cp_command(handle: number, operation: any): any;
+export function execute_cp_command(handle: number, operation: any, payload: any): any;
 
 export function export_cp(handle: number): string;
 
@@ -28,7 +28,7 @@ export interface InitOutput {
     readonly cp_operation_descriptors: () => [number, number, number];
     readonly document_snapshot: (a: number) => [number, number, number];
     readonly document_summary: (a: number) => [number, number, number];
-    readonly execute_cp_command: (a: number, b: any) => [number, number, number];
+    readonly execute_cp_command: (a: number, b: any, c: any) => [number, number, number];
     readonly export_cp: (a: number) => [number, number, number, number];
     readonly export_fold: (a: number) => [number, number, number, number];
     readonly free_document: (a: number) => [number, number];

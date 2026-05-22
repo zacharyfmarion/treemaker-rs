@@ -474,8 +474,13 @@ describe('CreasePatternPanel', () => {
     const foldEstimateButton = container.querySelector<HTMLButtonElement>(
       'button[aria-label="Fold estimate"]'
     );
+    const makeMountainButton = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Make mountain"]'
+    );
     expect(drawCreaseButton?.getAttribute('aria-disabled')).toBe('true');
     expect(drawCreaseButton?.getAttribute('data-ui-status')).toBe('not-implemented');
+    expect(makeMountainButton?.getAttribute('aria-disabled')).toBe('false');
+    expect(makeMountainButton?.getAttribute('data-ui-status')).toBe('ready');
     expect(foldEstimateButton?.getAttribute('aria-disabled')).toBe('true');
     expect(foldEstimateButton?.getAttribute('data-ui-status')).toBe('porting');
 
@@ -527,5 +532,30 @@ describe('CreasePatternPanel', () => {
     expect(useWorkspaceStore.getState().oristudioCpViewport.snapToGrid).toBe(false);
     expect(useWorkspaceStore.getState().oristudioCpViewport.snapToVertices).toBe(false);
     expect(useWorkspaceStore.getState().oristudioCpViewport.snapToLines).toBe(false);
+  });
+
+  it('runs ready CP line commands with the current editable selection payload', async () => {
+    const executeOristudioCpCommand = vi.fn(async () => true);
+    const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
+      documentMode: 'crease-pattern',
+      importedCreasePattern: importedCpDocument(),
+      oristudioCpDocument: editableCpState(),
+      executeOristudioCpCommand,
+    });
+
+    act(() => {
+      container.querySelector<SVGLineElement>('[data-cp-line-id="1"]')?.dispatchEvent(
+        new MouseEvent('click', { bubbles: true })
+      );
+    });
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('button[aria-label="Make mountain"]')?.click();
+      await Promise.resolve();
+    });
+
+    expect(executeOristudioCpCommand).toHaveBeenCalledWith('CreaseMakeMountain', {
+      line_ids: [1],
+    });
   });
 });

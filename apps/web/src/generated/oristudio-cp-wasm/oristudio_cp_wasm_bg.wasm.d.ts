@@ -4,7 +4,7 @@ export const memory: WebAssembly.Memory;
 export const cp_operation_descriptors: () => [number, number, number];
 export const document_snapshot: (a: number) => [number, number, number];
 export const document_summary: (a: number) => [number, number, number];
-export const execute_cp_command: (a: number, b: any) => [number, number, number];
+export const execute_cp_command: (a: number, b: any, c: any) => [number, number, number];
 export const export_cp: (a: number) => [number, number, number, number];
 export const export_fold: (a: number) => [number, number, number, number];
 export const free_document: (a: number) => [number, number];

@@ -1,5 +1,6 @@
 import { wrap, type Remote } from 'comlink';
 import type {
+  OristudioCpCommandPayload,
   OristudioCpCommandResult,
   OristudioCpDocumentSnapshot,
   OristudioCpDocumentState,
@@ -119,13 +120,14 @@ export async function refreshOristudioCpDocument(
 }
 
 export async function executeOristudioCpCommand(
-  operationId: OristudioCpOperationId
+  operationId: OristudioCpOperationId,
+  payload: OristudioCpCommandPayload = {}
 ): Promise<OristudioCpDocumentState> {
   if (handle === null) {
     throw new Error('No editable crease-pattern document is loaded');
   }
   const api = await getOristudioCpClient();
-  const result = await api.executeCommand(handle, operationId);
+  const result = await api.executeCommand(handle, operationId, payload);
   const refreshed = await refreshOristudioCpDocument(result);
   if (!refreshed) throw new Error('Editable crease-pattern document was released');
   return refreshed;

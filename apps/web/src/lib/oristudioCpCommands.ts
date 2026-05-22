@@ -156,6 +156,26 @@ function porting(
   };
 }
 
+function ready(
+  operationId: OristudioCpOperationId,
+  label: string,
+  group: OristudioCpCommandGroupId,
+  icon: string,
+  upstream: string,
+  options: Partial<
+    Pick<
+      OristudioCpCommandDefinition,
+      'placement' | 'selectionRequirement' | 'shortcut' | 'toolSteps' | 'tooltip'
+    >
+  > = {}
+): OristudioCpCommandDefinition {
+  return {
+    ...notImplemented(operationId, label, group, icon, upstream, options),
+    uiStatus: 'ready',
+    disabledReason: 'Ready',
+  };
+}
+
 function outOfScopeUi(
   operationId: OristudioCpOperationId,
   label: string,
@@ -195,13 +215,16 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
     'MouseHandlerMoveCreasePattern',
     'Covered by the landed CP viewport pan controls'
   ),
-  notImplemented(
+  ready(
     'LineSegmentDelete',
     'Delete line segment',
     'select-edit',
     'eraser',
     'MouseHandlerLineSegmentDelete',
-    { selectionRequirement: 'line segment' }
+    {
+      selectionRequirement: 'selected line segment',
+      tooltip: 'Delete selected line segments',
+    }
   ),
   notImplemented('ChangeCreaseType', 'Change crease type', 'color', 'paintbrush', 'MouseHandlerChangeCreaseType'),
   notImplemented('LengthenCrease', 'Lengthen crease', 'transform', 'stretch-horizontal', 'MouseHandlerLengthenCrease'),
@@ -230,9 +253,18 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
     selectionRequirement: 'selected creases',
     toolSteps: ['Pick source point', 'Pick destination point'],
   }),
-  notImplemented('CreaseMakeMountain', 'Make mountain', 'color', 'mountain', 'MouseHandlerCreaseMakeMountain'),
-  notImplemented('CreaseMakeValley', 'Make valley', 'color', 'waves', 'MouseHandlerCreaseMakeValley'),
-  notImplemented('CreaseMakeEdge', 'Make edge', 'color', 'box-select', 'MouseHandlerCreaseMakeEdge'),
+  ready('CreaseMakeMountain', 'Make mountain', 'color', 'mountain', 'MouseHandlerCreaseMakeMountain', {
+    selectionRequirement: 'selected lines',
+    tooltip: 'Make selected lines mountain folds',
+  }),
+  ready('CreaseMakeValley', 'Make valley', 'color', 'waves', 'MouseHandlerCreaseMakeValley', {
+    selectionRequirement: 'selected lines',
+    tooltip: 'Make selected lines valley folds',
+  }),
+  ready('CreaseMakeEdge', 'Make edge', 'color', 'box-select', 'MouseHandlerCreaseMakeEdge', {
+    selectionRequirement: 'selected lines',
+    tooltip: 'Make selected lines edge folds',
+  }),
   outOfScopeUi(
     'BackgroundChangePosition',
     'Move background',
@@ -282,9 +314,15 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
   notImplemented('DisplayAngleBetweenThreePoints3', 'Measure angle 3', 'measure', 'angle', 'MouseHandlerDisplayAngleBetweenThreePoints', {
     toolSteps: ['Pick first point', 'Pick vertex point', 'Pick second point'],
   }),
-  notImplemented('CreaseToggleMv', 'Toggle mountain/valley', 'color', 'repeat-2', 'MouseHandlerCreaseToggleMV'),
+  ready('CreaseToggleMv', 'Toggle mountain/valley', 'color', 'repeat-2', 'MouseHandlerCreaseToggleMV', {
+    selectionRequirement: 'selected mountain or valley lines',
+    tooltip: 'Toggle selected mountain and valley lines',
+  }),
   notImplemented('CircleChangeColor', 'Change circle color', 'annotations', 'palette', 'MouseHandlerCircleChangeColor'),
-  notImplemented('CreaseMakeAux', 'Make auxiliary', 'color', 'scan-line', 'MouseHandlerCreaseMakeAux'),
+  ready('CreaseMakeAux', 'Make auxiliary', 'color', 'scan-line', 'MouseHandlerCreaseMakeAux', {
+    selectionRequirement: 'selected folding lines',
+    tooltip: 'Convert selected folding lines to auxiliary lines',
+  }),
   notImplemented('OperationFrameCreate', 'Operation frame', 'transform', 'frame', 'MouseHandlerOperationFrameCreate', {
     toolSteps: ['Drag operation frame'],
   }),

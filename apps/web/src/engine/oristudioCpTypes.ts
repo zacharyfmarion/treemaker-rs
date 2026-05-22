@@ -100,6 +100,10 @@ export interface OristudioCpCommandResult {
   diagnostics: string[];
 }
 
+export interface OristudioCpCommandPayload {
+  line_ids?: number[];
+}
+
 export interface OristudioCpDocumentState {
   handle: number;
   document: OristudioCpDocumentSnapshot;

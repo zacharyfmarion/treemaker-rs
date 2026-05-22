@@ -1214,12 +1214,121 @@ describe('workspace store slices', () => {
       false
     );
 
-    expect(oristudioCpMocks.executeOristudioCpCommand).toHaveBeenCalledWith('DrawCreaseFree');
+    expect(oristudioCpMocks.executeOristudioCpCommand).toHaveBeenCalledWith('DrawCreaseFree', {});
     expect(useWorkspaceStore.getState().oristudioCpDocument?.source.filename).toBe('line.cp');
     expect(useWorkspaceStore.getState().oristudioCpError).toContain('DrawCreaseFree');
     expect(useWorkspaceStore.getState().error).toMatchObject({
       code: 'not_implemented',
     });
+  });
+
+  it('passes selected editable CP line IDs into kernel commands and keeps stable color selections', async () => {
+    resetStores(seedSnapshot());
+    await useWorkspaceStore.getState().loadCreasePatternText('1 0 0 1 0\n2 0 0 0 1', {
+      filename: 'lines.cp',
+      path: '/tmp/lines.cp',
+    });
+    useWorkspaceStore.setState({
+      oristudioCpSelection: {
+        lines: [1, 2],
+        points: [],
+        circles: [],
+        texts: [],
+        faces: [],
+      },
+    });
+    const currentDocument = useWorkspaceStore.getState().oristudioCpDocument;
+    if (!currentDocument) throw new Error('expected editable CP document');
+    oristudioCpMocks.executeOristudioCpCommand.mockResolvedValueOnce({
+      ...currentDocument,
+      document: {
+        ...currentDocument.document,
+        crease_pattern: {
+          ...currentDocument.document.crease_pattern,
+          line_segments: [
+            {
+              a: { x: 0, y: 0 },
+              b: { x: 1, y: 0 },
+              active: 'Inactive0',
+              color: 'Red1',
+              selected: 0,
+              customized: 0,
+              customized_color: { red: 100, green: 200, blue: 200 },
+            },
+            {
+              a: { x: 0, y: 0 },
+              b: { x: 0, y: 1 },
+              active: 'Inactive0',
+              color: 'Red1',
+              selected: 0,
+              customized: 0,
+              customized_color: { red: 100, green: 200, blue: 200 },
+            },
+          ],
+        },
+      },
+      lastCommandResult: {
+        operation: 'CreaseMakeMountain',
+        status: 'OracleTested',
+        diagnostics: ['Changed 2 line(s)'],
+      },
+    });
+
+    await expect(
+      useWorkspaceStore.getState().executeOristudioCpCommand('CreaseMakeMountain', {
+        line_ids: [1, 2],
+      })
+    ).resolves.toBe(true);
+
+    expect(oristudioCpMocks.executeOristudioCpCommand).toHaveBeenCalledWith(
+      'CreaseMakeMountain',
+      { line_ids: [1, 2] }
+    );
+    expect(useWorkspaceStore.getState().oristudioCpSelection.lines).toEqual([1, 2]);
+    expect(useWorkspaceStore.getState().dirty).toBe(true);
+  });
+
+  it('clears editable CP selection after destructive kernel commands', async () => {
+    resetStores(seedSnapshot());
+    await useWorkspaceStore.getState().loadCreasePatternText('1 0 0 1 0\n2 0 0 0 1', {
+      filename: 'lines.cp',
+      path: '/tmp/lines.cp',
+    });
+    useWorkspaceStore.setState({
+      oristudioCpSelection: {
+        lines: [1],
+        points: [],
+        circles: [],
+        texts: [],
+        faces: [],
+      },
+    });
+    const currentDocument = useWorkspaceStore.getState().oristudioCpDocument;
+    if (!currentDocument) throw new Error('expected editable CP document');
+    oristudioCpMocks.executeOristudioCpCommand.mockResolvedValueOnce({
+      ...currentDocument,
+      document: {
+        ...currentDocument.document,
+        crease_pattern: {
+          ...currentDocument.document.crease_pattern,
+          line_segments: currentDocument.document.crease_pattern.line_segments.slice(1),
+        },
+      },
+      summary: {
+        ...currentDocument.summary,
+        line_segments: Math.max(0, currentDocument.summary.line_segments - 1),
+      },
+    });
+
+    await expect(
+      useWorkspaceStore.getState().executeOristudioCpCommand('LineSegmentDelete', {
+        line_ids: [1],
+      })
+    ).resolves.toBe(true);
+
+    expect(useWorkspaceStore.getState().oristudioCpSelection).toEqual(
+      emptyOristudioCpSelection()
+    );
   });
 
   it('saves imported FOLD documents as CP without overwriting the source FOLD path', async () => {

@@ -1,0 +1,40 @@
+{
+  "file_spec": 1.2,
+  "file_title": "treemaker-triad-base",
+  "file_creator": "treemaker-rs folding sequence Phase 0",
+  "frame_title": "TreeMaker triad base proxy",
+  "frame_classes": ["creasePattern"],
+  "vertices_coords": [
+    [0.5, 0.5],
+    [0.5, 1.0],
+    [0.9330127018922193, 0.75],
+    [0.9330127018922193, 0.25],
+    [0.5, 0.0],
+    [0.0669872981077807, 0.25],
+    [0.0669872981077807, 0.75]
+  ],
+  "edges_vertices": [
+    [1, 2],
+    [2, 3],
+    [3, 4],
+    [4, 5],
+    [5, 6],
+    [6, 1],
+    [0, 1],
+    [0, 2],
+    [0, 3],
+    [0, 4],
+    [0, 5],
+    [0, 6]
+  ],
+  "edges_assignment": ["B", "B", "B", "B", "B", "B", "M", "V", "M", "M", "V", "M"],
+  "edges_foldAngle": [null, null, null, null, null, null, -180, 180, -180, -180, 180, -180],
+  "faces_vertices": [
+    [0, 1, 2],
+    [0, 2, 3],
+    [0, 3, 4],
+    [0, 4, 5],
+    [0, 5, 6],
+    [0, 6, 1]
+  ]
+}

@@ -115,6 +115,17 @@ function pointDistanceSquared(a: Point, b: Point): number {
   return dx * dx + dy * dy;
 }
 
+function isLineClickSelectionOperation(operationId: string | null | undefined): boolean {
+  return operationId === 'CreaseSelect' || operationId === 'CreaseUnselect';
+}
+
+function isCpLineEventTarget(target: EventTarget | null): boolean {
+  return (
+    target instanceof Element &&
+    target.closest('[data-cp-line-id], [data-cp-line-hit-id]') !== null
+  );
+}
+
 export function CreasePatternPanel() {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -313,6 +324,12 @@ export function CreasePatternPanel() {
       }
       const stepCount = activeCpCommand.toolSteps?.length ?? 0;
       if (stepCount === 0) return;
+      if (
+        isLineClickSelectionOperation(activeCpCommand.operationId) &&
+        isCpLineEventTarget(event.target)
+      ) {
+        return;
+      }
 
       if (activeCpCommand.inputMode === 'drag-path') {
         const point = eventToEditableModelPoint(event);
@@ -471,6 +488,83 @@ export function CreasePatternPanel() {
     cpToolDragRef.current = null;
     setCpToolPath([]);
   }, []);
+
+  const handleEditableLineClick = useCallback(
+    (id: number, additive = false) => {
+      if (
+        activeCpCommand?.uiStatus === 'ready' &&
+        cpToolState.phase === 'active' &&
+        isLineClickSelectionOperation(activeCpCommand.operationId)
+      ) {
+        setCpToolPoints([]);
+        setCpToolPath([]);
+        void (async () => {
+          const succeeded = await executeOristudioCpCommand(
+            activeCpCommand.operationId,
+            buildCpCommandPayload(activeCpCommand, {
+              line_ids: [id],
+            })
+          );
+          setCpToolState((state) =>
+            state.activeOperationId === activeCpCommand.operationId
+              ? transitionOristudioCpToolState(
+                  state,
+                  succeeded
+                    ? { type: 'commit' }
+                    : {
+                        type: 'commandError',
+                        message: useWorkspaceStore.getState().oristudioCpError ?? 'Command failed',
+                      }
+                )
+              : state
+          );
+        })();
+        return;
+      }
+
+      if (cpToolState.phase === 'active') return;
+      toggleOristudioCpLineSelection(id, additive);
+    },
+    [
+      activeCpCommand,
+      buildCpCommandPayload,
+      cpToolState.phase,
+      executeOristudioCpCommand,
+      toggleOristudioCpLineSelection,
+    ]
+  );
+
+  const handleEditableVertexClick = useCallback(
+    (id: string, additive = false) => {
+      if (cpToolState.phase === 'active') return;
+      toggleOristudioCpVertexSelection(id, additive);
+    },
+    [cpToolState.phase, toggleOristudioCpVertexSelection]
+  );
+
+  const handleEditablePointClick = useCallback(
+    (id: number, additive = false) => {
+      if (cpToolState.phase === 'active') return;
+      toggleOristudioCpPointSelection(id, additive);
+    },
+    [cpToolState.phase, toggleOristudioCpPointSelection]
+  );
+
+  const handleEditableCircleClick = useCallback(
+    (id: number, additive = false) => {
+      if (cpToolState.phase === 'active') return;
+      toggleOristudioCpCircleSelection(id, additive);
+    },
+    [cpToolState.phase, toggleOristudioCpCircleSelection]
+  );
+
+  const handleEditableTextClick = useCallback(
+    (id: number, additive = false) => {
+      if (cpToolState.phase === 'active') return;
+      toggleOristudioCpTextSelection(id, additive);
+    },
+    [cpToolState.phase, toggleOristudioCpTextSelection]
+  );
 
   const clearSelectionOnBackgroundPointerDown = (event: PointerEvent<SVGElement>) => {
     if (event.button !== 0 || spacePressed) return;
@@ -811,11 +905,11 @@ export function CreasePatternPanel() {
                         selection={oristudioCpSelection}
                         snapTarget={snapTarget}
                         spacePressed={spacePressed}
-                        toggleCircle={toggleOristudioCpCircleSelection}
-                        toggleLine={toggleOristudioCpLineSelection}
-                        togglePoint={toggleOristudioCpPointSelection}
-                        toggleText={toggleOristudioCpTextSelection}
-                        toggleVertex={toggleOristudioCpVertexSelection}
+                        toggleCircle={handleEditableCircleClick}
+                        toggleLine={handleEditableLineClick}
+                        togglePoint={handleEditablePointClick}
+                        toggleText={handleEditableTextClick}
+                        toggleVertex={handleEditableVertexClick}
                         vertices={editableCpVertices}
                       />
                     ) : (

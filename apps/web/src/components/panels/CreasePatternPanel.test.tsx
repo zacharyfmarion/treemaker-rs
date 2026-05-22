@@ -623,6 +623,37 @@ describe('CreasePatternPanel', () => {
     });
   });
 
+  it('routes active unselect-crease clicks through the command instead of direct selection', async () => {
+    const executeOristudioCpCommand = vi.fn(async () => true);
+    const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
+      documentMode: 'crease-pattern',
+      importedCreasePattern: importedCpDocument(),
+      oristudioCpDocument: editableCpState(),
+      executeOristudioCpCommand,
+    });
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('button[aria-label="Unselect crease"]')?.click();
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      container.querySelector<SVGLineElement>('[data-cp-line-hit-id="1"]')?.dispatchEvent(
+        new MouseEvent('click', { bubbles: true })
+      );
+      await Promise.resolve();
+    });
+
+    expect(executeOristudioCpCommand).toHaveBeenCalledWith(
+      'CreaseUnselect',
+      expect.objectContaining({
+        line_ids: [1],
+        selection_distance: expect.any(Number),
+      })
+    );
+    expect(useWorkspaceStore.getState().oristudioCpSelection.lines).toEqual([]);
+  });
+
   it('runs ready multi-step CP transform commands with resolved model points', async () => {
     const executeOristudioCpCommand = vi.fn(
       async (_operationId: string, _payload?: OristudioCpCommandPayload) => true

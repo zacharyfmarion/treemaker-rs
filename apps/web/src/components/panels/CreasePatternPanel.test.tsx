@@ -76,6 +76,11 @@ function renderPanel(
 ) {
   const buildCreasePattern = vi.fn(async () => undefined);
   const optimizeScale = vi.fn(async () => undefined);
+  const previewOristudioCpCommand = vi.fn(async () => ({
+    segments: [],
+    points: [],
+    diagnostics: [],
+  }));
   useWorkspaceStore.setState(
     {
       ...useWorkspaceStore.getInitialState(),
@@ -84,6 +89,7 @@ function renderPanel(
       engineReady: true,
       optimizeScale,
       buildCreasePattern,
+      previewOristudioCpCommand,
       ...state,
     },
     true
@@ -107,7 +113,7 @@ function renderPanel(
   transformMocks.setTransform.mockClear();
   transformMocks.zoomIn.mockClear();
   transformMocks.zoomOut.mockClear();
-  return { container, buildCreasePattern, optimizeScale };
+  return { container, buildCreasePattern, optimizeScale, previewOristudioCpCommand };
 }
 
 function importedCpDocument(): ImportedCreasePatternDocument {
@@ -521,8 +527,8 @@ describe('CreasePatternPanel', () => {
     const selectLassoButton = container.querySelector<HTMLButtonElement>(
       'button[aria-label="Select lasso"]'
     );
-    expect(drawCreaseButton?.getAttribute('aria-disabled')).toBe('true');
-    expect(drawCreaseButton?.getAttribute('data-ui-status')).toBe('not-implemented');
+    expect(drawCreaseButton?.getAttribute('aria-disabled')).toBe('false');
+    expect(drawCreaseButton?.getAttribute('data-ui-status')).toBe('ready');
     expect(makeMountainButton?.getAttribute('aria-disabled')).toBe('false');
     expect(makeMountainButton?.getAttribute('data-ui-status')).toBe('ready');
     expect(moveButton?.getAttribute('aria-disabled')).toBe('false');
@@ -543,7 +549,7 @@ describe('CreasePatternPanel', () => {
     act(() => {
       drawCreaseButton?.click();
     });
-    expect(container.textContent).toContain('Draw crease: Not implemented');
+    expect(container.textContent).toContain('Draw crease: Pick start point');
     expect(drawCreaseButton?.hasAttribute('data-active')).toBe(true);
 
     act(() => {
@@ -859,6 +865,97 @@ describe('CreasePatternPanel', () => {
     expect(payload?.points).toHaveLength(3);
     expect(payload?.line_color).toBe('Red1');
     expect(payload?.selection_distance).toBeGreaterThan(0);
+  });
+
+  it('runs ready construction draw commands with live candidate overlays', async () => {
+    const executeOristudioCpCommand = vi.fn(
+      async (_operationId: string, _payload?: OristudioCpCommandPayload) => true
+    );
+    const previewOristudioCpCommand = vi.fn(async () => ({
+      segments: [
+        {
+          a: { x: 0, y: 0 },
+          b: { x: 80, y: 0 },
+          color: 'Red1',
+          active: 'Inactive0',
+          selected: 0,
+          customized: 0,
+          customized_color: { red: 0, green: 0, blue: 0 },
+        },
+      ],
+      points: [{ x: 40, y: 0 }],
+      diagnostics: [],
+    }));
+    const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
+      documentMode: 'crease-pattern',
+      importedCreasePattern: importedCpDocument(),
+      oristudioCpDocument: editableCpState(),
+      oristudioCpViewport: {
+        gridVisible: true,
+        snapToGrid: false,
+        snapToVertices: false,
+        snapToLines: false,
+      },
+      executeOristudioCpCommand,
+      previewOristudioCpCommand,
+    });
+    const canvas = setCanvasClientRect(container);
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('button[aria-label="Draw crease"]')?.click();
+      await Promise.resolve();
+    });
+
+    act(() => {
+      canvas.dispatchEvent(
+        new MouseEvent('pointerdown', {
+          bubbles: true,
+          button: 0,
+          clientX: 360,
+          clientY: 348,
+        })
+      );
+      canvas.dispatchEvent(
+        new MouseEvent('pointermove', {
+          bubbles: true,
+          button: 0,
+          clientX: 477.6,
+          clientY: 348,
+        })
+      );
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(previewOristudioCpCommand).toHaveBeenCalledWith(
+      'DrawCreaseFree',
+      expect.objectContaining({
+        line_color: 'Red1',
+        points: expect.any(Array),
+      })
+    );
+    expect(container.querySelector('.cp-command-candidate')).not.toBeNull();
+    expect(container.querySelector('.cp-command-candidate-point')).not.toBeNull();
+
+    await act(async () => {
+      canvas.dispatchEvent(
+        new MouseEvent('pointerdown', {
+          bubbles: true,
+          button: 0,
+          clientX: 477.6,
+          clientY: 348,
+        })
+      );
+      await Promise.resolve();
+    });
+
+    expect(executeOristudioCpCommand).toHaveBeenCalledOnce();
+    const [operation, payload] = executeOristudioCpCommand.mock.calls[0] ?? [];
+    expect(operation).toBe('DrawCreaseFree');
+    expect(payload?.line_color).toBe('Red1');
+    expect(payload?.selection_distance).toBeGreaterThan(0);
+    expect(payload?.points).toHaveLength(2);
   });
 
   it('runs ready lasso commands from a freehand drag path', async () => {

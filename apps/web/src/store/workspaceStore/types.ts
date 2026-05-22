@@ -28,6 +28,7 @@ import type { FileService } from '../../platform/fileService';
 import type { ImportedCreasePatternDocument } from '../../lib/creasePatternImport';
 import type {
   OristudioCpCommandPayload,
+  OristudioCpCommandPreview,
   OristudioCpDocumentSnapshot,
   OristudioCpDocumentState,
   OristudioCpOperationDescriptor,
@@ -87,6 +88,10 @@ export interface ProjectSliceActions {
     operationId: OristudioCpOperationId,
     payload?: OristudioCpCommandPayload
   ) => Promise<boolean>;
+  previewOristudioCpCommand: (
+    operationId: OristudioCpOperationId,
+    payload?: OristudioCpCommandPayload
+  ) => Promise<OristudioCpCommandPreview | null>;
   clearOristudioCpDocument: () => Promise<void>;
   openProject: (fileService?: FileService) => Promise<boolean>;
   saveProject: (fileService?: FileService) => Promise<boolean>;

@@ -27,18 +27,18 @@ describe('oristudio CP tool state', () => {
   it('selects unavailable commands as blocked but keeps the active command visible', () => {
     const state = transitionOristudioCpToolState(IDLE_ORISTUDIO_CP_TOOL_STATE, {
       type: 'selectCommand',
-      command: command('DrawCreaseFree'),
+      command: command('DisplayLengthBetweenPoints1'),
       editable: true,
     });
 
     expect(state).toMatchObject({
-      activeOperationId: 'DrawCreaseFree',
+      activeOperationId: 'DisplayLengthBetweenPoints1',
       phase: 'blocked',
-      prompt: 'Draw crease: Not implemented',
+      prompt: 'Measure length 1: Not implemented',
       status: 'not-implemented',
       stepIndex: 0,
     });
-    expect(state.steps).toEqual(['Pick start point', 'Pick end point']);
+    expect(state.steps).toEqual(['Pick first point', 'Pick second point']);
   });
 
   it('starts ready multi-step commands and advances prompts without changing tools', () => {

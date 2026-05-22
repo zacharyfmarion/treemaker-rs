@@ -11,6 +11,7 @@ export const free_document: (a: number) => [number, number];
 export const load_cp: (a: number, b: number, c: number, d: number) => [number, number, number];
 export const load_document: (a: any) => [number, number, number];
 export const load_fold: (a: number, b: number, c: number, d: number) => [number, number, number];
+export const preview_cp_command: (a: number, b: any, c: any) => [number, number, number];
 export const __wbindgen_malloc: (a: number, b: number) => number;
 export const __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
 export const __wbindgen_exn_store: (a: number) => void;

@@ -39,6 +39,7 @@ import {
   getOristudioCpOperationDescriptors,
   loadOristudioCpDocumentFromText,
   oristudioCpError,
+  previewOristudioCpCommand as previewRuntimeOristudioCpCommand,
   releaseOristudioCpDocument,
   setOristudioCpDocumentSource,
 } from '../oristudioCpRuntime';
@@ -624,6 +625,19 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
           error: normalized,
         });
         return false;
+      }
+    },
+
+    previewOristudioCpCommand: async (operationId, payload = {}) => {
+      if (!get().oristudioCpDocument) return null;
+      try {
+        const preview = await previewRuntimeOristudioCpCommand(operationId, payload);
+        set({ oristudioCpError: null });
+        return preview;
+      } catch (error) {
+        const normalized = oristudioCpError(error);
+        set({ oristudioCpError: normalized.message });
+        return null;
       }
     },
 

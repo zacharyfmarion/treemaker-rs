@@ -150,6 +150,20 @@ export function load_fold(text, title) {
     }
     return ret[0] >>> 0;
 }
+
+/**
+ * @param {number} handle
+ * @param {any} operation
+ * @param {any} payload
+ * @returns {any}
+ */
+export function preview_cp_command(handle, operation, payload) {
+    const ret = wasm.preview_cp_command(handle, operation, payload);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return takeFromExternrefTable0(ret[0]);
+}
 function __wbg_get_imports() {
     const import0 = {
         __proto__: null,

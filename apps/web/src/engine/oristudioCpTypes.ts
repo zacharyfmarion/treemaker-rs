@@ -106,11 +106,25 @@ export interface OristudioCpCommandResult {
   diagnostics: string[];
 }
 
+export interface OristudioCpCommandPreview {
+  segments: OristudioCpLineSegment[];
+  points: Point[];
+  diagnostics: string[];
+}
+
 export interface OristudioCpCommandPayload {
   line_ids?: number[];
   points?: Point[];
   line_color?: OristudioCpLineColor;
   selection_distance?: number;
+  grid_width?: number;
+  angle_system_divider?: number;
+  angles?: [number, number, number, number, number, number];
+  candidate_index?: number;
+  division_count?: number;
+  ratio_s?: number;
+  ratio_t?: number;
+  width?: number;
   custom_from_line_type?: OristudioCpCustomLineType;
   custom_to_line_type?: OristudioCpCustomLineType;
   custom_line_type?: OristudioCpCustomLineType;

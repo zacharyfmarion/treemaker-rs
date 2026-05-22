@@ -204,9 +204,10 @@ function commandId(operationId: string): `cp.${string}` {
 }
 
 export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
-  notImplemented('DrawCreaseFree', 'Draw crease', 'draw', 'pen-line', 'MouseHandlerDrawCreaseFree', {
+  ready('DrawCreaseFree', 'Draw crease', 'draw', 'pen-line', 'MouseHandlerDrawCreaseFree', {
     shortcut: 'L',
     toolSteps: ['Pick start point', 'Pick end point'],
+    tooltip: 'Draw a crease between two resolved points',
   }),
   outOfScopeUi(
     'MoveCreasePattern',
@@ -235,22 +236,41 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
     toolSteps: ['Pick crossing start point', 'Pick crossing end point', 'Pick extension target'],
     tooltip: 'Extend creases crossed by the guide line to the target crease',
   }),
-  notImplemented('SquareBisector', 'Square bisector', 'construct', 'square-dashed', 'MouseHandlerSquareBisector'),
-  notImplemented('Inward', 'Inward fold line', 'construct', 'corner-down-left', 'MouseHandlerInward'),
-  notImplemented('PerpendicularDraw', 'Perpendicular draw', 'construct', 'ruler', 'MouseHandlerPerpendicularDraw'),
-  notImplemented('SymmetricDraw', 'Symmetric draw', 'construct', 'flip-horizontal', 'MouseHandlerSymmetricDraw'),
-  notImplemented('DrawCreaseRestricted', 'Draw restricted crease', 'draw', 'pen-tool', 'MouseHandlerDrawCreaseRestricted'),
-  notImplemented('DrawCreaseSymmetric', 'Mirror selected creases', 'construct', 'copy-plus', 'MouseHandlerDrawCreaseSymmetric'),
-  notImplemented('DrawCreaseAngleRestricted', 'Angle restricted crease', 'construct', 'drafting-compass', 'MouseHandlerDrawCreaseAngleRestricted'),
-  notImplemented('DrawPoint', 'Draw point', 'draw', 'circle-dot', 'MouseHandlerDrawPoint', {
+  ready('SquareBisector', 'Square bisector', 'construct', 'square-dashed', 'MouseHandlerSquareBisector', {
+    toolSteps: ['Pick first point', 'Pick vertex point', 'Pick second point', 'Pick destination crease'],
+  }),
+  ready('Inward', 'Inward fold line', 'construct', 'corner-down-left', 'MouseHandlerInward', {
+    toolSteps: ['Pick first triangle point', 'Pick second triangle point', 'Pick third triangle point'],
+  }),
+  ready('PerpendicularDraw', 'Perpendicular draw', 'construct', 'ruler', 'MouseHandlerPerpendicularDraw', {
+    toolSteps: ['Pick target point', 'Pick base crease'],
+  }),
+  ready('SymmetricDraw', 'Symmetric draw', 'construct', 'flip-horizontal', 'MouseHandlerSymmetricDraw', {
+    toolSteps: ['Pick source crease', 'Pick mirror crease'],
+  }),
+  ready('DrawCreaseRestricted', 'Draw restricted crease', 'draw', 'pen-tool', 'MouseHandlerDrawCreaseRestricted', {
+    toolSteps: ['Pick start point', 'Pick end point'],
+  }),
+  ready('DrawCreaseSymmetric', 'Mirror selected creases', 'construct', 'copy-plus', 'MouseHandlerDrawCreaseSymmetric', {
+    selectionRequirement: 'selected creases',
+    toolSteps: ['Pick mirror axis start', 'Pick mirror axis end'],
+  }),
+  ready('DrawCreaseAngleRestricted', 'Angle restricted crease', 'construct', 'drafting-compass', 'MouseHandlerDrawCreaseAngleRestricted', {
+    toolSteps: ['Pick base start point', 'Pick base end point', 'Pick convergence candidate'],
+  }),
+  ready('DrawPoint', 'Draw point', 'draw', 'circle-dot', 'MouseHandlerDrawPoint', {
     toolSteps: ['Pick point'],
   }),
   ready('DeletePoint', 'Delete point', 'select-edit', 'circle-x', 'MouseHandlerDeletePoint', {
     toolSteps: ['Pick vertex'],
     tooltip: 'Merge same-color creases meeting at the picked vertex',
   }),
-  notImplemented('AngleSystem', 'Angle system', 'construct', 'chart-no-axes-combined', 'MouseHandlerAngleSystem'),
-  notImplemented('DrawCreaseAngleRestricted3', 'Angle restricted 3 crease', 'construct', 'between-horizontal-start', 'MouseHandlerDrawCreaseAngleRestricted3_2'),
+  ready('AngleSystem', 'Angle system', 'construct', 'chart-no-axes-combined', 'MouseHandlerAngleSystem', {
+    toolSteps: ['Pick angle start point', 'Pick angle end point', 'Pick destination crease'],
+  }),
+  ready('DrawCreaseAngleRestricted3', 'Angle restricted 3 crease', 'construct', 'between-horizontal-start', 'MouseHandlerDrawCreaseAngleRestricted3_2', {
+    toolSteps: ['Pick fan start point', 'Pick fan end point', 'Pick angle candidate'],
+  }),
   ready('CreaseSelect', 'Select crease', 'select-edit', 'mouse-pointer-2', 'MouseHandlerCreaseSelect', {
     shortcut: 'V',
     toolSteps: ['Pick box start point', 'Pick box end point'],
@@ -288,8 +308,12 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
     'MouseHandlerBackgroundChangePosition',
     'Background image manipulation is UI-only and not part of the CP kernel'
   ),
-  notImplemented('LineSegmentDivision', 'Divide line by count', 'draw', 'split', 'MouseHandlerLineSegmentDivision'),
-  notImplemented('LineSegmentRatioSet', 'Divide line by ratio', 'draw', 'divide', 'MouseHandlerLineSegmentRatioSet'),
+  ready('LineSegmentDivision', 'Divide line by count', 'draw', 'split', 'MouseHandlerLineSegmentDivision', {
+    toolSteps: ['Pick line segment'],
+  }),
+  ready('LineSegmentRatioSet', 'Divide line by ratio', 'draw', 'divide', 'MouseHandlerLineSegmentRatioSet', {
+    toolSteps: ['Pick line segment'],
+  }),
   notImplemented('PolygonSetNoCorners', 'Regular polygon', 'generators', 'hexagon', 'MouseHandlerPolygonSetNoCorners'),
   ready('CreaseAdvanceType', 'Advance crease type', 'color', 'list-restart', 'MouseHandlerCreaseAdvanceType', {
     selectionRequirement: 'selected folding lines',
@@ -313,20 +337,32 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
       'Pick target second point',
     ],
   }),
-  notImplemented('FishBoneDraw', 'Fishbone draw', 'construct', 'git-branch', 'MouseHandlerFishBoneDraw'),
+  ready('FishBoneDraw', 'Fishbone draw', 'construct', 'git-branch', 'MouseHandlerFishBoneDraw', {
+    toolSteps: ['Pick spine start point', 'Pick spine end point'],
+  }),
   ready('CreaseMakeMv', 'Make alternating M/V', 'color', 'git-branch', 'MouseHandlerCreaseMakeMV', {
     toolSteps: ['Pick guide start point', 'Pick guide end point'],
     tooltip: 'Assign alternating mountain and valley folds along a guide line',
   }),
-  notImplemented('DoubleSymmetricDraw', 'Double symmetric draw', 'construct', 'fold-horizontal', 'MouseHandlerDoubleSymmetricDraw'),
+  ready('DoubleSymmetricDraw', 'Double symmetric draw', 'construct', 'fold-horizontal', 'MouseHandlerDoubleSymmetricDraw', {
+    toolSteps: ['Pick symmetry axis start', 'Pick symmetry axis end'],
+  }),
   ready('CreasesAlternateMv', 'Alternate crossing M/V', 'color', 'shuffle', 'MouseHandlerCreasesAlternateMV', {
     toolSteps: ['Pick guide start point', 'Pick guide end point'],
     tooltip: 'Assign alternating mountain and valley folds to crossings along a guide line',
   }),
-  notImplemented('DrawCreaseAngleRestricted5', 'Angle restricted 5 crease', 'construct', 'chart-pie', 'MouseHandlerDrawCreaseAngleRestricted5'),
-  notImplemented('VertexMakeAngularlyFlatFoldable', 'Make vertex flat-foldable', 'construct', 'badge-check', 'MouseHandlerVertexMakeAngularlyFlatFoldable'),
-  notImplemented('FoldableLineInput', 'Foldable line input', 'construct', 'list-plus', 'MouseHandlerFoldableLineInput'),
-  notImplemented('ParallelDraw', 'Parallel draw', 'construct', 'align-justify', 'MouseHandlerParallelDraw'),
+  ready('DrawCreaseAngleRestricted5', 'Angle restricted 5 crease', 'construct', 'chart-pie', 'MouseHandlerDrawCreaseAngleRestricted5', {
+    toolSteps: ['Pick anchor point', 'Pick snapped endpoint'],
+  }),
+  ready('VertexMakeAngularlyFlatFoldable', 'Make vertex flat-foldable', 'construct', 'badge-check', 'MouseHandlerVertexMakeAngularlyFlatFoldable', {
+    toolSteps: ['Pick odd vertex', 'Pick destination crease'],
+  }),
+  ready('FoldableLineInput', 'Foldable line input', 'construct', 'list-plus', 'MouseHandlerFoldableLineInput', {
+    toolSteps: ['Pick start vertex', 'Pick endpoint'],
+  }),
+  ready('ParallelDraw', 'Parallel draw', 'construct', 'align-justify', 'MouseHandlerParallelDraw', {
+    toolSteps: ['Pick target point', 'Pick parallel source crease', 'Pick destination crease'],
+  }),
   ready('VertexDeleteOnCrease', 'Delete vertex on crease', 'select-edit', 'scan-x', 'MouseHandlerVertexDeleteOnCrease', {
     toolSteps: ['Pick vertex'],
     tooltip: 'Merge adjacent creases at a vertex with Oriedita color-change rules',
@@ -340,8 +376,12 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
   notImplemented('CircleDrawConcentric', 'Concentric circle', 'annotations', 'circle-dot-dashed', 'MouseHandlerCircleDrawConcentric'),
   notImplemented('CircleDrawConcentricSelect', 'Concentric from selection', 'annotations', 'circle-dot', 'MouseHandlerCircleDrawConcentricSelect'),
   notImplemented('CircleDrawConcentricTwoCircleSelect', 'Concentric from two circles', 'annotations', 'venetian-mask', 'MouseHandlerCircleDrawConcentricTwoCircleSelect'),
-  notImplemented('ParallelDrawWidth', 'Parallel draw by width', 'construct', 'between-horizontal-end', 'MouseHandlerParallelDrawWidth'),
-  notImplemented('ContinuousSymmetricDraw', 'Continuous symmetric draw', 'construct', 'repeat', 'MouseHandlerContinuousSymmetricDraw'),
+  ready('ParallelDrawWidth', 'Parallel draw by width', 'construct', 'between-horizontal-end', 'MouseHandlerParallelDrawWidth', {
+    toolSteps: ['Pick source crease', 'Pick width point'],
+  }),
+  ready('ContinuousSymmetricDraw', 'Continuous symmetric draw', 'construct', 'repeat', 'MouseHandlerContinuousSymmetricDraw', {
+    toolSteps: ['Pick start point', 'Pick through point'],
+  }),
   notImplemented('DisplayLengthBetweenPoints1', 'Measure length 1', 'measure', 'ruler', 'MouseHandlerDisplayLengthBetweenPoints', {
     toolSteps: ['Pick first point', 'Pick second point'],
   }),
@@ -403,7 +443,9 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
     toolSteps: ['Pick crossing start point', 'Pick crossing end point', 'Pick extension target'],
     tooltip: 'Extend creases crossed by the guide line while preserving original colors',
   }),
-  notImplemented('FoldableLineDraw', 'Foldable line draw', 'construct', 'pen-line', 'MouseHandlerFoldableLineDraw'),
+  ready('FoldableLineDraw', 'Foldable line draw', 'construct', 'pen-line', 'MouseHandlerFoldableLineDraw', {
+    toolSteps: ['Pick start vertex', 'Pick destination'],
+  }),
   ready('ReplaceLineTypeSelect', 'Replace selected line type', 'color', 'replace', 'MouseHandlerReplaceTypeSelect', {
     selectionRequirement: 'selected lines',
     tooltip: 'Replace selected lines matching the active source line type',
@@ -432,8 +474,12 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
   notImplemented('MoveCalculatedShape', 'Move calculated shape', 'folding', 'move', 'MouseHandlerMoveCalculatedShape'),
   notImplemented('ChangeStandardFace', 'Change standard face', 'folding', 'layers', 'MouseHandlerChangeStandardFace'),
   notImplemented('AddFoldingConstraint', 'Add folding constraint', 'folding', 'list-plus', 'MouseHandlerAddFoldingConstraints'),
-  notImplemented('Axiom5', 'Axiom 5', 'construct', 'compass', 'MouseHandlerAxiom5'),
-  notImplemented('Axiom7', 'Axiom 7', 'construct', 'compass', 'MouseHandlerAxiom7'),
+  ready('Axiom5', 'Axiom 5', 'construct', 'compass', 'MouseHandlerAxiom5', {
+    toolSteps: ['Pick target point', 'Pick target crease', 'Pick pivot point', 'Pick destination crease'],
+  }),
+  ready('Axiom7', 'Axiom 7', 'construct', 'compass', 'MouseHandlerAxiom7', {
+    toolSteps: ['Pick target point', 'Pick target crease', 'Pick perpendicular crease', 'Pick destination crease'],
+  }),
   ready('FixInaccurate', 'Fix inaccurate creases', 'check-fix', 'wrench', 'MouseHandlerCreaseFixInaccurate', {
     selectionRequirement: 'selected folding lines',
     tooltip: 'Snap inaccurate selected folding lines to Oriedita fix targets',

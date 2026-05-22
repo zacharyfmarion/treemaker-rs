@@ -10,7 +10,9 @@ import { TransformComponent, TransformWrapper, type ReactZoomPanPinchRef } from 
 import { GitBranch, Grid2X2, Magnet, ScanLine } from 'lucide-react';
 import type {
   OristudioCpCommandPayload,
+  OristudioCpCommandPreview,
   OristudioCpDocumentSnapshot,
+  OristudioCpLineSegment,
 } from '../../engine/oristudioCpTypes';
 import { formatNumber, paperToSvg, type Point } from '../../lib/geometry';
 import { getViewportFitScale, type ViewportSize } from '../../lib/designViewport';
@@ -35,6 +37,7 @@ import {
   getCpGridLines,
   getCpVertices,
   getEditableCpModelBounds,
+  getOrieditaGridBasis,
   modelPointToCpSvg,
   nearestCpSnapTarget,
   textCoordinate,
@@ -80,7 +83,8 @@ function modelSelectionDistance(bounds: ReturnType<typeof getEditableCpModelBoun
 
 function cpCommandPayloadDefaults(
   command: OristudioCpCommandDefinition,
-  bounds: ReturnType<typeof getEditableCpModelBounds>
+  bounds: ReturnType<typeof getEditableCpModelBounds>,
+  gridWidth?: number
 ): OristudioCpCommandPayload {
   const payload: OristudioCpCommandPayload = {};
   const operationId = command.operationId;
@@ -92,9 +96,56 @@ function cpCommandPayloadDefaults(
   if (
     operationId === 'CreaseMakeMv' ||
     operationId === 'CreasesAlternateMv' ||
-    operationId === 'LengthenCrease'
+    operationId === 'LengthenCrease' ||
+    operationId === 'DrawCreaseFree' ||
+    operationId === 'DrawCreaseRestricted' ||
+    operationId === 'DrawCreaseSymmetric' ||
+    operationId === 'DrawCreaseAngleRestricted' ||
+    operationId === 'DrawCreaseAngleRestricted3' ||
+    operationId === 'DrawCreaseAngleRestricted5' ||
+    operationId === 'SquareBisector' ||
+    operationId === 'Inward' ||
+    operationId === 'PerpendicularDraw' ||
+    operationId === 'SymmetricDraw' ||
+    operationId === 'FishBoneDraw' ||
+    operationId === 'DoubleSymmetricDraw' ||
+    operationId === 'VertexMakeAngularlyFlatFoldable' ||
+    operationId === 'FoldableLineInput' ||
+    operationId === 'ParallelDraw' ||
+    operationId === 'ParallelDrawWidth' ||
+    operationId === 'ContinuousSymmetricDraw' ||
+    operationId === 'FoldableLineDraw' ||
+    operationId === 'Axiom5' ||
+    operationId === 'Axiom7'
   ) {
     payload.line_color = 'Red1';
+  }
+
+  if (
+    operationId === 'FishBoneDraw' ||
+    operationId === 'VertexMakeAngularlyFlatFoldable' ||
+    operationId === 'FoldableLineInput' ||
+    operationId === 'FoldableLineDraw'
+  ) {
+    payload.grid_width = gridWidth;
+  }
+
+  if (
+    operationId === 'AngleSystem' ||
+    operationId === 'DrawCreaseAngleRestricted' ||
+    operationId === 'DrawCreaseAngleRestricted3' ||
+    operationId === 'DrawCreaseAngleRestricted5'
+  ) {
+    payload.angle_system_divider = 4;
+  }
+
+  if (operationId === 'LineSegmentDivision') {
+    payload.division_count = 2;
+  }
+
+  if (operationId === 'LineSegmentRatioSet') {
+    payload.ratio_s = 1;
+    payload.ratio_t = 1;
   }
 
   if (operationId === 'ReplaceLineTypeSelect') {
@@ -137,6 +188,8 @@ export function CreasePatternPanel() {
   const [cpToolState, setCpToolState] = useState(IDLE_ORISTUDIO_CP_TOOL_STATE);
   const [cpToolPoints, setCpToolPoints] = useState<Point[]>([]);
   const [cpToolPath, setCpToolPath] = useState<Point[]>([]);
+  const [cpCommandPreview, setCpCommandPreview] = useState<OristudioCpCommandPreview | null>(null);
+  const cpPreviewRequestRef = useRef(0);
   const cpToolDragRef = useRef<{
     operationId: OristudioCpCommandDefinition['operationId'];
     pointerId: number;
@@ -179,6 +232,9 @@ export function CreasePatternPanel() {
   const executeOristudioCpCommand = useWorkspaceStore(
     (state) => state.executeOristudioCpCommand
   );
+  const previewOristudioCpCommand = useWorkspaceStore(
+    (state) => state.previewOristudioCpCommand
+  );
 
   const editableCp = documentMode === 'crease-pattern' ? oristudioCpDocument?.document : null;
   const editableCpSummary = oristudioCpDocument?.summary ?? null;
@@ -193,6 +249,13 @@ export function CreasePatternPanel() {
   const editableCpGridLines = useMemo(
     () => (editableCpVisibleGrid ? getCpGridLines(editableCpBounds, editableCpVisibleGrid) : []),
     [editableCpBounds, editableCpVisibleGrid]
+  );
+  const editableCpGridWidth = useMemo(
+    () =>
+      editableCp
+        ? getOrieditaGridBasis(visibleOrieditaGridMetadata(editableCp.crease_pattern.grid)).gridWidth
+        : undefined,
+    [editableCp]
   );
   const editableCpVertices = useMemo(() => getCpVertices(editableCp), [editableCp]);
   const hasEditableCreasePattern =
@@ -211,21 +274,67 @@ export function CreasePatternPanel() {
         : undefined,
     [cpToolState.activeOperationId]
   );
+  const liveCommandPreviewPoints = useMemo(() => {
+    if (cpToolPath.length > 0) return cpToolPath;
+    if (!activeCpCommand || cpToolState.phase !== 'active') return cpToolPoints;
+    const stepCount = activeCpCommand.toolSteps?.length ?? 0;
+    const livePoint = snapTarget?.point ?? cursorModelPoint;
+    if (stepCount === 0 || !livePoint || cpToolPoints.length === 0) return cpToolPoints;
+    return [...cpToolPoints, livePoint].slice(0, stepCount);
+  }, [activeCpCommand, cpToolPath, cpToolPoints, cpToolState.phase, cursorModelPoint, snapTarget]);
   const buildCpCommandPayload = useCallback(
     (
       command: OristudioCpCommandDefinition,
       payload: OristudioCpCommandPayload = {}
     ): OristudioCpCommandPayload => ({
-      ...cpCommandPayloadDefaults(command, editableCpBounds),
+      ...cpCommandPayloadDefaults(command, editableCpBounds, editableCpGridWidth),
       ...payload,
     }),
-    [editableCpBounds]
+    [editableCpBounds, editableCpGridWidth]
   );
+
+  useEffect(() => {
+    if (
+      !editableCp ||
+      !activeCpCommand ||
+      activeCpCommand.uiStatus !== 'ready' ||
+      cpToolState.phase !== 'active' ||
+      activeCpCommand.inputMode === 'drag-path' ||
+      liveCommandPreviewPoints.length === 0
+    ) {
+      cpPreviewRequestRef.current += 1;
+      setCpCommandPreview(null);
+      return;
+    }
+
+    const requestId = cpPreviewRequestRef.current + 1;
+    cpPreviewRequestRef.current = requestId;
+    void previewOristudioCpCommand(
+      activeCpCommand.operationId,
+      buildCpCommandPayload(activeCpCommand, {
+        line_ids: oristudioCpSelection.lines,
+        points: liveCommandPreviewPoints,
+      })
+    ).then((preview) => {
+      if (cpPreviewRequestRef.current === requestId) {
+        setCpCommandPreview(preview);
+      }
+    });
+  }, [
+    activeCpCommand,
+    buildCpCommandPayload,
+    cpToolState.phase,
+    editableCp,
+    liveCommandPreviewPoints,
+    oristudioCpSelection.lines,
+    previewOristudioCpCommand,
+  ]);
 
   const handleCpToolCommand = useCallback(
     (command: OristudioCpCommandDefinition) => {
       setCpToolPoints([]);
       setCpToolPath([]);
+      setCpCommandPreview(null);
       cpToolDragRef.current = null;
       setCpToolState((state) =>
         transitionOristudioCpToolState(state, {
@@ -901,7 +1010,9 @@ export function CreasePatternPanel() {
                         gridLines={editableCpGridLines}
                         gridVisible={oristudioCpViewport.gridVisible}
                         mode={mode}
-                        commandPreviewPoints={cpToolPath.length > 0 ? cpToolPath : cpToolPoints}
+                        commandCandidatePoints={cpCommandPreview?.points ?? []}
+                        commandPreviewPoints={liveCommandPreviewPoints}
+                        commandPreviewSegments={cpCommandPreview?.segments ?? []}
                         selection={oristudioCpSelection}
                         snapTarget={snapTarget}
                         spacePressed={spacePressed}
@@ -1008,7 +1119,9 @@ interface EditableCreasePatternProps {
   gridLines: ReturnType<typeof getCpGridLines>;
   gridVisible: boolean;
   mode: 'mvf' | 'agrh';
+  commandCandidatePoints: Point[];
   commandPreviewPoints: Point[];
+  commandPreviewSegments: OristudioCpLineSegment[];
   selection: OristudioCpSelection;
   snapTarget: CpSnapTarget | null;
   spacePressed: boolean;
@@ -1027,7 +1140,9 @@ function EditableCreasePattern({
   gridLines,
   gridVisible,
   mode,
+  commandCandidatePoints,
   commandPreviewPoints,
+  commandPreviewSegments,
   selection,
   snapTarget,
   spacePressed,
@@ -1190,9 +1305,26 @@ function EditableCreasePattern({
           points={document.operation_frame.points
             .map((point) => modelPointToCpSvg(point, bounds))
             .map((point) => `${point.x},${point.y}`)
-            .join(' ')}
+          .join(' ')}
         />
       )}
+      {commandPreviewSegments.map((segment, index) => {
+        const a = modelPointToCpSvg(segment.a, bounds);
+        const b = modelPointToCpSvg(segment.b, bounds);
+        return (
+          <line
+            key={`${index}-${segment.a.x}-${segment.a.y}-${segment.b.x}-${segment.b.y}`}
+            className={[
+              cpLineColorClass(segment.color, mode),
+              'cp-command-candidate',
+            ].join(' ')}
+            x1={a.x}
+            y1={a.y}
+            x2={b.x}
+            y2={b.y}
+          />
+        );
+      })}
       {commandPreviewPoints.length > 1 && (
         <polyline
           className="cp-command-preview"
@@ -1202,6 +1334,18 @@ function EditableCreasePattern({
             .join(' ')}
         />
       )}
+      {commandCandidatePoints.map((point, index) => {
+        const svgPoint = modelPointToCpSvg(point, bounds);
+        return (
+          <circle
+            key={`${index}-${point.x}-${point.y}`}
+            className="cp-command-candidate-point"
+            cx={svgPoint.x}
+            cy={svgPoint.y}
+            r="4"
+          />
+        );
+      })}
       {snapTarget && (
         <circle
           className="cp-snap-target"

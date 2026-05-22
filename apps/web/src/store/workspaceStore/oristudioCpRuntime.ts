@@ -1,6 +1,7 @@
 import { wrap, type Remote } from 'comlink';
 import type {
   OristudioCpCommandPayload,
+  OristudioCpCommandPreview,
   OristudioCpCommandResult,
   OristudioCpDocumentSnapshot,
   OristudioCpDocumentState,
@@ -150,6 +151,17 @@ export async function executeOristudioCpCommand(
   const refreshed = await refreshOristudioCpDocument(result);
   if (!refreshed) throw new Error('Editable crease-pattern document was released');
   return refreshed;
+}
+
+export async function previewOristudioCpCommand(
+  operationId: OristudioCpOperationId,
+  payload: OristudioCpCommandPayload = {}
+): Promise<OristudioCpCommandPreview> {
+  if (handle === null) {
+    throw new Error('No editable crease-pattern document is loaded');
+  }
+  const api = await getOristudioCpClient();
+  return api.previewCommand(handle, operationId, payload);
 }
 
 export async function exportOristudioCpDocumentAsCp(): Promise<string> {

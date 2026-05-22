@@ -54,6 +54,19 @@ describe('oristudio CP command registry', () => {
       uiStatus: 'ready',
       toolSteps: ['Pick drag start point', 'Pick drag end point'],
     });
+    expect(cpCommandByOperation('DrawCreaseFree')).toMatchObject({
+      uiStatus: 'ready',
+      toolSteps: ['Pick start point', 'Pick end point'],
+    });
+    expect(cpCommandByOperation('Axiom5')).toMatchObject({
+      uiStatus: 'ready',
+      toolSteps: [
+        'Pick target point',
+        'Pick target crease',
+        'Pick pivot point',
+        'Pick destination crease',
+      ],
+    });
     expect(cpCommandByOperation('SelectLineIntersecting')).toMatchObject({
       uiStatus: 'ready',
       toolSteps: ['Pick drag start point', 'Pick drag end point'],

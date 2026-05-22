@@ -6,7 +6,7 @@
 use oristudio_cp::{
     CommandError, CreasePatternCommand, CreasePatternCommandPayload, CreasePatternDocument,
     OperationCategory, OperationDescriptor, OperationId, OperationStatus, execute_command, io,
-    operation_descriptors,
+    operation_descriptors, preview_command,
 };
 use serde::Serialize;
 use std::cell::RefCell;
@@ -129,6 +129,26 @@ pub fn execute_cp_command(
         serde_wasm_bindgen::from_value(payload).map_err(to_js_value_error)?;
     with_document_mut(handle, |document| {
         let result = execute_command(
+            document,
+            CreasePatternCommand::new(operation).with_payload(payload),
+        )
+        .map_err(to_js_command_error)?;
+        to_js_value(&result)
+    })
+}
+
+#[wasm_bindgen]
+pub fn preview_cp_command(
+    handle: u32,
+    operation: JsValue,
+    payload: JsValue,
+) -> Result<JsValue, JsValue> {
+    let operation: OperationId =
+        serde_wasm_bindgen::from_value(operation).map_err(to_js_value_error)?;
+    let payload: CreasePatternCommandPayload =
+        serde_wasm_bindgen::from_value(payload).map_err(to_js_value_error)?;
+    with_document(handle, |document| {
+        let result = preview_command(
             document,
             CreasePatternCommand::new(operation).with_payload(payload),
         )

@@ -657,8 +657,8 @@ Done when:
       lengthen, and operation-frame commands.
 - [x] Stage 5: Add web command tests and visual workflows for each enabled
       core edit command.
-- [ ] Stage 6: Enable drawing and geometric construction tools with previews.
-- [ ] Stage 6: Validate candidate previews and final mutations separately.
+- [x] Stage 6: Enable drawing and geometric construction tools with previews.
+- [x] Stage 6: Validate candidate previews and final mutations separately.
 - [ ] Stage 7: Enable circles, text, generators, and measurement tools.
 - [ ] Stage 7: Validate annotation preservation and non-mutating measurement
       behavior.

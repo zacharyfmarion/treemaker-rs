@@ -23,10 +23,10 @@ fn command_dispatch_returns_typed_not_implemented_error() {
         oristudio_cp_wasm::load_cp("1 0 0 1 0\n", "sample").expect("cp import should succeed");
     let error = oristudio_cp_wasm::execute_cp_command(
         handle,
-        serde_wasm_bindgen::to_value("DrawCreaseFree").expect("operation id should serialize"),
+        serde_wasm_bindgen::to_value("FoldingEstimate").expect("operation id should serialize"),
         serde_wasm_bindgen::to_value(&serde_json::json!({})).expect("payload should serialize"),
     )
-    .expect_err("registered commands should stay disabled until UI wiring exists");
+    .expect_err("ported registry entries without command dispatch should return typed errors");
     let error: serde_json::Value =
         serde_wasm_bindgen::from_value(error).expect("error should deserialize");
 
@@ -34,7 +34,7 @@ fn command_dispatch_returns_typed_not_implemented_error() {
     assert!(
         error["message"]
             .as_str()
-            .is_some_and(|message| message.contains("DrawCreaseFree"))
+            .is_some_and(|message| message.contains("FoldingEstimate"))
     );
     oristudio_cp_wasm::free_document(handle).expect("document handle should free");
 }

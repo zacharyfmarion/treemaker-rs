@@ -18,10 +18,15 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 pub use canonical::CanonicalCreasePattern;
-use geometry::{Epsilon, LineColor, LineSegment, Polygon};
+use geometry::{Epsilon, LineColor, LineSegment, Point, Polygon, determine_line_segment_distance};
 pub use model::CreasePatternModel;
 
 const DEFAULT_SELECTION_DISTANCE: f64 = 1.0;
+const ORIEDITA_PAPER_SIZE: f64 = 400.0;
+const DEFAULT_ANGLE_SYSTEM_DIVIDER: i32 = 4;
+const DEFAULT_ANGLE_SYSTEM_ANGLES: [f64; 6] = [40.0, 60.0, 80.0, 30.0, 50.0, 100.0];
+const DEFAULT_LINE_DIVISION_COUNT: usize = 2;
+const DEFAULT_LINE_RATIO: f64 = 1.0;
 
 /// Crate-local result type.
 pub type Result<T> = std::result::Result<T, CommandError>;
@@ -95,6 +100,30 @@ pub struct CreasePatternCommandPayload {
     /// Optional model-space hit tolerance for point/line tools.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub selection_distance: Option<f64>,
+    /// Optional active grid width for grid-spaced construction tools.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub grid_width: Option<f64>,
+    /// Optional active angle-system divider. Oriedita's default divider is 4.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub angle_system_divider: Option<i32>,
+    /// Optional custom angle-system values used when the divider is zero.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub angles: Option<[f64; 6]>,
+    /// Optional zero-based construction candidate selected by the UI.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub candidate_index: Option<usize>,
+    /// Optional division count for line division tools.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub division_count: Option<usize>,
+    /// Optional first ratio value for ratio division tools.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ratio_s: Option<f64>,
+    /// Optional second ratio value for ratio division tools.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ratio_t: Option<f64>,
+    /// Optional model-space width for parallel-width construction tools.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub width: Option<f64>,
     /// Optional source custom line type for replace-type commands.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub custom_from_line_type: Option<model::CustomLineType>,
@@ -114,6 +143,17 @@ pub struct CommandResult {
     /// Implementation status after execution.
     pub status: OperationStatus,
     /// Human-readable diagnostics emitted by the command.
+    pub diagnostics: Vec<String>,
+}
+
+/// Transient candidate geometry for active construction tools.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct CommandPreview {
+    /// Candidate, guide, or would-be committed line segments.
+    pub segments: Vec<geometry::LineSegment>,
+    /// Candidate commit points, such as angle-restricted convergence points.
+    pub points: Vec<geometry::Point>,
+    /// Human-readable diagnostics emitted by the preview query.
     pub diagnostics: Vec<String>,
 }
 
@@ -1228,6 +1268,14 @@ pub fn execute_command(
     }
 
     let changed = match command.operation {
+        OperationId::DrawCreaseFree | OperationId::DrawCreaseRestricted => {
+            let points = required_points(&command, 2)?;
+            usize::from(operations::construction::draw_crease_segment(
+                &mut document.crease_pattern,
+                &LineSegment::with_color(points[0], points[1], active_line_color(&command)),
+                operations::construction::DrawCreaseTarget::FoldLine,
+            ))
+        }
         OperationId::LineSegmentDelete => {
             let line_indices = required_line_indices(&command)?;
             operations::arrangement::delete_line_segments_for_indices(
@@ -1254,6 +1302,20 @@ pub fn execute_command(
                 Epsilon::UNKNOWN_1EN6,
             );
             before.abs_diff(document.crease_pattern.line_segments.len())
+        }
+        OperationId::DrawPoint => {
+            let points = required_points(&command, 1)?;
+            let (index, _) = nearest_line_segment(
+                &document.crease_pattern,
+                points[0],
+                selection_distance(&command),
+            )?;
+            usize::from(operations::point::draw_point_on_segment(
+                &mut document.crease_pattern,
+                index,
+                points[0],
+                selection_distance(&command),
+            ))
         }
         OperationId::CreaseSelect => {
             if command.payload.line_ids.is_empty() {
@@ -1343,6 +1405,438 @@ pub fn execute_command(
                 points[2],
                 points[3],
             )
+        }
+        OperationId::LineSegmentDivision => {
+            let segment = required_or_nearest_line_segment(document, &command)?;
+            operations::point::divide_segment_by_count(
+                &mut document.crease_pattern,
+                &segment,
+                division_count(&command),
+            )
+        }
+        OperationId::LineSegmentRatioSet => {
+            let segment = required_or_nearest_line_segment(document, &command)?;
+            operations::point::divide_segment_by_ratio(
+                &mut document.crease_pattern,
+                &segment,
+                ratio_s(&command),
+                ratio_t(&command),
+            )
+        }
+        OperationId::SquareBisector => {
+            if command.payload.line_ids.len() >= 3 {
+                let line_indices = required_line_indices(&command)?;
+                let first =
+                    line_segment_for_operation(document, command.operation, line_indices[0])?;
+                let second =
+                    line_segment_for_operation(document, command.operation, line_indices[1])?;
+                let destination =
+                    line_segment_for_operation(document, command.operation, line_indices[2])?;
+                usize::from(
+                    operations::construction::square_bisector_from_lines_to_destination(
+                        &mut document.crease_pattern,
+                        &first,
+                        &second,
+                        &destination,
+                        active_line_color(&command),
+                    ),
+                )
+            } else {
+                let points = required_points(&command, 4)?;
+                let (_, destination) = nearest_line_segment(
+                    &document.crease_pattern,
+                    points[3],
+                    selection_distance(&command),
+                )?;
+                usize::from(
+                    operations::construction::square_bisector_from_points_to_destination(
+                        &mut document.crease_pattern,
+                        points[0],
+                        points[1],
+                        points[2],
+                        &destination,
+                        active_line_color(&command),
+                    ),
+                )
+            }
+        }
+        OperationId::Inward => {
+            let points = required_points(&command, 3)?;
+            operations::construction::inward(
+                &mut document.crease_pattern,
+                points[0],
+                points[1],
+                points[2],
+                active_line_color(&command),
+            )
+        }
+        OperationId::PerpendicularDraw => {
+            let points = required_points_at_least(&command, 2)?;
+            let (_, base) = nearest_line_segment(
+                &document.crease_pattern,
+                points[1],
+                selection_distance(&command),
+            )?;
+            if points.len() >= 3 {
+                let (_, destination) = nearest_line_segment(
+                    &document.crease_pattern,
+                    points[2],
+                    selection_distance(&command),
+                )?;
+                let indicator = operations::construction::perpendicular_indicator(
+                    &document.crease_pattern,
+                    points[0],
+                    &base,
+                )
+                .unwrap_or_else(|| LineSegment::new(points[0], points[1]));
+                usize::from(operations::construction::perpendicular_draw_to_destination(
+                    &mut document.crease_pattern,
+                    points[0],
+                    &indicator,
+                    &destination,
+                    active_line_color(&command),
+                ))
+            } else if let Some(indicator) = operations::construction::perpendicular_indicator(
+                &document.crease_pattern,
+                points[0],
+                &base,
+            ) {
+                usize::from(operations::construction::commit_perpendicular_indicator(
+                    &mut document.crease_pattern,
+                    &indicator,
+                    active_line_color(&command),
+                ))
+            } else {
+                usize::from(operations::construction::perpendicular_projection(
+                    &mut document.crease_pattern,
+                    points[0],
+                    &base,
+                    active_line_color(&command),
+                ))
+            }
+        }
+        OperationId::SymmetricDraw => {
+            let points = required_points(&command, 2)?;
+            let (_, source) = nearest_line_segment(
+                &document.crease_pattern,
+                points[0],
+                selection_distance(&command),
+            )?;
+            let (_, mirror) = nearest_line_segment(
+                &document.crease_pattern,
+                points[1],
+                selection_distance(&command),
+            )?;
+            usize::from(operations::construction::symmetric_draw(
+                &mut document.crease_pattern,
+                &source,
+                &mirror,
+                active_line_color(&command),
+            ))
+        }
+        OperationId::DrawCreaseSymmetric => {
+            let line_indices = required_line_indices(&command)?;
+            let points = required_points(&command, 2)?;
+            set_selected_line_flags(&mut document.crease_pattern, &line_indices);
+            operations::construction::mirror_selected_lines(
+                &mut document.crease_pattern,
+                &LineSegment::new(points[0], points[1]),
+            )
+        }
+        OperationId::DrawCreaseAngleRestricted => {
+            let points = required_points(&command, 3)?;
+            let segment = LineSegment::new(points[0], points[1]);
+            let candidates = operations::construction::angle_restricted_converging_candidates(
+                &segment,
+                angle_system_divider(&command),
+                angle_system_angles(&command),
+            );
+            let converge_point =
+                nearest_candidate_point(&command, points[2], &candidates.intersections)?;
+            operations::construction::draw_crease_angle_restricted_converging(
+                &mut document.crease_pattern,
+                &segment,
+                converge_point,
+                active_line_color(&command),
+            )
+        }
+        OperationId::AngleSystem => {
+            let points = required_points(&command, 3)?;
+            let candidates = operations::construction::angle_system_candidates(
+                points[0],
+                points[1],
+                angle_system_divider(&command),
+                angle_system_angles(&command),
+            );
+            let selected = nearest_candidate_segment(&command, points[2], &candidates)?;
+            let (_, destination) = nearest_line_segment(
+                &document.crease_pattern,
+                points[2],
+                selection_distance(&command),
+            )?;
+            usize::from(operations::construction::angle_system_draw_to_destination(
+                &mut document.crease_pattern,
+                points[1],
+                &selected,
+                &destination,
+                active_line_color(&command),
+            ))
+        }
+        OperationId::DrawCreaseAngleRestricted3 => {
+            let points = required_points(&command, 3)?;
+            let candidates = operations::construction::draw_crease_angle_restricted_3_candidates(
+                points[0],
+                points[1],
+                angle_system_divider(&command),
+                angle_system_angles(&command),
+            );
+            let selected = nearest_candidate_segment(&command, points[2], &candidates)?;
+            usize::from(
+                operations::construction::draw_crease_angle_restricted_3_to_point(
+                    &mut document.crease_pattern,
+                    points[2],
+                    points[1],
+                    &selected,
+                    selection_distance(&command),
+                    active_line_color(&command),
+                ),
+            )
+        }
+        OperationId::FishBoneDraw => {
+            let points = required_points(&command, 2)?;
+            let grid_width = grid_width(&command, &document.crease_pattern);
+            operations::construction::fishbone_draw(
+                &mut document.crease_pattern,
+                &LineSegment::new(points[0], points[1]),
+                grid_width,
+                active_line_color(&command),
+                selection_distance(&command),
+            )
+        }
+        OperationId::DoubleSymmetricDraw => {
+            let points = required_points(&command, 2)?;
+            operations::construction::double_symmetric_draw(
+                &mut document.crease_pattern,
+                &LineSegment::new(points[0], points[1]),
+            )
+        }
+        OperationId::DrawCreaseAngleRestricted5 => {
+            let points = required_points(&command, 2)?;
+            usize::from(operations::construction::draw_crease_angle_restricted_5(
+                &mut document.crease_pattern,
+                points[0],
+                points[1],
+                angle_system_divider(&command),
+                angle_system_angles(&command),
+                selection_distance(&command),
+                active_line_color(&command),
+            ))
+        }
+        OperationId::VertexMakeAngularlyFlatFoldable => {
+            let points = required_points(&command, 2)?;
+            let candidates = operations::construction::make_vertex_flat_foldable_candidates(
+                &document.crease_pattern,
+                points[0],
+                grid_width(&command, &document.crease_pattern),
+                active_line_color(&command),
+            );
+            let selected = nearest_candidate_segment(&command, points[1], &candidates.candidates)?;
+            let (_, destination) = nearest_line_segment(
+                &document.crease_pattern,
+                points[1],
+                selection_distance(&command),
+            )?;
+            usize::from(
+                operations::construction::make_vertex_flat_foldable_to_destination(
+                    &mut document.crease_pattern,
+                    points[0],
+                    &selected,
+                    &destination,
+                    candidates.commit_color,
+                ),
+            )
+        }
+        OperationId::FoldableLineInput => {
+            let points = required_points(&command, 2)?;
+            let input = LineSegment::new(points[0], points[1]);
+            usize::from(operations::construction::foldable_line_input_direct(
+                &mut document.crease_pattern,
+                &input,
+                active_line_color(&command),
+            ))
+        }
+        OperationId::ParallelDraw => {
+            let points = required_points(&command, 3)?;
+            let (_, parallel_segment) = nearest_line_segment(
+                &document.crease_pattern,
+                points[1],
+                selection_distance(&command),
+            )?;
+            let (_, destination_segment) = nearest_line_segment(
+                &document.crease_pattern,
+                points[2],
+                selection_distance(&command),
+            )?;
+            usize::from(operations::construction::parallel_draw(
+                &mut document.crease_pattern,
+                points[0],
+                &parallel_segment,
+                &destination_segment,
+                active_line_color(&command),
+            ))
+        }
+        OperationId::ParallelDrawWidth => {
+            let points = required_points(&command, 2)?;
+            let selected_segment = required_or_nearest_line_segment(document, &command)?;
+            let width = command
+                .payload
+                .width
+                .filter(|width| width.is_finite() && *width > 0.0)
+                .unwrap_or_else(|| determine_line_segment_distance(points[1], &selected_segment));
+            let indicators =
+                operations::construction::parallel_width_indicators(&selected_segment, width);
+            let selected = nearest_candidate_segment(&command, points[1], &indicators)?;
+            usize::from(operations::construction::commit_parallel_width_indicator(
+                &mut document.crease_pattern,
+                &selected,
+                active_line_color(&command),
+            ))
+        }
+        OperationId::ContinuousSymmetricDraw => {
+            let points = required_points(&command, 2)?;
+            operations::construction::continuous_symmetric_draw(
+                &mut document.crease_pattern,
+                points[0],
+                points[1],
+                active_line_color(&command),
+            )
+        }
+        OperationId::FoldableLineDraw => {
+            let points = required_points(&command, 2)?;
+            let mode = operations::construction::foldable_line_draw_operation_mode(
+                &document.crease_pattern,
+                points[0],
+                selection_distance(&command),
+            );
+            if mode == operations::construction::FoldableLineDrawOperationMode::DrawCreaseFree
+                || operations::construction::foldable_line_draw_switches_to_free(
+                    points[1],
+                    points[0],
+                    selection_distance(&command),
+                )
+            {
+                usize::from(operations::construction::draw_crease_segment(
+                    &mut document.crease_pattern,
+                    &LineSegment::with_color(points[0], points[1], active_line_color(&command)),
+                    operations::construction::DrawCreaseTarget::FoldLine,
+                ))
+            } else {
+                let candidates = operations::construction::make_vertex_flat_foldable_candidates(
+                    &document.crease_pattern,
+                    points[0],
+                    grid_width(&command, &document.crease_pattern),
+                    active_line_color(&command),
+                );
+                let selected =
+                    nearest_candidate_segment(&command, points[1], &candidates.candidates)?;
+                let (_, destination) = nearest_line_segment(
+                    &document.crease_pattern,
+                    points[1],
+                    selection_distance(&command),
+                )?;
+                usize::from(
+                    operations::construction::make_vertex_flat_foldable_to_destination(
+                        &mut document.crease_pattern,
+                        points[0],
+                        &selected,
+                        &destination,
+                        candidates.commit_color,
+                    ),
+                )
+            }
+        }
+        OperationId::Axiom5 => {
+            let points = required_points_at_least(&command, 3)?;
+            let (_, target_segment) = nearest_line_segment(
+                &document.crease_pattern,
+                points[1],
+                selection_distance(&command),
+            )?;
+            let indicators = operations::construction::axiom5_indicators(
+                &document.crease_pattern,
+                points[0],
+                &target_segment,
+                points[2],
+            )
+            .ok_or_else(|| CommandError::InvalidInput {
+                operation: command.operation,
+                message: "resolved Axiom 5 inputs do not produce a fold candidate".to_string(),
+            })?;
+            if points.len() >= 4 {
+                let (_, destination) = nearest_line_segment(
+                    &document.crease_pattern,
+                    points[3],
+                    selection_distance(&command),
+                )?;
+                usize::from(operations::construction::axiom5_draw_to_destination(
+                    &mut document.crease_pattern,
+                    points[2],
+                    &indicators[0],
+                    &indicators[1],
+                    &destination,
+                    points[3],
+                    active_line_color(&command),
+                ))
+            } else {
+                let selected = nearest_candidate_segment(&command, points[2], &indicators)?;
+                usize::from(operations::construction::commit_axiom5_indicator(
+                    &mut document.crease_pattern,
+                    &selected,
+                    active_line_color(&command),
+                ))
+            }
+        }
+        OperationId::Axiom7 => {
+            let points = required_points_at_least(&command, 3)?;
+            let (_, target_segment) = nearest_line_segment(
+                &document.crease_pattern,
+                points[1],
+                selection_distance(&command),
+            )?;
+            let (_, perpendicular_segment) = nearest_line_segment(
+                &document.crease_pattern,
+                points[2],
+                selection_distance(&command),
+            )?;
+            let indicator = operations::construction::axiom7_indicator(
+                &document.crease_pattern,
+                points[0],
+                &target_segment,
+                &perpendicular_segment,
+            )
+            .ok_or_else(|| CommandError::InvalidInput {
+                operation: command.operation,
+                message: "resolved Axiom 7 inputs do not produce a fold candidate".to_string(),
+            })?;
+            if points.len() >= 4 {
+                let (_, destination) = nearest_line_segment(
+                    &document.crease_pattern,
+                    points[3],
+                    selection_distance(&command),
+                )?;
+                usize::from(operations::construction::axiom7_draw_to_destination(
+                    &mut document.crease_pattern,
+                    &indicator,
+                    &destination,
+                    active_line_color(&command),
+                ))
+            } else {
+                usize::from(operations::construction::commit_axiom7_indicator(
+                    &mut document.crease_pattern,
+                    &indicator,
+                    active_line_color(&command),
+                ))
+            }
         }
         OperationId::CreaseMakeMv => {
             let points = required_points(&command, 2)?;
@@ -1513,6 +2007,234 @@ pub fn execute_command(
     })
 }
 
+/// Query transient candidate geometry for an active construction command.
+pub fn preview_command(
+    document: &CreasePatternDocument,
+    command: CreasePatternCommand,
+) -> Result<CommandPreview> {
+    let status = operation_status(command.operation);
+    match status {
+        OperationStatus::Unsupported | OperationStatus::OutOfScopeUi => {
+            return Err(CommandError::UnsupportedOperation {
+                operation: command.operation,
+            });
+        }
+        OperationStatus::Porting
+        | OperationStatus::UnitTested
+        | OperationStatus::OracleTested
+        | OperationStatus::DocumentedDifference => {}
+    }
+
+    let mut preview = CommandPreview::default();
+    let points = &command.payload.points;
+
+    match command.operation {
+        OperationId::DrawCreaseFree
+        | OperationId::DrawCreaseRestricted
+        | OperationId::DrawCreaseSymmetric
+        | OperationId::DoubleSymmetricDraw
+        | OperationId::ContinuousSymmetricDraw
+        | OperationId::FishBoneDraw
+        | OperationId::FoldableLineInput
+        | OperationId::FoldableLineDraw
+            if points.len() >= 2 =>
+        {
+            preview.segments.push(LineSegment::with_color(
+                points[0],
+                points[1],
+                active_line_color(&command),
+            ));
+        }
+        OperationId::Inward if points.len() >= 3 => {
+            let center = geometry::center(points[0], points[1], points[2]);
+            preview.segments.extend(
+                points.iter().take(3).map(|point| {
+                    LineSegment::with_color(*point, center, active_line_color(&command))
+                }),
+            );
+        }
+        OperationId::PerpendicularDraw if points.len() >= 2 => {
+            let (_, base) = nearest_line_segment(
+                &document.crease_pattern,
+                points[1],
+                selection_distance(&command),
+            )?;
+            if let Some(indicator) = operations::construction::perpendicular_indicator(
+                &document.crease_pattern,
+                points[0],
+                &base,
+            ) {
+                preview.segments.push(indicator);
+            } else {
+                preview.segments.push(LineSegment::with_color(
+                    points[0],
+                    geometry::find_projection(
+                        geometry::StraightLine::from_segment(&base),
+                        points[0],
+                    ),
+                    active_line_color(&command),
+                ));
+            }
+        }
+        OperationId::DrawCreaseAngleRestricted if points.len() >= 2 => {
+            let candidates = operations::construction::angle_restricted_converging_candidates(
+                &LineSegment::new(points[0], points[1]),
+                angle_system_divider(&command),
+                angle_system_angles(&command),
+            );
+            preview.segments = candidates.indicators;
+            preview.points = candidates.intersections;
+        }
+        OperationId::AngleSystem if points.len() >= 2 => {
+            preview.segments = operations::construction::angle_system_candidates(
+                points[0],
+                points[1],
+                angle_system_divider(&command),
+                angle_system_angles(&command),
+            );
+        }
+        OperationId::DrawCreaseAngleRestricted3 if points.len() >= 2 => {
+            preview.segments = operations::construction::draw_crease_angle_restricted_3_candidates(
+                points[0],
+                points[1],
+                angle_system_divider(&command),
+                angle_system_angles(&command),
+            );
+        }
+        OperationId::DrawCreaseAngleRestricted5 if points.len() >= 2 => {
+            let snapped = operations::construction::snap_to_close_point_in_active_angle_system(
+                &document.crease_pattern,
+                points[0],
+                points[1],
+                angle_system_divider(&command),
+                angle_system_angles(&command),
+                selection_distance(&command),
+            );
+            preview.segments.push(LineSegment::with_color(
+                points[0],
+                snapped,
+                active_line_color(&command),
+            ));
+        }
+        OperationId::VertexMakeAngularlyFlatFoldable if !points.is_empty() => {
+            let candidates = operations::construction::make_vertex_flat_foldable_candidates(
+                &document.crease_pattern,
+                points[0],
+                grid_width(&command, &document.crease_pattern),
+                active_line_color(&command),
+            );
+            preview.segments = candidates.candidates;
+        }
+        OperationId::ParallelDraw if points.len() >= 2 => {
+            let (_, parallel_segment) = nearest_line_segment(
+                &document.crease_pattern,
+                points[1],
+                selection_distance(&command),
+            )?;
+            preview.segments.push(LineSegment::with_color(
+                points[0],
+                Point::new(
+                    points[0].x + parallel_segment.determine_bx() - parallel_segment.determine_ax(),
+                    points[0].y + parallel_segment.determine_by() - parallel_segment.determine_ay(),
+                ),
+                active_line_color(&command),
+            ));
+        }
+        OperationId::ParallelDrawWidth if points.len() >= 2 => {
+            let selected_segment = required_or_nearest_line_segment(document, &command)?;
+            let width = command
+                .payload
+                .width
+                .filter(|width| width.is_finite() && *width > 0.0)
+                .unwrap_or_else(|| determine_line_segment_distance(points[1], &selected_segment));
+            preview.segments =
+                operations::construction::parallel_width_indicators(&selected_segment, width)
+                    .into_iter()
+                    .collect();
+        }
+        OperationId::Axiom5 if points.len() >= 3 => {
+            let (_, target_segment) = nearest_line_segment(
+                &document.crease_pattern,
+                points[1],
+                selection_distance(&command),
+            )?;
+            if let Some(indicators) = operations::construction::axiom5_indicators(
+                &document.crease_pattern,
+                points[0],
+                &target_segment,
+                points[2],
+            ) {
+                preview.segments = indicators.into_iter().collect();
+            }
+        }
+        OperationId::Axiom7 if points.len() >= 3 => {
+            let (_, target_segment) = nearest_line_segment(
+                &document.crease_pattern,
+                points[1],
+                selection_distance(&command),
+            )?;
+            let (_, perpendicular_segment) = nearest_line_segment(
+                &document.crease_pattern,
+                points[2],
+                selection_distance(&command),
+            )?;
+            if let Some(indicator) = operations::construction::axiom7_indicator(
+                &document.crease_pattern,
+                points[0],
+                &target_segment,
+                &perpendicular_segment,
+            ) {
+                preview.segments.push(indicator);
+            }
+        }
+        OperationId::SquareBisector if points.len() >= 3 => {
+            let center = geometry::center(points[0], points[1], points[2]);
+            preview.segments.push(LineSegment::with_color(
+                points[1],
+                center,
+                active_line_color(&command),
+            ));
+        }
+        OperationId::SymmetricDraw if points.len() >= 2 => {
+            let (_, source) = nearest_line_segment(
+                &document.crease_pattern,
+                points[0],
+                selection_distance(&command),
+            )?;
+            let (_, mirror) = nearest_line_segment(
+                &document.crease_pattern,
+                points[1],
+                selection_distance(&command),
+            )?;
+            let mut clone = document.clone();
+            if operations::construction::symmetric_draw(
+                &mut clone.crease_pattern,
+                &source,
+                &mirror,
+                active_line_color(&command),
+            ) {
+                preview.segments = clone
+                    .crease_pattern
+                    .line_segments
+                    .into_iter()
+                    .skip(document.crease_pattern.line_segments.len())
+                    .collect();
+            }
+        }
+        _ => {
+            if points.len() >= 2 {
+                preview.segments.push(LineSegment::with_color(
+                    points[points.len() - 2],
+                    points[points.len() - 1],
+                    active_line_color(&command),
+                ));
+            }
+        }
+    }
+
+    Ok(preview)
+}
+
 fn required_line_indices(command: &CreasePatternCommand) -> Result<Vec<usize>> {
     if command.payload.line_ids.is_empty() {
         return Err(CommandError::InvalidInput {
@@ -1584,6 +2306,21 @@ fn active_line_color(command: &CreasePatternCommand) -> LineColor {
     command.payload.line_color.unwrap_or(LineColor::Red1)
 }
 
+fn angle_system_divider(command: &CreasePatternCommand) -> i32 {
+    command
+        .payload
+        .angle_system_divider
+        .filter(|divider| *divider >= 0)
+        .unwrap_or(DEFAULT_ANGLE_SYSTEM_DIVIDER)
+}
+
+fn angle_system_angles(command: &CreasePatternCommand) -> [f64; 6] {
+    command
+        .payload
+        .angles
+        .unwrap_or(DEFAULT_ANGLE_SYSTEM_ANGLES)
+}
+
 fn selection_distance(command: &CreasePatternCommand) -> f64 {
     command
         .payload
@@ -1592,9 +2329,194 @@ fn selection_distance(command: &CreasePatternCommand) -> f64 {
         .unwrap_or(DEFAULT_SELECTION_DISTANCE)
 }
 
+fn grid_width(command: &CreasePatternCommand, model: &CreasePatternModel) -> f64 {
+    command
+        .payload
+        .grid_width
+        .filter(|width| width.is_finite() && *width > 0.0)
+        .unwrap_or_else(|| {
+            let grid_size = f64::from(model.grid.grid_size.max(1));
+            ORIEDITA_PAPER_SIZE / grid_size
+        })
+}
+
+fn division_count(command: &CreasePatternCommand) -> usize {
+    command
+        .payload
+        .division_count
+        .filter(|count| *count > 0)
+        .unwrap_or(DEFAULT_LINE_DIVISION_COUNT)
+}
+
+fn ratio_s(command: &CreasePatternCommand) -> f64 {
+    command
+        .payload
+        .ratio_s
+        .filter(|ratio| ratio.is_finite() && *ratio >= 0.0)
+        .unwrap_or(DEFAULT_LINE_RATIO)
+}
+
+fn ratio_t(command: &CreasePatternCommand) -> f64 {
+    command
+        .payload
+        .ratio_t
+        .filter(|ratio| ratio.is_finite() && *ratio >= 0.0)
+        .unwrap_or(DEFAULT_LINE_RATIO)
+}
+
 fn set_selected_line_flags(model: &mut CreasePatternModel, line_indices: &[usize]) {
     operations::selection::unselect_all(model);
     operations::selection::select_indices(model, line_indices);
+}
+
+fn nearest_line_segment(
+    model: &CreasePatternModel,
+    point: Point,
+    max_distance: f64,
+) -> Result<(usize, LineSegment)> {
+    let mut best: Option<(usize, LineSegment, f64)> = None;
+    for (index, segment) in model.line_segments.iter().enumerate() {
+        let distance = determine_line_segment_distance(point, segment);
+        if best
+            .as_ref()
+            .is_none_or(|(_, _, best_distance)| distance < *best_distance)
+        {
+            best = Some((index, segment.clone(), distance));
+        }
+    }
+
+    let Some((index, segment, distance)) = best else {
+        return Err(CommandError::InvalidInput {
+            operation: OperationId::DrawPoint,
+            message: "document has no line segment candidates".to_string(),
+        });
+    };
+
+    if distance > max_distance {
+        return Err(CommandError::InvalidInput {
+            operation: OperationId::DrawPoint,
+            message: format!(
+                "nearest line is outside selection distance ({distance:.6} > {max_distance:.6})"
+            ),
+        });
+    }
+
+    Ok((index, segment))
+}
+
+fn required_or_nearest_line_segment(
+    document: &CreasePatternDocument,
+    command: &CreasePatternCommand,
+) -> Result<LineSegment> {
+    if let Some(line_id) = command.payload.line_ids.first() {
+        let index = line_id
+            .checked_sub(1)
+            .ok_or_else(|| CommandError::InvalidInput {
+                operation: command.operation,
+                message: "line IDs are one-based".to_string(),
+            })?;
+        return line_segment_for_operation(document, command.operation, index);
+    }
+
+    let points = required_points_at_least(command, 1)?;
+    nearest_line_segment(
+        &document.crease_pattern,
+        points[0],
+        selection_distance(command),
+    )
+    .map(|(_, segment)| segment)
+    .map_err(|_| CommandError::InvalidInput {
+        operation: command.operation,
+        message: "pick or select a line segment".to_string(),
+    })
+}
+
+fn line_segment_for_operation(
+    document: &CreasePatternDocument,
+    operation: OperationId,
+    index: usize,
+) -> Result<LineSegment> {
+    document
+        .crease_pattern
+        .line_segments
+        .get(index)
+        .cloned()
+        .ok_or_else(|| CommandError::InvalidInput {
+            operation,
+            message: format!("line index {} is out of bounds", index + 1),
+        })
+}
+
+fn nearest_candidate_segment(
+    command: &CreasePatternCommand,
+    point: Point,
+    candidates: &[LineSegment],
+) -> Result<LineSegment> {
+    if candidates.is_empty() {
+        return Err(CommandError::InvalidInput {
+            operation: command.operation,
+            message: "no construction candidates are available".to_string(),
+        });
+    }
+
+    if let Some(index) = command.payload.candidate_index {
+        return candidates
+            .get(index)
+            .cloned()
+            .ok_or_else(|| CommandError::InvalidInput {
+                operation: command.operation,
+                message: format!("candidate index {index} is out of bounds"),
+            });
+    }
+
+    candidates
+        .iter()
+        .min_by(|left, right| {
+            determine_line_segment_distance(point, left)
+                .partial_cmp(&determine_line_segment_distance(point, right))
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
+        .cloned()
+        .ok_or_else(|| CommandError::InvalidInput {
+            operation: command.operation,
+            message: "no construction candidates are available".to_string(),
+        })
+}
+
+fn nearest_candidate_point(
+    command: &CreasePatternCommand,
+    point: Point,
+    candidates: &[Point],
+) -> Result<Point> {
+    if candidates.is_empty() {
+        return Err(CommandError::InvalidInput {
+            operation: command.operation,
+            message: "no construction candidate points are available".to_string(),
+        });
+    }
+
+    if let Some(index) = command.payload.candidate_index {
+        return candidates
+            .get(index)
+            .copied()
+            .ok_or_else(|| CommandError::InvalidInput {
+                operation: command.operation,
+                message: format!("candidate index {index} is out of bounds"),
+            });
+    }
+
+    candidates
+        .iter()
+        .copied()
+        .min_by(|left, right| {
+            left.distance(point)
+                .partial_cmp(&right.distance(point))
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
+        .ok_or_else(|| CommandError::InvalidInput {
+            operation: command.operation,
+            message: "no construction candidate points are available".to_string(),
+        })
 }
 
 fn delete_lines_along(
@@ -2236,6 +3158,89 @@ mod tests {
                 operation: OperationId::SelectLineIntersecting,
                 message: "expected 2 resolved point(s)".to_string(),
             }
+        );
+    }
+
+    #[test]
+    fn command_dispatch_routes_stage_six_draw_and_point_commands() {
+        let mut document = CreasePatternDocument::default();
+
+        let draw_result = execute_command(
+            &mut document,
+            CreasePatternCommand::new(OperationId::DrawCreaseFree).with_payload(
+                CreasePatternCommandPayload {
+                    points: vec![Point::new(0.0, 0.0), Point::new(2.0, 0.0)],
+                    line_color: Some(LineColor::Blue2),
+                    selection_distance: Some(0.5),
+                    ..CreasePatternCommandPayload::default()
+                },
+            ),
+        )
+        .expect("free draw should execute through the command dispatcher");
+
+        assert_eq!(draw_result.status, OperationStatus::OracleTested);
+        assert_eq!(document.crease_pattern.line_segments.len(), 1);
+        assert_eq!(
+            document.crease_pattern.line_segments[0].color,
+            LineColor::Blue2
+        );
+
+        let point_result = execute_command(
+            &mut document,
+            CreasePatternCommand::new(OperationId::DrawPoint).with_payload(
+                CreasePatternCommandPayload {
+                    points: vec![Point::new(1.0, 0.0)],
+                    selection_distance: Some(0.5),
+                    ..CreasePatternCommandPayload::default()
+                },
+            ),
+        )
+        .expect("draw point should split the nearest target segment");
+
+        assert_eq!(point_result.status, OperationStatus::OracleTested);
+        assert_eq!(document.crease_pattern.line_segments.len(), 2);
+        assert!(
+            document
+                .crease_pattern
+                .line_segments
+                .iter()
+                .any(|segment| segment.a == Point::new(1.0, 0.0)
+                    || segment.b == Point::new(1.0, 0.0))
+        );
+    }
+
+    #[test]
+    fn command_preview_returns_stage_six_candidates_without_mutating_document() {
+        let mut document = CreasePatternDocument::default();
+        document.crease_pattern.add_line(
+            Point::new(-1.0, 1.0),
+            Point::new(2.0, 1.0),
+            LineColor::Black0,
+        );
+        let before = document.clone();
+
+        let preview = preview_command(
+            &document,
+            CreasePatternCommand::new(OperationId::DrawCreaseAngleRestricted).with_payload(
+                CreasePatternCommandPayload {
+                    points: vec![Point::new(0.0, 0.0), Point::new(1.0, 0.0)],
+                    angle_system_divider: Some(4),
+                    line_color: Some(LineColor::Red1),
+                    selection_distance: Some(0.5),
+                    ..CreasePatternCommandPayload::default()
+                },
+            ),
+        )
+        .expect("angle-restricted construction should expose preview candidates");
+
+        assert_eq!(document, before);
+        assert!(!preview.segments.is_empty());
+        assert!(!preview.points.is_empty());
+        assert!(
+            preview
+                .segments
+                .iter()
+                .any(|segment| segment.color == LineColor::Orange4)
         );
     }
 

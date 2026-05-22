@@ -10,9 +10,11 @@ import init, {
   load_cp,
   load_document,
   load_fold,
+  preview_cp_command,
 } from '../generated/oristudio-cp-wasm/oristudio_cp_wasm';
 import type {
   OristudioCpCommandPayload,
+  OristudioCpCommandPreview,
   OristudioCpCommandResult,
   OristudioCpDocumentSnapshot,
   OristudioCpDocumentSummary,
@@ -78,6 +80,13 @@ const api = {
     payload: OristudioCpCommandPayload = {}
   ): Promise<OristudioCpCommandResult> {
     return call(() => execute_cp_command(handle, operationId, payload) as OristudioCpCommandResult);
+  },
+  async previewCommand(
+    handle: number,
+    operationId: OristudioCpOperationId,
+    payload: OristudioCpCommandPayload = {}
+  ): Promise<OristudioCpCommandPreview> {
+    return call(() => preview_cp_command(handle, operationId, payload) as OristudioCpCommandPreview);
   },
   async exportCp(handle: number): Promise<string> {
     return call(() => export_cp(handle));

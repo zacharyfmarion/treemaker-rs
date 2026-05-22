@@ -43,6 +43,7 @@ const oristudioCpMocks = vi.hoisted(() => ({
   exportOristudioCpDocumentAsFold: vi.fn(),
   getOristudioCpOperationDescriptors: vi.fn(),
   loadOristudioCpDocumentFromText: vi.fn(),
+  previewOristudioCpCommand: vi.fn(),
   releaseOristudioCpDocument: vi.fn(),
   restoreOristudioCpDocument: vi.fn(),
   setOristudioCpDocumentSource: vi.fn(),
@@ -77,6 +78,7 @@ vi.mock('./oristudioCpRuntime', async (importOriginal) => {
     exportOristudioCpDocumentAsFold: oristudioCpMocks.exportOristudioCpDocumentAsFold,
     getOristudioCpOperationDescriptors: oristudioCpMocks.getOristudioCpOperationDescriptors,
     loadOristudioCpDocumentFromText: oristudioCpMocks.loadOristudioCpDocumentFromText,
+    previewOristudioCpCommand: oristudioCpMocks.previewOristudioCpCommand,
     releaseOristudioCpDocument: oristudioCpMocks.releaseOristudioCpDocument,
     restoreOristudioCpDocument: oristudioCpMocks.restoreOristudioCpDocument,
     setOristudioCpDocumentSource: oristudioCpMocks.setOristudioCpDocumentSource,
@@ -960,6 +962,9 @@ function resetStores(snapshot = makeSnapshot()) {
     code: 'not_implemented',
     message: 'Oriedita operation DrawCreaseFree is not implemented yet',
   });
+  oristudioCpMocks.previewOristudioCpCommand
+    .mockReset()
+    .mockResolvedValue({ segments: [], points: [], diagnostics: [] });
   return api;
 }
 

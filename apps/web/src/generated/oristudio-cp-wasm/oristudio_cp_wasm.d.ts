@@ -21,6 +21,8 @@ export function load_document(document: any): number;
 
 export function load_fold(text: string, title: string): number;
 
+export function preview_cp_command(handle: number, operation: any, payload: any): any;
+
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
 export interface InitOutput {
@@ -35,6 +37,7 @@ export interface InitOutput {
     readonly load_cp: (a: number, b: number, c: number, d: number) => [number, number, number];
     readonly load_document: (a: any) => [number, number, number];
     readonly load_fold: (a: number, b: number, c: number, d: number) => [number, number, number];
+    readonly preview_cp_command: (a: number, b: any, c: any) => [number, number, number];
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
     readonly __wbindgen_exn_store: (a: number) => void;

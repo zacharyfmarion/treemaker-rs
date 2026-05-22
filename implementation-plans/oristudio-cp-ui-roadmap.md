@@ -398,7 +398,8 @@ Intent:
 
 UX work:
 
-- Replace the operation-centric left rail with an action-centric rail:
+- Replace the operation-centric left rail with an action-centric rail and
+  palette-ready action registry:
   - line type selector: M, V, E, A,
   - draw actions,
   - construction action groups and dropdown variants,
@@ -408,8 +409,10 @@ UX work:
   - overflow/search for rare commands.
 - Keep the rail two buttons wide on desktop and compact two-wide on narrow
   panes.
-- Add active tool options for line type, auxiliary input mode, angle system,
-  division count/ratio, parallel width, and candidate choice.
+- Add active tool options for line type now. Keep auxiliary input mode, angle
+  system, division count/ratio, parallel width, and candidate choice as
+  action metadata or later per-tool controls until their handlers need visible
+  user-adjustable options.
 - Make `Draw crease` behave like Oriedita's visible action: click-drag-release,
   using the current line type and input mode.
 - Distinguish free draw, restricted draw, and auxiliary-line draw as action
@@ -740,13 +743,13 @@ Done when:
       core edit command.
 - [x] Stage 6: Enable drawing and geometric construction tools with previews.
 - [x] Stage 6: Validate candidate previews and final mutations separately.
-- [ ] Stage 7: Replace operation-centric CP editing with an action-based rail,
-      command palette, and inspector option model.
-- [ ] Stage 7: Add M/V/E/A line type state, Oriedita-style input modes, and
+- [x] Stage 7: Replace operation-centric CP editing with an action-based rail
+      and palette-ready action model.
+- [x] Stage 7: Add M/V/E/A line type state, Oriedita-style input modes, and
       per-action snap/input resolvers.
-- [ ] Stage 7: Convert draw crease free/restricted to Oriedita-style
+- [x] Stage 7: Convert draw crease free/restricted to Oriedita-style
       click-drag-release preview and commit semantics.
-- [ ] Stage 7: Validate action registry coverage, preview/commit input
+- [x] Stage 7: Validate action registry coverage, preview/commit input
       agreement, and pointer-sequence-sensitive draw behavior.
 - [ ] Stage 8: Enable circles, text, generators, and measurement tools.
 - [ ] Stage 8: Validate annotation preservation and non-mutating measurement

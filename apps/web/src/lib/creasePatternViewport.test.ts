@@ -12,6 +12,7 @@ import {
   getOrieditaGridBasis,
   modelPointToCpSvg,
   nearestCpSnapTarget,
+  nearestOrieditaDrawPointTarget,
   ORIEDITA_PAPER_BOUNDS,
   orieditaGridBaseState,
   toggleCpSelectionList,
@@ -210,6 +211,34 @@ describe('crease pattern viewport helpers', () => {
         faces: [],
       })
     ).toBe(4);
+  });
+
+  it('uses Oriedita draw snapping without snapping endpoints to line interiors', () => {
+    const bounds = getEditableCpModelBounds(document);
+
+    expect(
+      nearestCpSnapTarget(document, { x: 2, y: 0.2 }, bounds, {
+        gridVisible: false,
+        snapToGrid: false,
+        snapToVertices: true,
+        snapToLines: true,
+      })
+    ).toMatchObject({ kind: 'line', label: 'line 1' });
+
+    expect(
+      nearestOrieditaDrawPointTarget(
+        document,
+        { x: 2, y: 0.2 },
+        bounds,
+        {
+          gridVisible: false,
+          snapToGrid: false,
+          snapToVertices: true,
+          snapToLines: true,
+        },
+        3
+      )
+    ).toMatchObject({ kind: 'vertex', label: 'line 1 start', point: { x: 0, y: 0 } });
   });
 
   it('snaps to the same Oriedita paper grid basis used for rendering', () => {

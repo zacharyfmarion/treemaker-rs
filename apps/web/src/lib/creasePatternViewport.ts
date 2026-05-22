@@ -510,6 +510,47 @@ export function nearestCpSnapTarget(
   return best;
 }
 
+export function nearestOrieditaDrawPointTarget(
+  document: OristudioCpDocumentSnapshot,
+  point: Point,
+  bounds: CpModelBounds,
+  options: OristudioCpViewportOptions,
+  maxDistance = Math.max(bounds.spanX, bounds.spanY) * 0.015
+): CpSnapTarget | null {
+  let best: CpSnapTarget | null = null;
+  const consider = (target: CpSnapTarget) => {
+    if (target.distance > maxDistance) return;
+    if (!best || target.distance < best.distance) best = target;
+  };
+
+  if (options.snapToVertices) {
+    document.crease_pattern.line_segments.forEach((segment, index) => {
+      consider(pointTarget(segment.a, point, 'vertex', `line ${index + 1} start`));
+      consider(pointTarget(segment.b, point, 'vertex', `line ${index + 1} end`));
+    });
+    document.crease_pattern.points.forEach((candidate, index) => {
+      consider(pointTarget(candidate, point, 'point', `point ${index + 1}`));
+    });
+    document.crease_pattern.circles.forEach((circle, index) => {
+      consider(
+        pointTarget({ x: circle.x, y: circle.y }, point, 'point', `circle ${index + 1} center`)
+      );
+    });
+  }
+
+  if (options.snapToGrid) {
+    const grid = options.gridVisible
+      ? visibleOrieditaGridMetadata(document.crease_pattern.grid)
+      : document.crease_pattern.grid;
+    const gridPoint = closestOrieditaGridPoint(point, grid);
+    if (gridPoint) {
+      consider(pointTarget(gridPoint, point, 'grid', 'grid'));
+    }
+  }
+
+  return best;
+}
+
 export function textCoordinate(value: number | { 0: number }): number {
   return typeof value === 'number' ? value : value[0];
 }

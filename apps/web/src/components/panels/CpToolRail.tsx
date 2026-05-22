@@ -74,17 +74,20 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import {
-  ORISTUDIO_CP_COMMANDS,
-  ORISTUDIO_CP_COMMAND_GROUPS,
-  cpCommandsForGroup,
-  type OristudioCpCommandDefinition,
-  type OristudioCpOperationId,
-} from '../../lib/oristudioCpCommands';
+  ORISTUDIO_CP_ACTIONS,
+  ORISTUDIO_CP_ACTION_GROUPS,
+  cpActionsForGroup,
+  type OristudioCpActionDefinition,
+  type OristudioCpActionId,
+} from '../../lib/oristudioCpActions';
+import type { OristudioCpLineColor } from '../../engine/oristudioCpTypes';
+import type { OristudioCpOperationId } from '../../lib/oristudioCpCommands';
 
 interface CpToolRailProps {
-  activeOperationId: OristudioCpOperationId | null;
+  activeActionId: OristudioCpActionId | null;
+  activeLineColor: OristudioCpLineColor;
   editable: boolean;
-  onSelectCommand: (command: OristudioCpCommandDefinition) => void;
+  onSelectAction: (action: OristudioCpActionDefinition) => void;
 }
 
 const LUCIDE_ICONS: Record<string, LucideIcon> = {
@@ -173,33 +176,49 @@ const ICON_ALIASES: Record<string, string> = {
 };
 
 const CP_TOOL_ICON_BY_OPERATION = Object.fromEntries(
-  ORISTUDIO_CP_COMMANDS.map((command) => [command.operationId, commandIcon(command.icon)])
+  ORISTUDIO_CP_ACTIONS.filter((action) => action.kind === 'command').map((action) => [
+    action.operationId,
+    commandIcon(action.icon),
+  ])
 ) as Partial<Record<OristudioCpOperationId, LucideIcon>>;
 
-export function CpToolRail({ activeOperationId, editable, onSelectCommand }: CpToolRailProps) {
+const CP_TOOL_ICON_BY_ACTION = Object.fromEntries(
+  ORISTUDIO_CP_ACTIONS.map((action) => [action.id, commandIcon(action.icon)])
+) as Partial<Record<OristudioCpActionId, LucideIcon>>;
+
+export function CpToolRail({
+  activeActionId,
+  activeLineColor,
+  editable,
+  onSelectAction,
+}: CpToolRailProps) {
   return (
     <aside className="cp-tool-rail" aria-label="Crease pattern tools">
       <div className="cp-tool-rail__header">Tools</div>
       <div className="cp-tool-rail__groups">
-        {ORISTUDIO_CP_COMMAND_GROUPS.map((group) => {
-          const commands = cpCommandsForGroup(group.id).filter(
-            (command) =>
-              command.placement === 'left-rail' ||
-              command.placement === 'left-rail-overflow'
+        {ORISTUDIO_CP_ACTION_GROUPS.map((group) => {
+          const actions = cpActionsForGroup(group.id).filter(
+            (action) =>
+              action.placement === 'left-rail' ||
+              action.placement === 'left-rail-overflow'
           );
-          if (commands.length === 0) return null;
+          if (actions.length === 0) return null;
 
           return (
             <section key={group.id} className="cp-tool-rail__group" aria-label={group.label}>
               <div className="cp-tool-rail__group-label">{group.railLabel}</div>
               <div className="cp-tool-rail__buttons">
-                {commands.map((command) => (
+                {actions.map((action) => (
                   <CpToolButton
-                    key={command.id}
-                    command={command}
+                    key={action.id}
+                    action={action}
                     editable={editable}
-                    isActive={activeOperationId === command.operationId}
-                    onSelectCommand={onSelectCommand}
+                    isActive={
+                      action.kind === 'line-type'
+                        ? activeLineColor === action.lineColor
+                        : activeActionId === action.id
+                    }
+                    onSelectAction={onSelectAction}
                   />
                 ))}
               </div>
@@ -212,32 +231,43 @@ export function CpToolRail({ activeOperationId, editable, onSelectCommand }: CpT
 }
 
 function CpToolButton({
-  command,
+  action,
   editable,
   isActive,
-  onSelectCommand,
+  onSelectAction,
 }: {
-  command: OristudioCpCommandDefinition;
+  action: OristudioCpActionDefinition;
   editable: boolean;
   isActive: boolean;
-  onSelectCommand: (command: OristudioCpCommandDefinition) => void;
+  onSelectAction: (action: OristudioCpActionDefinition) => void;
 }) {
-  const Icon = CP_TOOL_ICON_BY_OPERATION[command.operationId] ?? CircleDashed;
-  const available = editable && command.uiStatus === 'ready';
-  const statusLabel = commandStatusLabel(command, editable);
+  const Icon =
+    action.kind === 'command'
+      ? (CP_TOOL_ICON_BY_OPERATION[action.operationId] ?? CircleDashed)
+      : (CP_TOOL_ICON_BY_ACTION[action.id] ?? CircleDashed);
+  const available = editable && action.uiStatus === 'ready';
+  const statusLabel = commandStatusLabel(action, editable);
 
   return (
     <button
       type="button"
       className="cp-tool-rail__button"
-      aria-label={command.label}
+      aria-label={action.label}
       aria-disabled={!available}
       data-active={isActive || undefined}
-      data-ui-status={command.uiStatus}
-      title={`${command.label} - ${statusLabel}`}
-      onClick={() => onSelectCommand(command)}
+      data-action-kind={action.kind}
+      data-line-color={action.kind === 'line-type' ? action.lineColor : undefined}
+      data-ui-status={action.uiStatus}
+      title={`${action.label} - ${statusLabel}`}
+      onClick={() => onSelectAction(action)}
     >
-      <Icon size={15} aria-hidden="true" />
+      {action.railLabel ? (
+        <span className="cp-tool-rail__button-label" aria-hidden="true">
+          {action.railLabel}
+        </span>
+      ) : (
+        <Icon size={15} aria-hidden="true" />
+      )}
       <span className="cp-tool-rail__status-dot" aria-hidden="true" />
     </button>
   );
@@ -253,8 +283,8 @@ function capitalize(value: string): string {
   return value.length === 0 ? value : `${value[0].toUpperCase()}${value.slice(1)}`;
 }
 
-function commandStatusLabel(command: OristudioCpCommandDefinition, editable: boolean): string {
+function commandStatusLabel(action: OristudioCpActionDefinition, editable: boolean): string {
   if (!editable) return 'Open an editable crease pattern first';
-  if (command.uiStatus === 'ready') return command.tooltip;
-  return command.disabledReason;
+  if (action.uiStatus === 'ready') return action.tooltip;
+  return action.disabledReason;
 }

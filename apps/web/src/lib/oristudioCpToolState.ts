@@ -1,4 +1,8 @@
 import type {
+  OristudioCpActionDefinition,
+  OristudioCpActionId,
+} from './oristudioCpActions';
+import type {
   OristudioCpCommandDefinition,
   OristudioCpCommandUiStatus,
   OristudioCpOperationId,
@@ -7,7 +11,9 @@ import type {
 export type OristudioCpToolPhase = 'idle' | 'active' | 'blocked' | 'error';
 
 export interface OristudioCpToolState {
+  activeActionId: OristudioCpActionId | null;
   activeOperationId: OristudioCpOperationId | null;
+  activeLabel: string | null;
   phase: OristudioCpToolPhase;
   prompt: string;
   status: OristudioCpCommandUiStatus | 'idle' | 'error';
@@ -16,15 +22,18 @@ export interface OristudioCpToolState {
 }
 
 export type OristudioCpToolEvent =
+  | { type: 'selectAction'; action: OristudioCpActionDefinition; editable: boolean }
   | { type: 'selectCommand'; command: OristudioCpCommandDefinition; editable: boolean }
   | { type: 'advanceStep' }
-  | { type: 'commit' }
-  | { type: 'cancel' }
+  | { type: 'commit'; keepActive?: boolean }
+  | { type: 'cancel'; keepActive?: boolean }
   | { type: 'reset' }
   | { type: 'commandError'; message: string };
 
 export const IDLE_ORISTUDIO_CP_TOOL_STATE: OristudioCpToolState = {
+  activeActionId: null,
   activeOperationId: null,
+  activeLabel: null,
   phase: 'idle',
   prompt: 'Tool Select',
   status: 'idle',
@@ -37,12 +46,16 @@ export function transitionOristudioCpToolState(
   event: OristudioCpToolEvent
 ): OristudioCpToolState {
   switch (event.type) {
+    case 'selectAction':
+      return stateForAction(event.action, event.editable);
     case 'selectCommand':
       return stateForCommand(event.command, event.editable);
     case 'advanceStep':
       return advanceToolStep(state);
     case 'commit':
     case 'cancel':
+      if (event.keepActive) return resetActiveToolInput(state);
+      return IDLE_ORISTUDIO_CP_TOOL_STATE;
     case 'reset':
       return IDLE_ORISTUDIO_CP_TOOL_STATE;
     case 'commandError':
@@ -77,10 +90,37 @@ function stateForCommand(
 
   const steps = command.toolSteps ?? [];
   return {
+    activeActionId: null,
     activeOperationId: command.operationId,
+    activeLabel: command.label,
     phase: 'active',
-    prompt: steps.length > 0 ? `${command.label}: ${steps[0]}` : `Tool ${command.label}`,
+    prompt: promptForStep(command.label, steps, 0),
     status: command.uiStatus,
+    stepIndex: 0,
+    steps,
+  };
+}
+
+function stateForAction(
+  action: OristudioCpActionDefinition,
+  editable: boolean
+): OristudioCpToolState {
+  if (action.kind === 'line-type') return IDLE_ORISTUDIO_CP_TOOL_STATE;
+  if (!editable) {
+    return blockedActionState(action, 'Open an editable crease pattern first');
+  }
+  if (action.uiStatus !== 'ready') {
+    return blockedActionState(action, commandUiStatusLabel(action.uiStatus));
+  }
+
+  const steps = action.toolSteps ?? action.command.toolSteps ?? [];
+  return {
+    activeActionId: action.id,
+    activeOperationId: action.operationId,
+    activeLabel: action.label,
+    phase: 'active',
+    prompt: promptForStep(action.label, steps, 0),
+    status: action.uiStatus,
     stepIndex: 0,
     steps,
   };
@@ -91,12 +131,31 @@ function blockedCommandState(
   reason: string
 ): OristudioCpToolState {
   return {
+    activeActionId: null,
     activeOperationId: command.operationId,
+    activeLabel: command.label,
     phase: 'blocked',
     prompt: `${command.label}: ${reason}`,
     status: command.uiStatus,
     stepIndex: 0,
     steps: command.toolSteps ?? [],
+  };
+}
+
+function blockedActionState(
+  action: OristudioCpActionDefinition & { kind: 'command' },
+  reason: string
+): OristudioCpToolState {
+  const steps = action.toolSteps ?? action.command.toolSteps ?? [];
+  return {
+    activeActionId: action.id,
+    activeOperationId: action.operationId,
+    activeLabel: action.label,
+    phase: 'blocked',
+    prompt: `${action.label}: ${reason}`,
+    status: action.uiStatus,
+    stepIndex: 0,
+    steps,
   };
 }
 
@@ -107,13 +166,28 @@ function advanceToolStep(state: OristudioCpToolState): OristudioCpToolState {
   return {
     ...state,
     stepIndex: nextStepIndex,
-    prompt: `${activeToolLabel(state)}: ${state.steps[nextStepIndex]}`,
+    prompt: promptForStep(activeToolLabel(state), state.steps, nextStepIndex),
+  };
+}
+
+function resetActiveToolInput(state: OristudioCpToolState): OristudioCpToolState {
+  if (state.phase === 'idle' || !state.activeOperationId) return IDLE_ORISTUDIO_CP_TOOL_STATE;
+  return {
+    ...state,
+    phase: state.status === 'ready' ? 'active' : state.phase,
+    stepIndex: 0,
+    prompt: promptForStep(activeToolLabel(state), state.steps, 0),
   };
 }
 
 function activeToolLabel(state: OristudioCpToolState): string {
+  if (state.activeLabel) return state.activeLabel;
   if (!state.activeOperationId) return 'Tool';
   return state.prompt.split(':', 1)[0] || 'Tool';
+}
+
+function promptForStep(label: string, steps: readonly string[], stepIndex: number): string {
+  return steps.length > 0 ? `${label}: ${steps[stepIndex]}` : `Tool ${label}`;
 }
 
 function commandUiStatusLabel(status: OristudioCpCommandUiStatus): string {

@@ -104,7 +104,7 @@ export interface OristudioCpCommandDefinition {
   selectionRequirement?: string;
   shortcut?: string;
   toolSteps?: readonly string[];
-  inputMode?: 'point-sequence' | 'drag-path';
+  inputMode?: 'point-sequence' | 'drag-path' | 'drag-line';
 }
 
 type CommandOptionKeys =
@@ -206,8 +206,9 @@ function commandId(operationId: string): `cp.${string}` {
 export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
   ready('DrawCreaseFree', 'Draw crease', 'draw', 'pen-line', 'MouseHandlerDrawCreaseFree', {
     shortcut: 'L',
-    toolSteps: ['Pick start point', 'Pick end point'],
-    tooltip: 'Draw a crease between two resolved points',
+    toolSteps: ['Drag crease endpoint'],
+    inputMode: 'drag-line',
+    tooltip: 'Drag a crease using the current line type',
   }),
   outOfScopeUi(
     'MoveCreasePattern',
@@ -249,7 +250,8 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
     toolSteps: ['Pick source crease', 'Pick mirror crease'],
   }),
   ready('DrawCreaseRestricted', 'Draw restricted crease', 'draw', 'pen-tool', 'MouseHandlerDrawCreaseRestricted', {
-    toolSteps: ['Pick start point', 'Pick end point'],
+    toolSteps: ['Drag between existing points'],
+    inputMode: 'drag-line',
   }),
   ready('DrawCreaseSymmetric', 'Mirror selected creases', 'construct', 'copy-plus', 'MouseHandlerDrawCreaseSymmetric', {
     selectionRequirement: 'selected creases',

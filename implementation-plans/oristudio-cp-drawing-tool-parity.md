@@ -150,16 +150,16 @@ This stage is now promoted into the main roadmap as
 ## Checklist
 
 - [x] Stage 1: Make the rail two buttons wide.
-- [ ] Stage 1: Remove async lag from simple draw-crease preview.
-- [ ] Stage 1: Make draw preview and commit use the same snapped endpoint.
-- [ ] Stage 1: Add endpoint-snap and rail-layout tests.
-- [ ] Stage 2: Add Oriedita-style input resolver and zoom-aware selection distance.
+- [x] Stage 1: Remove async lag from simple draw-crease preview.
+- [x] Stage 1: Make draw preview and commit use the same snapped endpoint.
+- [x] Stage 1: Add endpoint-snap and rail-layout tests.
+- [x] Stage 2: Add Oriedita-style input resolver and zoom-aware selection distance.
 - [ ] Stage 2: Split snap intents by command step type.
-- [ ] Stage 3: Add active M/V/E/A line type state.
-- [ ] Stage 3: Route draw commands through current line type and input mode.
-- [ ] Stage 4: Add visible action registry over kernel operation registry.
-- [ ] Stage 4: Rebuild the left rail around Oriedita action groupings.
-- [ ] Stage 5: Convert free/restricted drawing to click-drag-release.
+- [x] Stage 3: Add active M/V/E/A line type state.
+- [x] Stage 3: Route draw commands through current line type and input mode.
+- [x] Stage 4: Add visible action registry over kernel operation registry.
+- [x] Stage 4: Rebuild the left rail around Oriedita action groupings.
+- [x] Stage 5: Convert free/restricted drawing to click-drag-release.
 - [ ] Stage 5: Add command-specific candidate choice and option controls.
 - [ ] Stage 6: Add handler-level Oriedita oracle fixtures for pointer sequences.
 - [ ] Stage 6: Add browser smoke and visual validation for drawing parity.

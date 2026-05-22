@@ -1702,10 +1702,35 @@
   color: var(--text-muted);
 }
 
+.cp-tool-rail__button[data-action-kind='line-type'] {
+  font-size: 0.8rem;
+  font-weight: 780;
+}
+
+.cp-tool-rail__button[data-line-color='Red1'] {
+  color: var(--fold-mountain);
+}
+
+.cp-tool-rail__button[data-line-color='Blue2'] {
+  color: var(--fold-valley);
+}
+
+.cp-tool-rail__button[data-line-color='Black0'] {
+  color: var(--fold-border);
+}
+
+.cp-tool-rail__button[data-line-color='Cyan3'] {
+  color: var(--fold-flat);
+}
+
 .cp-tool-rail__button[data-active] {
   border-color: color-mix(in srgb, var(--accent-primary) 55%, var(--border-default));
   background: color-mix(in srgb, var(--accent-primary) 13%, var(--bg-tertiary));
   color: var(--text-primary);
+}
+
+.cp-tool-rail__button-label {
+  line-height: 1;
 }
 
 .cp-tool-rail__status-dot {

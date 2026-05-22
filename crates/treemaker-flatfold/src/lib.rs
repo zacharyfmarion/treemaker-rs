@@ -12,7 +12,8 @@ mod math;
 
 use conversion::{build_overlap_graph, normalize_document, project_normalized};
 use serde::{Deserialize, Serialize};
-use treemaker_fold::FoldDocument;
+use std::collections::BTreeMap;
+use treemaker_fold::{Assignment, FoldDocument};
 
 pub type Result<T> = std::result::Result<T, FlatFoldError>;
 
@@ -185,10 +186,50 @@ pub fn solve_flat_fold(document: &FoldDocument, options: SolveOptions) -> Result
     })
 }
 
+/// Infer simulator-friendly mountain/valley assignments from solved face orders.
+pub fn infer_edge_assignments_from_face_orders(
+    document: &FoldDocument,
+    face_orders: &[[i64; 3]],
+) -> Vec<Assignment> {
+    let mut assignments = (0..document.edges_vertices.len())
+        .map(|edge| document.assignment_for_edge(edge))
+        .collect::<Vec<_>>();
+    let mut orientation_by_faces = BTreeMap::new();
+    for [face_a, face_b, orientation] in face_orders {
+        let (Ok(face_a), Ok(face_b)) = (usize::try_from(*face_a), usize::try_from(*face_b)) else {
+            continue;
+        };
+        orientation_by_faces.insert(unordered_pair(face_a, face_b), *orientation);
+    }
+
+    for (edge_index, faces) in document.edges_faces.iter().enumerate() {
+        if edge_index >= assignments.len()
+            || assignments[edge_index] != Assignment::Unassigned
+            || faces.len() != 2
+        {
+            continue;
+        }
+        let Some(orientation) = orientation_by_faces.get(&unordered_pair(faces[0], faces[1]))
+        else {
+            continue;
+        };
+        assignments[edge_index] = if *orientation < 0 {
+            Assignment::Mountain
+        } else {
+            Assignment::Valley
+        };
+    }
+
+    assignments
+}
+
+fn unordered_pair(a: usize, b: usize) -> [usize; 2] {
+    if a < b { [a, b] } else { [b, a] }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use treemaker_fold::Assignment;
 
     fn square_doc() -> FoldDocument {
         FoldDocument::new(
@@ -368,6 +409,50 @@ mod tests {
         assert_eq!(analysis.folded_vertices.len(), 4);
         assert_eq!(analysis.faces_flip, vec![false, true]);
         assert!(analysis.overlap.is_none());
+    }
+
+    #[test]
+    fn infer_edge_assignments_from_face_orders_assigns_unassigned_two_face_creases() {
+        let mut doc = square_doc();
+        doc.edges_vertices.push([0, 2]);
+        doc.edges_assignment = vec![
+            Assignment::Boundary,
+            Assignment::Boundary,
+            Assignment::Boundary,
+            Assignment::Boundary,
+            Assignment::Unassigned,
+        ];
+        doc.faces_vertices = vec![vec![0, 1, 2], vec![0, 2, 3]];
+        doc.edges_faces = vec![vec![0], vec![0], vec![1], vec![1], vec![0, 1]];
+
+        let mountain = infer_edge_assignments_from_face_orders(&doc, &[[0, 1, -1]]);
+        let valley = infer_edge_assignments_from_face_orders(&doc, &[[0, 1, 1]]);
+
+        assert_eq!(mountain[4], Assignment::Mountain);
+        assert_eq!(valley[4], Assignment::Valley);
+    }
+
+    #[test]
+    fn infer_edge_assignments_from_face_orders_preserves_explicit_and_unresolved_edges() {
+        let mut doc = square_doc();
+        doc.edges_vertices.push([0, 2]);
+        doc.edges_assignment = vec![
+            Assignment::Unassigned,
+            Assignment::Mountain,
+            Assignment::Valley,
+            Assignment::Boundary,
+            Assignment::Unassigned,
+        ];
+        doc.faces_vertices = vec![vec![0, 1, 2], vec![0, 2, 3]];
+        doc.edges_faces = vec![vec![0], vec![0], vec![1], vec![1], vec![0, 1]];
+
+        let assignments = infer_edge_assignments_from_face_orders(&doc, &[]);
+
+        assert_eq!(assignments[0], Assignment::Unassigned);
+        assert_eq!(assignments[1], Assignment::Mountain);
+        assert_eq!(assignments[2], Assignment::Valley);
+        assert_eq!(assignments[3], Assignment::Boundary);
+        assert_eq!(assignments[4], Assignment::Unassigned);
     }
 
     #[test]

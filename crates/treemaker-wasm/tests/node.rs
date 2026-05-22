@@ -157,6 +157,52 @@ fn flat_folder_artifacts_returns_imported_folded_base() {
     assert!(artifacts["simulation_model"].is_object());
 }
 
+#[wasm_bindgen_test]
+fn flat_folder_artifacts_infers_simulator_only_assignments() {
+    let fold = serde_json::json!({
+        "file_spec": 1.2,
+        "frame_classes": ["creasePattern"],
+        "vertices_coords": [[0, 0], [1, 0], [1, 1], [0, 1]],
+        "edges_vertices": [[0, 1], [1, 2], [2, 3], [3, 0], [0, 2]],
+        "edges_assignment": ["B", "B", "B", "B", "U"],
+        "edges_foldAngle": [null, null, null, null, null],
+        "faces_vertices": [[0, 1, 2], [0, 2, 3]]
+    });
+    let options = serde_wasm_bindgen::to_value(&serde_json::json!({
+        "solution_limit": 1
+    }))
+    .expect("options");
+
+    let artifacts =
+        json(flat_fold_artifacts(&fold.to_string(), options).expect("flat-folder artifacts"));
+    let canonical_assignment = artifacts["fold"]["edges_assignment"][4]
+        .as_str()
+        .expect("canonical assignment");
+    let simulation_assignment = artifacts["simulation_model"]["fold"]["edges_assignment"][4]
+        .as_str()
+        .expect("simulation assignment");
+    let simulation_angle = artifacts["simulation_model"]["fold"]["edges_foldAngle"][4]
+        .as_f64()
+        .expect("simulation fold angle");
+
+    assert_eq!(canonical_assignment, "U");
+    assert!(matches!(simulation_assignment, "M" | "V"));
+    assert_eq!(
+        simulation_angle,
+        if simulation_assignment == "M" {
+            -180.0
+        } else {
+            180.0
+        }
+    );
+    assert!(
+        !artifacts["simulation_model"]["crease_params"]
+            .as_array()
+            .expect("crease params")
+            .is_empty()
+    );
+}
+
 fn json(value: JsValue) -> Value {
     serde_wasm_bindgen::from_value(value).expect("json value")
 }

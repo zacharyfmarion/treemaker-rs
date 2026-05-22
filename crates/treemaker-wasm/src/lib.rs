@@ -11,7 +11,10 @@ use treemaker_core::{
     FoldedBaseCrease, FoldedBaseFacet, FoldedBaseSnapshot, FoldedBaseVertex, Point, Tree,
     TreeDesign, TreeEdit, TreeError,
 };
-use treemaker_flatfold::{FlatFoldError, SolutionLimit, SolveOptions, solve_flat_fold};
+use treemaker_flatfold::{
+    FlatFoldError, SolutionLimit, SolveOptions, infer_edge_assignments_from_face_orders,
+    solve_flat_fold,
+};
 use treemaker_fold::{Assignment, FoldDocument};
 use wasm_bindgen::prelude::*;
 
@@ -155,8 +158,17 @@ pub fn flat_fold_artifacts(
         &solved.analysis.folded_vertices,
         &solved.face_orders,
     );
+    let mut simulation_fold = normalized.clone();
+    simulation_fold.edges_assignment =
+        infer_edge_assignments_from_face_orders(&simulation_fold, &solved.face_orders);
+    simulation_fold.edges_fold_angle = simulation_fold
+        .edges_assignment
+        .iter()
+        .copied()
+        .map(treemaker_fold::FoldAngle::default_for_assignment)
+        .collect();
     let (simulation_model, simulation_model_error) =
-        match treemaker_fold::prepare_simulation_model(&normalized) {
+        match treemaker_fold::prepare_simulation_model(&simulation_fold) {
             Ok(model) => (Some(model), None),
             Err(error) => (None, Some(error.to_string())),
         };

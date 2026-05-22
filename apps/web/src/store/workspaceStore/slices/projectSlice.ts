@@ -241,6 +241,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
       projectMessage: `Loaded ${filename}`,
       selection: { kind: 'tree' },
       oristudioCpSelection: emptyOristudioCpSelection(),
+      oristudioCpActiveDiagnosticId: null,
       toolMode: 'select',
       symmetryAuthoringPairs: [],
       creaseColorMode: DEFAULT_CREASE_COLOR_MODE,
@@ -318,6 +319,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
       projectMessage: `Loaded ${filename}`,
       selection: { kind: 'tree' },
       oristudioCpSelection: emptyOristudioCpSelection(),
+      oristudioCpActiveDiagnosticId: null,
       toolMode: 'select',
       creaseColorMode: DEFAULT_CREASE_COLOR_MODE,
       foldArtifacts: result.foldArtifacts,
@@ -485,6 +487,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
           projectLoadId: get().projectLoadId + 1,
           selection: { kind: 'tree' },
           oristudioCpSelection: emptyOristudioCpSelection(),
+          oristudioCpActiveDiagnosticId: null,
           symmetryAuthoringPairs: [],
           dirty: false,
           lastOptimization: null,
@@ -520,6 +523,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
           projectMessage: null,
           selection: { kind: 'tree' },
           oristudioCpSelection: emptyOristudioCpSelection(),
+          oristudioCpActiveDiagnosticId: null,
           toolMode: 'select',
           symmetryAuthoringPairs: [],
           creaseColorMode: DEFAULT_CREASE_COLOR_MODE,
@@ -558,6 +562,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
           projectMessage: 'Loaded starter project',
           selection: { kind: 'tree' },
           oristudioCpSelection: emptyOristudioCpSelection(),
+          oristudioCpActiveDiagnosticId: null,
           toolMode: 'select',
           symmetryAuthoringPairs: [],
           creaseColorMode: DEFAULT_CREASE_COLOR_MODE,
@@ -607,10 +612,14 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
         const previousSelection = get().oristudioCpSelection;
         const nextDocument = await executeRuntimeOristudioCpCommand(operationId, payload);
         const mutatesDocument = !NON_MUTATING_CP_OPERATIONS.has(operationId);
+        const diagnosticEntries = nextDocument.lastCommandResult?.diagnostic_entries ?? [];
         set({
           oristudioCpDocument: nextDocument,
           oristudioCpOperationDescriptors: nextDocument.operationDescriptors,
           oristudioCpError: null,
+          oristudioCpActiveDiagnosticId: mutatesDocument
+            ? null
+            : (diagnosticEntries[0]?.id ?? null),
           oristudioCpSelection: oristudioCpSelectionAfterCommand(
             operationId,
             previousSelection,
@@ -659,6 +668,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
         oristudioCpError: null,
         oristudioCpHistoryPast: [],
         oristudioCpHistoryFuture: [],
+        oristudioCpActiveDiagnosticId: null,
       });
     },
 

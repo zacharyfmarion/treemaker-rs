@@ -50,6 +50,7 @@ function setRestoredCreasePatternState(
     oristudioCpDocument: restored,
     oristudioCpOperationDescriptors: restored.operationDescriptors,
     oristudioCpSelection: selection,
+    oristudioCpActiveDiagnosticId: null,
     oristudioCpError: null,
     error: null,
     dirty: true,
@@ -91,6 +92,7 @@ export const createHistorySlice: WorkspaceSliceCreator<HistorySlice> = (set, get
       historyFuture: [],
       oristudioCpHistoryPast: [],
       oristudioCpHistoryFuture: [],
+      oristudioCpActiveDiagnosticId: null,
     }),
 
   undo: async () => {

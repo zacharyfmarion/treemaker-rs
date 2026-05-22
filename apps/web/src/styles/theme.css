@@ -799,12 +799,22 @@
 }
 
 .diagnostic-list__item {
+  border: 0;
+  background: transparent;
   display: grid;
   grid-template-columns: minmax(56px, max-content) 1fr;
   gap: var(--space-2);
+  width: 100%;
   padding: 7px var(--space-3);
   color: var(--text-secondary);
+  cursor: pointer;
   font-size: 0.72rem;
+  text-align: left;
+}
+
+.diagnostic-list__item:hover,
+.diagnostic-list__item[data-active='true'] {
+  background: color-mix(in srgb, var(--status-danger) 11%, transparent);
 }
 
 .diagnostic-list__item + .diagnostic-list__item {
@@ -1917,16 +1927,28 @@
   stroke-width: 3.2;
   stroke-linecap: round;
   opacity: 0.78;
-  pointer-events: none;
+  cursor: pointer;
+  pointer-events: stroke;
   vector-effect: non-scaling-stroke;
+}
+
+.cp-diagnostic-segment--active {
+  stroke-width: 5.2;
+  opacity: 0.95;
 }
 
 .cp-diagnostic-point {
   fill: color-mix(in srgb, var(--status-danger) 18%, transparent);
   stroke: var(--status-danger);
   stroke-width: 2;
-  pointer-events: none;
+  cursor: pointer;
+  pointer-events: all;
   vector-effect: non-scaling-stroke;
+}
+
+.cp-diagnostic-point--active {
+  fill: color-mix(in srgb, var(--status-danger) 26%, transparent);
+  stroke-width: 3;
 }
 
 .cp-operation-frame {

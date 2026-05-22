@@ -890,6 +890,10 @@ Done when:
 - [x] Stage 9 slice: Validate diagnostic command results, repair dispatch,
       history neutrality, wasm bridge behavior, and panel rendering without
       browser smoke tests.
+- [x] Stage 9 slice: Add active diagnostic issue navigation across the
+      Diagnostics panel and CP canvas, including viewport centering.
+- [x] Stage 9 slice: Validate active diagnostic reset/focus behavior with
+      non-browser store and React tests.
 - [ ] Stage 9: Enable checks, diagnostics, issue navigation, and repair
       commands.
 - [ ] Stage 9: Validate diagnostic overlays and repair results against the

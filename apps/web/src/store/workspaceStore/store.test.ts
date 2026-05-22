@@ -1364,9 +1364,27 @@ describe('workspace store slices', () => {
     expect(useWorkspaceStore.getState().oristudioCpHistoryPast).toHaveLength(0);
     expect(useWorkspaceStore.getState().oristudioCpHistoryFuture).toHaveLength(0);
     expect(useWorkspaceStore.getState().dirty).toBe(false);
+    expect(useWorkspaceStore.getState().oristudioCpActiveDiagnosticId).toBe('Check1-1');
     expect(
       useWorkspaceStore.getState().oristudioCpDocument?.lastCommandResult?.diagnostic_entries
     ).toHaveLength(1);
+
+    const checkedDocument = useWorkspaceStore.getState().oristudioCpDocument;
+    if (!checkedDocument) throw new Error('expected checked CP document');
+    oristudioCpMocks.executeOristudioCpCommand.mockResolvedValueOnce({
+      ...checkedDocument,
+      lastCommandResult: {
+        operation: 'Fix1',
+        status: 'OracleTested',
+        diagnostics: ['Changed 0 line(s)'],
+      },
+    });
+
+    await expect(useWorkspaceStore.getState().executeOristudioCpCommand('Fix1')).resolves.toBe(
+      true
+    );
+
+    expect(useWorkspaceStore.getState().oristudioCpActiveDiagnosticId).toBeNull();
   });
 
   it('clears editable CP selection after destructive kernel commands', async () => {

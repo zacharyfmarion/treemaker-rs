@@ -1,4 +1,5 @@
 import { AlertTriangle, CheckCircle2, CircleDashed } from 'lucide-react';
+import { useLayoutStore } from '../../store/layoutStore';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 
 export function DiagnosticsPanel() {
@@ -6,6 +7,12 @@ export function DiagnosticsPanel() {
   const documentMode = useWorkspaceStore((state) => state.documentMode);
   const importedCreasePattern = useWorkspaceStore((state) => state.importedCreasePattern);
   const oristudioCpDocument = useWorkspaceStore((state) => state.oristudioCpDocument);
+  const oristudioCpActiveDiagnosticId = useWorkspaceStore(
+    (state) => state.oristudioCpActiveDiagnosticId
+  );
+  const setOristudioCpActiveDiagnostic = useWorkspaceStore(
+    (state) => state.setOristudioCpActiveDiagnostic
+  );
   const status = useWorkspaceStore((state) => state.status);
   const engineReady = useWorkspaceStore((state) => state.engineReady);
   const error = useWorkspaceStore((state) => state.error);
@@ -71,10 +78,19 @@ export function DiagnosticsPanel() {
           {cpDiagnosticEntries.length > 0 && (
             <div className="diagnostic-list" aria-label="Oriedita check results">
               {cpDiagnosticEntries.slice(0, 12).map((entry) => (
-                <div className="diagnostic-list__item" key={entry.id}>
+                <button
+                  type="button"
+                  className="diagnostic-list__item"
+                  data-active={entry.id === oristudioCpActiveDiagnosticId || undefined}
+                  key={entry.id}
+                  onClick={() => {
+                    setOristudioCpActiveDiagnostic(entry.id);
+                    useLayoutStore.getState().activatePanel('crease-pattern');
+                  }}
+                >
                   <span>{entry.kind}</span>
                   <span>{entry.message}</span>
-                </div>
+                </button>
               ))}
             </div>
           )}

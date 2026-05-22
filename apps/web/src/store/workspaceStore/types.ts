@@ -233,6 +233,7 @@ export type ClipboardSlice = ClipboardSliceState & ClipboardSliceActions;
 export interface CreasePatternSliceState {
   creaseColorMode: CreaseColorMode;
   oristudioCpSelection: OristudioCpSelection;
+  oristudioCpActiveDiagnosticId: string | null;
   oristudioCpViewport: OristudioCpViewportOptions;
   foldArtifacts: FoldArtifacts | null;
   foldArtifactError: string | null;
@@ -262,6 +263,7 @@ export interface CreasePatternSliceActions {
     value: boolean
   ) => void;
   setOristudioCpSelection: (selection: OristudioCpSelection) => void;
+  setOristudioCpActiveDiagnostic: (id: string | null) => void;
   clearOristudioCpSelection: () => void;
   toggleOristudioCpLineSelection: (id: number, additive?: boolean) => void;
   toggleOristudioCpVertexSelection: (id: string, additive?: boolean) => void;

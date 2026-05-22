@@ -975,6 +975,16 @@ describe('CreasePatternPanel', () => {
     expect(container.querySelectorAll('.cp-diagnostic-segment')).toHaveLength(2);
     expect(container.querySelector('.cp-diagnostic-point')).not.toBeNull();
 
+    act(() => {
+      container
+        .querySelector<SVGLineElement>('.cp-diagnostic-segment')
+        ?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
+    });
+
+    expect(useWorkspaceStore.getState().oristudioCpActiveDiagnosticId).toBe('Check1-1');
+    expect(container.querySelector('.cp-diagnostic-segment--active')).not.toBeNull();
+    expect(transformMocks.setTransform).toHaveBeenCalled();
+
     await act(async () => {
       container.querySelector<HTMLButtonElement>('button[aria-label="Check 1"]')?.click();
       await Promise.resolve();

@@ -126,4 +126,17 @@ describe('DiagnosticsPanel', () => {
     expect(view.textContent).toContain('Check1 found 1 issue(s)');
     expect(view.textContent).toContain('Overlapping or contained non-auxiliary creases');
   });
+
+  it('selects a diagnostic issue from the list', () => {
+    const view = renderDiagnosticsPanel({
+      documentMode: 'crease-pattern',
+      oristudioCpDocument: cpDocumentWithDiagnostics(),
+    });
+
+    act(() => {
+      view.querySelector<HTMLButtonElement>('.diagnostic-list__item')?.click();
+    });
+
+    expect(useWorkspaceStore.getState().oristudioCpActiveDiagnosticId).toBe('Check1-1');
+  });
 });

@@ -37,19 +37,19 @@ describe('oristudio CP tool state', () => {
   it('selects unavailable commands as blocked but keeps the active command visible', () => {
     const state = transitionOristudioCpToolState(IDLE_ORISTUDIO_CP_TOOL_STATE, {
       type: 'selectAction',
-      action: action('cp.action.circle-draw-tangent-line'),
+      action: action('cp.action.draw-auxiliary-line'),
       editable: true,
     });
 
     expect(state).toMatchObject({
-      activeActionId: 'cp.action.circle-draw-tangent-line',
-      activeOperationId: 'CircleDrawTangentLine',
+      activeActionId: 'cp.action.draw-auxiliary-line',
+      activeOperationId: 'DrawCreaseFree',
       phase: 'blocked',
-      prompt: 'Circle tangent line: Not implemented',
+      prompt: 'Draw auxiliary line: Not implemented',
       status: 'not-implemented',
       stepIndex: 0,
     });
-    expect(state.steps).toEqual([]);
+    expect(state.steps).toEqual(['Drag crease endpoint']);
   });
 
   it('starts ready action tools and keeps repeatable draw tools active after commit', () => {

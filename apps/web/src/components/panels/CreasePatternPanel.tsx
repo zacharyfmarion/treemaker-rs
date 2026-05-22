@@ -105,6 +105,22 @@ function formatZoom(scale: number): string {
   return `${Math.round(scale * 100)}%`;
 }
 
+const EMPTY_DIAGNOSTIC_ENTRIES: OristudioCpDiagnosticEntry[] = [];
+
+function diagnosticEntryFocusPoint(entry: OristudioCpDiagnosticEntry): Point | null {
+  const points: Point[] = [];
+  if (entry.point) points.push(entry.point);
+  for (const segment of entry.segments) {
+    points.push(segment.a, segment.b);
+  }
+  if (points.length === 0) return null;
+  const minX = Math.min(...points.map((point) => point.x));
+  const maxX = Math.max(...points.map((point) => point.x));
+  const minY = Math.min(...points.map((point) => point.y));
+  const maxY = Math.max(...points.map((point) => point.y));
+  return { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
+}
+
 function modelSelectionDistance(
   bounds: ReturnType<typeof getEditableCpModelBounds>,
   zoomScale = 1
@@ -482,6 +498,7 @@ export function CreasePatternPanel() {
   );
   const [cpCommandPreview, setCpCommandPreview] = useState<OristudioCpCommandPreview | null>(null);
   const cpPreviewRequestRef = useRef(0);
+  const lastFocusedDiagnosticRef = useRef<string | null>(null);
   const cpToolDragRef = useRef<{
     operationId: OristudioCpCommandDefinition['operationId'];
     actionId: OristudioCpCommandActionDefinition['id'] | null;
@@ -499,6 +516,9 @@ export function CreasePatternPanel() {
   const oristudioCpDocument = useWorkspaceStore((state) => state.oristudioCpDocument);
   const oristudioCpError = useWorkspaceStore((state) => state.oristudioCpError);
   const oristudioCpSelection = useWorkspaceStore((state) => state.oristudioCpSelection);
+  const oristudioCpActiveDiagnosticId = useWorkspaceStore(
+    (state) => state.oristudioCpActiveDiagnosticId
+  );
   const oristudioCpViewport = useWorkspaceStore((state) => state.oristudioCpViewport);
   const projectLoadId = useWorkspaceStore((state) => state.projectLoadId);
   const mode = useWorkspaceStore((state) => state.creaseColorMode);
@@ -524,6 +544,9 @@ export function CreasePatternPanel() {
     (state) => state.toggleOristudioCpTextSelection
   );
   const setOristudioCpSelection = useWorkspaceStore((state) => state.setOristudioCpSelection);
+  const setOristudioCpActiveDiagnostic = useWorkspaceStore(
+    (state) => state.setOristudioCpActiveDiagnostic
+  );
   const clearOristudioCpSelection = useWorkspaceStore((state) => state.clearOristudioCpSelection);
   const executeOristudioCpCommand = useWorkspaceStore(
     (state) => state.executeOristudioCpCommand
@@ -619,7 +642,12 @@ export function CreasePatternPanel() {
       : (cpCommandPreview?.segments ?? []);
   const renderedCommandPreviewCircles = cpCommandPreview?.circles ?? [];
   const latestDiagnosticEntries =
-    oristudioCpDocument?.lastCommandResult?.diagnostic_entries ?? [];
+    oristudioCpDocument?.lastCommandResult?.diagnostic_entries ?? EMPTY_DIAGNOSTIC_ENTRIES;
+  const activeDiagnosticEntry = useMemo(
+    () =>
+      latestDiagnosticEntries.find((entry) => entry.id === oristudioCpActiveDiagnosticId) ?? null,
+    [latestDiagnosticEntries, oristudioCpActiveDiagnosticId]
+  );
   const buildCpCommandPayload = useCallback(
     (
       command: OristudioCpCommandDefinition,
@@ -819,6 +847,13 @@ export function CreasePatternPanel() {
         : state
     );
   }, [activeCpCommand]);
+
+  const handleSelectCpDiagnostic = useCallback(
+    (id: string) => {
+      setOristudioCpActiveDiagnostic(id);
+    },
+    [setOristudioCpActiveDiagnostic]
+  );
 
   const handleDeleteSelectedText = useCallback(() => {
     if (
@@ -1590,6 +1625,41 @@ export function CreasePatternPanel() {
   }, [creasePatternFitKey, hasCreasePattern]);
 
   useEffect(() => {
+    if (!activeDiagnosticEntry || !editableCp) {
+      lastFocusedDiagnosticRef.current = null;
+      return;
+    }
+
+    const focusPoint = diagnosticEntryFocusPoint(activeDiagnosticEntry);
+    if (!focusPoint) return;
+    const focusKey = `${editableCpHandle ?? 'none'}:${activeDiagnosticEntry.id}:${focusPoint.x}:${focusPoint.y}`;
+    if (lastFocusedDiagnosticRef.current === focusKey) return;
+    const container = containerRef.current;
+    const transform = transformRef.current;
+    if (!container || !transform || container.clientWidth <= 0 || container.clientHeight <= 0) {
+      return;
+    }
+    const svgPoint = modelPointToCpSvg(focusPoint, editableCpBounds);
+    const fitScale = computeFitScale();
+    const currentScale = Math.max(zoomPercent / 100, 0.05);
+    const focusScale = Math.min(30, Math.max(currentScale, Math.min(3, fitScale * 2)));
+    transform.setTransform(
+      container.clientWidth / 2 - svgPoint.x * focusScale,
+      container.clientHeight / 2 - svgPoint.y * focusScale,
+      focusScale,
+      180
+    );
+    lastFocusedDiagnosticRef.current = focusKey;
+  }, [
+    activeDiagnosticEntry,
+    computeFitScale,
+    editableCp,
+    editableCpBounds,
+    editableCpHandle,
+    zoomPercent,
+  ]);
+
+  useEffect(() => {
     const container = containerRef.current;
     if (!container || !hasCreasePattern) return undefined;
 
@@ -1821,7 +1891,9 @@ export function CreasePatternPanel() {
                         commandPreviewCircles={renderedCommandPreviewCircles}
                         commandPreviewPoints={renderedCommandPreviewPoints}
                         commandPreviewSegments={renderedCommandPreviewSegments}
+                        activeDiagnosticId={oristudioCpActiveDiagnosticId}
                         diagnostics={latestDiagnosticEntries}
+                        selectDiagnostic={handleSelectCpDiagnostic}
                         selection={oristudioCpSelection}
                         snapTarget={snapTarget}
                         spacePressed={spacePressed}
@@ -1950,6 +2022,7 @@ export function CreasePatternPanel() {
 }
 
 interface EditableCreasePatternProps {
+  activeDiagnosticId: string | null;
   bounds: ReturnType<typeof getEditableCpModelBounds>;
   clearSelectionOnBackgroundPointerDown: (event: PointerEvent<SVGElement>) => void;
   document: OristudioCpDocumentSnapshot;
@@ -1961,6 +2034,7 @@ interface EditableCreasePatternProps {
   commandPreviewPoints: Point[];
   commandPreviewSegments: OristudioCpLineSegment[];
   diagnostics: OristudioCpDiagnosticEntry[];
+  selectDiagnostic: (id: string) => void;
   selection: OristudioCpSelection;
   snapTarget: CpSnapTarget | null;
   spacePressed: boolean;
@@ -1973,6 +2047,7 @@ interface EditableCreasePatternProps {
 }
 
 function EditableCreasePattern({
+  activeDiagnosticId,
   bounds,
   clearSelectionOnBackgroundPointerDown,
   document,
@@ -1984,6 +2059,7 @@ function EditableCreasePattern({
   commandPreviewPoints,
   commandPreviewSegments,
   diagnostics,
+  selectDiagnostic,
   selection,
   snapTarget,
   spacePressed,
@@ -2115,14 +2191,25 @@ function EditableCreasePattern({
         diagnostic.segments.map((segment, index) => {
           const a = modelPointToCpSvg(segment.a, bounds);
           const b = modelPointToCpSvg(segment.b, bounds);
+          const active = diagnostic.id === activeDiagnosticId;
           return (
             <line
               key={`${diagnostic.id}-segment-${index}`}
-              className="cp-diagnostic-segment"
+              className={[
+                'cp-diagnostic-segment',
+                active ? 'cp-diagnostic-segment--active' : '',
+              ].join(' ')}
+              data-active={active || undefined}
+              data-cp-diagnostic-id={diagnostic.id}
               x1={a.x}
               y1={a.y}
               x2={b.x}
               y2={b.y}
+              onPointerDown={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                selectDiagnostic(diagnostic.id);
+              }}
             />
           );
         })
@@ -2131,13 +2218,24 @@ function EditableCreasePattern({
         .filter((diagnostic) => diagnostic.point)
         .map((diagnostic) => {
           const point = modelPointToCpSvg(diagnostic.point as Point, bounds);
+          const active = diagnostic.id === activeDiagnosticId;
           return (
             <circle
               key={`${diagnostic.id}-point`}
-              className="cp-diagnostic-point"
+              className={[
+                'cp-diagnostic-point',
+                active ? 'cp-diagnostic-point--active' : '',
+              ].join(' ')}
+              data-active={active || undefined}
+              data-cp-diagnostic-id={diagnostic.id}
               cx={point.x}
               cy={point.y}
               r="6"
+              onPointerDown={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                selectDiagnostic(diagnostic.id);
+              }}
             />
           );
         })}

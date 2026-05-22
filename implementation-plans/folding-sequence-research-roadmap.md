@@ -80,6 +80,11 @@ has a validated implementation.
 - [x] Phase 7: Expand fixture/corpus validation and optional Oriedita cross-checks.
 - [x] Phase 8: Decide whether ML/ranking data collection is warranted.
 - [x] Phase 9: V2 reference/precrease planner integration.
+- [x] Phase 10: Add visual step playback for current planner artifacts.
+- [ ] Phase 11: Add complex-transform validation harness and invariants.
+- [ ] Phase 12: Implement first validated local complex transforms.
+- [ ] Phase 13: Implement rabbit-ear and molecule transforms.
+- [ ] Phase 14: Promote visual/corpus review for complex sequences.
 
 ## Phase 0: Fixtures And Contracts
 
@@ -541,6 +546,167 @@ Phase 9 implementation notes:
   steps.
 - Added `implementation-plans/reference-precrease-v2-boundary.md` to document
   the GPL-compatible porting boundary and future validation requirements.
+
+## Phase 10: Visual Step Playback
+
+Goal: make every current sequence artifact visually inspectable before adding
+more move semantics.
+
+Deliverables:
+
+- Add a selected-step viewer to the Sequence panel.
+- Render before/after CP frames for the selected step from `SequencePlan.states`.
+- Render before/after folded projections using each state's `folded_vertices`.
+- Highlight affected creases, affected faces, and unresolved-region creases.
+- Keep unsupported regions visible and honest: they should render as highlighted
+  unresolved geometry, not as completed moves.
+- Add compact state badges for missing, invalid, or unsupported frames.
+
+Validation:
+
+- Component tests for a complete simple-fold plan with a selected visual step.
+- Component tests for unsupported-region highlighting.
+- Typecheck and web tests for the browser surface.
+- Browser smoke check on one complete fixture and one partial/unsupported
+  fixture.
+
+Exit criteria:
+
+- A user can click a step and see what crease/faces it refers to without opening
+  developer tools.
+- Visual playback works for complete, partial, and unsupported plans even when
+  complex transforms are still not implemented.
+
+Phase 10 implementation notes:
+
+- Added a selected-step viewer to the Sequence panel.
+- Added before/after CP previews and folded-projection previews sourced from
+  `SequencePlan.states`.
+- Highlighted affected creases/faces for implemented steps and unresolved
+  region geometry for unsupported steps.
+- Added component tests for complete simple-fold playback and unsupported-region
+  highlighting.
+
+## Phase 11: Complex-Transform Harness And Invariants
+
+Goal: prepare complex moves for real rewrites without allowing approximate
+geometry changes.
+
+Deliverables:
+
+- Add a typed `ComplexMoveTransform`/result shape that can return `applied`,
+  `unsupported`, or `invalid_candidate`.
+- Add per-move invariant checks:
+  - all active creases accounted for or deliberately left unresolved;
+  - before/after states pass `SequenceState` validation;
+  - generated intermediate FOLD frames parse and render;
+  - layer-order relaxation requires an explicit diagnostic;
+  - transform output can be re-solved by `treemaker-flatfold` when it claims to
+    be flat-foldable.
+- Add negative fixtures where near-matching topology must remain unsupported.
+- Route complex candidates through the transform harness before adding
+  unsupported-region steps.
+
+Validation:
+
+- Unit tests for transform result serialization and invariant failures.
+- Fixture tests proving existing unsupported cases stay unsupported until their
+  transform is implemented.
+- Determinism tests so transform ordering remains stable.
+
+Exit criteria:
+
+- Adding a new complex move transform requires passing the invariant harness.
+- Non-implemented transforms still produce `unsupported_region` diagnostics.
+
+## Phase 12: First Local Complex Transforms
+
+Goal: complete the smallest practical non-simple complex moves.
+
+Deliverables:
+
+- Implement one validated reverse-fold transform for a local three-crease fan.
+- Implement one validated squash-fold transform for the smallest local squash
+  fixture if the topology and face-order checks are sufficient.
+- Convert successful transforms into forward `reverse_fold` or `squash_fold`
+  instruction steps with before/after states.
+- Keep unhandled reverse/squash variants explicitly unsupported.
+
+Validation:
+
+- Unit tests for each accepted transform, including affected creases/faces and
+  before/after state IDs.
+- Negative tests for ambiguous fans, boundary-center fans, bad MV parity, and
+  non-manifold adjacency.
+- Fixture tests showing at least one complex fixture moves from `partial` to
+  `complete` only when all remaining creases are accounted for.
+- Visual review in the Sequence panel.
+
+Exit criteria:
+
+- The planner completes at least one checked-in complex fixture with a complex
+  instruction step.
+- Unsupported variants remain clearly labeled with transform-specific reasons.
+
+## Phase 13: Rabbit-Ear And Molecule Transforms
+
+Goal: cover TreeMaker-like local base collapses that are not single reverse or
+squash moves.
+
+Deliverables:
+
+- Implement a validated rabbit-ear transform for a four-crease local pattern.
+- Implement a small molecule-collapse transform only when the whole local
+  molecule can be transformed as a single verified group.
+- Add layer-mode metadata that distinguishes multi-layer sequential moves from
+  genuinely simultaneous moves.
+- Keep simultaneous-collapse cases unsupported unless the transform is fully
+  verified.
+
+Validation:
+
+- One positive fixture per implemented move type.
+- Negative tests for near-miss topology and inconsistent assignments.
+- Corpus bucket reports that distinguish:
+  - complete simple;
+  - complete complex;
+  - partial with recognized unsupported complex move;
+  - unsupported simultaneous collapse;
+  - target-state failure.
+
+Exit criteria:
+
+- The planner can complete a small TreeMaker-style base that requires at least
+  one complex move beyond simple folds.
+- Molecule/simultaneous claims are conservative and visually reviewable.
+
+## Phase 14: Visual And Corpus Promotion
+
+Goal: make the complex planner reviewable enough to guide future research.
+
+Deliverables:
+
+- Add a fixture gallery or generated HTML report that links each plan to visual
+  before/after states.
+- Add visual thumbnails for candidate moves rejected by the search path when
+  debug output is enabled.
+- Add corpus summary JSON with counts by status, move type, and diagnostic code.
+- Document which complex move families are implemented, partial, or explicitly
+  unsupported.
+
+Validation:
+
+- Gallery/report generation test over checked-in fixtures.
+- Optional local `ORIEDITA_FOLD_CORPUS` run reports status buckets without
+  failing normal CI.
+- Browser smoke check of complete-simple, complete-complex, partial, and
+  unsupported examples.
+
+Exit criteria:
+
+- Visual review can catch bad transform behavior before broader corpus claims.
+- Future ML/ranking discussion has real symbolic traces and visual artifacts to
+  inspect.
 
 ## Validation Command Guide
 

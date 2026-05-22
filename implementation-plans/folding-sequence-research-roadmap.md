@@ -69,7 +69,7 @@ has a validated implementation.
 ## Checklist
 
 - [x] Phase 0: Define fixtures, correctness contracts, and visual review format.
-- [ ] Phase 1: Add the sequence crate and target-state adapter over
+- [x] Phase 1: Add the sequence crate and target-state adapter over
       `treemaker-flatfold`.
 - [ ] Phase 2: Implement sequence-state snapshots and deterministic validators.
 - [ ] Phase 3: Build the first reverse rewrite rules for simple folds.
@@ -156,6 +156,18 @@ Exit criteria:
 - The planner can reject malformed, unsolved, or ambiguous target states with
   specific diagnostics.
 - No sequence logic is needed to inspect the target state visually.
+
+Phase 1 implementation notes:
+
+- Added `crates/treemaker-sequence` as a reusable crate over
+  `treemaker-fold` and `treemaker-flatfold`.
+- `TargetState` now exposes normalized FOLD data, folded coordinates, face flip
+  flags, overlap graph, deterministic first-solution `face_orders`, solution
+  counts, constraints, diagnostics, and a best-effort source ID map.
+- Ambiguous layer orders produce an `ambiguous_layer_order` diagnostic by
+  default and can be rejected with `require_unique_layer_order`.
+- The sequence planner itself remains explicitly not implemented through
+  `SequenceError::NotImplemented` rather than a placeholder plan.
 
 ## Phase 2: Sequence State And Validators
 

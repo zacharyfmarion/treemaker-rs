@@ -42,6 +42,8 @@ Signed Apple Silicon DMGs are published from local notarized builds on
   structures and geometry helpers for origami applications.
 - [`treemaker-flatfold`](https://docs.rs/treemaker-flatfold): flat-foldability
   and layer-order solving for FOLD crease patterns.
+- `treemaker-sequence`: early research primitives for target-state resolution
+  and future folding-sequence planning over FOLD crease patterns.
 
 The main TreeMaker engine entry point is
 [`Tree`](https://docs.rs/treemaker-core/latest/treemaker_core/struct.Tree.html).

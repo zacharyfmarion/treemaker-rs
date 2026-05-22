@@ -3,6 +3,7 @@ import { GpuMath } from './gpuMath.js';
 import { OrigamiModel } from './model.js';
 import type {
   CreateSimulatorConfig,
+  FoldProfile,
   OrigamiSimulatorController,
   SimulationFrame,
   SimulatorOptions,
@@ -24,6 +25,9 @@ export function createOrigamiSimulator(config: CreateSimulatorConfig): OrigamiSi
   const controller: OrigamiSimulatorController = {
     setFoldPercent(percent: number) {
       solver.setFoldPercent(percent);
+    },
+    setFoldProfile(profile: FoldProfile | null) {
+      solver.setFoldProfile(profile);
     },
     setMaterial(options: Partial<SimulatorOptions>) {
       solver.setMaterial(options);

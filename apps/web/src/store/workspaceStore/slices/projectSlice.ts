@@ -191,6 +191,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
       foldArtifactError: null,
       sequenceTarget: null,
       sequencePlan: null,
+      sequenceSimulationFocus: { kind: 'whole' },
       sequencePlanning: false,
       sequenceError: null,
       status: 'crease_pattern_ready',

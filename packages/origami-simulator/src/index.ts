@@ -6,7 +6,9 @@ export { OrigamiModel } from './model.js';
 export { ORIGAMI_SIMULATOR_UPSTREAM } from './provenance.js';
 export type {
   CreateSimulatorConfig,
+  CreaseFoldRange,
   CreaseParameter,
+  FoldProfile,
   FoldAssignment,
   FoldDocument,
   OrigamiSimulatorController,

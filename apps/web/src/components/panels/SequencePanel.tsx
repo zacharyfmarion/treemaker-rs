@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { AlertTriangle, ArrowRight, CheckCircle2, CircleDashed, Layers3, Play } from 'lucide-react';
+import { AlertTriangle, ArrowRight, CheckCircle2, CircleDashed, Layers3, Play, Waves } from 'lucide-react';
 import type {
   FoldDocument,
   SequenceInstructionStep,
@@ -8,7 +8,9 @@ import type {
   SequenceTargetState,
 } from '../../engine/types';
 import { useWorkspaceStore } from '../../store/workspaceStore';
+import { useLayoutStore } from '../../store/layoutStore';
 import { Button } from '../ui/Button';
+import { IconButton } from '../ui/IconButton';
 
 const PREVIEW_VIEWBOX = 320;
 const PREVIEW_PADDING = 24;
@@ -132,6 +134,8 @@ function SequenceDetails({
 }
 
 function SequenceDiagramList({ plan }: { plan: SequencePlan }) {
+  const setSequenceSimulationFocus = useWorkspaceStore((state) => state.setSequenceSimulationFocus);
+  const activatePanel = useLayoutStore((state) => state.activatePanel);
   const stateById = useMemo(
     () => new Map(plan.states.map((state) => [state.id, state])),
     [plan.states]
@@ -154,13 +158,27 @@ function SequenceDiagramList({ plan }: { plan: SequencePlan }) {
         return (
           <li key={step.id} className="sequence-diagram-step">
             <div className="sequence-diagram-step__header">
-              <div>
+              <div className="sequence-diagram-step__header-main">
                 <span>Step {index + 1}</span>
                 <strong>{formatKind(step.kind)}</strong>
               </div>
-              <span>
-                {stepCreaseCount(step)} crease{stepCreaseCount(step) === 1 ? '' : 's'}
-              </span>
+              <div className="sequence-diagram-step__header-actions">
+                <span>
+                  {stepCreaseCount(step)} crease{stepCreaseCount(step) === 1 ? '' : 's'}
+                </span>
+                <IconButton
+                  size="sm"
+                  variant="toolbar"
+                  title="Simulate step"
+                  tooltipSide="left"
+                  onClick={() => {
+                    setSequenceSimulationFocus({ kind: 'sequence_step', stepId: step.id });
+                    activatePanel('simulator');
+                  }}
+                >
+                  <Waves size={13} />
+                </IconButton>
+              </div>
             </div>
             <div className="sequence-diagram-step__visuals">
               <SequencePreview

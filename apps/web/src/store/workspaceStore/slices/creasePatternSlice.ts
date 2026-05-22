@@ -17,6 +17,8 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
   set,
   get
 ) => {
+  const wholeSimulationFocus = { kind: 'whole' as const };
+
   async function requireActiveTree() {
     const result = await ensureTreeHandle();
     if (result.initializedSnapshot) {
@@ -30,7 +32,13 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
     try {
       const { api, treeHandle } = await requireActiveTree();
       const foldArtifacts = await api.foldArtifacts(treeHandle);
-      set({ foldArtifacts, foldArtifactError: null, sequenceTarget: null, sequencePlan: null });
+      set({
+        foldArtifacts,
+        foldArtifactError: null,
+        sequenceTarget: null,
+        sequencePlan: null,
+        sequenceSimulationFocus: wholeSimulationFocus,
+      });
       return foldArtifacts;
     } catch (error) {
       set({
@@ -38,6 +46,7 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
         foldArtifactError: engineError(error).message,
         sequenceTarget: null,
         sequencePlan: null,
+        sequenceSimulationFocus: wholeSimulationFocus,
       });
       return null;
     }
@@ -81,6 +90,7 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
         foldArtifactError: null,
         sequenceTarget: null,
         sequencePlan: null,
+        sequenceSimulationFocus: wholeSimulationFocus,
         sequenceError: null,
         dirty: true,
         projectMessage: label,
@@ -101,6 +111,7 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
     foldArtifactError: null,
     sequenceTarget: null,
     sequencePlan: null,
+    sequenceSimulationFocus: wholeSimulationFocus,
     sequencePlanning: false,
     sequenceError: null,
 
@@ -160,6 +171,7 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
             foldArtifactError: null,
             sequenceTarget: null,
             sequencePlan: null,
+            sequenceSimulationFocus: wholeSimulationFocus,
             sequenceError: null,
             projectMessage: null,
           });
@@ -179,6 +191,7 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
           foldArtifactError,
           sequenceTarget: null,
           sequencePlan: null,
+          sequenceSimulationFocus: wholeSimulationFocus,
           sequenceError: null,
           dirty: true,
           projectMessage: 'Built crease pattern',
@@ -229,6 +242,7 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
         set({
           sequenceTarget: target,
           sequencePlan: plan,
+          sequenceSimulationFocus: wholeSimulationFocus,
           sequencePlanning: false,
           sequenceError: null,
         });
@@ -236,11 +250,17 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
         return plan;
       } catch (error) {
         const message = engineError(error).message;
-        set({ sequencePlanning: false, sequenceError: message, sequencePlan: null });
+        set({
+          sequencePlanning: false,
+          sequenceError: message,
+          sequencePlan: null,
+          sequenceSimulationFocus: wholeSimulationFocus,
+        });
         return null;
       }
     },
 
     setCreaseColorMode: (creaseColorMode) => set({ creaseColorMode }),
+    setSequenceSimulationFocus: (sequenceSimulationFocus) => set({ sequenceSimulationFocus }),
   };
 };

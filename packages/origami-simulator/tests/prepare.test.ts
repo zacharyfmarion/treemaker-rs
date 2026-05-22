@@ -132,6 +132,55 @@ describe('createOrigamiSimulator', () => {
     simulator.dispose();
   });
 
+  it('keeps a profiled crease still when its fold range is flat', () => {
+    const prepared = prepareFoldModel(makeBookFoldFixture());
+    const simulator = createOrigamiSimulator({
+      model: prepared,
+      options: {
+        foldPercent: 100,
+        foldProfile: { ranges: [{ edge: 4, fromAngle: 0, toAngle: 0 }] },
+      },
+    });
+    const before = simulator.readFrame().positions;
+    const after = simulator.step(64).positions;
+
+    expect(maxPositionDelta(before, after)).toBeLessThan(1e-6);
+    simulator.dispose();
+  });
+
+  it('moves a profiled crease as the fold percent advances through its range', () => {
+    const prepared = prepareFoldModel(makeBookFoldFixture());
+    const simulator = createOrigamiSimulator({
+      model: prepared,
+      options: {
+        foldPercent: 100,
+        foldProfile: { ranges: [{ edge: 4, fromAngle: 0, toAngle: -180 }] },
+      },
+    });
+    const before = simulator.readFrame().positions;
+    const after = simulator.step(64).positions;
+
+    expect(maxPositionDelta(before, after)).toBeGreaterThan(0);
+    simulator.dispose();
+  });
+
+  it('returns to whole-model targets after clearing a fold profile', () => {
+    const prepared = prepareFoldModel(makeBookFoldFixture());
+    const simulator = createOrigamiSimulator({
+      model: prepared,
+      options: {
+        foldPercent: 100,
+        foldProfile: { ranges: [{ edge: 4, fromAngle: 0, toAngle: 0 }] },
+      },
+    });
+    const before = simulator.step(64).positions;
+    simulator.setFoldProfile(null);
+    const after = simulator.step(64).positions;
+
+    expect(maxPositionDelta(before, after)).toBeGreaterThan(0);
+    simulator.dispose();
+  });
+
   it('reports WebGL availability without throwing in node', () => {
     expect(detectWebGlSupport()).toBe(false);
   });

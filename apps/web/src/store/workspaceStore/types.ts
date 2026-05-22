@@ -201,9 +201,14 @@ export interface CreasePatternSliceState {
   foldArtifactError: string | null;
   sequenceTarget: SequenceTargetState | null;
   sequencePlan: SequencePlan | null;
+  sequenceSimulationFocus: SequenceSimulationFocus;
   sequencePlanning: boolean;
   sequenceError: string | null;
 }
+
+export type SequenceSimulationFocus =
+  | { kind: 'whole' }
+  | { kind: 'sequence_step'; stepId: string };
 
 export interface CreasePatternSliceActions {
   optimizeScale: () => Promise<void>;
@@ -214,6 +219,7 @@ export interface CreasePatternSliceActions {
   analyzeSequenceTarget: () => Promise<SequenceTargetState | null>;
   planFoldingSequence: () => Promise<SequencePlan | null>;
   setCreaseColorMode: (mode: CreaseColorMode) => void;
+  setSequenceSimulationFocus: (focus: SequenceSimulationFocus) => void;
 }
 
 export type CreasePatternSlice = CreasePatternSliceState & CreasePatternSliceActions;

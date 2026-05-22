@@ -164,6 +164,7 @@ export function projectStateFromSnapshot(snapshot: TreeSnapshot, title?: string)
     foldArtifactError: null,
     sequenceTarget: null,
     sequencePlan: null,
+    sequenceSimulationFocus: { kind: 'whole' as const },
     sequencePlanning: false,
     sequenceError: null,
   };

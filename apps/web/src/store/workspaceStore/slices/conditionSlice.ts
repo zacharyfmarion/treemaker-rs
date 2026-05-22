@@ -56,6 +56,7 @@ export const createConditionSlice: WorkspaceSliceCreator<ConditionSlice> = (set,
         lastOptimization: null,
         foldArtifacts: null,
         foldArtifactError: null,
+        sequenceSimulationFocus: { kind: 'whole' },
         projectMessage: label,
       });
       get().commitHistoryCheckpoint(checkpoint, label);
@@ -91,6 +92,7 @@ export const createConditionSlice: WorkspaceSliceCreator<ConditionSlice> = (set,
         lastOptimization: null,
         foldArtifacts: null,
         foldArtifactError: null,
+        sequenceSimulationFocus: { kind: 'whole' },
         projectMessage: label,
       });
       get().commitHistoryCheckpoint(checkpoint, label);

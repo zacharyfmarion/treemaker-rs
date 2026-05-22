@@ -1,9 +1,11 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { FoldArtifacts, FoldDocument, SequencePlan, SequenceStateSnapshot } from '../../engine/types';
 import { createSampleProject } from '../../lib/sampleProject';
+import { useLayoutStore } from '../../store/layoutStore';
 import { useWorkspaceStore } from '../../store/workspaceStore';
+import { TooltipProvider } from '../ui/Tooltip';
 import { SequencePanel } from './SequencePanel';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -21,6 +23,7 @@ afterEach(() => {
   root = null;
   container = null;
   useWorkspaceStore.setState(useWorkspaceStore.getInitialState(), true);
+  useLayoutStore.setState(useLayoutStore.getInitialState(), true);
 });
 
 describe('SequencePanel', () => {
@@ -72,6 +75,23 @@ describe('SequencePanel', () => {
     expect(rendered.querySelectorAll('.sequence-preview-crease--highlight')).toHaveLength(4);
     expect(rendered.querySelector('.sequence-preview-face--highlight')).not.toBeNull();
   });
+
+  it('focuses the simulator on a step when the step simulate action is clicked', () => {
+    const activatePanel = vi.fn();
+    useLayoutStore.setState({ activatePanel });
+    const rendered = renderPanel(simplePlan());
+    const button = rendered.querySelector<HTMLButtonElement>('[aria-label="Simulate step"]');
+
+    act(() => {
+      button?.click();
+    });
+
+    expect(useWorkspaceStore.getState().sequenceSimulationFocus).toEqual({
+      kind: 'sequence_step',
+      stepId: 'step-1',
+    });
+    expect(activatePanel).toHaveBeenCalledWith('simulator');
+  });
 });
 
 function renderPanel(plan: SequencePlan) {
@@ -93,7 +113,11 @@ function renderPanel(plan: SequencePlan) {
   document.body.append(container);
   root = createRoot(container);
   act(() => {
-    root?.render(<SequencePanel />);
+    root?.render(
+      <TooltipProvider>
+        <SequencePanel />
+      </TooltipProvider>
+    );
   });
   return container;
 }

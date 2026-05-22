@@ -771,6 +771,7 @@ function loadSnapshotIntoStore(snapshot: TreeSnapshot, title = 'Seed project') {
     foldArtifactError: null,
     sequenceTarget: null,
     sequencePlan: null,
+    sequenceSimulationFocus: { kind: 'whole' },
     sequencePlanning: false,
     sequenceError: null,
   });
@@ -1481,6 +1482,9 @@ describe('workspace store slices', () => {
     const activatePanel = vi.fn();
     useLayoutStore.setState({ activatePanel });
     await useWorkspaceStore.getState().buildCreasePattern();
+    useWorkspaceStore
+      .getState()
+      .setSequenceSimulationFocus({ kind: 'sequence_step', stepId: 'stale-step' });
 
     const plan = await useWorkspaceStore.getState().planFoldingSequence();
 
@@ -1488,6 +1492,7 @@ describe('workspace store slices', () => {
     expect(api.sequencePlanFold).toHaveBeenCalledOnce();
     expect(plan?.status).toBe('complete');
     expect(useWorkspaceStore.getState().sequencePlan?.status).toBe('complete');
+    expect(useWorkspaceStore.getState().sequenceSimulationFocus).toEqual({ kind: 'whole' });
     expect(useWorkspaceStore.getState().sequenceError).toBeNull();
     expect(activatePanel).toHaveBeenCalledWith('sequence');
   });

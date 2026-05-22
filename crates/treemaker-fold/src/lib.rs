@@ -170,7 +170,7 @@ pub struct FoldDocument {
         default,
         skip_serializing_if = "Vec::is_empty"
     )]
-    pub face_orders: Vec<[usize; 3]>,
+    pub face_orders: Vec<[i64; 3]>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -602,6 +602,20 @@ mod tests {
         .unwrap();
 
         assert_eq!(doc.face_orders, vec![[0, 0, 0]]);
+    }
+
+    #[test]
+    fn fold_document_deserializes_signed_face_order_orientation() {
+        let doc: FoldDocument = serde_json::from_value(serde_json::json!({
+            "file_spec": 1.2,
+            "vertices_coords": [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]],
+            "edges_vertices": [[0, 1], [1, 2], [2, 3], [3, 0], [0, 2]],
+            "faces_vertices": [[0, 1, 2], [0, 2, 3]],
+            "faceOrders": [[0, 1, -1]]
+        }))
+        .unwrap();
+
+        assert_eq!(doc.face_orders, vec![[0, 1, -1]]);
     }
 
     #[test]

@@ -1,12 +1,14 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
   type WheelEvent as ReactWheelEvent,
 } from 'react';
 import {
+  AlertTriangle,
   Eye,
   EyeOff,
   Layers3,
@@ -26,6 +28,12 @@ import {
   type PreparedOrigamiModel,
   type SimulationFrame,
 } from '@treemaker/origami-simulator';
+import { buildSequenceStepSimulation } from '../../lib/sequenceSimulation';
+import {
+  STEP_SIMULATION_ACCURACY_OPTIONS,
+  simulatorRunConfig,
+  type StepSimulationAccuracy,
+} from '../../lib/simulatorRunConfig';
 import {
   nextSimulatorOrbitView,
   type SimulatorOrbitView as SimulatorView,
@@ -46,6 +54,11 @@ interface SimulatorViewSettings {
   showHiddenLines: boolean;
 }
 
+interface SimulatorHighlights {
+  creases: Set<number>;
+  faces: Set<number>;
+}
+
 interface DragState {
   pointerId: number;
   x: number;
@@ -60,14 +73,19 @@ interface ProjectedPoint {
   depth: number;
 }
 
-const INITIAL_SETTLE_STEPS = 300;
-const FOLD_CHANGE_IMMEDIATE_STEPS = 200;
-const FOLD_CHANGE_SETTLE_BATCH = 200;
-const FOLD_CHANGE_SETTLE_FRAMES = 40;
-const FOLD_PLAY_STEP_BATCH = 160;
-const FOLD_PLAY_PERCENT_PER_SECOND = 28;
-const FOLD_STEP_PERCENT = 5;
+interface ScreenPoint extends ProjectedPoint {
+  sx: number;
+  sy: number;
+}
+
+interface DepthSurface {
+  depths: Float32Array;
+  width: number;
+  height: number;
+}
+
 const SETTLE_DELTA_EPSILON = 0.0002;
+const PAPER_EDGE_DEPTH_EPSILON = 0.006;
 const INITIAL_FOLD_PERCENT = 0;
 const DEFAULT_VIEW: SimulatorView = { yaw: 0, pitch: 0.38, zoom: 1 };
 const DEFAULT_VIEW_SETTINGS: SimulatorViewSettings = {
@@ -75,6 +93,10 @@ const DEFAULT_VIEW_SETTINGS: SimulatorViewSettings = {
   showFaces: true,
   showEdges: true,
   showHiddenLines: false,
+};
+const EMPTY_HIGHLIGHTS: SimulatorHighlights = {
+  creases: new Set(),
+  faces: new Set(),
 };
 
 export function SimulatorPanel() {
@@ -86,12 +108,17 @@ export function SimulatorPanel() {
   const settleRafRef = useRef<number | null>(null);
   const viewRef = useRef<SimulatorView>({ ...DEFAULT_VIEW });
   const viewSettingsRef = useRef<SimulatorViewSettings>(DEFAULT_VIEW_SETTINGS);
+  const highlightsRef = useRef<SimulatorHighlights>(EMPTY_HIGHLIGHTS);
   const dragRef = useRef<DragState | null>(null);
   const foldPercentRef = useRef(INITIAL_FOLD_PERCENT);
+  const sourceKeyRef = useRef<string | null>(null);
 
   const creaseCount = useWorkspaceStore((state) => state.project.creases.length);
   const foldArtifacts = useWorkspaceStore((state) => state.foldArtifacts);
   const foldArtifactError = useWorkspaceStore((state) => state.foldArtifactError);
+  const sequencePlan = useWorkspaceStore((state) => state.sequencePlan);
+  const sequenceSimulationFocus = useWorkspaceStore((state) => state.sequenceSimulationFocus);
+  const setSequenceSimulationFocus = useWorkspaceStore((state) => state.setSequenceSimulationFocus);
   const refreshFoldArtifacts = useWorkspaceStore((state) => state.refreshFoldArtifacts);
   const capabilities = useWorkspaceCapabilities();
 
@@ -103,14 +130,41 @@ export function SimulatorPanel() {
   const [strain, setStrain] = useState(0);
   const [modelStats, setModelStats] = useState({ vertices: 0, triangles: 0 });
   const [viewSettings, setViewSettings] = useState<SimulatorViewSettings>(DEFAULT_VIEW_SETTINGS);
+  const [stepAccuracy, setStepAccuracy] = useState<StepSimulationAccuracy>('fast');
   const refreshCapability = capabilities['simulator.refresh'];
+  const stepSimulationResult = useMemo(
+    () =>
+      sequenceSimulationFocus.kind === 'sequence_step'
+        ? buildSequenceStepSimulation(sequencePlan, sequenceSimulationFocus.stepId)
+        : null,
+    [sequencePlan, sequenceSimulationFocus]
+  );
+  const activeStepSimulation = stepSimulationResult?.ok ? stepSimulationResult.simulation : null;
+  const stepSimulationError =
+    stepSimulationResult && !stepSimulationResult.ok ? stepSimulationResult.reason : null;
+  const simulatorMode = sequenceSimulationFocus.kind === 'sequence_step' ? 'step' : 'whole';
+  const runConfig = useMemo(
+    () => simulatorRunConfig(simulatorMode, stepAccuracy),
+    [simulatorMode, stepAccuracy]
+  );
+  const simulationFold = activeStepSimulation
+    ? activeStepSimulation.fold
+    : (foldArtifacts?.simulation_model?.fold ?? foldArtifacts?.fold ?? null);
+  const simulationFoldProfile = activeStepSimulation?.foldProfile ?? null;
+  const simulationModelError =
+    stepSimulationError ?? (!activeStepSimulation ? foldArtifacts?.simulation_model_error : null);
+  const simulationSourceKey = activeStepSimulation
+    ? `step:${activeStepSimulation.step.id}:${activeStepSimulation.beforeState.id}:${activeStepSimulation.afterState.id}`
+    : sequenceSimulationFocus.kind === 'sequence_step'
+      ? `step-error:${sequenceSimulationFocus.stepId}:${stepSimulationError ?? 'unknown'}`
+      : `whole:${foldArtifacts ? 'loaded' : 'empty'}`;
 
   const drawCurrentFrame = useCallback(() => {
     const canvas = canvasRef.current;
     const model = modelRef.current;
     const frame = frameRef.current;
     if (!canvas || !model || !frame) return;
-    drawFrame(canvas, model, frame, viewRef.current, viewSettingsRef.current);
+    drawFrame(canvas, model, frame, viewRef.current, viewSettingsRef.current, highlightsRef.current);
     setStep(frame.step);
     setStrain(frame.diagnostics.maxEdgeStrain ?? 0);
   }, []);
@@ -153,7 +207,7 @@ export function SimulatorPanel() {
   }, []);
 
   const startSettling = useCallback(
-    (frames = FOLD_CHANGE_SETTLE_FRAMES) => {
+    (frames = runConfig.foldChangeSettleFrames) => {
       if (typeof window === 'undefined') return;
       clearSettling();
       let remaining = frames;
@@ -161,7 +215,7 @@ export function SimulatorPanel() {
 
       const tick = () => {
         const previous = frameRef.current?.positions;
-        const next = stepSimulation(FOLD_CHANGE_SETTLE_BATCH);
+        const next = stepSimulation(runConfig.foldChangeSettleBatch);
         if (!next) {
           settleRafRef.current = null;
           return;
@@ -180,10 +234,27 @@ export function SimulatorPanel() {
 
       settleRafRef.current = window.requestAnimationFrame(tick);
     },
-    [clearSettling, stepSimulation]
+    [clearSettling, runConfig, stepSimulation]
   );
 
   useEffect(() => {
+    if (simulatorMode === 'step') {
+      clearPlayback();
+      clearSettling();
+      setPlaying(false);
+      if (stepSimulationError) {
+        setModelError(stepSimulationError);
+        setLoadState('error');
+      } else if (activeStepSimulation) {
+        setModelError(null);
+        setLoadState('ready');
+      } else {
+        setModelError('Step simulation unavailable.');
+        setLoadState('error');
+      }
+      return;
+    }
+
     if (creaseCount === 0) {
       clearPlayback();
       clearSettling();
@@ -193,8 +264,8 @@ export function SimulatorPanel() {
       return;
     }
     if (foldArtifacts) {
-      setModelError(foldArtifacts.simulation_model_error ?? null);
-      setLoadState(foldArtifacts.simulation_model_error ? 'error' : 'ready');
+      setModelError(simulationModelError ?? null);
+      setLoadState(simulationModelError ? 'error' : 'ready');
       return;
     }
 
@@ -208,7 +279,17 @@ export function SimulatorPanel() {
     return () => {
       cancelled = true;
     };
-  }, [clearPlayback, clearSettling, creaseCount, foldArtifacts, refreshFoldArtifacts]);
+  }, [
+    clearPlayback,
+    clearSettling,
+    creaseCount,
+    foldArtifacts,
+    refreshFoldArtifacts,
+    simulationModelError,
+    simulatorMode,
+    activeStepSimulation,
+    stepSimulationError,
+  ]);
 
   useEffect(() => {
     clearPlayback();
@@ -220,27 +301,53 @@ export function SimulatorPanel() {
     setModelError(null);
     setModelStats({ vertices: 0, triangles: 0 });
 
-    if (!foldArtifacts) return;
+    highlightsRef.current = activeStepSimulation
+      ? {
+          creases: new Set(activeStepSimulation.affectedCreases),
+          faces: new Set(activeStepSimulation.affectedFaces),
+        }
+      : EMPTY_HIGHLIGHTS;
+
+    if (!simulationFold) {
+      if (simulationModelError) {
+        setPlaying(false);
+        setModelError(simulationModelError);
+        setLoadState('error');
+      }
+      return;
+    }
 
     try {
-      if (foldArtifacts.simulation_model_error) {
-        throw new Error(foldArtifacts.simulation_model_error);
+      if (simulationModelError) {
+        throw new Error(simulationModelError);
+      }
+      const sourceChanged = sourceKeyRef.current !== simulationSourceKey;
+      sourceKeyRef.current = simulationSourceKey;
+      const initialFoldPercent = sourceChanged ? INITIAL_FOLD_PERCENT : foldPercentRef.current;
+      if (sourceChanged) {
+        foldPercentRef.current = initialFoldPercent;
+        setFoldPercent(initialFoldPercent);
+        setPlaying(false);
       }
       const model = prepareFoldModel(
-        (foldArtifacts.simulation_model?.fold ?? foldArtifacts.fold) as SimulatorFoldDocument,
-        { triangulate: false }
+        simulationFold as SimulatorFoldDocument,
+        { triangulate: foldNeedsTriangulation(simulationFold) }
       );
       const controller = createOrigamiSimulator({
         model,
-        options: { foldPercent: foldPercentRef.current },
+        options: {
+          ...runConfig.solverOptions,
+          foldPercent: initialFoldPercent,
+          foldProfile: simulationFoldProfile,
+        },
       });
       modelRef.current = model;
       controllerRef.current = controller;
       setModelStats({ vertices: model.vertexCount, triangles: model.faceCount });
-      frameRef.current = controller.step(INITIAL_SETTLE_STEPS);
+      frameRef.current = controller.step(runConfig.initialSettleSteps);
       setLoadState('ready');
       drawCurrentFrame();
-      if (foldPercentRef.current !== 0) startSettling();
+      if (initialFoldPercent !== 0) startSettling();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.warn('Failed to prepare simulator model', error);
@@ -259,25 +366,39 @@ export function SimulatorPanel() {
       frameRef.current = null;
       setModelStats({ vertices: 0, triangles: 0 });
     };
-  }, [clearPlayback, clearSettling, drawCurrentFrame, foldArtifacts, startSettling]);
+  }, [
+    clearPlayback,
+    clearSettling,
+    drawCurrentFrame,
+    simulationFold,
+    simulationFoldProfile,
+    simulationModelError,
+    simulationSourceKey,
+    runConfig,
+    startSettling,
+    activeStepSimulation,
+  ]);
 
   const setFoldTarget = useCallback(
     (percent: number) => {
       clearPlayback();
       setPlaying(false);
       applyFoldPercent(percent);
-      if (stepSimulation(FOLD_CHANGE_IMMEDIATE_STEPS)) {
+      if (stepSimulation(runConfig.foldChangeImmediateSteps)) {
         startSettling();
       }
     },
-    [applyFoldPercent, clearPlayback, startSettling, stepSimulation]
+    [applyFoldPercent, clearPlayback, runConfig, startSettling, stepSimulation]
   );
 
   const stepFoldTarget = useCallback(() => {
     setFoldTarget(
-      Math.min(100, Math.floor(foldPercentRef.current / FOLD_STEP_PERCENT + 1) * FOLD_STEP_PERCENT)
+      Math.min(
+        100,
+        Math.floor(foldPercentRef.current / runConfig.foldStepPercent + 1) * runConfig.foldStepPercent
+      )
     );
-  }, [setFoldTarget]);
+  }, [runConfig.foldStepPercent, setFoldTarget]);
 
   const replayFromFlat = useCallback(() => {
     clearPlayback();
@@ -285,9 +406,9 @@ export function SimulatorPanel() {
     setPlaying(false);
     controllerRef.current?.reset();
     applyFoldPercent(0);
-    frameRef.current = controllerRef.current?.step(INITIAL_SETTLE_STEPS) ?? null;
+    frameRef.current = controllerRef.current?.step(runConfig.initialSettleSteps) ?? null;
     drawCurrentFrame();
-  }, [applyFoldPercent, clearPlayback, clearSettling, drawCurrentFrame]);
+  }, [applyFoldPercent, clearPlayback, clearSettling, drawCurrentFrame, runConfig.initialSettleSteps]);
 
   useEffect(() => {
     if (!playing || typeof window === 'undefined') return;
@@ -296,7 +417,7 @@ export function SimulatorPanel() {
     if (foldPercentRef.current >= 100) {
       controllerRef.current?.reset();
       applyFoldPercent(0);
-      frameRef.current = controllerRef.current?.step(INITIAL_SETTLE_STEPS) ?? null;
+      frameRef.current = controllerRef.current?.step(runConfig.initialSettleSteps) ?? null;
       drawCurrentFrame();
     }
 
@@ -307,11 +428,11 @@ export function SimulatorPanel() {
       previousTime = time;
       const nextPercent = Math.min(
         100,
-        foldPercentRef.current + elapsedSeconds * FOLD_PLAY_PERCENT_PER_SECOND
+        foldPercentRef.current + elapsedSeconds * runConfig.foldPlayPercentPerSecond
       );
 
       applyFoldPercent(nextPercent);
-      stepSimulation(FOLD_PLAY_STEP_BATCH);
+      stepSimulation(runConfig.foldPlayStepBatch);
 
       if (nextPercent >= 100) {
         rafRef.current = null;
@@ -330,6 +451,7 @@ export function SimulatorPanel() {
     clearSettling,
     drawCurrentFrame,
     playing,
+    runConfig,
     startSettling,
     stepSimulation,
   ]);
@@ -392,7 +514,7 @@ export function SimulatorPanel() {
     drawCurrentFrame();
   };
 
-  const errorDetail = modelError ?? foldArtifactError ?? 'Simulator unavailable';
+  const errorDetail = stepSimulationError ?? modelError ?? foldArtifactError ?? 'Simulator unavailable';
   const statusLabel =
     loadState === 'ready'
       ? `${modelStats.vertices} vertices | ${modelStats.triangles} triangles`
@@ -410,6 +532,48 @@ export function SimulatorPanel() {
         <div className="panel-toolbar__group">
           <Waves size={14} />
           <span className="panel-title">Simulator</span>
+        </div>
+        <div className="panel-toolbar__group simulator-scope-controls">
+          <SegmentedControl
+            aria-label="Simulator scope"
+            value={simulatorMode}
+            onChange={(mode) => {
+              if (mode === 'whole') {
+                setSequenceSimulationFocus({ kind: 'whole' });
+                return;
+              }
+              if (sequenceSimulationFocus.kind === 'sequence_step') return;
+              const firstStep = sequencePlan?.steps[0];
+              if (firstStep) {
+                setSequenceSimulationFocus({ kind: 'sequence_step', stepId: firstStep.id });
+              }
+            }}
+            options={[
+              { value: 'whole', label: 'Whole', title: 'Simulate the whole crease pattern' },
+              { value: 'step', label: 'Step', title: 'Simulate the selected sequence step' },
+            ]}
+          />
+          {activeStepSimulation && (
+            <span className="simulator-step-chip">
+              Step {activeStepSimulation.stepIndex + 1}: {formatKind(activeStepSimulation.step.kind)}
+            </span>
+          )}
+          {activeStepSimulation?.warning && (
+            <span className="simulator-step-chip simulator-step-chip--warn">
+              <AlertTriangle size={12} />
+              Manual preview
+            </span>
+          )}
+          {simulatorMode === 'step' && (
+            <div className="simulator-accuracy-controls">
+              <SegmentedControl
+                aria-label="Step simulation accuracy"
+                value={stepAccuracy}
+                onChange={setStepAccuracy}
+                options={STEP_SIMULATION_ACCURACY_OPTIONS}
+              />
+            </div>
+          )}
         </div>
         <div className="panel-toolbar__group simulator-view-settings" aria-label="Simulator view settings">
           <SegmentedControl
@@ -526,9 +690,9 @@ export function SimulatorPanel() {
           </IconButton>
         </div>
         <label className="simulator-slider">
-          <span>Fold</span>
+          <span>{simulatorMode === 'step' ? 'Step' : 'Fold'}</span>
           <input
-            aria-label="Fold percent"
+            aria-label={simulatorMode === 'step' ? 'Step percent' : 'Fold percent'}
             type="range"
             min="0"
             max="100"
@@ -568,12 +732,21 @@ function shortStatus(message: string): string {
   return sentence.length > 54 ? `${sentence.slice(0, 51)}...` : sentence;
 }
 
+function formatKind(kind: string): string {
+  return kind.replaceAll('_', ' ');
+}
+
+function foldNeedsTriangulation(fold: SimulatorFoldDocument): boolean {
+  return fold.faces_vertices.some((face) => face.length !== 3);
+}
+
 function drawFrame(
   canvas: HTMLCanvasElement,
   model: PreparedOrigamiModel,
   frame: SimulationFrame,
   view: SimulatorView,
-  settings: SimulatorViewSettings
+  settings: SimulatorViewSettings,
+  highlights: SimulatorHighlights
 ): void {
   const rect = canvas.getBoundingClientRect();
   const dpr = Math.max(1, window.devicePixelRatio || 1);
@@ -605,8 +778,33 @@ function drawFrame(
   const faceAlpha = settings.renderMode === 'xray' ? 0.48 : 1;
   const surfaceEdgeAlpha = settings.renderMode === 'xray' ? 0.5 : 0.92;
 
+  if (settings.renderMode === 'paper' && settings.showFaces) {
+    const depthSurface = drawPaperFacesWithDepth(
+      ctx,
+      model,
+      frame,
+      triangles,
+      projected,
+      map,
+      width,
+      height,
+      palette,
+      highlights
+    );
+    if (depthSurface) {
+      if (settings.showEdges) {
+        drawVisibleEdges(ctx, model, projected, map, dpr, 0.94, palette, highlights, depthSurface);
+        if (settings.showHiddenLines) {
+          drawAllEdges(ctx, model, projected, map, dpr, 0.26, true, palette, highlights);
+        }
+      }
+      return;
+    }
+  }
+
   for (const triangle of triangles) {
     if (settings.showFaces) {
+      const highlighted = highlights.faces.has(triangle.faceIndex);
       const a = map(projected[triangle.vertices[0]] ?? { x: 0, y: 0, depth: 0 });
       const b = map(projected[triangle.vertices[1]] ?? { x: 0, y: 0, depth: 0 });
       const c = map(projected[triangle.vertices[2]] ?? { x: 0, y: 0, depth: 0 });
@@ -617,9 +815,18 @@ function drawFrame(
       ctx.closePath();
       ctx.fillStyle = triangleColor(frame.colors, triangle.vertices, faceAlpha);
       ctx.fill();
+      if (highlighted) {
+        ctx.fillStyle = palette.highlightFace;
+        ctx.fill();
+        ctx.strokeStyle = palette.highlight;
+        ctx.globalAlpha = 0.9;
+        ctx.lineWidth = Math.max(1.4, dpr * 1.2);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
     }
     if (settings.showEdges && settings.showFaces) {
-      drawTriangleEdges(ctx, model, triangle, projected, map, dpr, surfaceEdgeAlpha, palette);
+      drawTriangleEdges(ctx, model, triangle, projected, map, dpr, surfaceEdgeAlpha, palette, highlights);
     }
   }
 
@@ -632,7 +839,8 @@ function drawFrame(
       dpr,
       settings.showFaces ? 0.34 : 0.95,
       settings.showFaces && settings.renderMode === 'paper',
-      palette
+      palette,
+      highlights
     );
   }
 }
@@ -713,6 +921,9 @@ interface SimulatorPalette {
   valley: string;
   border: string;
   flat: string;
+  highlight: string;
+  highlightFace: string;
+  highlightFaceRgb: [number, number, number];
 }
 
 function readSimulatorPalette(canvas: HTMLCanvasElement): SimulatorPalette {
@@ -726,6 +937,9 @@ function readSimulatorPalette(canvas: HTMLCanvasElement): SimulatorPalette {
     valley: cssVar('--accent-primary', '#5fb3a5'),
     border: cssVar('--text-primary', '#e8edf0'),
     flat: cssVar('--text-secondary', '#aeb9bf'),
+    highlight: cssVar('--status-warning', '#f0c674'),
+    highlightFace: 'rgb(240 198 116 / 0.3)',
+    highlightFaceRgb: [240, 198, 116],
   };
 }
 
@@ -744,6 +958,106 @@ function averageDepth(triangle: OrderedTriangle, projected: ProjectedPoint[]): n
   return triangle.vertices.reduce((total, vertex) => total + (projected[vertex]?.depth ?? 0), 0) / 3;
 }
 
+function drawPaperFacesWithDepth(
+  ctx: CanvasRenderingContext2D,
+  model: PreparedOrigamiModel,
+  frame: SimulationFrame,
+  triangles: OrderedTriangle[],
+  projected: ProjectedPoint[],
+  map: (point: ProjectedPoint) => { x: number; y: number },
+  width: number,
+  height: number,
+  palette: SimulatorPalette,
+  highlights: SimulatorHighlights
+): DepthSurface | null {
+  let imageData: ImageData;
+  try {
+    imageData = ctx.getImageData(0, 0, width, height);
+  } catch {
+    return null;
+  }
+
+  const depths = new Float32Array(width * height);
+  depths.fill(-Infinity);
+
+  for (const triangle of triangles) {
+    const points = triangle.vertices.map((vertex) => {
+      const projectedPoint = projected[vertex] ?? { x: 0, y: 0, depth: 0 };
+      const screen = map(projectedPoint);
+      return {
+        ...projectedPoint,
+        sx: screen.x,
+        sy: screen.y,
+      };
+    }) as [ScreenPoint, ScreenPoint, ScreenPoint];
+    const color = triangleRasterColor(
+      frame.colors,
+      triangle.vertices,
+      highlights.faces.has(triangle.faceIndex),
+      palette
+    );
+    rasterizeDepthTriangle(imageData, depths, width, height, points, color);
+  }
+
+  ctx.putImageData(imageData, 0, 0);
+  return { depths, width, height };
+}
+
+function rasterizeDepthTriangle(
+  imageData: ImageData,
+  depths: Float32Array,
+  width: number,
+  height: number,
+  points: [ScreenPoint, ScreenPoint, ScreenPoint],
+  color: [number, number, number, number]
+): void {
+  const [a, b, c] = points;
+  const area = edgeFunction(a, b, c);
+  if (Math.abs(area) < 0.0001) return;
+
+  const minX = clamp(Math.floor(Math.min(a.sx, b.sx, c.sx)), 0, width - 1);
+  const maxX = clamp(Math.ceil(Math.max(a.sx, b.sx, c.sx)), 0, width - 1);
+  const minY = clamp(Math.floor(Math.min(a.sy, b.sy, c.sy)), 0, height - 1);
+  const maxY = clamp(Math.ceil(Math.max(a.sy, b.sy, c.sy)), 0, height - 1);
+  const data = imageData.data;
+
+  for (let y = minY; y <= maxY; y += 1) {
+    for (let x = minX; x <= maxX; x += 1) {
+      const sample = { sx: x + 0.5, sy: y + 0.5 };
+      const w0 = edgeFunction(b, c, sample);
+      const w1 = edgeFunction(c, a, sample);
+      const w2 = edgeFunction(a, b, sample);
+      const inside =
+        area > 0
+          ? w0 >= -0.001 && w1 >= -0.001 && w2 >= -0.001
+          : w0 <= 0.001 && w1 <= 0.001 && w2 <= 0.001;
+      if (!inside) continue;
+
+      const n0 = w0 / area;
+      const n1 = w1 / area;
+      const n2 = w2 / area;
+      const depth = n0 * a.depth + n1 * b.depth + n2 * c.depth;
+      const pixelIndex = y * width + x;
+      if (depth < (depths[pixelIndex] ?? -Infinity)) continue;
+
+      depths[pixelIndex] = depth;
+      const offset = pixelIndex * 4;
+      data[offset] = color[0];
+      data[offset + 1] = color[1];
+      data[offset + 2] = color[2];
+      data[offset + 3] = color[3];
+    }
+  }
+}
+
+function edgeFunction(
+  a: Pick<ScreenPoint, 'sx' | 'sy'>,
+  b: Pick<ScreenPoint, 'sx' | 'sy'>,
+  point: Pick<ScreenPoint, 'sx' | 'sy'>
+): number {
+  return (point.sx - a.sx) * (b.sy - a.sy) - (point.sy - a.sy) * (b.sx - a.sx);
+}
+
 function triangleColor(colors: Float32Array, triangle: number[], alpha = 1): string {
   const channel = (offset: number) =>
     triangle.reduce((total, vertex) => total + (colors[vertex * 3 + offset] ?? 0.75), 0) / 3;
@@ -751,6 +1065,35 @@ function triangleColor(colors: Float32Array, triangle: number[], alpha = 1): str
   const g = Math.round(channel(1) * 255);
   const b = Math.round(channel(2) * 255);
   return alpha >= 1 ? `rgb(${r} ${g} ${b})` : `rgb(${r} ${g} ${b} / ${alpha})`;
+}
+
+function triangleRasterColor(
+  colors: Float32Array,
+  triangle: number[],
+  highlighted: boolean,
+  palette: SimulatorPalette
+): [number, number, number, number] {
+  const channel = (offset: number) =>
+    triangle.reduce((total, vertex) => total + (colors[vertex * 3 + offset] ?? 0.75), 0) / 3;
+  const color: [number, number, number] = [
+    Math.round(channel(0) * 255),
+    Math.round(channel(1) * 255),
+    Math.round(channel(2) * 255),
+  ];
+  const rgb = highlighted ? blendRgb(color, palette.highlightFaceRgb, 0.3) : color;
+  return [rgb[0], rgb[1], rgb[2], 255];
+}
+
+function blendRgb(
+  base: [number, number, number],
+  overlay: [number, number, number],
+  alpha: number
+): [number, number, number] {
+  return [
+    Math.round(base[0] * (1 - alpha) + overlay[0] * alpha),
+    Math.round(base[1] * (1 - alpha) + overlay[1] * alpha),
+    Math.round(base[2] * (1 - alpha) + overlay[2] * alpha),
+  ];
 }
 
 function drawTriangleEdges(
@@ -761,7 +1104,8 @@ function drawTriangleEdges(
   map: (point: ProjectedPoint) => { x: number; y: number },
   dpr: number,
   alpha: number,
-  palette: SimulatorPalette
+  palette: SimulatorPalette,
+  highlights: SimulatorHighlights
 ): void {
   const faceEdges = model.facesEdges[triangle.faceIndex] ?? [];
   const pairs: Array<[number, number]> = [
@@ -781,7 +1125,9 @@ function drawTriangleEdges(
       to,
       faceEdges[side] ?? findEdge(model.edgesVertices, from, to),
       alpha,
-      palette
+      palette,
+      highlights,
+      dpr
     );
   });
 }
@@ -794,14 +1140,46 @@ function drawAllEdges(
   dpr: number,
   alpha: number,
   dashed: boolean,
-  palette: SimulatorPalette
+  palette: SimulatorPalette,
+  highlights: SimulatorHighlights
 ): void {
   ctx.setLineDash(dashed ? [Math.max(3, dpr * 3), Math.max(3, dpr * 3)] : []);
   ctx.lineWidth = Math.max(1.5, dpr * 1.25);
   model.edgesVertices.forEach((edge, index) => {
-    drawEdgeSegment(ctx, model, projected, map, edge[0], edge[1], index, alpha, palette);
+    drawEdgeSegment(ctx, model, projected, map, edge[0], edge[1], index, alpha, palette, highlights, dpr);
   });
   ctx.setLineDash([]);
+}
+
+function drawVisibleEdges(
+  ctx: CanvasRenderingContext2D,
+  model: PreparedOrigamiModel,
+  projected: ProjectedPoint[],
+  map: (point: ProjectedPoint) => { x: number; y: number },
+  dpr: number,
+  alpha: number,
+  palette: SimulatorPalette,
+  highlights: SimulatorHighlights,
+  depthSurface: DepthSurface
+): void {
+  ctx.setLineDash([]);
+  ctx.lineWidth = Math.max(1.5, dpr * 1.25);
+  model.edgesVertices.forEach((edge, index) => {
+    drawVisibleEdgeSegment(
+      ctx,
+      model,
+      projected,
+      map,
+      edge[0],
+      edge[1],
+      index,
+      alpha,
+      palette,
+      highlights,
+      dpr,
+      depthSurface
+    );
+  });
 }
 
 function drawEdgeSegment(
@@ -813,18 +1191,95 @@ function drawEdgeSegment(
   to: number,
   edgeIndex: number,
   alpha: number,
-  palette: SimulatorPalette
+  palette: SimulatorPalette,
+  highlights: SimulatorHighlights,
+  dpr: number
 ): void {
   const a = map(projected[from] ?? { x: 0, y: 0, depth: 0 });
   const b = map(projected[to] ?? { x: 0, y: 0, depth: 0 });
   const assignment = model.edgesAssignment[edgeIndex];
+  const highlighted = highlights.creases.has(edgeIndex);
+  const previousLineWidth = ctx.lineWidth;
   ctx.beginPath();
   ctx.moveTo(a.x, a.y);
   ctx.lineTo(b.x, b.y);
-  ctx.strokeStyle = edgeColor(assignment, palette);
-  ctx.globalAlpha = edgeAlpha(assignment, alpha);
+  ctx.strokeStyle = highlighted ? palette.highlight : edgeColor(assignment, palette);
+  ctx.globalAlpha = highlighted ? 1 : edgeAlpha(assignment, alpha);
+  if (highlighted) ctx.lineWidth = Math.max(ctx.lineWidth, dpr * 3);
   ctx.stroke();
+  ctx.lineWidth = previousLineWidth;
   ctx.globalAlpha = 1;
+}
+
+function drawVisibleEdgeSegment(
+  ctx: CanvasRenderingContext2D,
+  model: PreparedOrigamiModel,
+  projected: ProjectedPoint[],
+  map: (point: ProjectedPoint) => { x: number; y: number },
+  from: number,
+  to: number,
+  edgeIndex: number,
+  alpha: number,
+  palette: SimulatorPalette,
+  highlights: SimulatorHighlights,
+  dpr: number,
+  depthSurface: DepthSurface
+): void {
+  const fromProjected = projected[from] ?? { x: 0, y: 0, depth: 0 };
+  const toProjected = projected[to] ?? { x: 0, y: 0, depth: 0 };
+  const a = map(fromProjected);
+  const b = map(toProjected);
+  const assignment = model.edgesAssignment[edgeIndex];
+  const highlighted = highlights.creases.has(edgeIndex);
+  const previousLineWidth = ctx.lineWidth;
+  const steps = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y)));
+  let segmentStart: { x: number; y: number } | null = null;
+  let previousVisible: { x: number; y: number } | null = null;
+
+  ctx.strokeStyle = highlighted ? palette.highlight : edgeColor(assignment, palette);
+  ctx.globalAlpha = highlighted ? 1 : edgeAlpha(assignment, alpha);
+  if (highlighted) ctx.lineWidth = Math.max(ctx.lineWidth, dpr * 3);
+
+  const flushSegment = () => {
+    if (!segmentStart || !previousVisible) return;
+    ctx.beginPath();
+    ctx.moveTo(segmentStart.x, segmentStart.y);
+    ctx.lineTo(previousVisible.x, previousVisible.y);
+    ctx.stroke();
+  };
+
+  for (let step = 0; step <= steps; step += 1) {
+    const t = step / steps;
+    const point = {
+      x: a.x + (b.x - a.x) * t,
+      y: a.y + (b.y - a.y) * t,
+      depth: fromProjected.depth + (toProjected.depth - fromProjected.depth) * t,
+    };
+    if (edgePointIsVisible(point, depthSurface)) {
+      segmentStart ??= point;
+      previousVisible = point;
+    } else {
+      flushSegment();
+      segmentStart = null;
+      previousVisible = null;
+    }
+  }
+  flushSegment();
+
+  ctx.lineWidth = previousLineWidth;
+  ctx.globalAlpha = 1;
+}
+
+function edgePointIsVisible(
+  point: { x: number; y: number; depth: number },
+  depthSurface: DepthSurface
+): boolean {
+  const x = Math.round(point.x);
+  const y = Math.round(point.y);
+  if (x < 0 || y < 0 || x >= depthSurface.width || y >= depthSurface.height) return false;
+  const surfaceDepth = depthSurface.depths[y * depthSurface.width + x];
+  if (surfaceDepth === undefined || !Number.isFinite(surfaceDepth)) return true;
+  return point.depth >= surfaceDepth - PAPER_EDGE_DEPTH_EPSILON;
 }
 
 function findEdge(edges: [number, number][], from: number, to: number): number {

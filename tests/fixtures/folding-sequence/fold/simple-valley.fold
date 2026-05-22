@@ -1,0 +1,30 @@
+{
+  "file_spec": 1.2,
+  "file_title": "simple-valley",
+  "file_creator": "treemaker-rs folding sequence Phase 0",
+  "frame_title": "Simple valley fold",
+  "frame_classes": ["creasePattern"],
+  "vertices_coords": [
+    [0.0, 0.0],
+    [1.0, 0.0],
+    [1.0, 1.0],
+    [0.0, 1.0],
+    [0.0, 0.5],
+    [1.0, 0.5]
+  ],
+  "edges_vertices": [
+    [0, 1],
+    [1, 5],
+    [5, 2],
+    [2, 3],
+    [3, 4],
+    [4, 0],
+    [4, 5]
+  ],
+  "edges_assignment": ["B", "B", "B", "B", "B", "B", "V"],
+  "edges_foldAngle": [null, null, null, null, null, null, 180],
+  "faces_vertices": [
+    [0, 1, 5, 4],
+    [4, 5, 2, 3]
+  ]
+}

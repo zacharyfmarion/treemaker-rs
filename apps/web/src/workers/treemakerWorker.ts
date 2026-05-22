@@ -13,12 +13,18 @@ import init, {
   optimize_scale,
   optimize_strain,
   save_tmd5,
+  sequence_analyze_fold,
+  sequence_plan_fold,
+  sequence_plan_fold_with_target,
   tree_snapshot,
 } from '../generated/treemaker-wasm/treemaker_wasm';
 import type {
   EditReport,
   FoldArtifacts,
   OptimizationReport,
+  SequencePlan,
+  SequencePlanFoldResult,
+  SequenceTargetState,
   TreeEdit,
   TreeSnapshot,
   WasmErrorEnvelope,
@@ -92,6 +98,36 @@ const api = {
     options?: { solution_limit?: number }
   ): Promise<FoldArtifacts> {
     return call(() => flat_fold_artifacts(foldJson, options ?? null) as FoldArtifacts);
+  },
+  async sequenceAnalyzeFold(
+    foldJson: string,
+    options?: { solution_limit?: number; require_unique_layer_order?: boolean }
+  ): Promise<SequenceTargetState> {
+    return call(() => sequence_analyze_fold(foldJson, options ?? null) as SequenceTargetState);
+  },
+  async sequencePlanFold(
+    foldJson: string,
+    options?: {
+      solution_limit?: number;
+      max_steps?: number;
+      max_states?: number;
+      require_unique_layer_order?: boolean;
+    }
+  ): Promise<SequencePlan> {
+    return call(() => sequence_plan_fold(foldJson, options ?? null) as SequencePlan);
+  },
+  async sequencePlanFoldWithTarget(
+    foldJson: string,
+    options?: {
+      solution_limit?: number;
+      max_steps?: number;
+      max_states?: number;
+      require_unique_layer_order?: boolean;
+    }
+  ): Promise<SequencePlanFoldResult> {
+    return call(
+      () => sequence_plan_fold_with_target(foldJson, options ?? null) as SequencePlanFoldResult
+    );
   },
   async saveTmd5(handle: number): Promise<string> {
     return call(() => save_tmd5(handle));

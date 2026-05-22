@@ -232,6 +232,7 @@ export const createClipboardSlice: WorkspaceSliceCreator<ClipboardSlice> = (set,
         lastOptimization: null,
         foldArtifacts: null,
         foldArtifactError: null,
+        sequenceSimulationFocus: { kind: 'whole' },
         clipboardPasteCount: get().clipboardPasteCount + 1,
         projectMessage: `Pasted ${pastedNodes.length} nodes`,
       });

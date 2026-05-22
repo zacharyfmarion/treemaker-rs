@@ -8,6 +8,7 @@ import { FoldedBasePanel } from './FoldedBasePanel';
 import { DiagnosticsPanel } from './DiagnosticsPanel';
 import { FilesPanel } from './FilesPanel';
 import { ConditionsPanel } from './ConditionsPanel';
+import { SequencePanel } from './SequencePanel';
 
 export const panelComponents: Record<string, FC<IDockviewPanelProps>> = {
   design: DesignPanel,
@@ -16,6 +17,7 @@ export const panelComponents: Record<string, FC<IDockviewPanelProps>> = {
   simulator: SimulatorPanel,
   'folded-base': FoldedBasePanel,
   diagnostics: DiagnosticsPanel,
+  sequence: SequencePanel,
   files: FilesPanel,
   conditions: ConditionsPanel,
 };

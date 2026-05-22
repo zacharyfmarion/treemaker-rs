@@ -6,6 +6,7 @@ import { selectWorkspaceCapabilities } from '../capabilities';
 import {
   engineError,
   ensureTreeHandle,
+  getEngine,
   projectStateFromSnapshot,
   type EngineClient,
 } from '../engineRuntime';
@@ -16,6 +17,8 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
   set,
   get
 ) => {
+  const wholeSimulationFocus = { kind: 'whole' as const };
+
   async function requireActiveTree() {
     const result = await ensureTreeHandle();
     if (result.initializedSnapshot) {
@@ -29,12 +32,36 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
     try {
       const { api, treeHandle } = await requireActiveTree();
       const foldArtifacts = await api.foldArtifacts(treeHandle);
-      set({ foldArtifacts, foldArtifactError: null });
+      set({
+        foldArtifacts,
+        foldArtifactError: null,
+        sequenceTarget: null,
+        sequencePlan: null,
+        sequenceSimulationFocus: wholeSimulationFocus,
+      });
       return foldArtifacts;
     } catch (error) {
-      set({ foldArtifacts: null, foldArtifactError: engineError(error).message });
+      set({
+        foldArtifacts: null,
+        foldArtifactError: engineError(error).message,
+        sequenceTarget: null,
+        sequencePlan: null,
+        sequenceSimulationFocus: wholeSimulationFocus,
+      });
       return null;
     }
+  }
+
+  async function requireFoldForSequence(): Promise<FoldArtifacts | null> {
+    const foldArtifacts = get().foldArtifacts ?? (await loadFoldArtifacts());
+    if (!foldArtifacts) {
+      set({
+        sequencePlanning: false,
+        sequenceError: 'No crease pattern is available for sequence planning.',
+      });
+      return null;
+    }
+    return foldArtifacts;
   }
 
   async function runOptimization(
@@ -61,6 +88,10 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
         lastOptimization: report,
         foldArtifacts: null,
         foldArtifactError: null,
+        sequenceTarget: null,
+        sequencePlan: null,
+        sequenceSimulationFocus: wholeSimulationFocus,
+        sequenceError: null,
         dirty: true,
         projectMessage: label,
         designViewportFitRequestId: options.fitPaperView
@@ -78,6 +109,11 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
     creaseColorMode: DEFAULT_CREASE_COLOR_MODE,
     foldArtifacts: null,
     foldArtifactError: null,
+    sequenceTarget: null,
+    sequencePlan: null,
+    sequenceSimulationFocus: wholeSimulationFocus,
+    sequencePlanning: false,
+    sequenceError: null,
 
     optimizeScale: async () => {
       await runOptimization('Optimize scale', 'optimize.scale', (api, treeHandle) =>
@@ -133,6 +169,10 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
             },
             foldArtifacts: null,
             foldArtifactError: null,
+            sequenceTarget: null,
+            sequencePlan: null,
+            sequenceSimulationFocus: wholeSimulationFocus,
+            sequenceError: null,
             projectMessage: null,
           });
           return;
@@ -149,6 +189,10 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
           error: null,
           foldArtifacts,
           foldArtifactError,
+          sequenceTarget: null,
+          sequencePlan: null,
+          sequenceSimulationFocus: wholeSimulationFocus,
+          sequenceError: null,
           dirty: true,
           projectMessage: 'Built crease pattern',
         });
@@ -162,6 +206,58 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
 
     refreshFoldArtifacts: loadFoldArtifacts,
 
+    analyzeSequenceTarget: async () => {
+      set({ sequencePlanning: true, sequenceError: null });
+      try {
+        const foldArtifacts = await requireFoldForSequence();
+        if (!foldArtifacts) return null;
+        const api = await getEngine();
+        const target = await api.sequenceAnalyzeFold(JSON.stringify(foldArtifacts.fold), {
+          solution_limit: 10,
+        });
+        set({ sequenceTarget: target, sequencePlanning: false, sequenceError: null });
+        return target;
+      } catch (error) {
+        const message = engineError(error).message;
+        set({ sequencePlanning: false, sequenceError: message, sequenceTarget: null });
+        return null;
+      }
+    },
+
+    planFoldingSequence: async () => {
+      set({ sequencePlanning: true, sequenceError: null });
+      try {
+        const foldArtifacts = await requireFoldForSequence();
+        if (!foldArtifacts) return null;
+        const api = await getEngine();
+        const foldJson = JSON.stringify(foldArtifacts.fold);
+        const { target, plan } = await api.sequencePlanFoldWithTarget(foldJson, {
+          solution_limit: 10,
+          max_steps: 64,
+          max_states: 1024,
+        });
+        set({
+          sequenceTarget: target,
+          sequencePlan: plan,
+          sequenceSimulationFocus: wholeSimulationFocus,
+          sequencePlanning: false,
+          sequenceError: null,
+        });
+        useLayoutStore.getState().activatePanel('sequence');
+        return plan;
+      } catch (error) {
+        const message = engineError(error).message;
+        set({
+          sequencePlanning: false,
+          sequenceError: message,
+          sequencePlan: null,
+          sequenceSimulationFocus: wholeSimulationFocus,
+        });
+        return null;
+      }
+    },
+
     setCreaseColorMode: (creaseColorMode) => set({ creaseColorMode }),
+    setSequenceSimulationFocus: (sequenceSimulationFocus) => set({ sequenceSimulationFocus }),
   };
 };

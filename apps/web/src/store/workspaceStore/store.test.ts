@@ -383,6 +383,60 @@ function createMockEngineApi(initialSnapshot: TreeSnapshot) {
     flatFoldArtifacts: vi.fn(async (foldJson: string) =>
       foldArtifactsFromFold(JSON.parse(foldJson) as FoldDocument)
     ),
+    sequenceAnalyzeFold: vi.fn(async (foldJson: string) => ({
+      normalized: JSON.parse(foldJson) as FoldDocument,
+      folded_vertices: [],
+      faces_flip: [],
+      face_orders: [],
+      states: '1',
+      diagnostics: [],
+    })),
+    sequencePlanFold: vi.fn(async () => ({
+      status: 'complete',
+      steps: [],
+      states: [],
+      diagnostics: [],
+      unresolved_regions: [],
+      search: {
+        states_explored: 1,
+        branches_pruned: 0,
+        repeated_states: 0,
+        timed_out: false,
+        budget_exhausted: false,
+        best_unresolved_creases: 0,
+        target_solves: 0,
+        target_solve_cache_hits: 0,
+        duplicate_candidates_pruned: 0,
+      },
+    })),
+    sequencePlanFoldWithTarget: vi.fn(async (foldJson: string) => ({
+      target: {
+        normalized: JSON.parse(foldJson) as FoldDocument,
+        folded_vertices: [],
+        faces_flip: [],
+        face_orders: [],
+        states: '1',
+        diagnostics: [],
+      },
+      plan: {
+        status: 'complete',
+        steps: [],
+        states: [],
+        diagnostics: [],
+        unresolved_regions: [],
+        search: {
+          states_explored: 1,
+          branches_pruned: 0,
+          repeated_states: 0,
+          timed_out: false,
+          budget_exhausted: false,
+          best_unresolved_creases: 0,
+          target_solves: 0,
+          target_solve_cache_hits: 0,
+          duplicate_candidates_pruned: 0,
+        },
+      },
+    })),
     optimizeScale: vi.fn(async (): Promise<OptimizationReport> => {
       const oldScale = snapshotState.paper.scale;
       snapshotState = makeSnapshot({
@@ -746,6 +800,11 @@ function loadSnapshotIntoStore(snapshot: TreeSnapshot, title = 'Seed project') {
     creaseColorMode: DEFAULT_CREASE_COLOR_MODE,
     foldArtifacts: null,
     foldArtifactError: null,
+    sequenceTarget: null,
+    sequencePlan: null,
+    sequenceSimulationFocus: { kind: 'whole' },
+    sequencePlanning: false,
+    sequenceError: null,
   });
 }
 
@@ -1446,6 +1505,28 @@ describe('workspace store slices', () => {
 
     useWorkspaceStore.getState().setCreaseColorMode('mvf');
     expect(useWorkspaceStore.getState().creaseColorMode).toBe('mvf');
+  });
+
+  it('plans a folding sequence from loaded fold artifacts', async () => {
+    const api = resetStores(seedSnapshot());
+    loadSnapshotIntoStore(seedSnapshot());
+    const activatePanel = vi.fn();
+    useLayoutStore.setState({ activatePanel });
+    await useWorkspaceStore.getState().buildCreasePattern();
+    useWorkspaceStore
+      .getState()
+      .setSequenceSimulationFocus({ kind: 'sequence_step', stepId: 'stale-step' });
+
+    const plan = await useWorkspaceStore.getState().planFoldingSequence();
+
+    expect(api.sequencePlanFoldWithTarget).toHaveBeenCalledOnce();
+    expect(api.sequenceAnalyzeFold).not.toHaveBeenCalled();
+    expect(api.sequencePlanFold).not.toHaveBeenCalled();
+    expect(plan?.status).toBe('complete');
+    expect(useWorkspaceStore.getState().sequencePlan?.status).toBe('complete');
+    expect(useWorkspaceStore.getState().sequenceSimulationFocus).toEqual({ kind: 'whole' });
+    expect(useWorkspaceStore.getState().sequenceError).toBeNull();
+    expect(activatePanel).toHaveBeenCalledWith('sequence');
   });
 
   it('does not mark CP ready when build returns no drawable crease pattern', async () => {

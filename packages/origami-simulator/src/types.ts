@@ -26,6 +26,16 @@ export interface CreaseParameter {
   targetAngle: number;
 }
 
+export interface CreaseFoldRange {
+  edge: number;
+  fromAngle: number;
+  toAngle: number;
+}
+
+export interface FoldProfile {
+  ranges: CreaseFoldRange[];
+}
+
 export interface PreparedOrigamiModel {
   fold: FoldDocument;
   vertexCount: number;
@@ -52,12 +62,14 @@ export interface PrepareFoldOptions {
 
 export interface SimulatorOptions {
   foldPercent?: number;
+  foldProfile?: FoldProfile | null;
   axialStiffness?: number;
   creaseStiffness?: number;
   panelStiffness?: number;
   faceStiffness?: number;
   damping?: number;
   timeStep?: number;
+  timeStepScale?: number;
   stepsPerFrame?: number;
   autoRender?: boolean;
   integrationType?: 'euler' | 'verlet';
@@ -90,6 +102,7 @@ export interface CreateSimulatorConfig {
 
 export interface OrigamiSimulatorController {
   setFoldPercent(percent: number): void;
+  setFoldProfile(profile: FoldProfile | null): void;
   setMaterial(options: Partial<SimulatorOptions>): void;
   step(numSteps?: number): SimulationFrame;
   start(): void;

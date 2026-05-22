@@ -1,5 +1,5 @@
 import { distanceToLine2D, edgeLength, normalizePoint } from './geometry.js';
-import type { PreparedOrigamiModel, SimulatorDiagnostics } from './types.js';
+import type { FoldProfile, PreparedOrigamiModel, SimulatorDiagnostics } from './types.js';
 
 const EPSILON = 1e-6;
 
@@ -30,10 +30,11 @@ export class OrigamiModel {
     this.velocities.fill(0);
   }
 
-  computeTarget(foldPercent: number): Float32Array {
+  computeTarget(foldPercent: number, foldProfile?: FoldProfile | null): Float32Array {
     const target = this.originalPositions.slice();
     const normalizedPercent = foldPercent / 100;
     const originalPoints = this.pointTuples(this.originalPositions);
+    const profileRanges = new Map((foldProfile?.ranges ?? []).map((range) => [range.edge, range]));
 
     for (const crease of this.prepared.creaseParams) {
       const edge = this.prepared.edgesVertices[crease.edge];
@@ -44,7 +45,11 @@ export class OrigamiModel {
       const v2 = originalPoints[crease.vertex2];
       if (!a || !b || !v1 || !v2) continue;
 
-      const theta = (crease.targetAngle * normalizedPercent * Math.PI) / 180;
+      const range = profileRanges.get(crease.edge);
+      const angle = range
+        ? range.fromAngle + (range.toAngle - range.fromAngle) * normalizedPercent
+        : crease.targetAngle * normalizedPercent;
+      const theta = (angle * Math.PI) / 180;
       const h1 = Math.sin(theta / 2) * distanceToLine2D(v1, a, b);
       const h2 = Math.sin(theta / 2) * distanceToLine2D(v2, a, b);
       target[crease.vertex1 * 3 + 1] -= h1;

@@ -122,6 +122,31 @@ describe('createOrigamiSimulator', () => {
     simulator.dispose();
   });
 
+  it('can scale the adaptive timestep down for higher-accuracy settling', () => {
+    const standardPrepared = prepareFoldModel(makeBookFoldFixture());
+    const accuratePrepared = prepareFoldModel(makeBookFoldFixture());
+    const standard = createOrigamiSimulator({
+      model: standardPrepared,
+      options: { foldPercent: 100 },
+    });
+    const accurate = createOrigamiSimulator({
+      model: accuratePrepared,
+      options: { foldPercent: 100, timeStepScale: 0.25 },
+    });
+    const standardBefore = standard.readFrame().positions;
+    const accurateBefore = accurate.readFrame().positions;
+    const standardAfter = standard.step(1).positions;
+    const accurateAfter = accurate.step(1).positions;
+
+    expect(maxPositionDelta(standardBefore, standardAfter)).toBeGreaterThan(0);
+    expect(maxPositionDelta(accurateBefore, accurateAfter)).toBeGreaterThan(0);
+    expect(maxPositionDelta(accurateBefore, accurateAfter)).toBeLessThan(
+      maxPositionDelta(standardBefore, standardAfter)
+    );
+    standard.dispose();
+    accurate.dispose();
+  });
+
   it('leaves a flat model still when the target fold percent is zero', () => {
     const prepared = prepareFoldModel(makeBookFoldFixture());
     const simulator = createOrigamiSimulator({ model: prepared, options: { foldPercent: 0 } });
@@ -129,6 +154,55 @@ describe('createOrigamiSimulator', () => {
     const after = simulator.step(64).positions;
 
     expect(maxPositionDelta(before, after)).toBeLessThan(1e-6);
+    simulator.dispose();
+  });
+
+  it('keeps a profiled crease still when its fold range is flat', () => {
+    const prepared = prepareFoldModel(makeBookFoldFixture());
+    const simulator = createOrigamiSimulator({
+      model: prepared,
+      options: {
+        foldPercent: 100,
+        foldProfile: { ranges: [{ edge: 4, fromAngle: 0, toAngle: 0 }] },
+      },
+    });
+    const before = simulator.readFrame().positions;
+    const after = simulator.step(64).positions;
+
+    expect(maxPositionDelta(before, after)).toBeLessThan(1e-6);
+    simulator.dispose();
+  });
+
+  it('moves a profiled crease as the fold percent advances through its range', () => {
+    const prepared = prepareFoldModel(makeBookFoldFixture());
+    const simulator = createOrigamiSimulator({
+      model: prepared,
+      options: {
+        foldPercent: 100,
+        foldProfile: { ranges: [{ edge: 4, fromAngle: 0, toAngle: -180 }] },
+      },
+    });
+    const before = simulator.readFrame().positions;
+    const after = simulator.step(64).positions;
+
+    expect(maxPositionDelta(before, after)).toBeGreaterThan(0);
+    simulator.dispose();
+  });
+
+  it('returns to whole-model targets after clearing a fold profile', () => {
+    const prepared = prepareFoldModel(makeBookFoldFixture());
+    const simulator = createOrigamiSimulator({
+      model: prepared,
+      options: {
+        foldPercent: 100,
+        foldProfile: { ranges: [{ edge: 4, fromAngle: 0, toAngle: 0 }] },
+      },
+    });
+    const before = simulator.step(64).positions;
+    simulator.setFoldProfile(null);
+    const after = simulator.step(64).positions;
+
+    expect(maxPositionDelta(before, after)).toBeGreaterThan(0);
     simulator.dispose();
   });
 

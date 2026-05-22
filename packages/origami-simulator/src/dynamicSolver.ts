@@ -1,5 +1,5 @@
 import { OrigamiModel } from './model.js';
-import type { SimulationFrame, SimulatorOptions } from './types.js';
+import type { CreaseFoldRange, CreaseParameter, SimulationFrame, SimulatorOptions } from './types.js';
 
 // TypeScript CPU port of Amanda Ghassaei's OrigamiSimulator dynamic solver.
 //
@@ -14,12 +14,14 @@ const TWO_PI = Math.PI * 2;
 
 const DEFAULT_OPTIONS: Required<SimulatorOptions> = {
   foldPercent: 0,
+  foldProfile: null,
   axialStiffness: 20,
   creaseStiffness: 0.7,
   panelStiffness: 0.7,
   faceStiffness: 0.2,
   damping: 0.45,
   timeStep: 0,
+  timeStepScale: 1,
   stepsPerFrame: 100,
   autoRender: true,
   integrationType: 'euler',
@@ -39,11 +41,13 @@ export class DynamicSolver {
   private readonly nodeCreases: NodeCreaseRef[][];
   private readonly nodeFaces: NodeFaceRef[][];
   private readonly nominalAngles: Vec3[];
+  private foldProfileRanges = new Map<number, CreaseFoldRange>();
 
   constructor(model: OrigamiModel, options: SimulatorOptions = {}) {
     this.model = model;
     this.options = { ...DEFAULT_OPTIONS, ...options };
     this.options.foldPercent = clampFoldPercent(this.options.foldPercent);
+    this.foldProfileRanges = foldProfileRangeMap(this.options.foldProfile?.ranges ?? []);
     this.forces = new Float32Array(model.positions.length);
     this.relativePositions = new Float32Array(model.positions.length);
     this.lastRelativePositions = new Float32Array(model.positions.length);
@@ -61,6 +65,11 @@ export class DynamicSolver {
     this.options.foldPercent = clampFoldPercent(percent);
   }
 
+  setFoldProfile(profile: SimulatorOptions['foldProfile']): void {
+    this.options.foldProfile = profile ?? null;
+    this.foldProfileRanges = foldProfileRangeMap(profile?.ranges ?? []);
+  }
+
   setMaterial(options: Partial<SimulatorOptions>): void {
     this.options = {
       ...this.options,
@@ -68,6 +77,9 @@ export class DynamicSolver {
       foldPercent:
         options.foldPercent === undefined ? this.options.foldPercent : clampFoldPercent(options.foldPercent),
     };
+    if ('foldProfile' in options) {
+      this.foldProfileRanges = foldProfileRangeMap(options.foldProfile?.ranges ?? []);
+    }
   }
 
   reset(): void {
@@ -297,15 +309,15 @@ export class DynamicSolver {
     geometry: CreaseGeometry[]
   ): Vec3 {
     let force: Vec3 = [0, 0, 0];
-    const foldScale = this.options.foldPercent / 100;
     for (const ref of this.nodeCreases[vertex] ?? []) {
       const crease = this.model.prepared.creaseParams[ref.creaseIndex];
       const geo = geometry[ref.creaseIndex];
       if (!crease || !geo || !geo.enabled) continue;
 
-      const targetTheta = ((crease.targetAngle * Math.PI) / 180) * foldScale;
+      const range = this.foldProfileRanges.get(crease.edge);
+      const targetTheta = (this.targetAngleDegrees(crease, range) * Math.PI) / 180;
       const stiffness =
-        (crease.targetAngle === 0 ? this.options.panelStiffness : this.options.creaseStiffness) *
+        (isFlatTarget(crease, range) ? this.options.panelStiffness : this.options.creaseStiffness) *
         this.model.edgeRestLength(crease.edge);
       const angularForce = stiffness * (targetTheta - (theta[ref.creaseIndex] ?? 0));
 
@@ -330,6 +342,12 @@ export class DynamicSolver {
       }
     }
     return force;
+  }
+
+  private targetAngleDegrees(crease: CreaseParameter, range: CreaseFoldRange | undefined): number {
+    const foldScale = this.options.foldPercent / 100;
+    if (!range) return crease.targetAngle * foldScale;
+    return range.fromAngle + (range.toAngle - range.fromAngle) * foldScale;
   }
 
   private faceForce(vertex: number, normals: Float32Array): Vec3 {
@@ -403,7 +421,7 @@ export class DynamicSolver {
       }
     }
     if (maxFrequency <= EPSILON) return 1 / 60;
-    return 0.9 / (TWO_PI * maxFrequency);
+    return (0.9 / (TWO_PI * maxFrequency)) * normalizedTimeStepScale(this.options.timeStepScale);
   }
 
   private relativePointAt(vertex: number): Vec3 {
@@ -518,6 +536,32 @@ function clamp(value: number, min: number, max: number): number {
 function clampFoldPercent(percent: number): number {
   if (!Number.isFinite(percent)) return 0;
   return clamp(percent, 0, 100);
+}
+
+function normalizedTimeStepScale(scale: number): number {
+  if (!Number.isFinite(scale) || scale <= 0) return 1;
+  return clamp(scale, 0.05, 1);
+}
+
+function foldProfileRangeMap(ranges: CreaseFoldRange[]): Map<number, CreaseFoldRange> {
+  const map = new Map<number, CreaseFoldRange>();
+  for (const range of ranges) {
+    if (
+      !Number.isInteger(range.edge) ||
+      range.edge < 0 ||
+      !Number.isFinite(range.fromAngle) ||
+      !Number.isFinite(range.toAngle)
+    ) {
+      continue;
+    }
+    map.set(range.edge, range);
+  }
+  return map;
+}
+
+function isFlatTarget(crease: CreaseParameter, range: CreaseFoldRange | undefined): boolean {
+  if (!range) return crease.targetAngle === 0;
+  return range.fromAngle === 0 && range.toAngle === 0;
 }
 
 function buildNodeBeams(model: OrigamiModel): NodeBeamRef[][] {

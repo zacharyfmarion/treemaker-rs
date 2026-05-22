@@ -70,6 +70,7 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
         lastOptimization: null,
         foldArtifacts: null,
         foldArtifactError: null,
+        sequenceSimulationFocus: { kind: 'whole' },
         projectMessage: null,
       });
       get().commitHistoryCheckpoint(checkpoint, label);
@@ -122,6 +123,7 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
           lastOptimization: null,
           foldArtifacts: null,
           foldArtifactError: null,
+          sequenceSimulationFocus: { kind: 'whole' },
         });
         get().commitHistoryCheckpoint(checkpoint, 'Add node');
         void get().autosaveProject();
@@ -221,6 +223,7 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
           lastOptimization: null,
           foldArtifacts: null,
           foldArtifactError: null,
+          sequenceSimulationFocus: { kind: 'whole' },
           projectMessage: addedPair ? 'Added mirrored branch' : snapped.snapped ? 'Added axial node' : null,
         });
         get().commitHistoryCheckpoint(checkpoint, addedPair ? 'Add mirrored branch' : 'Add node');
@@ -247,6 +250,7 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
           lastOptimization: null,
           foldArtifacts: null,
           foldArtifactError: null,
+          sequenceSimulationFocus: { kind: 'whole' },
         });
         get().commitHistoryCheckpoint(checkpoint, 'Move node');
         void get().autosaveProject();
@@ -286,6 +290,7 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
           lastOptimization: null,
           foldArtifacts: null,
           foldArtifactError: null,
+          sequenceSimulationFocus: { kind: 'whole' },
         });
         get().commitHistoryCheckpoint(checkpoint, 'Move mirrored nodes');
         void get().autosaveProject();
@@ -318,6 +323,7 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
           lastOptimization: null,
           foldArtifacts: null,
           foldArtifactError: null,
+          sequenceSimulationFocus: { kind: 'whole' },
         });
         get().commitHistoryCheckpoint(checkpoint, 'Add edge');
         void get().autosaveProject();
@@ -341,6 +347,7 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
           error: null,
           foldArtifacts: null,
           foldArtifactError: null,
+          sequenceSimulationFocus: { kind: 'whole' },
         });
         get().commitHistoryCheckpoint(checkpoint, 'Rename node');
         void get().autosaveProject();
@@ -381,6 +388,7 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
           lastOptimization: null,
           foldArtifacts: null,
           foldArtifactError: null,
+          sequenceSimulationFocus: { kind: 'whole' },
         });
         get().commitHistoryCheckpoint(checkpoint, shouldUpdateMirror ? 'Edit mirrored edges' : 'Edit edge');
         void get().autosaveProject();
@@ -518,6 +526,7 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
             lastOptimization: null,
             foldArtifacts: null,
             foldArtifactError: null,
+            sequenceSimulationFocus: { kind: 'whole' },
             projectMessage: 'Cleared design',
           });
           get().commitHistoryCheckpoint(checkpoint, 'Clear design');
@@ -544,6 +553,7 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
           lastOptimization: null,
           foldArtifacts: null,
           foldArtifactError: null,
+          sequenceSimulationFocus: { kind: 'whole' },
         });
         get().commitHistoryCheckpoint(checkpoint, 'Delete selection');
         void get().autosaveProject();

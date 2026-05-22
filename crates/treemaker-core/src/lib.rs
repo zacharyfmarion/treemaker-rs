@@ -1233,7 +1233,7 @@ impl Tree {
                 facet
                     .head_facets
                     .iter()
-                    .map(move |head| [facet.index - 1, head - 1, 1])
+                    .map(move |head| [(facet.index - 1) as i64, (head - 1) as i64, 1])
             })
             .collect();
         fold.extra.insert(

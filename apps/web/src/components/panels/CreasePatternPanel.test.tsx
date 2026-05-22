@@ -311,6 +311,7 @@ describe('CreasePatternPanel', () => {
 
     expect(useWorkspaceStore.getState().creaseColorMode).toBe(DEFAULT_CREASE_COLOR_MODE);
     expect(container.querySelector('[aria-label="Crease pattern"]')).not.toBeNull();
+    expect(container.querySelector('.cp-tool-rail')).toBeNull();
     expect(container.textContent).toContain('Color by');
     expect(container.textContent).toContain('Crease roles');
     expect(container.textContent).toContain('M/V assignment');
@@ -463,7 +464,32 @@ describe('CreasePatternPanel', () => {
     expect(container.querySelector('.cp-circle')).not.toBeNull();
     expect(container.querySelector('.cp-point')).not.toBeNull();
     expect(container.querySelector('.cp-text')?.textContent).toBe('note');
+    expect(container.querySelector('.cp-tool-rail')).not.toBeNull();
+    expect(container.textContent).toContain('Tool Select');
     expect(container.textContent).toContain('2 lines');
+
+    const drawCreaseButton = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Draw crease"]'
+    );
+    const foldEstimateButton = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Fold estimate"]'
+    );
+    expect(drawCreaseButton?.getAttribute('aria-disabled')).toBe('true');
+    expect(drawCreaseButton?.getAttribute('data-ui-status')).toBe('not-implemented');
+    expect(foldEstimateButton?.getAttribute('aria-disabled')).toBe('true');
+    expect(foldEstimateButton?.getAttribute('data-ui-status')).toBe('porting');
+
+    act(() => {
+      drawCreaseButton?.click();
+    });
+    expect(container.textContent).toContain('Draw crease: Not implemented');
+    expect(drawCreaseButton?.hasAttribute('data-active')).toBe(true);
+
+    act(() => {
+      foldEstimateButton?.click();
+    });
+    expect(container.textContent).toContain('Fold estimate: Porting');
+    expect(foldEstimateButton?.hasAttribute('data-active')).toBe(true);
 
     act(() => {
       container.querySelector<SVGLineElement>('[data-cp-line-id="1"]')?.dispatchEvent(

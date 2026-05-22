@@ -637,7 +637,7 @@ Done when:
 - [x] Stage 2: Align editable CP grid rendering and grid snapping with
       Oriedita's paper-coordinate grid model.
 - [x] Stage 2: Validate viewport behavior with unit and visual tests.
-- [ ] Stage 3: Add the left-side tool rail, command groups, active-tool
+- [x] Stage 3: Add the left-side tool rail, command groups, active-tool
       prompts, and Not-implemented presentation.
 - [ ] Stage 3: Add CP tool-state transitions for multi-step commands.
 - [ ] Stage 4: Add CP open/import/save/export workflows and dirty-state

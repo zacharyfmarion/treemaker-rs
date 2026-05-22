@@ -11,6 +11,10 @@ import { GitBranch, Grid2X2, Magnet, ScanLine } from 'lucide-react';
 import type { OristudioCpDocumentSnapshot } from '../../engine/oristudioCpTypes';
 import { formatNumber, paperToSvg, type Point } from '../../lib/geometry';
 import { getViewportFitScale, type ViewportSize } from '../../lib/designViewport';
+import type {
+  OristudioCpCommandDefinition,
+  OristudioCpOperationId,
+} from '../../lib/oristudioCpCommands';
 import {
   CP_PAPER_RECT,
   CP_PAPER_SHADOW_RECT,
@@ -40,6 +44,7 @@ import {
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { IconButton } from '../ui/IconButton';
 import { SegmentedControl } from '../ui/SegmentedControl';
+import { CpToolRail } from './CpToolRail';
 import { NextDocumentAction } from './NextDocumentAction';
 import {
   isViewportInteractiveTarget,
@@ -64,6 +69,9 @@ export function CreasePatternPanel() {
   const [spacePressed, setSpacePressed] = useState(false);
   const [cursorModelPoint, setCursorModelPoint] = useState<Point | null>(null);
   const [snapTarget, setSnapTarget] = useState<CpSnapTarget | null>(null);
+  const [activeCpOperationId, setActiveCpOperationId] =
+    useState<OristudioCpOperationId | null>(null);
+  const [cpToolPrompt, setCpToolPrompt] = useState('Tool Select');
 
   const project = useWorkspaceStore((state) => state.project);
   const status = useWorkspaceStore((state) => state.status);
@@ -119,6 +127,17 @@ export function CreasePatternPanel() {
   const hasCreasePattern =
     hasEditableCreasePattern || project.creases.length > 0 || project.facets.length > 0;
   const editableSelectionSize = cpSelectionSize(oristudioCpSelection);
+
+  const handleCpToolCommand = useCallback((command: OristudioCpCommandDefinition) => {
+    setActiveCpOperationId(command.operationId);
+    if (command.uiStatus === 'ready') {
+      setCpToolPrompt(`Tool ${command.label}`);
+      return;
+    }
+    setCpToolPrompt(
+      `${command.label}: ${command.uiStatus === 'porting' ? 'Porting' : 'Not implemented'}`
+    );
+  }, []);
 
   const clearSelectionOnBackgroundPointerDown = (event: PointerEvent<SVGElement>) => {
     if (event.button !== 0 || spacePressed) return;
@@ -326,6 +345,13 @@ export function CreasePatternPanel() {
     };
   }, [fitToView, hasCreasePattern, setActualSize]);
 
+  useEffect(() => {
+    if (!editableCp) {
+      setActiveCpOperationId(null);
+      setCpToolPrompt('Tool Select');
+    }
+  }, [editableCp]);
+
   return (
     <section className="panel-shell cp-panel">
       <div className="panel-toolbar">
@@ -362,7 +388,10 @@ export function CreasePatternPanel() {
       {sourceLabel && <div className="panel-subtitle">{sourceLabel}</div>}
       <div
         ref={containerRef}
-        className="panel-body cp-panel__body"
+        className={[
+          'panel-body cp-panel__body',
+          editableCp ? 'cp-panel__body--with-tools' : '',
+        ].join(' ')}
         data-space-pan={spacePressed || undefined}
         tabIndex={-1}
         onPointerDown={(event) => {
@@ -371,153 +400,163 @@ export function CreasePatternPanel() {
       >
         {hasCreasePattern ? (
           <>
-            <TransformWrapper
-              ref={transformRef}
-              initialScale={1}
-              minScale={0.05}
-              maxScale={30}
-              centerOnInit
-              limitToBounds={false}
-              wheel={{ step: 0.5, wheelDisabled: true }}
-              panning={{
-                velocityDisabled: true,
-                wheelPanning: true,
-                allowMiddleClickPan: true,
-                allowLeftClickPan: spacePressed,
-              }}
-              pinch={{ step: 0.5 }}
-              doubleClick={{ disabled: true }}
-              onInit={(ref) => {
-                transformRef.current = ref;
-                requestAnimationFrame(() => fitLoadedCreasePatternRef.current(0));
-              }}
-              onTransformed={(_ref, state) => setZoomPercent(Math.round(state.scale * 100))}
-            >
-              <TransformComponent
-                wrapperStyle={{ width: '100%', height: '100%' }}
-                contentStyle={{ width: 'fit-content', height: 'fit-content' }}
+            {editableCp && (
+              <CpToolRail
+                activeOperationId={activeCpOperationId}
+                editable={!!editableCp}
+                onSelectCommand={handleCpToolCommand}
+              />
+            )}
+            <div className="cp-panel__viewport">
+              <TransformWrapper
+                ref={transformRef}
+                initialScale={1}
+                minScale={0.05}
+                maxScale={30}
+                centerOnInit
+                limitToBounds={false}
+                wheel={{ step: 0.5, wheelDisabled: true }}
+                panning={{
+                  velocityDisabled: true,
+                  wheelPanning: true,
+                  allowMiddleClickPan: true,
+                  allowLeftClickPan: spacePressed,
+                }}
+                pinch={{ step: 0.5 }}
+                doubleClick={{ disabled: true }}
+                onInit={(ref) => {
+                  transformRef.current = ref;
+                  requestAnimationFrame(() => fitLoadedCreasePatternRef.current(0));
+                }}
+                onTransformed={(_ref, state) => setZoomPercent(Math.round(state.scale * 100))}
               >
-                <svg
-                  ref={svgRef}
-                  className="cp-canvas"
-                  viewBox={`0 0 ${CP_VIEWBOX_SIZE} ${CP_VIEWBOX_SIZE}`}
-                  width={CP_VIEWBOX_SIZE}
-                  height={CP_VIEWBOX_SIZE}
-                  style={{ width: CP_VIEWBOX_SIZE, height: CP_VIEWBOX_SIZE }}
-                  role="img"
-                  aria-label="Crease pattern"
-                  onPointerMove={updateEditablePointerStatus}
-                  onPointerLeave={clearEditablePointerStatus}
-                  onPointerDown={(event) => {
-                    if (event.target === event.currentTarget) clearSelectionOnBackgroundPointerDown(event);
-                  }}
+                <TransformComponent
+                  wrapperStyle={{ width: '100%', height: '100%' }}
+                  contentStyle={{ width: 'fit-content', height: 'fit-content' }}
                 >
-                  <rect
-                    className="paper-shadow"
-                    x={CP_PAPER_SHADOW_RECT.x}
-                    y={CP_PAPER_SHADOW_RECT.y}
-                    width={CP_PAPER_SHADOW_RECT.width}
-                    height={CP_PAPER_SHADOW_RECT.height}
-                    rx="6"
-                  />
-                  <rect
-                    className="paper"
-                    x={CP_PAPER_RECT.x}
-                    y={CP_PAPER_RECT.y}
-                    width={CP_PAPER_RECT.width}
-                    height={CP_PAPER_RECT.height}
-                    onPointerDown={clearSelectionOnBackgroundPointerDown}
-                  />
-                  {editableCp ? (
-                    <EditableCreasePattern
-                      bounds={editableCpBounds}
-                      clearSelectionOnBackgroundPointerDown={clearSelectionOnBackgroundPointerDown}
-                      document={editableCp}
-                      gridLines={editableCpGridLines}
-                      gridVisible={oristudioCpViewport.gridVisible}
-                      mode={mode}
-                      selection={oristudioCpSelection}
-                      snapTarget={snapTarget}
-                      spacePressed={spacePressed}
-                      toggleCircle={toggleOristudioCpCircleSelection}
-                      toggleLine={toggleOristudioCpLineSelection}
-                      togglePoint={toggleOristudioCpPointSelection}
-                      toggleText={toggleOristudioCpTextSelection}
-                    />
-                  ) : (
-                    <GeneratedCreasePattern
-                      clearSelectionOnBackgroundPointerDown={clearSelectionOnBackgroundPointerDown}
-                      mode={mode}
-                      project={project}
-                      select={select}
-                      selection={selection}
-                      spacePressed={spacePressed}
-                    />
-                  )}
-                </svg>
-              </TransformComponent>
-            </TransformWrapper>
-            <ViewportToolbar
-              ariaLabel="Crease pattern viewport controls"
-              zoomPercent={zoomPercent}
-              zoomIn={() => transformRef.current?.zoomIn(0.35, 120)}
-              zoomOut={() => transformRef.current?.zoomOut(0.35, 120)}
-              fitToView={() => fitToView()}
-              setActualSize={setActualSize}
-              setZoomLevel={setZoomLevel}
-            >
-              {editableCp && (
-                <>
-                  <ViewportToolbarSeparator />
-                  <IconButton
-                    size="sm"
-                    variant="toolbar"
-                    title="Grid"
-                    isActive={oristudioCpViewport.gridVisible}
-                    onClick={() =>
-                      setOristudioCpViewportOption('gridVisible', !oristudioCpViewport.gridVisible)
-                    }
-                  >
-                    <Grid2X2 size={14} />
-                  </IconButton>
-                  <IconButton
-                    size="sm"
-                    variant="toolbar"
-                    title="Snap"
-                    isActive={
-                      oristudioCpViewport.snapToGrid ||
-                      oristudioCpViewport.snapToVertices ||
-                      oristudioCpViewport.snapToLines
-                    }
-                    onClick={() => {
-                      const enabled =
-                        oristudioCpViewport.snapToGrid ||
-                        oristudioCpViewport.snapToVertices ||
-                        oristudioCpViewport.snapToLines;
-                      setOristudioCpViewportOption('snapToGrid', !enabled);
-                      setOristudioCpViewportOption('snapToVertices', !enabled);
-                      setOristudioCpViewportOption('snapToLines', !enabled);
+                  <svg
+                    ref={svgRef}
+                    className="cp-canvas"
+                    viewBox={`0 0 ${CP_VIEWBOX_SIZE} ${CP_VIEWBOX_SIZE}`}
+                    width={CP_VIEWBOX_SIZE}
+                    height={CP_VIEWBOX_SIZE}
+                    style={{ width: CP_VIEWBOX_SIZE, height: CP_VIEWBOX_SIZE }}
+                    role="img"
+                    aria-label="Crease pattern"
+                    onPointerMove={updateEditablePointerStatus}
+                    onPointerLeave={clearEditablePointerStatus}
+                    onPointerDown={(event) => {
+                      if (event.target === event.currentTarget) clearSelectionOnBackgroundPointerDown(event);
                     }}
                   >
-                    <Magnet size={14} />
-                  </IconButton>
-                </>
-              )}
-            </ViewportToolbar>
-            <div className="viewport-status-readout">
-              <span>{formatZoom(zoomPercent / 100)}</span>
-              {editableCp && editableCpSummary && (
-                <span>{editableCpSummary.line_segments} lines</span>
-              )}
-              {editableCp && cursorModelPoint && (
-                <span>
-                  {formatNumber(cursorModelPoint.x, 2)}, {formatNumber(cursorModelPoint.y, 2)}
-                </span>
-              )}
-              {editableCp && snapTarget && <span>Snap {snapTarget.label}</span>}
-              {editableCp && editableSelectionSize > 0 && (
-                <span>{editableSelectionSize} selected</span>
-              )}
+                    <rect
+                      className="paper-shadow"
+                      x={CP_PAPER_SHADOW_RECT.x}
+                      y={CP_PAPER_SHADOW_RECT.y}
+                      width={CP_PAPER_SHADOW_RECT.width}
+                      height={CP_PAPER_SHADOW_RECT.height}
+                      rx="6"
+                    />
+                    <rect
+                      className="paper"
+                      x={CP_PAPER_RECT.x}
+                      y={CP_PAPER_RECT.y}
+                      width={CP_PAPER_RECT.width}
+                      height={CP_PAPER_RECT.height}
+                      onPointerDown={clearSelectionOnBackgroundPointerDown}
+                    />
+                    {editableCp ? (
+                      <EditableCreasePattern
+                        bounds={editableCpBounds}
+                        clearSelectionOnBackgroundPointerDown={clearSelectionOnBackgroundPointerDown}
+                        document={editableCp}
+                        gridLines={editableCpGridLines}
+                        gridVisible={oristudioCpViewport.gridVisible}
+                        mode={mode}
+                        selection={oristudioCpSelection}
+                        snapTarget={snapTarget}
+                        spacePressed={spacePressed}
+                        toggleCircle={toggleOristudioCpCircleSelection}
+                        toggleLine={toggleOristudioCpLineSelection}
+                        togglePoint={toggleOristudioCpPointSelection}
+                        toggleText={toggleOristudioCpTextSelection}
+                      />
+                    ) : (
+                      <GeneratedCreasePattern
+                        clearSelectionOnBackgroundPointerDown={clearSelectionOnBackgroundPointerDown}
+                        mode={mode}
+                        project={project}
+                        select={select}
+                        selection={selection}
+                        spacePressed={spacePressed}
+                      />
+                    )}
+                  </svg>
+                </TransformComponent>
+              </TransformWrapper>
+              <ViewportToolbar
+                ariaLabel="Crease pattern viewport controls"
+                zoomPercent={zoomPercent}
+                zoomIn={() => transformRef.current?.zoomIn(0.35, 120)}
+                zoomOut={() => transformRef.current?.zoomOut(0.35, 120)}
+                fitToView={() => fitToView()}
+                setActualSize={setActualSize}
+                setZoomLevel={setZoomLevel}
+              >
+                {editableCp && (
+                  <>
+                    <ViewportToolbarSeparator />
+                    <IconButton
+                      size="sm"
+                      variant="toolbar"
+                      title="Grid"
+                      isActive={oristudioCpViewport.gridVisible}
+                      onClick={() =>
+                        setOristudioCpViewportOption('gridVisible', !oristudioCpViewport.gridVisible)
+                      }
+                    >
+                      <Grid2X2 size={14} />
+                    </IconButton>
+                    <IconButton
+                      size="sm"
+                      variant="toolbar"
+                      title="Snap"
+                      isActive={
+                        oristudioCpViewport.snapToGrid ||
+                        oristudioCpViewport.snapToVertices ||
+                        oristudioCpViewport.snapToLines
+                      }
+                      onClick={() => {
+                        const enabled =
+                          oristudioCpViewport.snapToGrid ||
+                          oristudioCpViewport.snapToVertices ||
+                          oristudioCpViewport.snapToLines;
+                        setOristudioCpViewportOption('snapToGrid', !enabled);
+                        setOristudioCpViewportOption('snapToVertices', !enabled);
+                        setOristudioCpViewportOption('snapToLines', !enabled);
+                      }}
+                    >
+                      <Magnet size={14} />
+                    </IconButton>
+                  </>
+                )}
+              </ViewportToolbar>
+              <div className="viewport-status-readout">
+                <span>{formatZoom(zoomPercent / 100)}</span>
+                {editableCp && <span>{cpToolPrompt}</span>}
+                {editableCp && editableCpSummary && (
+                  <span>{editableCpSummary.line_segments} lines</span>
+                )}
+                {editableCp && cursorModelPoint && (
+                  <span>
+                    {formatNumber(cursorModelPoint.x, 2)}, {formatNumber(cursorModelPoint.y, 2)}
+                  </span>
+                )}
+                {editableCp && snapTarget && <span>Snap {snapTarget.label}</span>}
+                {editableCp && editableSelectionSize > 0 && (
+                  <span>{editableSelectionSize} selected</span>
+                )}
+              </div>
             </div>
           </>
         ) : (

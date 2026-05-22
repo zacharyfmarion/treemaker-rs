@@ -1,0 +1,90 @@
+name: Release Jar and exe
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+jobs:
+  create_jar:
+    runs-on: ubuntu-latest
+    name: Create Executable Jar
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'adopt'
+          cache: maven
+
+      - name: Cache Maven packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-java17-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-java17-m2
+
+      - name: Build with Maven
+        run: mvn -B package --file pom.xml
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: oriedita/target/oriedita-*.jar
+
+  create_release:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            platform: win
+            name: Windows
+          - os: ubuntu-latest
+            platform: linux
+            name: Linux
+          - os: macos-latest
+            platform: mac
+            name: Mac
+          - os: macos-14
+            platform: mac
+            name: Mac M1
+            suffix: _m1
+
+
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+
+    name: Create Release ${{ matrix.name }}
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v3
+        with:
+          java-version: '21'
+          distribution: 'adopt'
+          cache: maven
+
+      - name: Cache Maven packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-java21-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-java21-m2
+
+      - name: Build project and prepare JRE
+        run: build/01_prepare.sh
+
+      - name: Create release (${{ matrix.name }})
+        run: build/02_create_release.sh ${{ matrix.platform }} ${{ matrix.name }} ${{ matrix.suffix }}
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            ci-build/Oriedita*
+            ci-build/oriedita*

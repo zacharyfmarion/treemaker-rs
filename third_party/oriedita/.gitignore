@@ -1,0 +1,13 @@
+out/
+target/
+*.snap.debug
+*.versionsBackup
+*.releaseBackup
+ci-build/
+lib/
+*.iml
+pom.xml.next
+pom.xml.tag
+release.properties
+.DS_Store
+.vscode/

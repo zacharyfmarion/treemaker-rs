@@ -1,0 +1,595 @@
+package oriedita.editor.service.impl;
+
+import com.google.common.collect.BiMap;
+import com.google.common.collect.HashBiMap;
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.SetMultimap;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import jakarta.inject.Named;
+import org.tinylog.Logger;
+import oriedita.editor.FrameProvider;
+import oriedita.editor.action.ActionService;
+import oriedita.editor.action.ActionType;
+import oriedita.editor.action.MouseModeAction;
+import oriedita.editor.action.OrieditaAction;
+import oriedita.editor.canvas.CreasePattern_Worker;
+import oriedita.editor.databinding.CanvasModel;
+import oriedita.editor.service.ButtonService;
+import oriedita.editor.swing.DropdownMouseWheelAdapter;
+import oriedita.editor.swing.component.DropdownToolButton;
+import oriedita.editor.swing.component.GlyphIcon;
+import oriedita.editor.swing.dialog.HelpDialog;
+import oriedita.editor.swing.dialog.SelectKeyStrokeDialog;
+import oriedita.editor.tools.KeyStrokeUtil;
+import oriedita.editor.tools.ResourceUtil;
+import oriedita.editor.tools.StringOp;
+
+import javax.swing.AbstractAction;
+import javax.swing.AbstractButton;
+import javax.swing.Action;
+import javax.swing.JButton;
+import javax.swing.JCheckBox;
+import javax.swing.JCheckBoxMenuItem;
+import javax.swing.JComboBox;
+import javax.swing.JComponent;
+import javax.swing.JLabel;
+import javax.swing.JMenu;
+import javax.swing.JMenuItem;
+import javax.swing.JPopupMenu;
+import javax.swing.JSlider;
+import javax.swing.KeyStroke;
+import javax.swing.MenuElement;
+import javax.swing.text.JTextComponent;
+import java.awt.Component;
+import java.awt.Container;
+import java.awt.GraphicsEnvironment;
+import java.awt.KeyboardFocusManager;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.beans.PropertyChangeListener;
+import java.beans.PropertyChangeSupport;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+@ApplicationScoped
+public class ButtonServiceImpl implements ButtonService {
+    private final SetMultimap<String, AbstractButton> registeredButtons;
+    private final BiMap<String, KeyStroke> keystrokes;
+    private final Map<AbstractButton, String> buttonKeys;
+
+    private final FrameProvider owner;
+    private final HelpDialog explanation;
+    private final CreasePattern_Worker mainCreasePatternWorker;
+    private final CanvasModel canvasModel;
+    private final ActionService actionService;
+
+    private final PropertyChangeSupport keystrokeChangeSupport = new PropertyChangeSupport(this);
+
+    @Inject
+    public ButtonServiceImpl(
+            FrameProvider frame,
+            HelpDialog explanation,
+            @Named("mainCreasePattern_Worker") CreasePattern_Worker mainCreasePatternWorker,
+            CanvasModel canvasModel,
+            ActionService actionService
+    ) {
+        this.owner = frame;
+        this.explanation = explanation;
+        this.mainCreasePatternWorker = mainCreasePatternWorker;
+        this.canvasModel = canvasModel;
+        this.actionService = actionService;
+        registeredButtons = HashMultimap.create();
+        keystrokes = HashBiMap.create();
+        buttonKeys = new HashMap<>();
+
+        canvasModel.addPropertyChangeListener(e -> {
+            if (Objects.equals(e.getPropertyName(), "mouseMode")){
+                updateActiveButton();
+            }
+        });
+    }
+
+    private void updateActiveButton() {
+        var m = canvasModel.getMouseMode();
+
+        synchronized (registeredButtons) {
+            for (AbstractButton btn : registeredButtons.values()) {
+                if (btn == null) continue;
+                if (btn.getAction() instanceof MouseModeAction action) {
+                    btn.setSelected(m == action.getMouseMode());
+                } else if (!(btn instanceof JCheckBoxMenuItem) && !(btn instanceof JCheckBox)) {
+                    btn.setSelected(false);
+                }
+
+                // The new action of the button is only set after the action is executed, so at this point the button
+                // still has the old action and therefore won't be selected in the first if statement.
+                if (btn instanceof DropdownToolButton dtb && dtb.wasDropdownItemJustSelected()) {
+                    btn.setSelected(true);
+                }
+            }
+        }
+    }
+
+    @Override
+    public void setIcon(JLabel label, String key) {
+        String icon = ResourceUtil.getBundleString("icons", key);
+        if (!StringOp.isEmpty(icon)) {
+            GlyphIcon glyphIcon = new GlyphIcon(icon, label.getForeground());
+            label.addPropertyChangeListener("foreground", glyphIcon);
+            // Reset the text if there is no icon.
+            if (label.getIcon() == null) {
+                label.setText(null);
+            }
+            label.setIcon(glyphIcon);
+        }
+    }
+
+    @Override
+    public void registerButton(AbstractButton button, String key) {
+        registerButton(button, key, true);
+    }
+
+    @Override
+    public synchronized void registerButton(AbstractButton button, String key, boolean replaceUnderscoresInMenus) {
+        String keyStrokeString = ResourceUtil.getBundleString("hotkey", key);
+        KeyStroke keyStroke = KeyStroke.getKeyStroke(keyStrokeString);
+        if (!StringOp.isEmpty(keyStrokeString) && keyStroke == null) {
+            Logger.error("Keystroke for \"" + key + "\": \"" + keyStrokeString + "\" is invalid");
+        }
+
+        addButtonToRegisteredButtons(key, button);
+        setAction(button, key);
+        setTooltip(key);
+
+        if (button instanceof JMenuItem menuItem) {
+            registerJMenuItem(menuItem, key, replaceUnderscoresInMenus);
+        } else {
+            registerAbstractButton(button, key);
+        }
+
+        addHelpUpdater(button);
+    }
+
+    private void addHelpUpdater(AbstractButton button) {
+        ActionListener explanationUpdater = e -> {
+            String key = buttonKeys.get(button);
+            explanation.setExplanation(key);
+            Action action = button.getAction();
+            if (action instanceof OrieditaAction oAction) {
+                Button_shared_operation(oAction.resetLineStep());
+            } else {
+                Button_shared_operation(true);
+            }
+        };
+        button.addActionListener(explanationUpdater);
+    }
+    public void registerTextField(JTextComponent textField, String key){
+        textField.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                explanation.setExplanation(key);
+            }
+        });
+    }
+
+    public void registerSlider(JSlider slider, String key){
+        slider.addChangeListener(l -> explanation.setExplanation(key));
+    }
+
+    @Override
+    public void removeAllKeyBinds() {
+        for (ActionType value : ActionType.values()) {
+           removeKeyStroke(value.action());
+        }
+    }
+
+    @Override
+    public void loadAllKeyStrokes() {
+        for (ActionType value : ActionType.values()) {
+            loadKeyStroke(value.action());
+        }
+    }
+
+    public void loadKeyStroke(String key) {
+        String keyStrokeString = ResourceUtil.getBundleString("hotkey", key);
+        KeyStroke keyStroke = KeyStroke.getKeyStroke(keyStrokeString);
+        setKeyStroke(keyStroke, key);
+    }
+
+    private void registerAbstractButton(AbstractButton button, String key) {
+        String keyStrokeString = ResourceUtil.getBundleString("hotkey", key);
+        String icon = ResourceUtil.getBundleString("icons", key);
+        KeyStroke keyStroke = KeyStroke.getKeyStroke(keyStrokeString);
+
+        if (button instanceof DropdownToolButton tb) {
+            for (Component component : tb.getDropdownMenu().getComponents()) {
+                if (component instanceof JMenuItem item) {
+                    // Since these aren't in a proper JMenu, JMenuItem.setAccelerator is not enough
+                    String itemKey = item.getActionCommand();
+                    if (itemKey != null) {
+                        setKeyStroke(item.getAccelerator(), itemKey);
+                    }
+                }
+            }
+            button.addPropertyChangeListener("activeAction", e -> {
+                String newKey = ((ActionType) e.getNewValue()).action();
+                String oldKey = ((ActionType) e.getOldValue()).action();
+                String newIcon = ResourceUtil.getBundleString("icons", newKey);
+                GlyphIcon glyphIcon = new GlyphIcon(newIcon, button.getForeground());
+                setAction(button, newKey);
+                synchronized (registeredButtons) {
+                    registeredButtons.remove(oldKey, button);
+                    registeredButtons.put(newKey, button);
+                }
+                setTooltip(newKey);
+                addContextMenu(button, newKey);
+                button.setIcon(glyphIcon);
+                buttonKeys.put(button, newKey);
+            });
+        }
+        KeyStrokeUtil.resetButton(button);
+
+        addContextMenu(button, key);
+
+        if (keyStroke != null && button instanceof JButton) {
+            setKeyStroke(keyStroke, key);
+        }
+
+        if (!StringOp.isEmpty(icon)) {
+            GlyphIcon glyphIcon = new GlyphIcon(icon, button.getForeground());
+            button.addPropertyChangeListener("foreground", glyphIcon);
+            // Reset the text if there is no icon.
+            if (button.getIcon() == null) {
+                button.setText(null);
+            }
+            button.setIcon(glyphIcon);
+
+            if (button instanceof JCheckBox) {
+                GlyphIcon selectedGlyphIcon = new GlyphIcon(String.valueOf((char) (icon.toCharArray()[0] + 1)), button.getForeground());
+                button.addPropertyChangeListener("foreground", selectedGlyphIcon);
+                button.setSelectedIcon(selectedGlyphIcon);
+            }
+        }
+    }
+
+    private void registerJMenuItem(JMenuItem menuItem, String key, boolean replaceUnderscoresInMenus) {
+        String name = ResourceUtil.getBundleString("name", key);
+        String keyStrokeString = ResourceUtil.getBundleString("hotkey", key);
+        String icon = ResourceUtil.getBundleString("icons", key);
+        KeyStroke keyStroke = KeyStroke.getKeyStroke(keyStrokeString);
+
+        if (!StringOp.isEmpty(name) && replaceUnderscoresInMenus) {
+            int mnemonicIndex = name.indexOf('_');
+            if (mnemonicIndex > -1) {
+                String formattedName = name.replaceAll("_", "");
+
+                menuItem.setText(formattedName);
+                menuItem.setMnemonic(formattedName.charAt(mnemonicIndex));
+                menuItem.setDisplayedMnemonicIndex(mnemonicIndex);
+            } else {
+                menuItem.setText(name);
+            }
+            menuItem.setActionCommand(key);
+        }
+
+        if (!StringOp.isEmpty(icon)) {
+            GlyphIcon glyphIcon = new GlyphIcon(icon, menuItem.getForeground());
+            menuItem.addPropertyChangeListener("foreground", glyphIcon);
+            menuItem.setIcon(glyphIcon);
+        }
+
+        if (keyStroke != null) {
+            // Menu item can handle own accelerator (and shows a nice hint).
+            menuItem.setAccelerator(keyStroke);
+        }
+    }
+
+    private void setAction(AbstractButton button, String key) {
+        ActionType type = ActionType.fromAction(key);
+
+        if (type != null && actionService != null) {
+            String text = button.getText();
+
+            Action action = actionService.getAllRegisteredActions().get(type);
+
+            if (action != null) {
+                button.setAction(action);
+            } else {
+                Logger.debug("No handler for {}", key);
+            }
+
+            button.setText(text); // setAction replaces the text with the action name, this is to keep the original text
+        }  else {
+            Logger.debug("No action found for {}", key);
+        }
+    }
+
+    private void addButtonToRegisteredButtons(String key, AbstractButton button) {
+        synchronized (registeredButtons) {
+            registeredButtons.put(key, button);
+        }
+        buttonKeys.put(button, key);
+    }
+
+    @Override
+    public void Button_shared_operation(boolean resetLineStep) {
+        if (resetLineStep) {
+            mainCreasePatternWorker.resetLineStep(0);
+        }
+        // TODO RESET VORONOI mouseHandlerVoronoiCreate.getVoronoiLineSet().clear();
+
+        canvasModel.markDirty();
+    }
+
+    @Override
+    public Map<KeyStroke, AbstractButton> getHelpInputMap() {
+        synchronized (keystrokes) {
+            synchronized (registeredButtons) {
+                //noinspection OptionalGetWithoutIsPresent
+                return registeredButtons.asMap().entrySet().stream()
+                        .filter(e -> keystrokes.containsKey(e.getKey()) && keystrokes.get(e.getKey()) != null)
+                        .collect(Collectors.toMap(
+                                        e -> keystrokes.get(e.getKey()),
+                                        e -> e.getValue().stream().findFirst().get() // get is safe because MultiMap only contains
+                                        // keys with at least one entry
+                                )
+                        );
+            }
+        }
+    }
+
+    @Override
+    public void addDefaultListener(Container component) {
+        addDefaultListener(component, true);
+    }
+
+    private void addDefaultListenerRecursive(Container root, boolean replaceUnderscoresInMenus) {
+        Component[] components = root.getComponents();
+        if (root instanceof DropdownToolButton tb) {
+            addDefaultListenerRecursive(tb.getDropdownMenu(), true);
+        }
+
+        for (Component component1 : components) {
+            if (component1 instanceof Container) {
+                addDefaultListenerRecursive((Container) component1, true);
+            }
+
+            if (component1 instanceof AbstractButton button) {
+                String key = button.getActionCommand();
+
+                if (key != null && !key.isEmpty()) {
+                    registerButton(button, key, replaceUnderscoresInMenus);
+                }
+            }
+
+            if (component1 instanceof JComboBox<?> comboBox) {
+                comboBox.addMouseWheelListener(new DropdownMouseWheelAdapter(comboBox));
+            }
+
+            if (component1 instanceof JMenu) {
+                for (MenuElement element : ((JMenu) component1).getSubElements()) {
+                    if (element instanceof Container) {
+                        addDefaultListenerRecursive((Container) element, true);
+                    }
+                }
+            }
+        }
+    }
+
+    @Override
+    public void addDefaultListener(Container root, boolean replaceUnderscoresInMenus) {
+        addDefaultListenerRecursive(root, replaceUnderscoresInMenus);
+        updateActiveButton();
+    }
+
+    @Override
+    public void setKeyStroke(KeyStroke keyStroke, String key) {
+        KeyStroke oldValue;
+        synchronized (keystrokes) {
+            oldValue = keystrokes.get(key);
+        }
+        removeKeyStroke(key);
+        if (keyStroke != null){
+            // hotkey already in use
+            if (keystrokes.containsValue(keyStroke)){
+                var conflictKey = keystrokes.inverse().get(keyStroke);
+                var jarBundleConflictKeyStroke = ResourceUtil.getJarBundleString("hotkey", conflictKey);
+                var jarBundleKeyStroke = ResourceUtil.getJarBundleString("hotkey", key);
+                // conflict with pre-set hotkey -> favor user-set hotkeys, remove preset hotkey
+                if (jarBundleConflictKeyStroke != null && !jarBundleConflictKeyStroke.isEmpty()){
+                    // conflictKey is the pre-set one to be removed
+                    Logger.info("keystroke conflict: {} and {}. Keeping {} since it is user-defined",
+                            conflictKey, key, key);
+                    removeKeyStrokeAndUpdateUi(conflictKey);
+                    keystrokeChangeSupport.firePropertyChange(conflictKey, keyStroke, null);
+                } else if (jarBundleKeyStroke != null && !jarBundleKeyStroke.isEmpty()) {
+                    // key is the pre-set one to be removed
+                    Logger.info("keystroke conflict: {} and {}. Keeping {} since it is user-defined",
+                            conflictKey, key, conflictKey);
+                    removeKeyStrokeAndUpdateUi(key);
+                    return;
+                } // else: both are user-defined, Exception is fine since this should never happen
+            }
+            synchronized (keystrokes) {
+                keystrokes.put(key, keyStroke);
+            }
+            if (!GraphicsEnvironment.isHeadless()) {
+                addUIKeystroke(key, keyStroke);
+            }
+        }
+        setTooltip(key);
+        keystrokeChangeSupport.firePropertyChange(key, oldValue, keyStroke);
+    }
+
+    private void removeKeyStrokeAndUpdateUi(String conflictKey) {
+        removeKeyStroke(conflictKey);
+        setTooltip(conflictKey);
+        this.registeredButtons.get(conflictKey).forEach(button -> {
+            if (button instanceof JMenuItem menuItem) {
+                menuItem.setAccelerator(null);
+            }
+        });
+    }
+
+    public String getActionFromKeystroke(KeyStroke stroke) {
+        synchronized (keystrokes) {
+            return keystrokes.inverse().get(stroke);
+        }
+    }
+
+    private void addContextMenu(AbstractButton button, String key) {
+        JPopupMenu popup = new JPopupMenu();
+        Action addKeybindAction = new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                KeyStroke currentKeyStroke;
+                synchronized (keystrokes) {
+                    currentKeyStroke = keystrokes.get(key);
+                }
+                new SelectKeyStrokeDialog(owner.get(), key, ButtonServiceImpl.this, currentKeyStroke);
+            }
+        };
+        String actionName = "Change key stroke";
+
+        synchronized (keystrokes) {
+            if (keystrokes.containsKey(key)) {
+                actionName += " (Current: " + KeyStrokeUtil.toString(keystrokes.get(key)) + ")";
+            }
+        }
+        addKeybindAction.putValue(Action.NAME, actionName);
+        popup.add(addKeybindAction);
+        this.addKeystrokeChangeListener(e -> {
+            if (Objects.equals(e.getPropertyName(), key)) {
+                KeyStroke ks = (KeyStroke) e.getNewValue();
+                if (ks != null) {
+                    addKeybindAction.putValue(Action.NAME, "Change key stroke (Current: " + KeyStrokeUtil.toString(ks) + ")");
+                } else {
+                    addKeybindAction.putValue(Action.NAME, "Change key stroke");
+                }
+            }
+        });
+        button.addMouseListener(new MouseAdapter() {
+            public void mousePressed(MouseEvent e) {
+                maybeShowPopup(e);
+            }
+
+            public void mouseReleased(MouseEvent e) {
+                maybeShowPopup(e);
+            }
+
+            private void maybeShowPopup(MouseEvent e) {
+                if (e.isPopupTrigger()) {
+                    popup.show(e.getComponent(),
+                            e.getX(), e.getY());
+                }
+            }
+        });
+    }
+
+    private void addUIKeystroke(String key, KeyStroke keyStroke) {
+        if (GraphicsEnvironment.isHeadless() || actionService == null) {
+            Logger.warn("running in headless mode or testing, skipping ButtonServiceImpl.addUIKeystroke");
+            return;
+        }
+        Action action = actionService.getAllRegisteredActions().get(ActionType.fromAction(key));
+        if (action == null) {
+            action = new AbstractAction() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    if (!(KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner() instanceof JTextComponent)) {
+                        synchronized (registeredButtons) {
+                            registeredButtons.get(key).stream().findFirst().ifPresentOrElse(
+                                    AbstractButton::doClick,
+                                    () -> Logger.error("Unknown action activated: " + key)
+                            );
+                        }
+                    }
+                }
+            };
+        } else {
+            Action tempAction = action;
+            action = new AbstractAction() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    if (!(KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner() instanceof JTextComponent)) {
+                        Optional<DropdownToolButton> btn;
+                        synchronized (registeredButtons) {
+                            btn = registeredButtons.values().stream()
+                                    .filter(b -> b instanceof DropdownToolButton)
+                                    .map(b -> (DropdownToolButton) b)
+                                    .filter(b ->
+                                            b.getActions().stream().anyMatch(a -> a.action().equals(key)))
+                                    .findFirst();
+                        }
+                        if (btn.isPresent()) {
+                            var button = btn.get();
+                            var action = button.getActions().stream()
+                                    .filter(a -> a.action().equals(key))
+                                    .findFirst()
+                                    .orElseThrow();
+                            button.cycleOrActivate(action);
+                        } else {
+                            tempAction.actionPerformed(e);
+                        }
+                    }
+                }
+            };
+        }
+        owner.get().getRootPane().getActionMap().put(key, action);
+        owner.get().getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(keyStroke, key);
+    }
+
+    private void removeKeyStroke(String key) {
+        synchronized (keystrokes) {
+            if (!GraphicsEnvironment.isHeadless()) {
+                owner.get().getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).remove(keystrokes.get(key));
+            }
+            keystrokes.remove(key);
+        }
+    }
+
+    public void setTooltip(String key) {
+        String name = ResourceUtil.getBundleString("name", key);
+        String tooltip = ResourceUtil.getBundleString("tooltip", key);
+
+
+        KeyStroke keyStroke = keystrokes.get(key);
+
+
+        String tooltipText = "<html>";
+        if (!StringOp.isEmpty(name)) {
+            tooltipText += "<i>" + name + "</i><br/>";
+        }
+        if (!StringOp.isEmpty(tooltip)) {
+            tooltipText += tooltip + "<br/>";
+        }
+        if (keyStroke != null) {
+            tooltipText += "Hotkey: " + KeyStrokeUtil.toString(keyStroke) + "<br/>";
+        }
+
+        if (!tooltipText.equals("<html>")) {
+            String finalTooltipText = tooltipText;
+            synchronized (registeredButtons) {
+                registeredButtons.get(key).stream()
+                        .filter(Objects::nonNull)
+                        .forEach(b -> b.setToolTipText(finalTooltipText));
+            }
+        }
+    }
+
+    @Override
+    public void addKeystrokeChangeListener(PropertyChangeListener listener) {
+        keystrokeChangeSupport.addPropertyChangeListener(listener);
+    }
+
+    @Override
+    public void removeKeystrokeChangeListener(PropertyChangeListener listener) {
+        keystrokeChangeSupport.removePropertyChangeListener(listener);
+    }
+}

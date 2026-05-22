@@ -11,9 +11,12 @@ import { SimulatorPanel } from './SimulatorPanel';
 
 let root: Root | null = null;
 let container: HTMLDivElement | null = null;
+let canvasContext: CanvasRenderingContext2D;
+let putImageDataMock: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
-  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(mockCanvasContext());
+  canvasContext = mockCanvasContext();
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(canvasContext);
   vi.spyOn(HTMLCanvasElement.prototype, 'getBoundingClientRect').mockReturnValue({
     width: 420,
     height: 320,
@@ -47,6 +50,7 @@ describe('SimulatorPanel', () => {
     expect(rendered.querySelector('[aria-label="Fold percent"]')).not.toBeNull();
     expect(rendered.querySelector('[aria-label="Simulator scope"]')?.textContent).toContain('Whole');
     expect(rendered.textContent).not.toContain('Manual preview');
+    expect(putImageDataMock).toHaveBeenCalled();
   });
 
   it('renders step-mode labels and manual-collapse warning copy when focused', () => {
@@ -160,7 +164,14 @@ function simpleFold(
   };
 }
 
-function mockCanvasContext() {
+function mockCanvasContext(): CanvasRenderingContext2D {
+  const imageData = {
+    data: new Uint8ClampedArray(420 * 360 * 4),
+    width: 420,
+    height: 360,
+    colorSpace: 'srgb',
+  } as ImageData;
+  putImageDataMock = vi.fn();
   return {
     clearRect: vi.fn(),
     fillRect: vi.fn(),
@@ -170,6 +181,8 @@ function mockCanvasContext() {
     closePath: vi.fn(),
     fill: vi.fn(),
     stroke: vi.fn(),
+    getImageData: vi.fn(() => imageData),
+    putImageData: putImageDataMock,
     setLineDash: vi.fn(),
     getLineDash: vi.fn(() => []),
     globalAlpha: 1,

@@ -28,9 +28,7 @@ import {
   type PreparedOrigamiModel,
   type SimulationFrame,
 } from '@treemaker/origami-simulator';
-import {
-  buildSequenceStepSimulation,
-} from '../../lib/sequenceSimulation';
+import { buildSequenceStepSimulation } from '../../lib/sequenceSimulation';
 import {
   nextSimulatorOrbitView,
   type SimulatorOrbitView as SimulatorView,
@@ -70,6 +68,17 @@ interface ProjectedPoint {
   depth: number;
 }
 
+interface ScreenPoint extends ProjectedPoint {
+  sx: number;
+  sy: number;
+}
+
+interface DepthSurface {
+  depths: Float32Array;
+  width: number;
+  height: number;
+}
+
 const INITIAL_SETTLE_STEPS = 300;
 const FOLD_CHANGE_IMMEDIATE_STEPS = 200;
 const FOLD_CHANGE_SETTLE_BATCH = 200;
@@ -78,6 +87,7 @@ const FOLD_PLAY_STEP_BATCH = 160;
 const FOLD_PLAY_PERCENT_PER_SECOND = 28;
 const FOLD_STEP_PERCENT = 5;
 const SETTLE_DELTA_EPSILON = 0.0002;
+const PAPER_EDGE_DEPTH_EPSILON = 0.006;
 const INITIAL_FOLD_PERCENT = 0;
 const DEFAULT_VIEW: SimulatorView = { yaw: 0, pitch: 0.38, zoom: 1 };
 const DEFAULT_VIEW_SETTINGS: SimulatorViewSettings = {
@@ -742,6 +752,30 @@ function drawFrame(
   const faceAlpha = settings.renderMode === 'xray' ? 0.48 : 1;
   const surfaceEdgeAlpha = settings.renderMode === 'xray' ? 0.5 : 0.92;
 
+  if (settings.renderMode === 'paper' && settings.showFaces) {
+    const depthSurface = drawPaperFacesWithDepth(
+      ctx,
+      model,
+      frame,
+      triangles,
+      projected,
+      map,
+      width,
+      height,
+      palette,
+      highlights
+    );
+    if (depthSurface) {
+      if (settings.showEdges) {
+        drawVisibleEdges(ctx, model, projected, map, dpr, 0.94, palette, highlights, depthSurface);
+        if (settings.showHiddenLines) {
+          drawAllEdges(ctx, model, projected, map, dpr, 0.26, true, palette, highlights);
+        }
+      }
+      return;
+    }
+  }
+
   for (const triangle of triangles) {
     if (settings.showFaces) {
       const highlighted = highlights.faces.has(triangle.faceIndex);
@@ -863,6 +897,7 @@ interface SimulatorPalette {
   flat: string;
   highlight: string;
   highlightFace: string;
+  highlightFaceRgb: [number, number, number];
 }
 
 function readSimulatorPalette(canvas: HTMLCanvasElement): SimulatorPalette {
@@ -878,6 +913,7 @@ function readSimulatorPalette(canvas: HTMLCanvasElement): SimulatorPalette {
     flat: cssVar('--text-secondary', '#aeb9bf'),
     highlight: cssVar('--status-warning', '#f0c674'),
     highlightFace: 'rgb(240 198 116 / 0.3)',
+    highlightFaceRgb: [240, 198, 116],
   };
 }
 
@@ -896,6 +932,106 @@ function averageDepth(triangle: OrderedTriangle, projected: ProjectedPoint[]): n
   return triangle.vertices.reduce((total, vertex) => total + (projected[vertex]?.depth ?? 0), 0) / 3;
 }
 
+function drawPaperFacesWithDepth(
+  ctx: CanvasRenderingContext2D,
+  model: PreparedOrigamiModel,
+  frame: SimulationFrame,
+  triangles: OrderedTriangle[],
+  projected: ProjectedPoint[],
+  map: (point: ProjectedPoint) => { x: number; y: number },
+  width: number,
+  height: number,
+  palette: SimulatorPalette,
+  highlights: SimulatorHighlights
+): DepthSurface | null {
+  let imageData: ImageData;
+  try {
+    imageData = ctx.getImageData(0, 0, width, height);
+  } catch {
+    return null;
+  }
+
+  const depths = new Float32Array(width * height);
+  depths.fill(-Infinity);
+
+  for (const triangle of triangles) {
+    const points = triangle.vertices.map((vertex) => {
+      const projectedPoint = projected[vertex] ?? { x: 0, y: 0, depth: 0 };
+      const screen = map(projectedPoint);
+      return {
+        ...projectedPoint,
+        sx: screen.x,
+        sy: screen.y,
+      };
+    }) as [ScreenPoint, ScreenPoint, ScreenPoint];
+    const color = triangleRasterColor(
+      frame.colors,
+      triangle.vertices,
+      highlights.faces.has(triangle.faceIndex),
+      palette
+    );
+    rasterizeDepthTriangle(imageData, depths, width, height, points, color);
+  }
+
+  ctx.putImageData(imageData, 0, 0);
+  return { depths, width, height };
+}
+
+function rasterizeDepthTriangle(
+  imageData: ImageData,
+  depths: Float32Array,
+  width: number,
+  height: number,
+  points: [ScreenPoint, ScreenPoint, ScreenPoint],
+  color: [number, number, number, number]
+): void {
+  const [a, b, c] = points;
+  const area = edgeFunction(a, b, c);
+  if (Math.abs(area) < 0.0001) return;
+
+  const minX = clamp(Math.floor(Math.min(a.sx, b.sx, c.sx)), 0, width - 1);
+  const maxX = clamp(Math.ceil(Math.max(a.sx, b.sx, c.sx)), 0, width - 1);
+  const minY = clamp(Math.floor(Math.min(a.sy, b.sy, c.sy)), 0, height - 1);
+  const maxY = clamp(Math.ceil(Math.max(a.sy, b.sy, c.sy)), 0, height - 1);
+  const data = imageData.data;
+
+  for (let y = minY; y <= maxY; y += 1) {
+    for (let x = minX; x <= maxX; x += 1) {
+      const sample = { sx: x + 0.5, sy: y + 0.5 };
+      const w0 = edgeFunction(b, c, sample);
+      const w1 = edgeFunction(c, a, sample);
+      const w2 = edgeFunction(a, b, sample);
+      const inside =
+        area > 0
+          ? w0 >= -0.001 && w1 >= -0.001 && w2 >= -0.001
+          : w0 <= 0.001 && w1 <= 0.001 && w2 <= 0.001;
+      if (!inside) continue;
+
+      const n0 = w0 / area;
+      const n1 = w1 / area;
+      const n2 = w2 / area;
+      const depth = n0 * a.depth + n1 * b.depth + n2 * c.depth;
+      const pixelIndex = y * width + x;
+      if (depth < (depths[pixelIndex] ?? -Infinity)) continue;
+
+      depths[pixelIndex] = depth;
+      const offset = pixelIndex * 4;
+      data[offset] = color[0];
+      data[offset + 1] = color[1];
+      data[offset + 2] = color[2];
+      data[offset + 3] = color[3];
+    }
+  }
+}
+
+function edgeFunction(
+  a: Pick<ScreenPoint, 'sx' | 'sy'>,
+  b: Pick<ScreenPoint, 'sx' | 'sy'>,
+  point: Pick<ScreenPoint, 'sx' | 'sy'>
+): number {
+  return (point.sx - a.sx) * (b.sy - a.sy) - (point.sy - a.sy) * (b.sx - a.sx);
+}
+
 function triangleColor(colors: Float32Array, triangle: number[], alpha = 1): string {
   const channel = (offset: number) =>
     triangle.reduce((total, vertex) => total + (colors[vertex * 3 + offset] ?? 0.75), 0) / 3;
@@ -903,6 +1039,35 @@ function triangleColor(colors: Float32Array, triangle: number[], alpha = 1): str
   const g = Math.round(channel(1) * 255);
   const b = Math.round(channel(2) * 255);
   return alpha >= 1 ? `rgb(${r} ${g} ${b})` : `rgb(${r} ${g} ${b} / ${alpha})`;
+}
+
+function triangleRasterColor(
+  colors: Float32Array,
+  triangle: number[],
+  highlighted: boolean,
+  palette: SimulatorPalette
+): [number, number, number, number] {
+  const channel = (offset: number) =>
+    triangle.reduce((total, vertex) => total + (colors[vertex * 3 + offset] ?? 0.75), 0) / 3;
+  const color: [number, number, number] = [
+    Math.round(channel(0) * 255),
+    Math.round(channel(1) * 255),
+    Math.round(channel(2) * 255),
+  ];
+  const rgb = highlighted ? blendRgb(color, palette.highlightFaceRgb, 0.3) : color;
+  return [rgb[0], rgb[1], rgb[2], 255];
+}
+
+function blendRgb(
+  base: [number, number, number],
+  overlay: [number, number, number],
+  alpha: number
+): [number, number, number] {
+  return [
+    Math.round(base[0] * (1 - alpha) + overlay[0] * alpha),
+    Math.round(base[1] * (1 - alpha) + overlay[1] * alpha),
+    Math.round(base[2] * (1 - alpha) + overlay[2] * alpha),
+  ];
 }
 
 function drawTriangleEdges(
@@ -960,6 +1125,37 @@ function drawAllEdges(
   ctx.setLineDash([]);
 }
 
+function drawVisibleEdges(
+  ctx: CanvasRenderingContext2D,
+  model: PreparedOrigamiModel,
+  projected: ProjectedPoint[],
+  map: (point: ProjectedPoint) => { x: number; y: number },
+  dpr: number,
+  alpha: number,
+  palette: SimulatorPalette,
+  highlights: SimulatorHighlights,
+  depthSurface: DepthSurface
+): void {
+  ctx.setLineDash([]);
+  ctx.lineWidth = Math.max(1.5, dpr * 1.25);
+  model.edgesVertices.forEach((edge, index) => {
+    drawVisibleEdgeSegment(
+      ctx,
+      model,
+      projected,
+      map,
+      edge[0],
+      edge[1],
+      index,
+      alpha,
+      palette,
+      highlights,
+      dpr,
+      depthSurface
+    );
+  });
+}
+
 function drawEdgeSegment(
   ctx: CanvasRenderingContext2D,
   model: PreparedOrigamiModel,
@@ -987,6 +1183,77 @@ function drawEdgeSegment(
   ctx.stroke();
   ctx.lineWidth = previousLineWidth;
   ctx.globalAlpha = 1;
+}
+
+function drawVisibleEdgeSegment(
+  ctx: CanvasRenderingContext2D,
+  model: PreparedOrigamiModel,
+  projected: ProjectedPoint[],
+  map: (point: ProjectedPoint) => { x: number; y: number },
+  from: number,
+  to: number,
+  edgeIndex: number,
+  alpha: number,
+  palette: SimulatorPalette,
+  highlights: SimulatorHighlights,
+  dpr: number,
+  depthSurface: DepthSurface
+): void {
+  const fromProjected = projected[from] ?? { x: 0, y: 0, depth: 0 };
+  const toProjected = projected[to] ?? { x: 0, y: 0, depth: 0 };
+  const a = map(fromProjected);
+  const b = map(toProjected);
+  const assignment = model.edgesAssignment[edgeIndex];
+  const highlighted = highlights.creases.has(edgeIndex);
+  const previousLineWidth = ctx.lineWidth;
+  const steps = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y)));
+  let segmentStart: { x: number; y: number } | null = null;
+  let previousVisible: { x: number; y: number } | null = null;
+
+  ctx.strokeStyle = highlighted ? palette.highlight : edgeColor(assignment, palette);
+  ctx.globalAlpha = highlighted ? 1 : edgeAlpha(assignment, alpha);
+  if (highlighted) ctx.lineWidth = Math.max(ctx.lineWidth, dpr * 3);
+
+  const flushSegment = () => {
+    if (!segmentStart || !previousVisible) return;
+    ctx.beginPath();
+    ctx.moveTo(segmentStart.x, segmentStart.y);
+    ctx.lineTo(previousVisible.x, previousVisible.y);
+    ctx.stroke();
+  };
+
+  for (let step = 0; step <= steps; step += 1) {
+    const t = step / steps;
+    const point = {
+      x: a.x + (b.x - a.x) * t,
+      y: a.y + (b.y - a.y) * t,
+      depth: fromProjected.depth + (toProjected.depth - fromProjected.depth) * t,
+    };
+    if (edgePointIsVisible(point, depthSurface)) {
+      segmentStart ??= point;
+      previousVisible = point;
+    } else {
+      flushSegment();
+      segmentStart = null;
+      previousVisible = null;
+    }
+  }
+  flushSegment();
+
+  ctx.lineWidth = previousLineWidth;
+  ctx.globalAlpha = 1;
+}
+
+function edgePointIsVisible(
+  point: { x: number; y: number; depth: number },
+  depthSurface: DepthSurface
+): boolean {
+  const x = Math.round(point.x);
+  const y = Math.round(point.y);
+  if (x < 0 || y < 0 || x >= depthSurface.width || y >= depthSurface.height) return false;
+  const surfaceDepth = depthSurface.depths[y * depthSurface.width + x];
+  if (surfaceDepth === undefined || !Number.isFinite(surfaceDepth)) return true;
+  return point.depth >= surfaceDepth - PAPER_EDGE_DEPTH_EPSILON;
 }
 
 function findEdge(edges: [number, number][], from: number, to: number): number {

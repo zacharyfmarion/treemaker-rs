@@ -426,7 +426,10 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
     inputMode: 'drag-path',
     tooltip: 'Create or adjust an Oriedita operation frame by dragging on the CP',
   }),
-  notImplemented('VoronoiCreate', 'Voronoi', 'generators', 'network', 'MouseHandlerVoronoiCreate'),
+  ready('VoronoiCreate', 'Voronoi', 'generators', 'network', 'MouseHandlerVoronoiCreate', {
+    toolSteps: ['Click seed point'],
+    tooltip: 'Click seed points to preview a Voronoi diagram, then apply from the contextual panel',
+  }),
   notImplemented('FlatFoldableCheck', 'Flat-foldable boundary check', 'check-fix', 'shield-check', 'MouseHandlerFlatFoldableCheck'),
   ready('CreaseDeleteOverlapping', 'Delete overlapping creases', 'select-edit', 'combine', 'MouseHandlerCreaseDeleteOverlapping', {
     toolSteps: ['Pick drag start point', 'Pick drag end point'],

@@ -161,6 +161,7 @@ const LINE_COLOR_OPERATION_IDS = new Set<OristudioCpOperationId>([
   'DrawDoveBase',
   'DrawBirdBase',
   'DrawFrogBase',
+  'VoronoiCreate',
 ]);
 
 const TOOL_SETTING_GROUPS_BY_OPERATION: Partial<

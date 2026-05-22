@@ -2955,6 +2955,34 @@
   outline: none;
 }
 
+.cp-context-panel__apply:disabled {
+  border-color: var(--border-subtle);
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+  cursor: default;
+  opacity: 0.62;
+}
+
+.cp-context-panel__secondary {
+  justify-self: end;
+  min-height: 24px;
+  padding: 3px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font: inherit;
+  font-weight: 720;
+  cursor: pointer;
+}
+
+.cp-context-panel__secondary:hover,
+.cp-context-panel__secondary:focus-visible {
+  border-color: var(--border-default);
+  color: var(--text-primary);
+  outline: none;
+}
+
 .viewport-toolbar {
   position: absolute;
   left: 50%;

@@ -47,7 +47,10 @@ describe('oristudioCpToolSettings', () => {
       'replace-line-type',
     ]);
     expect(cpToolSettingGroupsForOperation('FixInaccurate')).toEqual(['fix-precision']);
-    expect(cpToolSettingGroupsForOperation('VoronoiCreate')).toEqual(['apply-lines']);
+    expect(cpToolSettingGroupsForOperation('VoronoiCreate')).toEqual([
+      'line-color',
+      'apply-lines',
+    ]);
     expect(cpToolSettingGroupsForOperation('CircleChangeColor')).toEqual([
       'custom-circle-color',
     ]);

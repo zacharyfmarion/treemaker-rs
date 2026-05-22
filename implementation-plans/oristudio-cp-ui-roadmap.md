@@ -856,6 +856,10 @@ Done when:
 - [x] Stage 8 slice: Enable Oriedita circle organization cleanup.
 - [x] Stage 8 slice: Validate circle organization dispatch with Rust, wasm, and
       web command tests.
+- [x] Stage 8 slice: Enable Voronoi seed collection, preview, clear, and apply
+      through the contextual tool panel.
+- [x] Stage 8 slice: Validate Voronoi dispatch, preview payloads, wasm bridge,
+      and web interaction state without browser smoke tests.
 - [ ] Stage 8: Enable circles, text, generators, and measurement tools.
 - [ ] Stage 8: Validate annotation preservation and non-mutating measurement
       behavior.

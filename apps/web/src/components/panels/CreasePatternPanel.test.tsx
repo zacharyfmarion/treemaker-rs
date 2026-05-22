@@ -1409,6 +1409,155 @@ describe('CreasePatternPanel', () => {
     expect(payload?.points?.[1]).toEqual({ x: 200, y: -200 });
   });
 
+  it('collects Voronoi seed presses, previews them, and applies from the context panel', async () => {
+    const executeOristudioCpCommand = vi.fn(
+      async (_operationId: string, _payload?: OristudioCpCommandPayload) => true
+    );
+    const previewOristudioCpCommand = vi.fn(
+      async (_operationId: string, _payload?: OristudioCpCommandPayload) => ({
+        segments: [
+          {
+            a: { x: 0, y: 0 },
+            b: { x: 1, y: 1 },
+            color: 'Magenta5',
+            active: 'Inactive0',
+            selected: 0,
+            customized: 0,
+            customized_color: { red: 0, green: 0, blue: 0 },
+          },
+        ],
+        circles: [],
+        points: [
+          { x: 0, y: 0 },
+          { x: 1, y: 0 },
+        ],
+        diagnostics: [],
+      })
+    );
+    const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
+      documentMode: 'crease-pattern',
+      importedCreasePattern: importedCpDocument(),
+      oristudioCpDocument: editableCpState(),
+      oristudioCpViewport: {
+        gridVisible: true,
+        snapToGrid: false,
+        snapToVertices: false,
+        snapToLines: false,
+      },
+      executeOristudioCpCommand,
+      previewOristudioCpCommand,
+    });
+    const canvas = setCanvasClientRect(container);
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('button[aria-label="Valley"]')?.click();
+      container.querySelector<HTMLButtonElement>('button[aria-label="Voronoi"]')?.click();
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).toContain('Voronoi seeds');
+    expect(container.textContent).toContain('0 seed presses pending');
+    const emptyApply = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find(
+      (button) => button.textContent?.trim() === 'Apply Voronoi'
+    );
+    expect(emptyApply?.disabled).toBe(true);
+
+    for (const [clientX, clientY] of [
+      [360, 348],
+      [477.6, 348],
+    ]) {
+      await act(async () => {
+        canvas.dispatchEvent(
+          new MouseEvent('pointerdown', {
+            bubbles: true,
+            button: 0,
+            clientX,
+            clientY,
+          })
+        );
+        await Promise.resolve();
+      });
+    }
+
+    expect(previewOristudioCpCommand).toHaveBeenCalled();
+    const lastPreviewCall =
+      previewOristudioCpCommand.mock.calls[previewOristudioCpCommand.mock.calls.length - 1];
+    const previewPayload = lastPreviewCall?.[1] as OristudioCpCommandPayload | undefined;
+    expect(lastPreviewCall?.[0]).toBe('VoronoiCreate');
+    expect(previewPayload?.line_color).toBe('Blue2');
+    expect(previewPayload?.selection_distance).toBeGreaterThan(0);
+    expect(previewPayload?.points).toHaveLength(2);
+    expect(container.querySelector('.cp-command-candidate')).not.toBeNull();
+    expect(container.querySelectorAll('.cp-command-candidate-point')).toHaveLength(2);
+    expect(container.textContent).toContain('2 seed presses pending');
+
+    const applyButton = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find(
+      (button) => button.textContent?.trim() === 'Apply Voronoi'
+    );
+    await act(async () => {
+      applyButton?.click();
+      await Promise.resolve();
+    });
+
+    expect(executeOristudioCpCommand).toHaveBeenCalledOnce();
+    const [operation, payload] = executeOristudioCpCommand.mock.calls[0] ?? [];
+    expect(operation).toBe('VoronoiCreate');
+    expect(payload?.line_color).toBe('Blue2');
+    expect(payload?.points).toHaveLength(2);
+    expect(container.textContent).toContain('0 seed presses pending');
+  });
+
+  it('clears pending Voronoi seeds without running a command', async () => {
+    const executeOristudioCpCommand = vi.fn(
+      async (_operationId: string, _payload?: OristudioCpCommandPayload) => true
+    );
+    const previewOristudioCpCommand = vi.fn(
+      async (_operationId: string, _payload?: OristudioCpCommandPayload) => ({
+        segments: [],
+        circles: [],
+        points: [{ x: 0, y: 0 }],
+        diagnostics: [],
+      })
+    );
+    const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
+      documentMode: 'crease-pattern',
+      importedCreasePattern: importedCpDocument(),
+      oristudioCpDocument: editableCpState(),
+      executeOristudioCpCommand,
+      previewOristudioCpCommand,
+    });
+    const canvas = setCanvasClientRect(container);
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('button[aria-label="Voronoi"]')?.click();
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      canvas.dispatchEvent(
+        new MouseEvent('pointerdown', {
+          bubbles: true,
+          button: 0,
+          clientX: 360,
+          clientY: 348,
+        })
+      );
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).toContain('1 seed press pending');
+    const clearButton = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find(
+      (button) => button.textContent?.trim() === 'Clear seeds'
+    );
+    await act(async () => {
+      clearButton?.click();
+      await Promise.resolve();
+    });
+
+    expect(executeOristudioCpCommand).not.toHaveBeenCalled();
+    expect(container.textContent).toContain('0 seed presses pending');
+  });
+
   it('runs ready lengthen CP commands with three resolved model points and current color', async () => {
     const executeOristudioCpCommand = vi.fn(
       async (_operationId: string, _payload?: OristudioCpCommandPayload) => true

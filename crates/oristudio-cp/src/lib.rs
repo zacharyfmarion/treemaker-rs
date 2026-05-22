@@ -1492,6 +1492,16 @@ pub fn execute_command(
                 message: error.to_string(),
             })?
         }
+        OperationId::VoronoiCreate => {
+            required_points_at_least(&command, 1)?;
+            let mut state = voronoi_state_from_points(&document.crease_pattern, &command);
+            let result = operations::generators::voronoi_apply(
+                &mut document.crease_pattern,
+                &mut state,
+                active_line_color(&command),
+            );
+            result.lines_added + result.circles_added
+        }
         OperationId::CircleDraw => {
             let points = required_points(&command, 2)?;
             usize::from(operations::circle::draw(
@@ -2181,6 +2191,15 @@ pub fn preview_command(
                 }
             }
         }
+        OperationId::VoronoiCreate if !points.is_empty() => {
+            let state = voronoi_state_from_points(&document.crease_pattern, &command);
+            preview.segments = state
+                .line_segments
+                .iter()
+                .map(|line| line.line_segment.with_line_color(LineColor::Magenta5))
+                .collect();
+            preview.points = state.seed_points;
+        }
         OperationId::CircleDraw | OperationId::CircleDrawFree if points.len() >= 2 => {
             preview.circles.push(Circle::from_center(
                 points[0],
@@ -2570,6 +2589,18 @@ fn default_molecule_for_operation(
         OperationId::DrawFrogBase => Some(operations::generators::DefaultMolecule::FrogBase),
         _ => None,
     }
+}
+
+fn voronoi_state_from_points(
+    model: &CreasePatternModel,
+    command: &CreasePatternCommand,
+) -> operations::generators::VoronoiState {
+    let mut state = operations::generators::VoronoiState::default();
+    let selection_distance = selection_distance(command);
+    for point in &command.payload.points {
+        operations::generators::voronoi_press(model, &mut state, *point, selection_distance);
+    }
+    state
 }
 
 fn custom_circle_color(command: &CreasePatternCommand) -> RgbColor {
@@ -3586,6 +3617,47 @@ mod tests {
     }
 
     #[test]
+    fn command_dispatch_routes_stage_eight_voronoi_generator() {
+        let mut document = CreasePatternDocument::default();
+
+        let result = execute_command(
+            &mut document,
+            CreasePatternCommand::new(OperationId::VoronoiCreate).with_payload(
+                CreasePatternCommandPayload {
+                    points: vec![
+                        Point::new(0.0, 0.0),
+                        Point::new(2.0, 0.0),
+                        Point::new(0.0, 2.0),
+                    ],
+                    line_color: Some(LineColor::Blue2),
+                    selection_distance: Some(0.25),
+                    ..CreasePatternCommandPayload::default()
+                },
+            ),
+        )
+        .expect("voronoi generator should execute");
+
+        assert_eq!(result.status, OperationStatus::OracleTested);
+        assert_eq!(result.diagnostics, vec!["Changed 6 line(s)"]);
+        assert_eq!(document.crease_pattern.line_segments.len(), 3);
+        assert_eq!(document.crease_pattern.circles.len(), 3);
+        assert!(
+            document
+                .crease_pattern
+                .line_segments
+                .iter()
+                .all(|segment| segment.color == LineColor::Blue2)
+        );
+        assert!(
+            document
+                .crease_pattern
+                .circles
+                .iter()
+                .all(|circle| circle.color == LineColor::Cyan3 && circle.r == 5.0)
+        );
+    }
+
+    #[test]
     fn command_dispatch_routes_stage_eight_circle_color_changes() {
         let mut document = CreasePatternDocument::default();
         document
@@ -3691,6 +3763,27 @@ mod tests {
         .expect("regular polygon should expose line previews");
 
         assert_eq!(polygon_preview.segments.len(), 3);
+        assert!(document.crease_pattern.line_segments.is_empty());
+        assert!(document.crease_pattern.circles.is_empty());
+
+        let voronoi_preview = preview_command(
+            &document,
+            CreasePatternCommand::new(OperationId::VoronoiCreate).with_payload(
+                CreasePatternCommandPayload {
+                    points: vec![
+                        Point::new(0.0, 0.0),
+                        Point::new(2.0, 0.0),
+                        Point::new(0.0, 2.0),
+                    ],
+                    selection_distance: Some(0.25),
+                    ..CreasePatternCommandPayload::default()
+                },
+            ),
+        )
+        .expect("voronoi should expose line and seed previews");
+
+        assert_eq!(voronoi_preview.segments.len(), 3);
+        assert_eq!(voronoi_preview.points.len(), 3);
         assert!(document.crease_pattern.line_segments.is_empty());
         assert!(document.crease_pattern.circles.is_empty());
     }

@@ -104,6 +104,10 @@ describe('oristudio CP command registry', () => {
       uiStatus: 'ready',
       tooltip: 'Prune invalid zero-radius circles using Oriedita cleanup rules',
     });
+    expect(cpCommandByOperation('VoronoiCreate')).toMatchObject({
+      uiStatus: 'ready',
+      toolSteps: ['Click seed point'],
+    });
   });
 
   it('keeps the left rail populated by ordered command groups', () => {

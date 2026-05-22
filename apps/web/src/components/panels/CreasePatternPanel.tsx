@@ -160,7 +160,8 @@ function cpCommandPayloadDefaults(
     operationId === 'DrawFishBase' ||
     operationId === 'DrawDoveBase' ||
     operationId === 'DrawBirdBase' ||
-    operationId === 'DrawFrogBase'
+    operationId === 'DrawFrogBase' ||
+    operationId === 'VoronoiCreate'
   ) {
     payload.line_color = lineColor;
   }
@@ -269,10 +270,17 @@ function activeActionInputMode(
 }
 
 function cpCommandRequiresContextApply(command: OristudioCpCommandDefinition): boolean {
+  if (command.operationId === 'VoronoiCreate') return true;
   if ((command.toolSteps?.length ?? 0) > 0) return false;
   return cpToolSettingGroupsForCommand(command).some(
     (group) => group !== 'line-color' && group !== 'line-select-help'
   );
+}
+
+function isVariablePointSequenceOperation(
+  operationId: OristudioCpCommandDefinition['operationId'] | null | undefined
+): boolean {
+  return operationId === 'VoronoiCreate';
 }
 
 function isCpLineEventTarget(target: EventTarget | null): boolean {
@@ -485,6 +493,7 @@ export function CreasePatternPanel() {
   const liveCommandPreviewPoints = useMemo(() => {
     if (cpToolPath.length > 0) return cpToolPath;
     if (!activeCpCommand || cpToolState.phase !== 'active') return cpToolPoints;
+    if (isVariablePointSequenceOperation(activeCpCommand.operationId)) return cpToolPoints;
     const stepCount = activeCpCommand.toolSteps?.length ?? 0;
     const livePoint = snapTarget?.point ?? cursorModelPoint;
     if (stepCount === 0 || !livePoint || cpToolPoints.length === 0) return cpToolPoints;
@@ -508,7 +517,10 @@ export function CreasePatternPanel() {
     ];
   }, [activeCpInputMode, activeCpLineColor, liveCommandPreviewPoints]);
   const renderedCommandPreviewPoints =
-    activeCpInputMode === 'drag-line' ? [] : liveCommandPreviewPoints;
+    activeCpInputMode === 'drag-line' ||
+    isVariablePointSequenceOperation(activeCpCommand?.operationId)
+      ? []
+      : liveCommandPreviewPoints;
   const renderedCommandPreviewSegments =
     localDragLinePreviewSegments.length > 0
       ? localDragLinePreviewSegments
@@ -631,8 +643,12 @@ export function CreasePatternPanel() {
       !editableCp ||
       !activeCpCommand ||
       activeCpCommand.uiStatus !== 'ready' ||
-      (activeCpCommand.toolSteps?.length ?? 0) > 0
+      ((activeCpCommand.toolSteps?.length ?? 0) > 0 &&
+        !isVariablePointSequenceOperation(activeCpCommand.operationId))
     ) {
+      return;
+    }
+    if (activeCpCommand.operationId === 'VoronoiCreate' && cpToolPoints.length === 0) {
       return;
     }
 
@@ -643,16 +659,26 @@ export function CreasePatternPanel() {
       if (activeCpCommand.operationId === 'CircleChangeColor') {
         selectionPayload.circle_ids = oristudioCpSelection.circles;
       }
+      if (activeCpCommand.operationId === 'VoronoiCreate') {
+        selectionPayload.points = cpToolPoints;
+      }
       const succeeded = await executeOristudioCpCommand(
         activeCpCommand.operationId,
         buildCpCommandPayload(activeCpCommand, selectionPayload)
       );
+      if (succeeded && activeCpCommand.operationId === 'VoronoiCreate') {
+        setCpToolPoints([]);
+        setCpCommandPreview(null);
+      }
       setCpToolState((state) =>
         state.activeOperationId === activeCpCommand.operationId
           ? transitionOristudioCpToolState(
               state,
               succeeded
-                ? { type: 'commit' }
+                ? {
+                    type: 'commit',
+                    keepActive: activeCpCommand.operationId === 'VoronoiCreate',
+                  }
                 : {
                     type: 'commandError',
                     message: useWorkspaceStore.getState().oristudioCpError ?? 'Command failed',
@@ -664,11 +690,23 @@ export function CreasePatternPanel() {
   }, [
     activeCpCommand,
     buildCpCommandPayload,
+    cpToolPoints,
     editableCp,
     executeOristudioCpCommand,
     oristudioCpSelection.circles,
     oristudioCpSelection.lines,
   ]);
+
+  const handleClearActiveContextInput = useCallback(() => {
+    if (!activeCpCommand || activeCpCommand.operationId !== 'VoronoiCreate') return;
+    setCpToolPoints([]);
+    setCpCommandPreview(null);
+    setCpToolState((state) =>
+      state.activeOperationId === activeCpCommand.operationId
+        ? transitionOristudioCpToolState(state, { type: 'cancel', keepActive: true })
+        : state
+    );
+  }, [activeCpCommand]);
 
   const eventToEditableModelPoint = useCallback(
     (event: PointerEvent<SVGElement>): Point | null => {
@@ -781,6 +819,20 @@ export function CreasePatternPanel() {
         isLineClickSelectionOperation(activeCpCommand.operationId) &&
         isCpLineEventTarget(event.target)
       ) {
+        return;
+      }
+
+      if (isVariablePointSequenceOperation(activeCpCommand.operationId)) {
+        const point = eventToEditableModelPoint(event);
+        if (!point) return;
+        event.preventDefault();
+        event.stopPropagation();
+        setCpToolPoints((current) => [...current, point]);
+        setCpToolState((state) =>
+          state.activeOperationId === activeCpCommand.operationId
+            ? transitionOristudioCpToolState(state, { type: 'advanceStep' })
+            : state
+        );
         return;
       }
 
@@ -1526,9 +1578,15 @@ export function CreasePatternPanel() {
                   setOptions={setCpToolOptions}
                   activeLineColor={activeCpLineColor}
                   measurementSlots={cpMeasurementSlots}
+                  pendingPointCount={cpToolPoints.length}
                   onApply={
                     cpCommandRequiresContextApply(activeCpCommand)
                       ? handleApplyActiveContextCommand
+                      : undefined
+                  }
+                  onClearInput={
+                    activeCpCommand.operationId === 'VoronoiCreate' && cpToolPoints.length > 0
+                      ? handleClearActiveContextInput
                       : undefined
                   }
                 />
@@ -1920,17 +1978,22 @@ function CpContextToolPanel({
   setOptions,
   activeLineColor,
   measurementSlots,
+  pendingPointCount,
   onApply,
+  onClearInput,
 }: {
   command: OristudioCpCommandDefinition;
   options: OristudioCpToolOptions;
   setOptions: Dispatch<SetStateAction<OristudioCpToolOptions>>;
   activeLineColor: OristudioCpLineColor;
   measurementSlots: CpMeasurementSlots;
+  pendingPointCount: number;
   onApply?: () => void;
+  onClearInput?: () => void;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const groups = cpToolSettingGroupsForCommand(command);
+  const applyDisabled = command.operationId === 'VoronoiCreate' && pendingPointCount === 0;
 
   if (groups.length === 0) return null;
 
@@ -1963,12 +2026,24 @@ function CpContextToolPanel({
               setOptions={setOptions}
               activeLineColor={activeLineColor}
               activeMeasurementSlot={cpMeasurementSlotForOperation(command.operationId)}
+              activeOperationId={command.operationId}
               measurementSlots={measurementSlots}
+              pendingPointCount={pendingPointCount}
             />
           ))}
           {onApply && (
-            <button className="cp-context-panel__apply" type="button" onClick={onApply}>
-              Apply to selection
+            <button
+              className="cp-context-panel__apply"
+              type="button"
+              disabled={applyDisabled}
+              onClick={onApply}
+            >
+              {command.operationId === 'VoronoiCreate' ? 'Apply Voronoi' : 'Apply to selection'}
+            </button>
+          )}
+          {onClearInput && (
+            <button className="cp-context-panel__secondary" type="button" onClick={onClearInput}>
+              Clear seeds
             </button>
           )}
         </div>
@@ -1983,14 +2058,18 @@ function CpContextToolGroup({
   setOptions,
   activeLineColor,
   activeMeasurementSlot,
+  activeOperationId,
   measurementSlots,
+  pendingPointCount,
 }: {
   group: OristudioCpToolSettingGroup;
   options: OristudioCpToolOptions;
   setOptions: Dispatch<SetStateAction<OristudioCpToolOptions>>;
   activeLineColor: OristudioCpLineColor;
   activeMeasurementSlot: CpMeasurementSlotId | null;
+  activeOperationId: OristudioCpCommandDefinition['operationId'];
   measurementSlots: CpMeasurementSlots;
+  pendingPointCount: number;
 }) {
   if (group === 'line-color') {
     return (
@@ -2208,9 +2287,13 @@ function CpContextToolGroup({
   if (group === 'apply-lines') {
     return (
       <div className="cp-context-panel__group">
-        <div className="cp-context-panel__group-title">Apply lines</div>
+        <div className="cp-context-panel__group-title">
+          {activeOperationId === 'VoronoiCreate' ? 'Voronoi seeds' : 'Apply lines'}
+        </div>
         <div className="cp-context-panel__readout">
-          Seed lines and apply action will unlock with the generator port.
+          {activeOperationId === 'VoronoiCreate'
+            ? `${pendingPointCount} seed ${pendingPointCount === 1 ? 'press' : 'presses'} pending`
+            : 'Apply the generated lines from this tool.'}
         </div>
       </div>
     );

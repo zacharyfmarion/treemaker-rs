@@ -649,6 +649,8 @@ Done when:
       commands through oracle-tested transform dispatch.
 - [x] Stage 5 slice: Enable two-point overlapping/intersecting crease deletion
       commands through oracle-tested drag-line dispatch.
+- [x] Stage 5 slice: Enable two-point intersecting-line select/unselect commands
+      with kernel-selected flag sync back into the web selection model.
 - [ ] Stage 5: Enable core selection, deletion, color, assignment, move, copy,
       lengthen, and operation-frame commands.
 - [ ] Stage 5: Add web command tests and visual workflows for each enabled

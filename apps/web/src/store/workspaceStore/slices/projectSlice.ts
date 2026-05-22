@@ -72,6 +72,11 @@ const CLEAR_CP_SELECTION_AFTER_OPERATIONS = new Set<OristudioCpOperationId>([
   'CreaseDeleteIntersecting',
 ]);
 
+const SYNC_CP_LINE_SELECTION_AFTER_OPERATIONS = new Set<OristudioCpOperationId>([
+  'SelectLineIntersecting',
+  'UnselectLineIntersecting',
+]);
+
 function oristudioCpSelectionAfterCommand(
   operationId: OristudioCpOperationId,
   selection: OristudioCpSelection,
@@ -79,6 +84,15 @@ function oristudioCpSelectionAfterCommand(
 ): OristudioCpSelection {
   if (CLEAR_CP_SELECTION_AFTER_OPERATIONS.has(operationId)) {
     return emptyOristudioCpSelection();
+  }
+
+  if (SYNC_CP_LINE_SELECTION_AFTER_OPERATIONS.has(operationId)) {
+    return {
+      ...emptyOristudioCpSelection(),
+      lines: document.crease_pattern.line_segments
+        .map((line, index) => (line.selected === 0 ? null : index + 1))
+        .filter((id): id is number => id !== null),
+    };
   }
 
   return {

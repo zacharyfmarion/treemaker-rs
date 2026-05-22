@@ -115,3 +115,38 @@ fn command_dispatch_accepts_drag_delete_point_payloads() {
     assert!(exported.lines().all(|line| line.starts_with("3 ")));
     oristudio_cp_wasm::free_document(handle).expect("document handle should free");
 }
+
+#[wasm_bindgen_test]
+fn command_dispatch_accepts_intersecting_selection_point_payloads() {
+    let handle = oristudio_cp_wasm::load_cp("1 0 0 10 0\n2 5 -5 5 5\n3 0 1 10 1\n", "sample")
+        .expect("cp import should succeed");
+    let result = oristudio_cp_wasm::execute_cp_command(
+        handle,
+        serde_wasm_bindgen::to_value("SelectLineIntersecting")
+            .expect("operation id should serialize"),
+        serde_wasm_bindgen::to_value(&oristudio_cp::CreasePatternCommandPayload {
+            points: vec![
+                oristudio_cp::geometry::Point::new(2.0, 0.0),
+                oristudio_cp::geometry::Point::new(8.0, 0.0),
+            ],
+            ..oristudio_cp::CreasePatternCommandPayload::default()
+        })
+        .expect("payload should serialize"),
+    )
+    .expect("intersecting-line selection command should execute");
+    let result: serde_json::Value =
+        serde_wasm_bindgen::from_value(result).expect("result should deserialize");
+    let snapshot = oristudio_cp_wasm::document_snapshot(handle).expect("snapshot should serialize");
+    let snapshot: serde_json::Value =
+        serde_wasm_bindgen::from_value(snapshot).expect("snapshot should deserialize");
+    let selected = snapshot["crease_pattern"]["line_segments"]
+        .as_array()
+        .expect("line segments should be an array")
+        .iter()
+        .map(|line| line["selected"].as_i64())
+        .collect::<Vec<_>>();
+
+    assert_eq!(result["operation"], "SelectLineIntersecting");
+    assert_eq!(selected, vec![Some(2), Some(2), Some(0)]);
+    oristudio_cp_wasm::free_document(handle).expect("document handle should free");
+}

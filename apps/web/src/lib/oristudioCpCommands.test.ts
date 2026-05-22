@@ -54,6 +54,10 @@ describe('oristudio CP command registry', () => {
       uiStatus: 'ready',
       toolSteps: ['Pick drag start point', 'Pick drag end point'],
     });
+    expect(cpCommandByOperation('SelectLineIntersecting')).toMatchObject({
+      uiStatus: 'ready',
+      toolSteps: ['Pick drag start point', 'Pick drag end point'],
+    });
   });
 
   it('keeps the left rail populated by ordered command groups', () => {

@@ -1331,6 +1331,72 @@ describe('workspace store slices', () => {
     );
   });
 
+  it('syncs editable CP selection from kernel line selection commands', async () => {
+    resetStores(seedSnapshot());
+    await useWorkspaceStore.getState().loadCreasePatternText('1 0 0 1 0\n2 0 0 0 1', {
+      filename: 'lines.cp',
+      path: '/tmp/lines.cp',
+    });
+    const currentDocument = useWorkspaceStore.getState().oristudioCpDocument;
+    if (!currentDocument) throw new Error('expected editable CP document');
+    oristudioCpMocks.executeOristudioCpCommand.mockResolvedValueOnce({
+      ...currentDocument,
+      document: {
+        ...currentDocument.document,
+        crease_pattern: {
+          ...currentDocument.document.crease_pattern,
+          line_segments: [
+            {
+              a: { x: 0, y: 0 },
+              b: { x: 1, y: 0 },
+              active: 'Inactive0',
+              color: 'Red1',
+              selected: 2,
+              customized: 0,
+              customized_color: { red: 100, green: 200, blue: 200 },
+            },
+            {
+              a: { x: 0, y: 0 },
+              b: { x: 0, y: 1 },
+              active: 'Inactive0',
+              color: 'Blue2',
+              selected: 2,
+              customized: 0,
+              customized_color: { red: 100, green: 200, blue: 200 },
+            },
+            {
+              a: { x: 1, y: 0 },
+              b: { x: 1, y: 1 },
+              active: 'Inactive0',
+              color: 'Black0',
+              selected: 0,
+              customized: 0,
+              customized_color: { red: 100, green: 200, blue: 200 },
+            },
+          ],
+        },
+      },
+      summary: {
+        ...currentDocument.summary,
+        line_segments: 3,
+      },
+    });
+
+    await expect(
+      useWorkspaceStore.getState().executeOristudioCpCommand('SelectLineIntersecting', {
+        points: [
+          { x: 0, y: 0 },
+          { x: 1, y: 0 },
+        ],
+      })
+    ).resolves.toBe(true);
+
+    expect(useWorkspaceStore.getState().oristudioCpSelection).toEqual({
+      ...emptyOristudioCpSelection(),
+      lines: [1, 2],
+    });
+  });
+
   it('saves imported FOLD documents as CP without overwriting the source FOLD path', async () => {
     resetStores(seedSnapshot());
     await useWorkspaceStore.getState().loadCreasePatternText(

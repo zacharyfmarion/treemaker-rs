@@ -1284,6 +1284,22 @@ pub fn execute_command(
             let points = required_points(&command, 2)?;
             delete_lines_along(document, &points, true)
         }
+        OperationId::SelectLineIntersecting => {
+            let points = required_points(&command, 2)?;
+            let selection = geometry::LineSegment::new(points[0], points[1]);
+            operations::selection::select_intersecting_line(
+                &mut document.crease_pattern,
+                &selection,
+            )
+        }
+        OperationId::UnselectLineIntersecting => {
+            let points = required_points(&command, 2)?;
+            let selection = geometry::LineSegment::new(points[0], points[1]);
+            operations::selection::unselect_intersecting_line(
+                &mut document.crease_pattern,
+                &selection,
+            )
+        }
         _ => {
             return Err(CommandError::NotImplemented {
                 operation: command.operation,
@@ -1670,6 +1686,64 @@ mod tests {
     }
 
     #[test]
+    fn command_dispatch_selects_lines_intersecting_resolved_drag_segment() {
+        let mut document = delete_along_fixture();
+
+        let result = execute_command(
+            &mut document,
+            CreasePatternCommand::new(OperationId::SelectLineIntersecting).with_payload(
+                CreasePatternCommandPayload {
+                    points: vec![Point::new(2.0, 0.0), Point::new(8.0, 0.0)],
+                    ..CreasePatternCommandPayload::default()
+                },
+            ),
+        )
+        .expect("intersecting-line select command should execute");
+
+        assert_eq!(result.status, OperationStatus::OracleTested);
+        assert_eq!(result.diagnostics, vec!["Changed 2 line(s)"]);
+        assert_eq!(
+            document
+                .crease_pattern
+                .line_segments
+                .iter()
+                .map(|line| line.selected)
+                .collect::<Vec<_>>(),
+            vec![2, 2, 0]
+        );
+    }
+
+    #[test]
+    fn command_dispatch_unselects_lines_intersecting_resolved_drag_segment() {
+        let mut document = delete_along_fixture();
+        for line in &mut document.crease_pattern.line_segments {
+            *line = line.with_selected(2);
+        }
+
+        let result = execute_command(
+            &mut document,
+            CreasePatternCommand::new(OperationId::UnselectLineIntersecting).with_payload(
+                CreasePatternCommandPayload {
+                    points: vec![Point::new(2.0, 0.0), Point::new(8.0, 0.0)],
+                    ..CreasePatternCommandPayload::default()
+                },
+            ),
+        )
+        .expect("intersecting-line unselect command should execute");
+
+        assert_eq!(result.diagnostics, vec!["Changed 2 line(s)"]);
+        assert_eq!(
+            document
+                .crease_pattern
+                .line_segments
+                .iter()
+                .map(|line| line.selected)
+                .collect::<Vec<_>>(),
+            vec![0, 0, 2]
+        );
+    }
+
+    #[test]
     fn command_dispatch_requires_resolved_line_targets() {
         let mut document = CreasePatternDocument::default();
 
@@ -1731,6 +1805,25 @@ mod tests {
             error,
             CommandError::InvalidInput {
                 operation: OperationId::CreaseDeleteOverlapping,
+                message: "expected 2 resolved point(s)".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn command_dispatch_requires_resolved_points_for_intersecting_selection_commands() {
+        let mut document = delete_along_fixture();
+
+        let error = execute_command(
+            &mut document,
+            CreasePatternCommand::new(OperationId::SelectLineIntersecting),
+        )
+        .expect_err("intersecting-line selection commands require a drag segment");
+
+        assert_eq!(
+            error,
+            CommandError::InvalidInput {
+                operation: OperationId::SelectLineIntersecting,
                 message: "expected 2 resolved point(s)".to_string(),
             }
         );

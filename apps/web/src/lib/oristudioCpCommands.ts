@@ -354,8 +354,14 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
   }),
   notImplemented('SelectPolygon', 'Select polygon', 'select-edit', 'lasso-select', 'MouseHandlerSelectPolygon'),
   notImplemented('UnselectPolygon', 'Unselect polygon', 'select-edit', 'lasso', 'MouseHandlerUnselectPolygon'),
-  notImplemented('SelectLineIntersecting', 'Select intersecting line', 'select-edit', 'scan-search', 'MouseHandlerSelectLineIntersecting'),
-  notImplemented('UnselectLineIntersecting', 'Unselect intersecting line', 'select-edit', 'scan-search', 'MouseHandlerUnselectLineIntersecting'),
+  ready('SelectLineIntersecting', 'Select intersecting line', 'select-edit', 'scan-search', 'MouseHandlerSelectLineIntersecting', {
+    toolSteps: ['Pick drag start point', 'Pick drag end point'],
+    tooltip: 'Select crease segments intersecting or overlapping a dragged line',
+  }),
+  ready('UnselectLineIntersecting', 'Unselect intersecting line', 'select-edit', 'scan-search', 'MouseHandlerUnselectLineIntersecting', {
+    toolSteps: ['Pick drag start point', 'Pick drag end point'],
+    tooltip: 'Unselect crease segments intersecting or overlapping a dragged line',
+  }),
   notImplemented('LengthenCreaseSameColor', 'Lengthen same color', 'transform', 'stretch-horizontal', 'MouseHandlerLengthenCreaseSameColor'),
   notImplemented('FoldableLineDraw', 'Foldable line draw', 'construct', 'pen-line', 'MouseHandlerFoldableLineDraw'),
   notImplemented('ReplaceLineTypeSelect', 'Replace selected line type', 'color', 'replace', 'MouseHandlerReplaceTypeSelect'),

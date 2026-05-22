@@ -1605,7 +1605,7 @@
 }
 
 .cp-panel__body--with-tools {
-  grid-template-columns: 52px minmax(0, 1fr);
+  grid-template-columns: 86px minmax(0, 1fr);
   place-items: stretch;
 }
 
@@ -1671,7 +1671,7 @@
 
 .cp-tool-rail__buttons {
   display: grid;
-  grid-template-columns: 32px;
+  grid-template-columns: repeat(2, 32px);
   justify-content: center;
   gap: 3px;
 }
@@ -2782,7 +2782,7 @@
   }
 
   .cp-panel__body--with-tools {
-    grid-template-columns: 44px minmax(0, 1fr);
+    grid-template-columns: 72px minmax(0, 1fr);
   }
 
   .cp-tool-rail__header {
@@ -2790,7 +2790,7 @@
   }
 
   .cp-tool-rail__buttons {
-    grid-template-columns: 28px;
+    grid-template-columns: repeat(2, 28px);
   }
 
   .cp-tool-rail__button {

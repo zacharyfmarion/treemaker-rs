@@ -58,6 +58,10 @@ describe('oristudio CP command registry', () => {
       uiStatus: 'ready',
       toolSteps: ['Pick drag start point', 'Pick drag end point'],
     });
+    expect(cpCommandByOperation('FixInaccurate')).toMatchObject({
+      uiStatus: 'ready',
+      selectionRequirement: 'selected folding lines',
+    });
   });
 
   it('keeps the left rail populated by ordered command groups', () => {

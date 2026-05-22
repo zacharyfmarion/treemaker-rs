@@ -1300,6 +1300,15 @@ pub fn execute_command(
                 &selection,
             )
         }
+        OperationId::FixInaccurate => {
+            let line_indices = required_line_indices(&command)?;
+            checks::fix_inaccurate_for_indices(
+                &mut document.crease_pattern,
+                &line_indices,
+                checks::FixInaccurateOptions::default(),
+            )
+            .num_fixed_lines
+        }
         _ => {
             return Err(CommandError::NotImplemented {
                 operation: command.operation,
@@ -1741,6 +1750,31 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![0, 0, 2]
         );
+    }
+
+    #[test]
+    fn command_dispatch_fixes_inaccurate_selected_lines_with_default_options() {
+        let mut document = CreasePatternDocument::default();
+        document.crease_pattern.add_line(
+            Point::new(0.1954, 0.0),
+            Point::new(10.0, 0.0),
+            LineColor::Red1,
+        );
+
+        let result = execute_command(
+            &mut document,
+            CreasePatternCommand::new(OperationId::FixInaccurate).with_payload(
+                CreasePatternCommandPayload {
+                    line_ids: vec![1],
+                    ..CreasePatternCommandPayload::default()
+                },
+            ),
+        )
+        .expect("fix inaccurate command should execute");
+
+        assert_eq!(result.status, OperationStatus::OracleTested);
+        assert_eq!(result.diagnostics, vec!["Changed 1 line(s)"]);
+        assert_close(document.crease_pattern.line_segments[0].a.x, 0.1953125);
     }
 
     #[test]

@@ -510,6 +510,9 @@ describe('CreasePatternPanel', () => {
     const selectIntersectingButton = container.querySelector<HTMLButtonElement>(
       'button[aria-label="Select intersecting line"]'
     );
+    const fixInaccurateButton = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Fix inaccurate creases"]'
+    );
     expect(drawCreaseButton?.getAttribute('aria-disabled')).toBe('true');
     expect(drawCreaseButton?.getAttribute('data-ui-status')).toBe('not-implemented');
     expect(makeMountainButton?.getAttribute('aria-disabled')).toBe('false');
@@ -520,6 +523,8 @@ describe('CreasePatternPanel', () => {
     expect(deleteIntersectingButton?.getAttribute('data-ui-status')).toBe('ready');
     expect(selectIntersectingButton?.getAttribute('aria-disabled')).toBe('false');
     expect(selectIntersectingButton?.getAttribute('data-ui-status')).toBe('ready');
+    expect(fixInaccurateButton?.getAttribute('aria-disabled')).toBe('false');
+    expect(fixInaccurateButton?.getAttribute('data-ui-status')).toBe('ready');
     expect(foldEstimateButton?.getAttribute('aria-disabled')).toBe('true');
     expect(foldEstimateButton?.getAttribute('data-ui-status')).toBe('porting');
 

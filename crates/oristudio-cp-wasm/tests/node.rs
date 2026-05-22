@@ -150,3 +150,26 @@ fn command_dispatch_accepts_intersecting_selection_point_payloads() {
     assert_eq!(selected, vec![Some(2), Some(2), Some(0)]);
     oristudio_cp_wasm::free_document(handle).expect("document handle should free");
 }
+
+#[wasm_bindgen_test]
+fn command_dispatch_accepts_fix_inaccurate_line_payloads() {
+    let handle = oristudio_cp_wasm::load_cp("1 0.1954 0 10 0\n", "sample")
+        .expect("cp import should succeed");
+    let result = oristudio_cp_wasm::execute_cp_command(
+        handle,
+        serde_wasm_bindgen::to_value("FixInaccurate").expect("operation id should serialize"),
+        serde_wasm_bindgen::to_value(&oristudio_cp::CreasePatternCommandPayload {
+            line_ids: vec![1],
+            ..oristudio_cp::CreasePatternCommandPayload::default()
+        })
+        .expect("payload should serialize"),
+    )
+    .expect("fix inaccurate command should execute");
+    let result: serde_json::Value =
+        serde_wasm_bindgen::from_value(result).expect("result should deserialize");
+    let exported = oristudio_cp_wasm::export_cp(handle).expect("cp export should succeed");
+
+    assert_eq!(result["operation"], "FixInaccurate");
+    assert!(exported.contains("0.1953125"));
+    oristudio_cp_wasm::free_document(handle).expect("document handle should free");
+}

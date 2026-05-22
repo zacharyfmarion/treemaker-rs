@@ -380,7 +380,10 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
   notImplemented('AddFoldingConstraint', 'Add folding constraint', 'folding', 'list-plus', 'MouseHandlerAddFoldingConstraints'),
   notImplemented('Axiom5', 'Axiom 5', 'construct', 'compass', 'MouseHandlerAxiom5'),
   notImplemented('Axiom7', 'Axiom 7', 'construct', 'compass', 'MouseHandlerAxiom7'),
-  notImplemented('FixInaccurate', 'Fix inaccurate creases', 'check-fix', 'wrench', 'MouseHandlerCreaseFixInaccurate'),
+  ready('FixInaccurate', 'Fix inaccurate creases', 'check-fix', 'wrench', 'MouseHandlerCreaseFixInaccurate', {
+    selectionRequirement: 'selected folding lines',
+    tooltip: 'Snap inaccurate selected folding lines to Oriedita fix targets',
+  }),
   notImplemented('ImportCp', 'Import CP', 'file', 'file-input', 'CpImporter', { placement: 'menu' }),
   notImplemented('ExportCp', 'Export CP', 'file', 'file-output', 'CpExporter', { placement: 'menu' }),
   notImplemented('ImportFold', 'Import FOLD', 'file', 'file-input', 'FoldImporter', { placement: 'menu' }),

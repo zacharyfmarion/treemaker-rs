@@ -70,6 +70,7 @@ const CLEAR_CP_SELECTION_AFTER_OPERATIONS = new Set<OristudioCpOperationId>([
   'CreaseCopy4p',
   'CreaseDeleteOverlapping',
   'CreaseDeleteIntersecting',
+  'FixInaccurate',
 ]);
 
 const SYNC_CP_LINE_SELECTION_AFTER_OPERATIONS = new Set<OristudioCpOperationId>([

@@ -9,7 +9,9 @@ use serde::{Deserialize, Serialize};
 use treemaker_flatfold::{
     ConstraintSummary, FlatFoldError, OverlapGraph, SolveOptions, solve_flat_fold,
 };
-use treemaker_fold::{FoldDocument, build_faces_edges, validate_basic};
+use treemaker_fold::{
+    Assignment, FoldDocument, build_edges_faces, build_faces_edges, validate_basic,
+};
 
 pub use treemaker_flatfold::SolutionLimit;
 
@@ -242,8 +244,140 @@ impl SequenceDiagnostic {
     }
 }
 
-pub fn plan_folding_sequence(_target: &TargetState) -> Result<()> {
-    Err(SequenceError::NotImplemented("folding sequence planner"))
+pub fn plan_folding_sequence(target: &TargetState) -> Result<SequencePlan> {
+    plan_folding_sequence_with_options(target, SequencePlanOptions::default())
+}
+
+pub fn plan_folding_sequence_with_options(
+    target: &TargetState,
+    options: SequencePlanOptions,
+) -> Result<SequencePlan> {
+    let target_state = SequenceState::from_target("target", target);
+    target_state.validate()?;
+
+    let mut reverse_states = vec![target_state.clone()];
+    let mut reverse_steps = Vec::new();
+    let mut current = target_state;
+    let mut explored_states = 1usize;
+    let mut applied_steps = 0usize;
+
+    loop {
+        if current.active_creases.is_empty() {
+            break;
+        }
+        if applied_steps >= options.max_steps {
+            break;
+        }
+        let Some(simple_fold) = detect_simple_fold(&current)? else {
+            break;
+        };
+        let next_state_id = format!("state-{}", reverse_states.len());
+        let next = apply_reverse_simple_fold(&current, &next_state_id, &simple_fold)?;
+        next.validate()?;
+        reverse_steps.push((simple_fold, current.id.clone(), next.id.clone()));
+        reverse_states.push(next.clone());
+        current = next;
+        explored_states += 1;
+        applied_steps += 1;
+    }
+
+    let unresolved_regions = unresolved_regions_for_state(&current);
+    let status = if unresolved_regions.is_empty() {
+        PlanStatus::Complete
+    } else if reverse_steps.is_empty() {
+        PlanStatus::Unsupported
+    } else {
+        PlanStatus::Partial
+    };
+
+    let mut diagnostics = target.diagnostics.clone();
+    if !unresolved_regions.is_empty() {
+        diagnostics.push(SequenceDiagnostic::warning(
+            "unsupported_region",
+            "planner stopped with crease groups outside the Phase 3 simple-fold rule set",
+        ));
+    }
+
+    let mut steps = reverse_steps
+        .into_iter()
+        .rev()
+        .enumerate()
+        .map(|(index, (simple_fold, before_reverse, after_reverse))| {
+            simple_fold.to_forward_step(index, after_reverse, before_reverse)
+        })
+        .collect::<Vec<_>>();
+    for (index, step) in steps.iter_mut().enumerate() {
+        if let InstructionStep::SimpleFold(details) = step {
+            details.id = format!("step-{}", index + 1);
+        }
+    }
+
+    let mut states = reverse_states;
+    states.reverse();
+    Ok(SequencePlan {
+        status,
+        steps,
+        states,
+        diagnostics,
+        unresolved_regions,
+        search: SearchStats {
+            states_explored: explored_states,
+            branches_pruned: 0,
+            repeated_states: 0,
+            timed_out: false,
+            best_unresolved_creases: current.active_creases.len(),
+        },
+    })
+}
+
+pub fn plan_reference_precreases(_document: &FoldDocument) -> Result<()> {
+    Err(SequenceError::NotImplemented("reference/precrease planner"))
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PlanStatus {
+    Complete,
+    Partial,
+    Unsupported,
+    InvalidInput,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SequencePlan {
+    pub status: PlanStatus,
+    pub steps: Vec<InstructionStep>,
+    pub states: Vec<SequenceState>,
+    pub diagnostics: Vec<SequenceDiagnostic>,
+    pub unresolved_regions: Vec<UnresolvedRegion>,
+    pub search: SearchStats,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SearchStats {
+    pub states_explored: usize,
+    pub branches_pruned: usize,
+    pub repeated_states: usize,
+    pub timed_out: bool,
+    pub best_unresolved_creases: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SequencePlanOptions {
+    pub max_steps: usize,
+}
+
+impl Default for SequencePlanOptions {
+    fn default() -> Self {
+        Self { max_steps: 64 }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SimpleFoldRule {
+    pub crease: usize,
+    pub faces: Vec<usize>,
+    pub assignment: Assignment,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -266,7 +400,9 @@ impl SequenceState {
             .edges_assignment
             .iter()
             .enumerate()
-            .filter_map(|(edge, assignment)| assignment.is_driven_crease().then_some(edge))
+            .filter_map(|(edge, assignment)| {
+                matches!(assignment, Assignment::Mountain | Assignment::Valley).then_some(edge)
+            })
             .collect();
         Self {
             id: id.into(),
@@ -544,6 +680,137 @@ pub fn validate_sequence_state(state: &SequenceState) -> Result<ValidationReport
         });
     }
     Ok(report)
+}
+
+pub fn detect_simple_fold(state: &SequenceState) -> Result<Option<SimpleFoldRule>> {
+    let edges_faces = if state.document.edges_faces.is_empty() {
+        build_edges_faces(&state.document)
+            .map_err(|error| SequenceError::InvalidInput(error.to_string()))?
+    } else {
+        state.document.edges_faces.clone()
+    };
+    let boundary_vertices = boundary_vertex_flags(&state.document);
+    let mut active_creases = state.active_creases.clone();
+    active_creases.sort_unstable();
+    for crease in active_creases {
+        let assignment = state.document.assignment_for_edge(crease);
+        if !matches!(assignment, Assignment::Mountain | Assignment::Valley) {
+            continue;
+        }
+        let Some([a, b]) = state.document.edges_vertices.get(crease).copied() else {
+            continue;
+        };
+        let faces = edges_faces.get(crease).cloned().unwrap_or_default();
+        if faces.len() == 2
+            && boundary_vertices.get(a).copied().unwrap_or(false)
+            && boundary_vertices.get(b).copied().unwrap_or(false)
+        {
+            return Ok(Some(SimpleFoldRule {
+                crease,
+                faces,
+                assignment,
+            }));
+        }
+    }
+    Ok(None)
+}
+
+fn apply_reverse_simple_fold(
+    state: &SequenceState,
+    next_state_id: &str,
+    rule: &SimpleFoldRule,
+) -> Result<SequenceState> {
+    let mut document = state.document.clone();
+    if let Some(assignment) = document.edges_assignment.get_mut(rule.crease) {
+        *assignment = Assignment::Flat;
+    }
+    if let Some(angle) = document.edges_fold_angle.get_mut(rule.crease) {
+        *angle = Some(0.0);
+    }
+    let target = resolve_target_state(&document, TargetStateOptions::default())?;
+    let mut next = SequenceState::from_target(next_state_id.to_string(), &target);
+    next.provenance =
+        StateProvenance::rewrite(&state.id, format!("reverse-simple-{}", rule.crease));
+    next.active_creases.retain(|crease| *crease != rule.crease);
+    Ok(next)
+}
+
+fn unresolved_regions_for_state(state: &SequenceState) -> Vec<UnresolvedRegion> {
+    if state.active_creases.is_empty() {
+        return Vec::new();
+    }
+    let mut faces = Vec::new();
+    if let Ok(edges_faces) = if state.document.edges_faces.is_empty() {
+        build_edges_faces(&state.document)
+    } else {
+        Ok(state.document.edges_faces.clone())
+    } {
+        for crease in &state.active_creases {
+            if let Some(edge_faces) = edges_faces.get(*crease) {
+                faces.extend(edge_faces.iter().copied());
+            }
+        }
+        faces.sort_unstable();
+        faces.dedup();
+    }
+    vec![UnresolvedRegion {
+        id: "unresolved-1".to_string(),
+        creases: state.active_creases.clone(),
+        faces,
+        reason: "no validated Phase 3 simple-fold rewrite matches these creases".to_string(),
+    }]
+}
+
+fn boundary_vertex_flags(document: &FoldDocument) -> Vec<bool> {
+    let mut flags = vec![false; document.vertices_coords.len()];
+    for (edge_index, [a, b]) in document.edges_vertices.iter().copied().enumerate() {
+        if document.assignment_for_edge(edge_index) == Assignment::Boundary {
+            if let Some(flag) = flags.get_mut(a) {
+                *flag = true;
+            }
+            if let Some(flag) = flags.get_mut(b) {
+                *flag = true;
+            }
+        }
+    }
+    flags
+}
+
+impl SimpleFoldRule {
+    fn to_forward_step(
+        &self,
+        index: usize,
+        before_state: String,
+        after_state: String,
+    ) -> InstructionStep {
+        let assignment = match self.assignment {
+            Assignment::Mountain => "mountain",
+            Assignment::Valley => "valley",
+            Assignment::Flat => "flat",
+            Assignment::Boundary | Assignment::Unassigned | Assignment::Cut | Assignment::Join => {
+                "fold"
+            }
+        };
+        let mut details = StepDetails::new(
+            format!("step-{}", index + 1),
+            format!("Make a {assignment} fold on crease {}", self.crease),
+            before_state,
+            after_state,
+        );
+        details.affected_creases = vec![self.crease];
+        details.affected_faces = self.faces.clone();
+        details.metadata = MoveMetadata {
+            difficulty: MoveDifficulty::Simple,
+            layer_mode: if self.faces.len() == 2 {
+                LayerMode::SingleLayer
+            } else {
+                LayerMode::Unknown
+            },
+            confidence: 1.0,
+            notes: Vec::new(),
+        };
+        InstructionStep::SimpleFold(details)
+    }
 }
 
 fn reject_zero_solution_limit(solution_limit: &SolutionLimit) -> Result<()> {
@@ -862,12 +1129,31 @@ mod tests {
     }
 
     #[test]
-    fn unfinished_planner_is_explicitly_not_implemented() {
-        let target = resolve_target_state(&two_face_valley(), TargetStateOptions::default())
-            .expect("target state");
-        let error = plan_folding_sequence(&target).expect_err("planner is not implemented");
+    fn reference_precrease_planner_is_explicitly_not_implemented() {
+        let document = two_face_valley();
+        let error =
+            plan_reference_precreases(&document).expect_err("reference finder is not implemented");
 
         assert_eq!(error.code(), "not_implemented");
+    }
+
+    #[test]
+    fn simple_fold_planner_completes_single_simple_fold() {
+        let target = resolve_target_state(&two_face_valley(), TargetStateOptions::default())
+            .expect("target state");
+        let plan = plan_folding_sequence(&target).expect("simple fold plan");
+
+        assert_eq!(plan.status, PlanStatus::Complete);
+        assert_eq!(plan.steps.len(), 1);
+        assert!(plan.unresolved_regions.is_empty());
+        assert_eq!(plan.search.best_unresolved_creases, 0);
+        match &plan.steps[0] {
+            InstructionStep::SimpleFold(details) => {
+                assert_eq!(details.affected_creases, vec![4]);
+                assert_eq!(details.metadata.difficulty, MoveDifficulty::Simple);
+            }
+            other => panic!("expected simple fold step, got {other:?}"),
+        }
     }
 
     #[test]

@@ -72,7 +72,7 @@ has a validated implementation.
 - [x] Phase 1: Add the sequence crate and target-state adapter over
       `treemaker-flatfold`.
 - [x] Phase 2: Implement sequence-state snapshots and deterministic validators.
-- [ ] Phase 3: Build the first reverse rewrite rules for simple folds.
+- [x] Phase 3: Build the first reverse rewrite rules for simple folds.
 - [ ] Phase 4: Add hierarchical complex moves for common base-collapse
       techniques.
 - [ ] Phase 5: Add search, ranking, partial-plan handling, and diagnostics.
@@ -257,6 +257,18 @@ Exit criteria:
 
 - At least the simple-fold fixtures produce complete plans.
 - Unsupported fixtures stop cleanly with unresolved regions.
+
+Phase 3 implementation notes:
+
+- Added a bounded Phase 3 planner that searches reverse rewrites using the
+  validated simple-fold rule set only.
+- Simple-fold detection accepts active mountain/valley creases with two adjacent
+  faces and boundary-to-boundary crease endpoints.
+- Reverse simple-fold application deactivates the crease by converting it to a
+  flat crease, re-runs target-state resolution for the intermediate state, and
+  emits the reversed user-facing `simple_fold` steps.
+- The simple Phase 0 fixtures now produce complete plans; non-simple fixtures
+  stop with `partial` or `unsupported` plans and unresolved-region diagnostics.
 
 ## Phase 4: Hierarchical Complex Moves
 

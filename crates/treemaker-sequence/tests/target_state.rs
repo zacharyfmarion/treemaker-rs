@@ -2,7 +2,8 @@ use std::path::Path;
 
 use treemaker_fold::FoldDocument;
 use treemaker_sequence::{
-    SequenceError, SolutionLimit, TargetStateOptions, plan_folding_sequence, resolve_target_state,
+    PlanStatus, SequenceError, SolutionLimit, TargetStateOptions, plan_folding_sequence,
+    resolve_target_state,
 };
 
 fn fixture_root() -> &'static Path {
@@ -51,10 +52,32 @@ fn phase0_fixtures_resolve_target_states() {
         );
         assert_eq!(target.selected_solution_index, 0, "{fixture}");
         assert!(!target.states.is_empty(), "{fixture}");
+        let plan =
+            plan_folding_sequence(&target).unwrap_or_else(|error| panic!("{fixture}: {error}"));
         assert!(
-            plan_folding_sequence(&target).is_err_and(|error| error.code() == "not_implemented"),
+            matches!(
+                plan.status,
+                PlanStatus::Complete | PlanStatus::Partial | PlanStatus::Unsupported
+            ),
             "{fixture}"
         );
+    }
+}
+
+#[test]
+fn phase0_simple_fixtures_have_complete_phase3_plans() {
+    let root = fixture_root().join("tests/fixtures/folding-sequence/fold");
+    for (fixture, expected_steps) in [("simple-valley.fold", 1), ("accordion-book-fold.fold", 2)] {
+        let document = read_fold(root.join(fixture));
+        let target = resolve_target_state(&document, TargetStateOptions::default())
+            .unwrap_or_else(|error| panic!("{fixture}: {error}"));
+        let plan =
+            plan_folding_sequence(&target).unwrap_or_else(|error| panic!("{fixture}: {error}"));
+
+        assert_eq!(plan.status, PlanStatus::Complete, "{fixture}");
+        assert_eq!(plan.steps.len(), expected_steps, "{fixture}");
+        assert!(plan.unresolved_regions.is_empty(), "{fixture}");
+        assert_eq!(plan.search.best_unresolved_creases, 0, "{fixture}");
     }
 }
 

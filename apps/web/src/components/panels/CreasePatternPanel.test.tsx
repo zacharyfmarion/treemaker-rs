@@ -243,6 +243,12 @@ function setCanvasClientRect(container: HTMLElement): SVGSVGElement {
   return canvas;
 }
 
+function setNumberInputValue(input: HTMLInputElement, value: string) {
+  const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+  valueSetter?.call(input, value);
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
 afterEach(() => {
   if (root) {
     act(() => {
@@ -821,6 +827,108 @@ describe('CreasePatternPanel', () => {
       custom_from_line_type: 'Any',
       custom_to_line_type: 'Edge',
     });
+  });
+
+  it('shows active tool inputs for line division count and sends the edited count', async () => {
+    const executeOristudioCpCommand = vi.fn(
+      async (_operationId: string, _payload?: OristudioCpCommandPayload) => true
+    );
+    const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
+      documentMode: 'crease-pattern',
+      importedCreasePattern: importedCpDocument(),
+      oristudioCpDocument: editableCpState(),
+      oristudioCpViewport: {
+        gridVisible: true,
+        snapToGrid: false,
+        snapToVertices: false,
+        snapToLines: false,
+      },
+      executeOristudioCpCommand,
+    });
+    const canvas = setCanvasClientRect(container);
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>('button[aria-label="Divide line by count"]')
+        ?.click();
+      await Promise.resolve();
+    });
+
+    const countInput = container.querySelector<HTMLInputElement>('input[aria-label="Division count"]');
+    expect(countInput?.value).toBe('2');
+    act(() => {
+      if (countInput) setNumberInputValue(countInput, '5');
+    });
+
+    await act(async () => {
+      canvas.dispatchEvent(
+        new MouseEvent('pointerdown', {
+          bubbles: true,
+          button: 0,
+          clientX: 360,
+          clientY: 348,
+        })
+      );
+      await Promise.resolve();
+    });
+
+    expect(executeOristudioCpCommand).toHaveBeenCalledOnce();
+    const [operation, payload] = executeOristudioCpCommand.mock.calls[0] ?? [];
+    expect(operation).toBe('LineSegmentDivision');
+    expect(payload?.division_count).toBe(5);
+  });
+
+  it('shows active tool inputs for line division ratio and sends the edited ratio', async () => {
+    const executeOristudioCpCommand = vi.fn(
+      async (_operationId: string, _payload?: OristudioCpCommandPayload) => true
+    );
+    const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
+      documentMode: 'crease-pattern',
+      importedCreasePattern: importedCpDocument(),
+      oristudioCpDocument: editableCpState(),
+      oristudioCpViewport: {
+        gridVisible: true,
+        snapToGrid: false,
+        snapToVertices: false,
+        snapToLines: false,
+      },
+      executeOristudioCpCommand,
+    });
+    const canvas = setCanvasClientRect(container);
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>('button[aria-label="Divide line by ratio"]')
+        ?.click();
+      await Promise.resolve();
+    });
+
+    const ratioSInput = container.querySelector<HTMLInputElement>('input[aria-label="Ratio S"]');
+    const ratioTInput = container.querySelector<HTMLInputElement>('input[aria-label="Ratio T"]');
+    expect(ratioSInput?.value).toBe('1');
+    expect(ratioTInput?.value).toBe('1');
+    act(() => {
+      if (ratioSInput) setNumberInputValue(ratioSInput, '2');
+      if (ratioTInput) setNumberInputValue(ratioTInput, '3');
+    });
+
+    await act(async () => {
+      canvas.dispatchEvent(
+        new MouseEvent('pointerdown', {
+          bubbles: true,
+          button: 0,
+          clientX: 360,
+          clientY: 348,
+        })
+      );
+      await Promise.resolve();
+    });
+
+    expect(executeOristudioCpCommand).toHaveBeenCalledOnce();
+    const [operation, payload] = executeOristudioCpCommand.mock.calls[0] ?? [];
+    expect(operation).toBe('LineSegmentRatioSet');
+    expect(payload?.ratio_s).toBe(2);
+    expect(payload?.ratio_t).toBe(3);
   });
 
   it('runs ready lengthen CP commands with three resolved model points and current color', async () => {

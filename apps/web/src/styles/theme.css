@@ -1729,6 +1729,22 @@
   color: var(--text-primary);
 }
 
+.cp-tool-rail__button[data-active][data-line-color='Red1'] {
+  color: var(--fold-mountain);
+}
+
+.cp-tool-rail__button[data-active][data-line-color='Blue2'] {
+  color: var(--fold-valley);
+}
+
+.cp-tool-rail__button[data-active][data-line-color='Black0'] {
+  color: var(--fold-border);
+}
+
+.cp-tool-rail__button[data-active][data-line-color='Cyan3'] {
+  color: var(--fold-flat);
+}
+
 .cp-tool-rail__button-label {
   line-height: 1;
 }
@@ -2663,6 +2679,50 @@
   font-variant-numeric: tabular-nums;
   pointer-events: none;
   box-shadow: 0 8px 24px var(--shadow-overlay);
+}
+
+.cp-tool-options {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  z-index: 16;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 28px;
+  padding: 3px 6px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--domain-overlay-bg);
+  color: var(--text-secondary);
+  box-shadow: 0 8px 24px var(--shadow-overlay);
+  font-size: 0.68rem;
+}
+
+.cp-tool-options__field {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-tertiary);
+  font-weight: 650;
+}
+
+.cp-tool-options__field input {
+  width: 44px;
+  height: 22px;
+  min-width: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  padding: 2px 5px;
+}
+
+.cp-tool-options__field input:focus-visible {
+  border-color: var(--accent-primary);
+  outline: none;
 }
 
 .viewport-toolbar {

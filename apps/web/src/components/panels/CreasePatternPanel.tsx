@@ -4,7 +4,9 @@ import {
   useMemo,
   useRef,
   useState,
+  type Dispatch,
   type PointerEvent,
+  type SetStateAction,
 } from 'react';
 import { TransformComponent, TransformWrapper, type ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
 import { GitBranch, Grid2X2, Magnet, ScanLine } from 'lucide-react';
@@ -100,7 +102,8 @@ function cpCommandPayloadDefaults(
   bounds: ReturnType<typeof getEditableCpModelBounds>,
   gridWidth: number | undefined,
   lineColor: OristudioCpLineColor,
-  zoomScale: number
+  zoomScale: number,
+  toolOptions: OristudioCpToolOptions
 ): OristudioCpCommandPayload {
   const payload: OristudioCpCommandPayload = {};
   const operationId = command.operationId;
@@ -156,12 +159,12 @@ function cpCommandPayloadDefaults(
   }
 
   if (operationId === 'LineSegmentDivision') {
-    payload.division_count = 2;
+    payload.division_count = toolOptions.divisionCount;
   }
 
   if (operationId === 'LineSegmentRatioSet') {
-    payload.ratio_s = 1;
-    payload.ratio_t = 1;
+    payload.ratio_s = toolOptions.ratioS;
+    payload.ratio_t = toolOptions.ratioT;
   }
 
   if (operationId === 'ReplaceLineTypeSelect') {
@@ -175,6 +178,18 @@ function cpCommandPayloadDefaults(
 
   return payload;
 }
+
+interface OristudioCpToolOptions {
+  divisionCount: number;
+  ratioS: number;
+  ratioT: number;
+}
+
+const DEFAULT_ORISTUDIO_CP_TOOL_OPTIONS: OristudioCpToolOptions = {
+  divisionCount: 2,
+  ratioS: 1,
+  ratioT: 1,
+};
 
 function pointDistanceSquared(a: Point, b: Point): number {
   const dx = a.x - b.x;
@@ -230,6 +245,9 @@ export function CreasePatternPanel() {
   const [snapTarget, setSnapTarget] = useState<CpSnapTarget | null>(null);
   const [cpToolState, setCpToolState] = useState(IDLE_ORISTUDIO_CP_TOOL_STATE);
   const [activeCpLineColor, setActiveCpLineColor] = useState<OristudioCpLineColor>('Red1');
+  const [cpToolOptions, setCpToolOptions] = useState<OristudioCpToolOptions>(
+    DEFAULT_ORISTUDIO_CP_TOOL_OPTIONS
+  );
   const [cpToolPoints, setCpToolPoints] = useState<Point[]>([]);
   const [cpToolPath, setCpToolPath] = useState<Point[]>([]);
   const [cpCommandPreview, setCpCommandPreview] = useState<OristudioCpCommandPreview | null>(null);
@@ -371,11 +389,12 @@ export function CreasePatternPanel() {
         editableCpBounds,
         editableCpGridWidth,
         activeCpLineColor,
-        zoomPercent / 100
+        zoomPercent / 100,
+        cpToolOptions
       ),
       ...payload,
     }),
-    [activeCpLineColor, editableCpBounds, editableCpGridWidth, zoomPercent]
+    [activeCpLineColor, cpToolOptions, editableCpBounds, editableCpGridWidth, zoomPercent]
   );
 
   useEffect(() => {
@@ -1294,6 +1313,13 @@ export function CreasePatternPanel() {
                   </>
                 )}
               </ViewportToolbar>
+              {editableCp && activeCpCommand && (
+                <CpActiveToolOptions
+                  command={activeCpCommand}
+                  options={cpToolOptions}
+                  setOptions={setCpToolOptions}
+                />
+              )}
               <div className="viewport-status-readout">
                 <span>{formatZoom(zoomPercent / 100)}</span>
                 {editableCp && <span>{cpToolState.prompt}</span>}
@@ -1655,6 +1681,93 @@ function GeneratedCreasePattern({
         onPointerDown={clearSelectionOnBackgroundPointerDown}
       />
     </>
+  );
+}
+
+function CpActiveToolOptions({
+  command,
+  options,
+  setOptions,
+}: {
+  command: OristudioCpCommandDefinition;
+  options: OristudioCpToolOptions;
+  setOptions: Dispatch<SetStateAction<OristudioCpToolOptions>>;
+}) {
+  if (command.operationId === 'LineSegmentDivision') {
+    return (
+      <div className="cp-tool-options" aria-label="Active crease pattern tool options">
+        <NumericToolOption
+          label="Count"
+          ariaLabel="Division count"
+          min={2}
+          max={256}
+          value={options.divisionCount}
+          onChange={(divisionCount) =>
+            setOptions((current) => ({ ...current, divisionCount }))
+          }
+        />
+      </div>
+    );
+  }
+
+  if (command.operationId === 'LineSegmentRatioSet') {
+    return (
+      <div className="cp-tool-options" aria-label="Active crease pattern tool options">
+        <NumericToolOption
+          label="S"
+          ariaLabel="Ratio S"
+          min={1}
+          max={999}
+          value={options.ratioS}
+          onChange={(ratioS) => setOptions((current) => ({ ...current, ratioS }))}
+        />
+        <NumericToolOption
+          label="T"
+          ariaLabel="Ratio T"
+          min={1}
+          max={999}
+          value={options.ratioT}
+          onChange={(ratioT) => setOptions((current) => ({ ...current, ratioT }))}
+        />
+      </div>
+    );
+  }
+
+  return null;
+}
+
+function NumericToolOption({
+  label,
+  ariaLabel,
+  min,
+  max,
+  value,
+  onChange,
+}: {
+  label: string;
+  ariaLabel: string;
+  min: number;
+  max: number;
+  value: number;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <label className="cp-tool-options__field">
+      <span>{label}</span>
+      <input
+        aria-label={ariaLabel}
+        type="number"
+        min={min}
+        max={max}
+        step={1}
+        value={value}
+        onChange={(event) => {
+          const parsed = Number.parseInt(event.currentTarget.value, 10);
+          if (!Number.isFinite(parsed)) return;
+          onChange(Math.min(max, Math.max(min, parsed)));
+        }}
+      />
+    </label>
   );
 }
 

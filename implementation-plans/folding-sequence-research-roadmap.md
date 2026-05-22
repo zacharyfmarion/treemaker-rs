@@ -71,7 +71,7 @@ has a validated implementation.
 - [x] Phase 0: Define fixtures, correctness contracts, and visual review format.
 - [x] Phase 1: Add the sequence crate and target-state adapter over
       `treemaker-flatfold`.
-- [ ] Phase 2: Implement sequence-state snapshots and deterministic validators.
+- [x] Phase 2: Implement sequence-state snapshots and deterministic validators.
 - [ ] Phase 3: Build the first reverse rewrite rules for simple folds.
 - [ ] Phase 4: Add hierarchical complex moves for common base-collapse
       techniques.
@@ -211,6 +211,21 @@ Exit criteria:
 
 - Invalid states fail loudly before any search result can be returned.
 - Accepted states can always produce a visual artifact.
+
+Phase 2 implementation notes:
+
+- Added serializable `SequenceState` snapshots with active creases, selected
+  face orders, folded coordinates, unresolved regions, provenance, and
+  layer-order policy.
+- Added the instruction vocabulary for precrease regions, simple folds, reverse
+  folds, squash folds, rabbit ears, molecule collapses, simultaneous collapses,
+  manual choices, and unsupported regions.
+- Added deterministic validators for FOLD topology, face cycles, active crease
+  assignment consistency, folded-coordinate shape/finite values, face-order
+  bounds/orientations, unresolved-region references, and relaxed layer-order
+  diagnostics.
+- Validation failures return `invalid_state`; unfinished planner behavior
+  remains `not_implemented`.
 
 ## Phase 3: Simple-Fold Reverse Rules
 

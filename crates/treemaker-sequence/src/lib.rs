@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use treemaker_flatfold::{
     ConstraintSummary, FlatFoldError, OverlapGraph, SolveOptions, solve_flat_fold,
 };
-use treemaker_fold::FoldDocument;
+use treemaker_fold::{FoldDocument, build_faces_edges, validate_basic};
 
 pub use treemaker_flatfold::SolutionLimit;
 
@@ -21,6 +21,8 @@ const ID_MAP_EPSILON: f64 = 1.0e-9;
 pub enum SequenceError {
     #[error("invalid folding-sequence input: {0}")]
     InvalidInput(String),
+    #[error("invalid sequence state: {diagnostics_len} diagnostic(s)")]
+    InvalidState { diagnostics_len: usize },
     #[error("target layer order is ambiguous: {states} possible state(s)")]
     AmbiguousLayerOrder { states: String },
     #[error("folding-sequence component is not yet implemented: {0}")]
@@ -33,6 +35,7 @@ impl SequenceError {
     pub fn code(&self) -> &'static str {
         match self {
             SequenceError::InvalidInput(_) => "invalid_input",
+            SequenceError::InvalidState { .. } => "invalid_state",
             SequenceError::AmbiguousLayerOrder { .. } => "ambiguous_layer_order",
             SequenceError::NotImplemented(_) => "not_implemented",
             SequenceError::FlatFold(error) => flatfold_error_code(error),
@@ -243,6 +246,306 @@ pub fn plan_folding_sequence(_target: &TargetState) -> Result<()> {
     Err(SequenceError::NotImplemented("folding sequence planner"))
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SequenceState {
+    pub id: String,
+    pub document: FoldDocument,
+    pub active_creases: Vec<usize>,
+    pub face_orders: Vec<[i64; 3]>,
+    pub folded_vertices: Vec<[f64; 2]>,
+    pub unresolved_regions: Vec<UnresolvedRegion>,
+    pub provenance: StateProvenance,
+    pub layer_order_policy: LayerOrderPolicy,
+    pub diagnostics: Vec<SequenceDiagnostic>,
+}
+
+impl SequenceState {
+    pub fn from_target(id: impl Into<String>, target: &TargetState) -> Self {
+        let active_creases = target
+            .normalized
+            .edges_assignment
+            .iter()
+            .enumerate()
+            .filter_map(|(edge, assignment)| assignment.is_driven_crease().then_some(edge))
+            .collect();
+        Self {
+            id: id.into(),
+            document: target.normalized.clone(),
+            active_creases,
+            face_orders: target.face_orders.clone(),
+            folded_vertices: target.folded_vertices.clone(),
+            unresolved_regions: Vec::new(),
+            provenance: StateProvenance::target_state(target.selected_solution_index),
+            layer_order_policy: LayerOrderPolicy::Preserved,
+            diagnostics: target.diagnostics.clone(),
+        }
+    }
+
+    pub fn to_frame(&self) -> TargetFrame {
+        TargetFrame {
+            document: self.document.clone(),
+            face_orders: self.face_orders.clone(),
+        }
+    }
+
+    pub fn validate(&self) -> Result<ValidationReport> {
+        validate_sequence_state(self)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StateProvenance {
+    pub source: StateSource,
+    pub selected_solution_index: Option<usize>,
+    pub predecessor: Option<String>,
+    pub step_id: Option<String>,
+}
+
+impl StateProvenance {
+    pub fn target_state(selected_solution_index: usize) -> Self {
+        Self {
+            source: StateSource::TargetState,
+            selected_solution_index: Some(selected_solution_index),
+            predecessor: None,
+            step_id: None,
+        }
+    }
+
+    pub fn rewrite(predecessor: impl Into<String>, step_id: impl Into<String>) -> Self {
+        Self {
+            source: StateSource::Rewrite,
+            selected_solution_index: None,
+            predecessor: Some(predecessor.into()),
+            step_id: Some(step_id.into()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StateSource {
+    Input,
+    TargetState,
+    Rewrite,
+    Manual,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LayerOrderPolicy {
+    Preserved,
+    RelaxedWithDiagnostic,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UnresolvedRegion {
+    pub id: String,
+    pub creases: Vec<usize>,
+    pub faces: Vec<usize>,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum InstructionStep {
+    PrecreaseRegion(StepDetails),
+    SimpleFold(StepDetails),
+    ReverseFold(StepDetails),
+    SquashFold(StepDetails),
+    RabbitEar(StepDetails),
+    MoleculeCollapse(StepDetails),
+    SimultaneousCollapse(StepDetails),
+    ManualChoice(ManualChoiceStep),
+    UnsupportedRegion(UnsupportedRegionStep),
+}
+
+impl InstructionStep {
+    pub fn id(&self) -> &str {
+        match self {
+            InstructionStep::PrecreaseRegion(details)
+            | InstructionStep::SimpleFold(details)
+            | InstructionStep::ReverseFold(details)
+            | InstructionStep::SquashFold(details)
+            | InstructionStep::RabbitEar(details)
+            | InstructionStep::MoleculeCollapse(details)
+            | InstructionStep::SimultaneousCollapse(details) => &details.id,
+            InstructionStep::ManualChoice(step) => &step.id,
+            InstructionStep::UnsupportedRegion(step) => &step.id,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct StepDetails {
+    pub id: String,
+    pub label: String,
+    pub affected_creases: Vec<usize>,
+    pub affected_faces: Vec<usize>,
+    pub before_state: String,
+    pub after_state: String,
+    pub metadata: MoveMetadata,
+    pub diagnostics: Vec<SequenceDiagnostic>,
+}
+
+impl StepDetails {
+    pub fn new(
+        id: impl Into<String>,
+        label: impl Into<String>,
+        before_state: impl Into<String>,
+        after_state: impl Into<String>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            label: label.into(),
+            affected_creases: Vec::new(),
+            affected_faces: Vec::new(),
+            before_state: before_state.into(),
+            after_state: after_state.into(),
+            metadata: MoveMetadata::default(),
+            diagnostics: Vec::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct MoveMetadata {
+    pub difficulty: MoveDifficulty,
+    pub layer_mode: LayerMode,
+    pub confidence: f64,
+    pub notes: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MoveDifficulty {
+    #[default]
+    Unknown,
+    Simple,
+    Intermediate,
+    Complex,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LayerMode {
+    #[default]
+    Unknown,
+    SingleLayer,
+    MultiLayer,
+    Simultaneous,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ManualChoiceStep {
+    pub id: String,
+    pub label: String,
+    pub before_state: String,
+    pub choices: Vec<ManualChoice>,
+    pub diagnostics: Vec<SequenceDiagnostic>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ManualChoice {
+    pub id: String,
+    pub label: String,
+    pub affected_creases: Vec<usize>,
+    pub affected_faces: Vec<usize>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct UnsupportedRegionStep {
+    pub id: String,
+    pub label: String,
+    pub before_state: String,
+    pub region: UnresolvedRegion,
+    pub diagnostics: Vec<SequenceDiagnostic>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ValidationReport {
+    pub state_id: String,
+    pub diagnostics: Vec<SequenceDiagnostic>,
+}
+
+impl ValidationReport {
+    pub fn is_valid(&self) -> bool {
+        !self
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.severity == DiagnosticSeverity::Error)
+    }
+}
+
+pub fn inspect_sequence_state(state: &SequenceState) -> ValidationReport {
+    let mut diagnostics = Vec::new();
+
+    if let Err(error) = validate_basic(&state.document) {
+        diagnostics.push(SequenceDiagnostic::error(
+            "invalid_fold_topology",
+            error.to_string(),
+        ));
+    }
+    if !state.document.faces_vertices.is_empty()
+        && let Err(error) = build_faces_edges(&state.document)
+    {
+        diagnostics.push(SequenceDiagnostic::error(
+            "invalid_face_cycles",
+            error.to_string(),
+        ));
+    }
+    let edge_count = state.document.edges_vertices.len();
+    for crease in &state.active_creases {
+        if *crease >= edge_count {
+            diagnostics.push(SequenceDiagnostic::error(
+                "active_crease_out_of_bounds",
+                format!("active crease {crease} is outside edge range 0..{edge_count}"),
+            ));
+            continue;
+        }
+        let assignment = state.document.assignment_for_edge(*crease);
+        if !assignment.is_driven_crease() {
+            diagnostics.push(SequenceDiagnostic::error(
+                "active_crease_not_driven",
+                format!(
+                    "active crease {crease} has assignment {}; expected M, V, or F",
+                    assignment.as_str()
+                ),
+            ));
+        }
+    }
+    validate_folded_vertices(state, &mut diagnostics);
+    validate_face_orders(state, &mut diagnostics);
+    validate_unresolved_regions(state, &mut diagnostics);
+
+    if state.layer_order_policy == LayerOrderPolicy::RelaxedWithDiagnostic
+        && !state
+            .diagnostics
+            .iter()
+            .chain(diagnostics.iter())
+            .any(|diagnostic| diagnostic.code == "layer_order_relaxed")
+    {
+        diagnostics.push(SequenceDiagnostic::error(
+            "missing_layer_order_relaxed_diagnostic",
+            "layer_order_policy is relaxed, but no layer_order_relaxed diagnostic explains why",
+        ));
+    }
+
+    ValidationReport {
+        state_id: state.id.clone(),
+        diagnostics,
+    }
+}
+
+pub fn validate_sequence_state(state: &SequenceState) -> Result<ValidationReport> {
+    let report = inspect_sequence_state(state);
+    if !report.is_valid() {
+        return Err(SequenceError::InvalidState {
+            diagnostics_len: report.diagnostics.len(),
+        });
+    }
+    Ok(report)
+}
+
 fn reject_zero_solution_limit(solution_limit: &SolutionLimit) -> Result<()> {
     if matches!(solution_limit, SolutionLimit::Count(0)) {
         return Err(SequenceError::InvalidInput(
@@ -250,6 +553,97 @@ fn reject_zero_solution_limit(solution_limit: &SolutionLimit) -> Result<()> {
         ));
     }
     Ok(())
+}
+
+fn validate_folded_vertices(state: &SequenceState, diagnostics: &mut Vec<SequenceDiagnostic>) {
+    let vertex_count = state.document.vertices_coords.len();
+    if state.folded_vertices.len() != vertex_count {
+        diagnostics.push(SequenceDiagnostic::error(
+            "folded_vertices_length",
+            format!(
+                "folded_vertices length {} does not match document vertex count {vertex_count}",
+                state.folded_vertices.len()
+            ),
+        ));
+        return;
+    }
+    for (index, [x, y]) in state.folded_vertices.iter().enumerate() {
+        if !x.is_finite() || !y.is_finite() {
+            diagnostics.push(SequenceDiagnostic::error(
+                "non_finite_folded_vertex",
+                format!("folded vertex {index} contains a non-finite coordinate"),
+            ));
+        }
+    }
+}
+
+fn validate_face_orders(state: &SequenceState, diagnostics: &mut Vec<SequenceDiagnostic>) {
+    let face_count = state.document.faces_vertices.len();
+    for (index, [above, below, orientation]) in state.face_orders.iter().enumerate() {
+        let Ok(above) = usize::try_from(*above) else {
+            diagnostics.push(SequenceDiagnostic::error(
+                "face_order_out_of_bounds",
+                format!("face order {index} has negative above face {above}"),
+            ));
+            continue;
+        };
+        let Ok(below) = usize::try_from(*below) else {
+            diagnostics.push(SequenceDiagnostic::error(
+                "face_order_out_of_bounds",
+                format!("face order {index} has negative below face {below}"),
+            ));
+            continue;
+        };
+        if above >= face_count || below >= face_count {
+            diagnostics.push(SequenceDiagnostic::error(
+                "face_order_out_of_bounds",
+                format!(
+                    "face order {index} references faces {above} and {below}; valid range is 0..{face_count}"
+                ),
+            ));
+        }
+        if !matches!(*orientation, -1 | 1) {
+            diagnostics.push(SequenceDiagnostic::error(
+                "face_order_orientation",
+                format!("face order {index} orientation must be -1 or 1, got {orientation}"),
+            ));
+        }
+    }
+}
+
+fn validate_unresolved_regions(state: &SequenceState, diagnostics: &mut Vec<SequenceDiagnostic>) {
+    let edge_count = state.document.edges_vertices.len();
+    let face_count = state.document.faces_vertices.len();
+    for region in &state.unresolved_regions {
+        for crease in &region.creases {
+            if *crease >= edge_count {
+                diagnostics.push(SequenceDiagnostic::error(
+                    "unresolved_crease_out_of_bounds",
+                    format!(
+                        "unresolved region {} references crease {crease}; valid range is 0..{edge_count}",
+                        region.id
+                    ),
+                ));
+            }
+        }
+        for face in &region.faces {
+            if *face >= face_count {
+                diagnostics.push(SequenceDiagnostic::error(
+                    "unresolved_face_out_of_bounds",
+                    format!(
+                        "unresolved region {} references face {face}; valid range is 0..{face_count}",
+                        region.id
+                    ),
+                ));
+            }
+        }
+        if region.reason.trim().is_empty() {
+            diagnostics.push(SequenceDiagnostic::error(
+                "unresolved_region_missing_reason",
+                format!("unresolved region {} must include a reason", region.id),
+            ));
+        }
+    }
 }
 
 fn solution_counts_are_ambiguous(solution_counts: &[usize]) -> bool {
@@ -488,5 +882,91 @@ mod tests {
         .expect_err("zero limit should be invalid");
 
         assert_eq!(error.code(), "invalid_input");
+    }
+
+    #[test]
+    fn sequence_state_from_target_validates() {
+        let target = resolve_target_state(&two_face_valley(), TargetStateOptions::default())
+            .expect("target state");
+        let state = SequenceState::from_target("target", &target);
+        let report = state.validate().expect("state validates");
+
+        assert_eq!(report.state_id, "target");
+        assert!(report.diagnostics.is_empty());
+        assert_eq!(state.to_frame().face_orders, target.face_orders);
+    }
+
+    #[test]
+    fn sequence_state_validator_reports_bad_active_crease() {
+        let target = resolve_target_state(&two_face_valley(), TargetStateOptions::default())
+            .expect("target state");
+        let mut state = SequenceState::from_target("bad-active", &target);
+        state.active_creases.push(0);
+        state
+            .active_creases
+            .push(state.document.edges_vertices.len());
+        let report = inspect_sequence_state(&state);
+
+        assert!(!report.is_valid());
+        assert!(
+            report
+                .diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.code == "active_crease_not_driven")
+        );
+        assert!(
+            report
+                .diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.code == "active_crease_out_of_bounds")
+        );
+        assert_eq!(
+            state.validate().expect_err("state should fail").code(),
+            "invalid_state"
+        );
+    }
+
+    #[test]
+    fn sequence_state_validator_reports_layer_order_errors() {
+        let target = resolve_target_state(&two_face_valley(), TargetStateOptions::default())
+            .expect("target state");
+        let mut state = SequenceState::from_target("bad-order", &target);
+        state.face_orders = vec![[0, 99, 0]];
+        state.layer_order_policy = LayerOrderPolicy::RelaxedWithDiagnostic;
+        let report = inspect_sequence_state(&state);
+
+        assert!(!report.is_valid());
+        assert!(
+            report
+                .diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.code == "face_order_out_of_bounds")
+        );
+        assert!(
+            report
+                .diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.code == "face_order_orientation")
+        );
+        assert!(
+            report
+                .diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.code == "missing_layer_order_relaxed_diagnostic")
+        );
+    }
+
+    #[test]
+    fn instruction_steps_serialize_with_stable_kind_names() {
+        let mut details = StepDetails::new("step-1", "Fold along the diagonal", "s0", "s1");
+        details.affected_creases = vec![4];
+        details.metadata.difficulty = MoveDifficulty::Simple;
+        details.metadata.layer_mode = LayerMode::SingleLayer;
+        details.metadata.confidence = 1.0;
+        let step = InstructionStep::SimpleFold(details);
+        let value = serde_json::to_value(&step).expect("serialize step");
+
+        assert_eq!(value["kind"], "simple_fold");
+        assert_eq!(step.id(), "step-1");
     }
 }

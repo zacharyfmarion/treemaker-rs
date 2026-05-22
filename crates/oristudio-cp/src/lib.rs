@@ -133,6 +133,15 @@ pub struct CreasePatternCommandPayload {
     /// Optional custom line type for delete-type commands.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub custom_line_type: Option<model::CustomLineType>,
+    /// Optional precision percentage for fix-inaccurate commands.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fix_precision: Option<f64>,
+    /// Optional toggle for BP fix-inaccurate targets.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fix_precision_use_bp: Option<bool>,
+    /// Optional toggle for 22.5-degree fix-inaccurate targets.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fix_precision_use_22_5: Option<bool>,
 }
 
 /// Result returned by a successfully executed command.
@@ -1935,7 +1944,7 @@ pub fn execute_command(
             checks::fix_inaccurate_for_indices(
                 &mut document.crease_pattern,
                 &line_indices,
-                checks::FixInaccurateOptions::default(),
+                fix_inaccurate_options(&command),
             )
             .num_fixed_lines
         }
@@ -2362,6 +2371,25 @@ fn ratio_t(command: &CreasePatternCommand) -> f64 {
         .ratio_t
         .filter(|ratio| ratio.is_finite() && *ratio >= 0.0)
         .unwrap_or(DEFAULT_LINE_RATIO)
+}
+
+fn fix_inaccurate_options(command: &CreasePatternCommand) -> checks::FixInaccurateOptions {
+    let defaults = checks::FixInaccurateOptions::default();
+    checks::FixInaccurateOptions {
+        fix_precision: command
+            .payload
+            .fix_precision
+            .filter(|precision| precision.is_finite() && *precision >= 0.0)
+            .unwrap_or(defaults.fix_precision),
+        use_bp: command
+            .payload
+            .fix_precision_use_bp
+            .unwrap_or(defaults.use_bp),
+        use_22_5: command
+            .payload
+            .fix_precision_use_22_5
+            .unwrap_or(defaults.use_22_5),
+    }
 }
 
 fn set_selected_line_flags(model: &mut CreasePatternModel, line_indices: &[usize]) {
@@ -2936,6 +2964,34 @@ mod tests {
         assert_eq!(result.status, OperationStatus::OracleTested);
         assert_eq!(result.diagnostics, vec!["Changed 1 line(s)"]);
         assert_close(document.crease_pattern.line_segments[0].a.x, 0.1953125);
+    }
+
+    #[test]
+    fn command_dispatch_uses_fix_inaccurate_payload_options() {
+        let mut document = CreasePatternDocument::default();
+        document.crease_pattern.add_line(
+            Point::new(0.1954, 0.0),
+            Point::new(10.0, 0.0),
+            LineColor::Red1,
+        );
+
+        let result = execute_command(
+            &mut document,
+            CreasePatternCommand::new(OperationId::FixInaccurate).with_payload(
+                CreasePatternCommandPayload {
+                    line_ids: vec![1],
+                    fix_precision: Some(0.0),
+                    fix_precision_use_bp: Some(false),
+                    fix_precision_use_22_5: Some(false),
+                    ..CreasePatternCommandPayload::default()
+                },
+            ),
+        )
+        .expect("fix inaccurate command should execute with explicit options");
+
+        assert_eq!(result.status, OperationStatus::OracleTested);
+        assert_eq!(result.diagnostics, vec!["Changed 0 line(s)"]);
+        assert_close(document.crease_pattern.line_segments[0].a.x, 0.1954);
     }
 
     #[test]

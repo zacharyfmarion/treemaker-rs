@@ -835,11 +835,11 @@ Done when:
       agreement, and pointer-sequence-sensitive draw behavior.
 - [x] Stage 7.5 planning: Audit OpenSCAD's viewer contextual panel pattern and
       Oriedita's contextual setting groups.
-- [ ] Stage 7.5: Replace temporary active-tool inputs with the bottom-right
+- [x] Stage 7.5: Replace temporary active-tool inputs with the bottom-right
       contextual tool panel.
-- [ ] Stage 7.5: Add registry-backed controls for every Oriedita tool setting
+- [x] Stage 7.5: Add registry-backed controls for every Oriedita tool setting
       and all additional web context inputs.
-- [ ] Stage 7.5: Validate settings defaults, undo neutrality, preview/commit
+- [x] Stage 7.5: Validate settings defaults, undo neutrality, preview/commit
       payload agreement, and responsive panel placement.
 - [ ] Stage 8: Enable circles, text, generators, and measurement tools.
 - [ ] Stage 8: Validate annotation preservation and non-mutating measurement

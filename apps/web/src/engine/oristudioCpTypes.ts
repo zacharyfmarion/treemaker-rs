@@ -128,6 +128,9 @@ export interface OristudioCpCommandPayload {
   custom_from_line_type?: OristudioCpCustomLineType;
   custom_to_line_type?: OristudioCpCustomLineType;
   custom_line_type?: OristudioCpCustomLineType;
+  fix_precision?: number;
+  fix_precision_use_bp?: boolean;
+  fix_precision_use_22_5?: boolean;
 }
 
 export type OristudioCpLineColor =

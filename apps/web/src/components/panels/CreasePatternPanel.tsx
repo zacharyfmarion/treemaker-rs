@@ -9,13 +9,15 @@ import {
   type SetStateAction,
 } from 'react';
 import { TransformComponent, TransformWrapper, type ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
-import { GitBranch, Grid2X2, Magnet, ScanLine } from 'lucide-react';
+import { ChevronDown, ChevronRight, GitBranch, Grid2X2, Magnet, ScanLine } from 'lucide-react';
 import type {
   OristudioCpCommandPayload,
   OristudioCpCommandPreview,
+  OristudioCpCustomLineType,
   OristudioCpDocumentSnapshot,
   OristudioCpLineColor,
   OristudioCpLineSegment,
+  OristudioCpRgbColor,
 } from '../../engine/oristudioCpTypes';
 import { formatNumber, paperToSvg, type Point } from '../../lib/geometry';
 import { getViewportFitScale, type ViewportSize } from '../../lib/designViewport';
@@ -34,6 +36,16 @@ import {
   IDLE_ORISTUDIO_CP_TOOL_STATE,
   transitionOristudioCpToolState,
 } from '../../lib/oristudioCpToolState';
+import {
+  DEFAULT_ORISTUDIO_CP_TOOL_OPTIONS,
+  ORISTUDIO_CP_CUSTOM_LINE_TYPE_OPTIONS,
+  ORISTUDIO_CP_REPLACE_TARGET_LINE_TYPE_OPTIONS,
+  cpToolSettingGroupsForCommand,
+  evaluateOrieditaRatioExpression,
+  type OristudioCpRatioExpression,
+  type OristudioCpToolOptions,
+  type OristudioCpToolSettingGroup,
+} from '../../lib/oristudioCpToolSettings';
 import {
   CP_PAPER_RECT,
   CP_PAPER_SHADOW_RECT,
@@ -155,7 +167,8 @@ function cpCommandPayloadDefaults(
     operationId === 'DrawCreaseAngleRestricted3' ||
     operationId === 'DrawCreaseAngleRestricted5'
   ) {
-    payload.angle_system_divider = 4;
+    payload.angle_system_divider = toolOptions.angleSystemDivider;
+    payload.angles = toolOptions.angleSystemAngles;
   }
 
   if (operationId === 'LineSegmentDivision') {
@@ -163,33 +176,39 @@ function cpCommandPayloadDefaults(
   }
 
   if (operationId === 'LineSegmentRatioSet') {
-    payload.ratio_s = toolOptions.ratioS;
-    payload.ratio_t = toolOptions.ratioT;
+    const ratio = evaluateOrieditaRatioExpression(toolOptions.divisionRatio);
+    payload.ratio_s = ratio.ratioS;
+    payload.ratio_t = ratio.ratioT;
+  }
+
+  if (operationId === 'ParallelDrawWidth') {
+    payload.width = toolOptions.parallelWidth;
+  }
+
+  if (
+    toolOptions.candidateIndex !== null &&
+    cpToolSettingGroupsForCommand(command).includes('candidate-choice')
+  ) {
+    payload.candidate_index = toolOptions.candidateIndex;
   }
 
   if (operationId === 'ReplaceLineTypeSelect') {
-    payload.custom_from_line_type = 'Any';
-    payload.custom_to_line_type = 'Edge';
+    payload.custom_from_line_type = toolOptions.customFromLineType;
+    payload.custom_to_line_type = toolOptions.customToLineType;
   }
 
   if (operationId === 'DeleteLineTypeSelect') {
-    payload.custom_line_type = 'Any';
+    payload.custom_line_type = toolOptions.customLineType;
+  }
+
+  if (operationId === 'FixInaccurate') {
+    payload.fix_precision = toolOptions.fixPrecision;
+    payload.fix_precision_use_bp = toolOptions.fixPrecisionUseBp;
+    payload.fix_precision_use_22_5 = toolOptions.fixPrecisionUse22_5;
   }
 
   return payload;
 }
-
-interface OristudioCpToolOptions {
-  divisionCount: number;
-  ratioS: number;
-  ratioT: number;
-}
-
-const DEFAULT_ORISTUDIO_CP_TOOL_OPTIONS: OristudioCpToolOptions = {
-  divisionCount: 2,
-  ratioS: 1,
-  ratioT: 1,
-};
 
 function pointDistanceSquared(a: Point, b: Point): number {
   const dx = a.x - b.x;
@@ -226,6 +245,13 @@ function activeActionInputMode(
 ): OristudioCpActionInputMode | undefined {
   if (action?.kind === 'command') return action.inputMode ?? action.command.inputMode;
   return command?.inputMode;
+}
+
+function cpCommandRequiresContextApply(command: OristudioCpCommandDefinition): boolean {
+  if ((command.toolSteps?.length ?? 0) > 0) return false;
+  return cpToolSettingGroupsForCommand(command).some(
+    (group) => group !== 'line-color' && group !== 'line-select-help'
+  );
 }
 
 function isCpLineEventTarget(target: EventTarget | null): boolean {
@@ -460,6 +486,10 @@ export function CreasePatternPanel() {
         return;
       }
 
+      if (cpCommandRequiresContextApply(command)) {
+        return;
+      }
+
       void (async () => {
         const succeeded = await executeOristudioCpCommand(
           command.operationId,
@@ -485,6 +515,45 @@ export function CreasePatternPanel() {
     },
     [buildCpCommandPayload, editableCp, executeOristudioCpCommand, oristudioCpSelection.lines]
   );
+
+  const handleApplyActiveContextCommand = useCallback(() => {
+    if (
+      !editableCp ||
+      !activeCpCommand ||
+      activeCpCommand.uiStatus !== 'ready' ||
+      (activeCpCommand.toolSteps?.length ?? 0) > 0
+    ) {
+      return;
+    }
+
+    void (async () => {
+      const succeeded = await executeOristudioCpCommand(
+        activeCpCommand.operationId,
+        buildCpCommandPayload(activeCpCommand, {
+          line_ids: oristudioCpSelection.lines,
+        })
+      );
+      setCpToolState((state) =>
+        state.activeOperationId === activeCpCommand.operationId
+          ? transitionOristudioCpToolState(
+              state,
+              succeeded
+                ? { type: 'commit' }
+                : {
+                    type: 'commandError',
+                    message: useWorkspaceStore.getState().oristudioCpError ?? 'Command failed',
+                  }
+            )
+          : state
+      );
+    })();
+  }, [
+    activeCpCommand,
+    buildCpCommandPayload,
+    editableCp,
+    executeOristudioCpCommand,
+    oristudioCpSelection.lines,
+  ]);
 
   const eventToEditableModelPoint = useCallback(
     (event: PointerEvent<SVGElement>): Point | null => {
@@ -1314,10 +1383,16 @@ export function CreasePatternPanel() {
                 )}
               </ViewportToolbar>
               {editableCp && activeCpCommand && (
-                <CpActiveToolOptions
+                <CpContextToolPanel
                   command={activeCpCommand}
                   options={cpToolOptions}
                   setOptions={setCpToolOptions}
+                  activeLineColor={activeCpLineColor}
+                  onApply={
+                    cpCommandRequiresContextApply(activeCpCommand)
+                      ? handleApplyActiveContextCommand
+                      : undefined
+                  }
                 />
               )}
               <div className="viewport-status-readout">
@@ -1684,23 +1759,95 @@ function GeneratedCreasePattern({
   );
 }
 
-function CpActiveToolOptions({
+function CpContextToolPanel({
   command,
   options,
   setOptions,
+  activeLineColor,
+  onApply,
 }: {
   command: OristudioCpCommandDefinition;
   options: OristudioCpToolOptions;
   setOptions: Dispatch<SetStateAction<OristudioCpToolOptions>>;
+  activeLineColor: OristudioCpLineColor;
+  onApply?: () => void;
 }) {
-  if (command.operationId === 'LineSegmentDivision') {
+  const [collapsed, setCollapsed] = useState(false);
+  const groups = cpToolSettingGroupsForCommand(command);
+
+  if (groups.length === 0) return null;
+
+  return (
+    <section
+      className="cp-context-panel"
+      aria-label="Crease pattern tool options"
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={(event) => event.stopPropagation()}
+    >
+      <button
+        className="cp-context-panel__header"
+        type="button"
+        aria-expanded={!collapsed}
+        onClick={() => setCollapsed((current) => !current)}
+      >
+        {collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
+        <span className="cp-context-panel__title">{command.label}</span>
+        <span className="cp-context-panel__meta">
+          {groups.length} {groups.length === 1 ? 'setting' : 'settings'}
+        </span>
+      </button>
+      {!collapsed && (
+        <div className="cp-context-panel__body">
+          {groups.map((group) => (
+            <CpContextToolGroup
+              key={group}
+              group={group}
+              options={options}
+              setOptions={setOptions}
+              activeLineColor={activeLineColor}
+            />
+          ))}
+          {onApply && (
+            <button className="cp-context-panel__apply" type="button" onClick={onApply}>
+              Apply to selection
+            </button>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function CpContextToolGroup({
+  group,
+  options,
+  setOptions,
+  activeLineColor,
+}: {
+  group: OristudioCpToolSettingGroup;
+  options: OristudioCpToolOptions;
+  setOptions: Dispatch<SetStateAction<OristudioCpToolOptions>>;
+  activeLineColor: OristudioCpLineColor;
+}) {
+  if (group === 'line-color') {
     return (
-      <div className="cp-tool-options" aria-label="Active crease pattern tool options">
+      <div className="cp-context-panel__group">
+        <div className="cp-context-panel__group-title">Line type</div>
+        <div className="cp-context-panel__readout">{cpLineTypeStatusLabel(activeLineColor)}</div>
+      </div>
+    );
+  }
+
+  if (group === 'division-count') {
+    return (
+      <div className="cp-context-panel__group">
+        <div className="cp-context-panel__group-title">Divide by count</div>
         <NumericToolOption
           label="Count"
           ariaLabel="Division count"
-          min={2}
+          min={1}
           max={256}
+          step={1}
           value={options.divisionCount}
           onChange={(divisionCount) =>
             setOptions((current) => ({ ...current, divisionCount }))
@@ -1710,25 +1857,269 @@ function CpActiveToolOptions({
     );
   }
 
-  if (command.operationId === 'LineSegmentRatioSet') {
+  if (group === 'division-ratio') {
+    const ratio = evaluateOrieditaRatioExpression(options.divisionRatio);
     return (
-      <div className="cp-tool-options" aria-label="Active crease pattern tool options">
+      <div className="cp-context-panel__group">
+        <div className="cp-context-panel__group-title">Divide by exact ratio</div>
+        <div className="cp-context-panel__ratio-grid">
+          {RATIO_FIELDS.map((field) => (
+            <NumericToolOption
+              key={field.key}
+              label={field.label}
+              ariaLabel={field.ariaLabel}
+              min={field.min}
+              max={999}
+              step={field.step}
+              value={options.divisionRatio[field.key]}
+              onChange={(value) => updateDivisionRatioField(setOptions, field.key, value)}
+            />
+          ))}
+        </div>
+        <div className="cp-context-panel__readout">
+          Computed {formatToolNumber(ratio.ratioS)} : {formatToolNumber(ratio.ratioT)}
+        </div>
+      </div>
+    );
+  }
+
+  if (group === 'angle-system') {
+    return (
+      <div className="cp-context-panel__group">
+        <div className="cp-context-panel__group-title">Angle system</div>
         <NumericToolOption
-          label="S"
-          ariaLabel="Ratio S"
-          min={1}
-          max={999}
-          value={options.ratioS}
-          onChange={(ratioS) => setOptions((current) => ({ ...current, ratioS }))}
+          label="Divider"
+          ariaLabel="Angle system divider"
+          min={0}
+          max={360}
+          step={1}
+          value={options.angleSystemDivider}
+          onChange={(angleSystemDivider) =>
+            setOptions((current) => ({ ...current, angleSystemDivider }))
+          }
+        />
+        <div className="cp-context-panel__angle-grid">
+          {ANGLE_FIELDS.map((field, index) => (
+            <NumericToolOption
+              key={field}
+              label={field}
+              ariaLabel={`Angle ${field}`}
+              min={0}
+              max={360}
+              step={0.1}
+              value={options.angleSystemAngles[index] ?? 0}
+              onChange={(value) => updateAngleField(setOptions, index, value)}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (group === 'replace-line-type') {
+    return (
+      <div className="cp-context-panel__group">
+        <div className="cp-context-panel__group-title">Replace line type</div>
+        <SelectToolOption
+          label="From"
+          ariaLabel="Replace from line type"
+          value={options.customFromLineType}
+          options={ORISTUDIO_CP_CUSTOM_LINE_TYPE_OPTIONS}
+          onChange={(customFromLineType) =>
+            setOptions((current) => ({ ...current, customFromLineType }))
+          }
+        />
+        <SelectToolOption
+          label="To"
+          ariaLabel="Replace to line type"
+          value={options.customToLineType}
+          options={ORISTUDIO_CP_REPLACE_TARGET_LINE_TYPE_OPTIONS}
+          onChange={(customToLineType) =>
+            setOptions((current) => ({ ...current, customToLineType }))
+          }
+        />
+      </div>
+    );
+  }
+
+  if (group === 'delete-line-type') {
+    return (
+      <div className="cp-context-panel__group">
+        <div className="cp-context-panel__group-title">Delete line type</div>
+        <SelectToolOption
+          label="Filter"
+          ariaLabel="Delete line type"
+          value={options.customLineType}
+          options={ORISTUDIO_CP_CUSTOM_LINE_TYPE_OPTIONS}
+          onChange={(customLineType) =>
+            setOptions((current) => ({ ...current, customLineType }))
+          }
+        />
+      </div>
+    );
+  }
+
+  if (group === 'fix-precision') {
+    return (
+      <div className="cp-context-panel__group">
+        <div className="cp-context-panel__group-title">Fix inaccurate</div>
+        <NumericToolOption
+          label="Precision"
+          ariaLabel="Fix precision"
+          min={0}
+          max={100}
+          step={0.01}
+          value={options.fixPrecision}
+          onChange={(fixPrecision) => setOptions((current) => ({ ...current, fixPrecision }))}
+        />
+        <CheckboxToolOption
+          label="BP"
+          ariaLabel="Use BP fix targets"
+          checked={options.fixPrecisionUseBp}
+          onChange={(fixPrecisionUseBp) =>
+            setOptions((current) => ({ ...current, fixPrecisionUseBp }))
+          }
+        />
+        <CheckboxToolOption
+          label="22.5"
+          ariaLabel="Use 22.5 fix targets"
+          checked={options.fixPrecisionUse22_5}
+          onChange={(fixPrecisionUse22_5) =>
+            setOptions((current) => ({ ...current, fixPrecisionUse22_5 }))
+          }
+        />
+      </div>
+    );
+  }
+
+  if (group === 'polygon-corners') {
+    return (
+      <div className="cp-context-panel__group">
+        <div className="cp-context-panel__group-title">Regular polygon</div>
+        <NumericToolOption
+          label="Corners"
+          ariaLabel="Polygon corners"
+          min={3}
+          max={256}
+          step={1}
+          value={options.polygonCorners}
+          onChange={(polygonCorners) =>
+            setOptions((current) => ({ ...current, polygonCorners }))
+          }
+        />
+      </div>
+    );
+  }
+
+  if (group === 'parallel-width') {
+    return (
+      <div className="cp-context-panel__group">
+        <div className="cp-context-panel__group-title">Parallel width</div>
+        <NumericToolOption
+          label="Width"
+          ariaLabel="Parallel width"
+          min={0}
+          max={9999}
+          step={0.1}
+          value={options.parallelWidth}
+          onChange={(parallelWidth) =>
+            setOptions((current) => ({ ...current, parallelWidth }))
+          }
+        />
+      </div>
+    );
+  }
+
+  if (group === 'candidate-choice') {
+    return (
+      <div className="cp-context-panel__group">
+        <div className="cp-context-panel__group-title">Candidate</div>
+        <CheckboxToolOption
+          label="Auto nearest"
+          ariaLabel="Use nearest candidate"
+          checked={options.candidateIndex === null}
+          onChange={(useNearest) =>
+            setOptions((current) => ({
+              ...current,
+              candidateIndex: useNearest ? null : 0,
+            }))
+          }
         />
         <NumericToolOption
-          label="T"
-          ariaLabel="Ratio T"
+          label="Index"
+          ariaLabel="Candidate index"
           min={1}
-          max={999}
-          value={options.ratioT}
-          onChange={(ratioT) => setOptions((current) => ({ ...current, ratioT }))}
+          max={256}
+          step={1}
+          value={(options.candidateIndex ?? 0) + 1}
+          disabled={options.candidateIndex === null}
+          onChange={(candidateIndex) =>
+            setOptions((current) => ({
+              ...current,
+              candidateIndex: Math.max(0, candidateIndex - 1),
+            }))
+          }
         />
+      </div>
+    );
+  }
+
+  if (group === 'apply-lines') {
+    return (
+      <div className="cp-context-panel__group">
+        <div className="cp-context-panel__group-title">Apply lines</div>
+        <div className="cp-context-panel__readout">
+          Seed lines and apply action will unlock with the generator port.
+        </div>
+      </div>
+    );
+  }
+
+  if (group === 'measurement-readout') {
+    return (
+      <div className="cp-context-panel__group">
+        <div className="cp-context-panel__group-title">Measurement</div>
+        <div className="cp-context-panel__readout">
+          Slot values will appear here when measurement tools are ported.
+        </div>
+      </div>
+    );
+  }
+
+  if (group === 'custom-circle-color') {
+    return (
+      <div className="cp-context-panel__group">
+        <div className="cp-context-panel__group-title">Circle color</div>
+        <div
+          className="cp-context-panel__color-swatch"
+          style={{
+            backgroundColor: `rgb(${options.customCircleColor.red}, ${options.customCircleColor.green}, ${options.customCircleColor.blue})`,
+          }}
+          aria-hidden="true"
+        />
+        <div className="cp-context-panel__angle-grid">
+          {RGB_FIELDS.map((field) => (
+            <NumericToolOption
+              key={field.key}
+              label={field.label}
+              ariaLabel={field.ariaLabel}
+              min={0}
+              max={255}
+              step={1}
+              value={options.customCircleColor[field.key]}
+              onChange={(value) => updateCustomCircleColor(setOptions, field.key, value)}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (group === 'line-select-help') {
+    return (
+      <div className="cp-context-panel__group">
+        <div className="cp-context-panel__group-title">Line selection</div>
+        <div className="cp-context-panel__readout">Drag across creases to apply this action.</div>
       </div>
     );
   }
@@ -1736,39 +2127,178 @@ function CpActiveToolOptions({
   return null;
 }
 
+const RATIO_FIELDS: readonly {
+  key: keyof OristudioCpRatioExpression;
+  label: string;
+  ariaLabel: string;
+  min?: number;
+  step: number;
+}[] = [
+  { key: 'a', label: 'A', ariaLabel: 'Ratio A', step: 0.1 },
+  { key: 'b', label: 'B', ariaLabel: 'Ratio B', step: 0.1 },
+  { key: 'c', label: 'C', ariaLabel: 'Ratio C', min: 0, step: 0.1 },
+  { key: 'd', label: 'D', ariaLabel: 'Ratio D', step: 0.1 },
+  { key: 'e', label: 'E', ariaLabel: 'Ratio E', step: 0.1 },
+  { key: 'f', label: 'F', ariaLabel: 'Ratio F', min: 0, step: 0.1 },
+];
+
+const ANGLE_FIELDS = ['A', 'B', 'C', 'D', 'E', 'F'] as const;
+
+const RGB_FIELDS: readonly {
+  key: keyof OristudioCpRgbColor;
+  label: string;
+  ariaLabel: string;
+}[] = [
+  { key: 'red', label: 'R', ariaLabel: 'Circle color red' },
+  { key: 'green', label: 'G', ariaLabel: 'Circle color green' },
+  { key: 'blue', label: 'B', ariaLabel: 'Circle color blue' },
+];
+
+function updateDivisionRatioField(
+  setOptions: Dispatch<SetStateAction<OristudioCpToolOptions>>,
+  field: keyof OristudioCpRatioExpression,
+  value: number
+) {
+  setOptions((current) => ({
+    ...current,
+    divisionRatio: {
+      ...current.divisionRatio,
+      [field]: value,
+    },
+  }));
+}
+
+function updateAngleField(
+  setOptions: Dispatch<SetStateAction<OristudioCpToolOptions>>,
+  index: number,
+  value: number
+) {
+  setOptions((current) => {
+    const angleSystemAngles = [...current.angleSystemAngles] as OristudioCpToolOptions['angleSystemAngles'];
+    angleSystemAngles[index] = value;
+    return {
+      ...current,
+      angleSystemAngles,
+    };
+  });
+}
+
+function updateCustomCircleColor(
+  setOptions: Dispatch<SetStateAction<OristudioCpToolOptions>>,
+  field: keyof OristudioCpRgbColor,
+  value: number
+) {
+  setOptions((current) => ({
+    ...current,
+    customCircleColor: {
+      ...current.customCircleColor,
+      [field]: Math.round(value),
+    },
+  }));
+}
+
+function formatToolNumber(value: number): string {
+  return Number.isInteger(value) ? value.toString() : value.toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
+}
+
 function NumericToolOption({
   label,
   ariaLabel,
   min,
   max,
+  step,
   value,
+  disabled = false,
   onChange,
 }: {
   label: string;
   ariaLabel: string;
-  min: number;
-  max: number;
+  min?: number;
+  max?: number;
+  step: number;
   value: number;
+  disabled?: boolean;
   onChange: (value: number) => void;
 }) {
   return (
-    <label className="cp-tool-options__field">
+    <label className="cp-context-panel__field">
       <span>{label}</span>
       <input
         aria-label={ariaLabel}
         type="number"
         min={min}
         max={max}
-        step={1}
+        step={step}
         value={value}
+        disabled={disabled}
         onChange={(event) => {
-          const parsed = Number.parseInt(event.currentTarget.value, 10);
+          const parsed = Number.parseFloat(event.currentTarget.value);
           if (!Number.isFinite(parsed)) return;
-          onChange(Math.min(max, Math.max(min, parsed)));
+          onChange(clampToolNumber(parsed, min, max));
         }}
       />
     </label>
   );
+}
+
+function SelectToolOption({
+  label,
+  ariaLabel,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  ariaLabel: string;
+  value: OristudioCpCustomLineType;
+  options: readonly { value: OristudioCpCustomLineType; label: string }[];
+  onChange: (value: OristudioCpCustomLineType) => void;
+}) {
+  return (
+    <label className="cp-context-panel__field">
+      <span>{label}</span>
+      <select
+        aria-label={ariaLabel}
+        value={value}
+        onChange={(event) => onChange(event.currentTarget.value as OristudioCpCustomLineType)}
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function CheckboxToolOption({
+  label,
+  ariaLabel,
+  checked,
+  onChange,
+}: {
+  label: string;
+  ariaLabel: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className="cp-context-panel__checkbox">
+      <input
+        aria-label={ariaLabel}
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.currentTarget.checked)}
+      />
+      <span>{label}</span>
+    </label>
+  );
+}
+
+function clampToolNumber(value: number, min: number | undefined, max: number | undefined): number {
+  const lowerBounded = min === undefined ? value : Math.max(min, value);
+  return max === undefined ? lowerBounded : Math.min(max, lowerBounded);
 }
 
 function shortStatus(message: string): string {

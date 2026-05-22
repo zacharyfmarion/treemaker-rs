@@ -249,6 +249,12 @@ function setNumberInputValue(input: HTMLInputElement, value: string) {
   input.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
+function setSelectValue(select: HTMLSelectElement, value: string) {
+  const valueSetter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set;
+  valueSetter?.call(select, value);
+  select.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
 afterEach(() => {
   if (root) {
     act(() => {
@@ -800,7 +806,7 @@ describe('CreasePatternPanel', () => {
     expect(points[1].y).toBeCloseTo(0);
   });
 
-  it('passes Oriedita line-type defaults for ready selected-type commands', async () => {
+  it('shows contextual line-type controls before applying selected-type commands', async () => {
     const executeOristudioCpCommand = vi.fn(async () => true);
     const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
       documentMode: 'crease-pattern',
@@ -822,10 +828,74 @@ describe('CreasePatternPanel', () => {
       await Promise.resolve();
     });
 
+    expect(executeOristudioCpCommand).not.toHaveBeenCalled();
+    const fromSelect = container.querySelector<HTMLSelectElement>(
+      'select[aria-label="Replace from line type"]'
+    );
+    const toSelect = container.querySelector<HTMLSelectElement>(
+      'select[aria-label="Replace to line type"]'
+    );
+    expect(fromSelect?.value).toBe('Any');
+    expect(toSelect?.value).toBe('Edge');
+    act(() => {
+      if (fromSelect) setSelectValue(fromSelect, 'Valley');
+      if (toSelect) setSelectValue(toSelect, 'Aux');
+    });
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('button.cp-context-panel__apply')?.click();
+      await Promise.resolve();
+    });
+
     expect(executeOristudioCpCommand).toHaveBeenCalledWith('ReplaceLineTypeSelect', {
       line_ids: [1],
-      custom_from_line_type: 'Any',
-      custom_to_line_type: 'Edge',
+      custom_from_line_type: 'Valley',
+      custom_to_line_type: 'Aux',
+    });
+  });
+
+  it('passes contextual fix-inaccurate options only after apply', async () => {
+    const executeOristudioCpCommand = vi.fn(async () => true);
+    const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
+      documentMode: 'crease-pattern',
+      importedCreasePattern: importedCpDocument(),
+      oristudioCpDocument: editableCpState(),
+      executeOristudioCpCommand,
+    });
+
+    act(() => {
+      container.querySelector<SVGLineElement>('[data-cp-line-id="1"]')?.dispatchEvent(
+        new MouseEvent('click', { bubbles: true })
+      );
+    });
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>('button[aria-label="Fix inaccurate creases"]')
+        ?.click();
+      await Promise.resolve();
+    });
+
+    expect(executeOristudioCpCommand).not.toHaveBeenCalled();
+    const precisionInput = container.querySelector<HTMLInputElement>('input[aria-label="Fix precision"]');
+    const bpCheckbox = container.querySelector<HTMLInputElement>('input[aria-label="Use BP fix targets"]');
+    expect(precisionInput?.value).toBe('0.05');
+    expect(bpCheckbox?.checked).toBe(true);
+    act(() => {
+      if (precisionInput) setNumberInputValue(precisionInput, '0.02');
+      bpCheckbox?.click();
+    });
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('button.cp-context-panel__apply')?.click();
+      await Promise.resolve();
+    });
+
+    expect(executeOristudioCpCommand).toHaveBeenCalledWith('FixInaccurate', {
+      line_ids: [1],
+      fix_precision: 0.02,
+      fix_precision_use_bp: false,
+      fix_precision_use_22_5: true,
     });
   });
 
@@ -854,11 +924,16 @@ describe('CreasePatternPanel', () => {
       await Promise.resolve();
     });
 
+    expect(
+      container.querySelector<HTMLElement>('section[aria-label="Crease pattern tool options"]')
+    ).not.toBeNull();
     const countInput = container.querySelector<HTMLInputElement>('input[aria-label="Division count"]');
     expect(countInput?.value).toBe('2');
     act(() => {
       if (countInput) setNumberInputValue(countInput, '5');
     });
+    expect(useWorkspaceStore.getState().oristudioCpHistoryPast).toHaveLength(0);
+    expect(useWorkspaceStore.getState().historyPast).toHaveLength(0);
 
     await act(async () => {
       canvas.dispatchEvent(
@@ -903,13 +978,18 @@ describe('CreasePatternPanel', () => {
       await Promise.resolve();
     });
 
-    const ratioSInput = container.querySelector<HTMLInputElement>('input[aria-label="Ratio S"]');
-    const ratioTInput = container.querySelector<HTMLInputElement>('input[aria-label="Ratio T"]');
-    expect(ratioSInput?.value).toBe('1');
-    expect(ratioTInput?.value).toBe('1');
+    const ratioAInput = container.querySelector<HTMLInputElement>('input[aria-label="Ratio A"]');
+    const ratioDInput = container.querySelector<HTMLInputElement>('input[aria-label="Ratio D"]');
+    const ratioEInput = container.querySelector<HTMLInputElement>('input[aria-label="Ratio E"]');
+    const ratioFInput = container.querySelector<HTMLInputElement>('input[aria-label="Ratio F"]');
+    expect(ratioAInput?.value).toBe('1');
+    expect(ratioDInput?.value).toBe('0');
+    expect(ratioEInput?.value).toBe('1');
+    expect(ratioFInput?.value).toBe('2');
     act(() => {
-      if (ratioSInput) setNumberInputValue(ratioSInput, '2');
-      if (ratioTInput) setNumberInputValue(ratioTInput, '3');
+      if (ratioAInput) setNumberInputValue(ratioAInput, '2');
+      if (ratioDInput) setNumberInputValue(ratioDInput, '3');
+      if (ratioEInput) setNumberInputValue(ratioEInput, '0');
     });
 
     await act(async () => {

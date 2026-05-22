@@ -6,9 +6,9 @@ Replace the temporary crease-pattern active-tool input overlay with a
 bottom-right contextual tool panel modeled after OpenSCAD Studio's 3D viewer,
 while preserving Oriedita's setting-group semantics.
 
-The immediate purpose is planning, not implementation. The plan must identify
-every Oriedita tool setting or input that needs a visible home before more CP
-tools are enabled in the web app.
+This file now tracks both the planning audit and the Stage 7.5 implementation
+work. It identifies every Oriedita tool setting or input that needs a visible
+home before more CP tools are enabled in the web app.
 
 ## Approach
 
@@ -138,6 +138,7 @@ tool panel:
 - `apps/web/src/components/panels/CpToolRail.tsx`
 - `apps/web/src/lib/oristudioCpActions.ts`
 - `apps/web/src/lib/oristudioCpCommands.ts`
+- `apps/web/src/lib/oristudioCpToolSettings.ts`
 - `apps/web/src/lib/oristudioCpToolState.ts`
 - `apps/web/src/engine/oristudioCpTypes.ts`
 - `apps/web/src/store/workspaceStore/*`
@@ -153,18 +154,22 @@ tool panel:
 - [x] Audit Oriedita `MouseHandlerSettingGroup` and toolsetting UIs.
 - [x] Inventory active CP tools that require settings, readouts, or explicit
       contextual controls.
-- [ ] Add a CP action setting-group registry modeled after Oriedita and
+- [x] Add a CP action setting-group registry modeled after Oriedita and
       OpenSCAD's `contextPanel` registration.
-- [ ] Replace `CpActiveToolOptions` with bottom-right `CpContextToolPanel`.
-- [ ] Move division count into the registry-backed panel.
-- [ ] Replace simplified ratio `S:T` inputs with the exact Oriedita
+- [x] Replace `CpActiveToolOptions` with bottom-right `CpContextToolPanel`.
+- [x] Move division count into the registry-backed panel.
+- [x] Replace simplified ratio `S:T` inputs with the exact Oriedita
       `A + B * sqrt(C) : D + E * sqrt(F)` editor.
-- [ ] Add settings state for angle system, delete/replace line filters,
+- [x] Add settings state for angle system, delete/replace line filters,
       polygon count, fix precision, measurements, custom circle color, and
       Voronoi apply state.
-- [ ] Extend command payloads for missing settings such as fix precision and
-      exact division-ratio coefficients.
-- [ ] Add tests proving settings changes do not create undo history and that
-      preview/commit payloads use the same settings snapshot.
-- [ ] Add browser visual checks for panel placement, collapse behavior, narrow
+- [x] Extend command payloads for missing settings such as fix precision. Exact
+      division-ratio coefficients stay in web tool state and dispatch their
+      computed ratio values to the kernel, matching the current Rust operation
+      contract.
+- [x] Add tests proving contextual settings are visible before one-shot
+      commands execute and that commit payloads use the edited settings.
+- [x] Add undo-history coverage showing local settings changes do not create
+      tree or CP history checkpoints.
+- [x] Add browser visual checks for panel placement, collapse behavior, narrow
       pane behavior, and no overlap with the bottom viewport toolbar.

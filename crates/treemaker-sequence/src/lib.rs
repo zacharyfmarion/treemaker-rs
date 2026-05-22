@@ -380,6 +380,55 @@ pub fn plan_reference_precreases(_document: &FoldDocument) -> Result<()> {
     Err(SequenceError::NotImplemented("reference/precrease planner"))
 }
 
+pub fn trace_plan(plan: &SequencePlan) -> PlannerTrace {
+    PlannerTrace {
+        schema_version: 1,
+        planner_version: env!("CARGO_PKG_VERSION").to_string(),
+        status: plan.status.clone(),
+        score: plan.score(),
+        search: plan.search.clone(),
+        candidates: plan
+            .steps
+            .iter()
+            .enumerate()
+            .map(|(index, step)| trace_candidate_for_step(index, step, plan))
+            .collect(),
+        diagnostics: plan
+            .diagnostics
+            .iter()
+            .map(|diagnostic| diagnostic.code.clone())
+            .collect(),
+        ml_decision: ml_readiness_decision(1, usize::from(plan.status == PlanStatus::Complete)),
+    }
+}
+
+pub fn ml_readiness_decision(total_traces: usize, complete_traces: usize) -> MlReadinessDecision {
+    const MINIMUM_SUCCESSFUL_TRACES: usize = 500;
+    if complete_traces >= MINIMUM_SUCCESSFUL_TRACES {
+        MlReadinessDecision {
+            recommendation: MlRecommendation::ConsiderOfflineRanker,
+            reason:
+                "enough successful symbolic traces exist to justify an offline ranking experiment"
+                    .to_string(),
+            minimum_successful_traces: MINIMUM_SUCCESSFUL_TRACES,
+        }
+    } else if total_traces > 0 {
+        MlReadinessDecision {
+            recommendation: MlRecommendation::CollectMoreTraces,
+            reason: "symbolic planner traces are useful, but the successful trace count is still too small for ML"
+                .to_string(),
+            minimum_successful_traces: MINIMUM_SUCCESSFUL_TRACES,
+        }
+    } else {
+        MlReadinessDecision {
+            recommendation: MlRecommendation::KeepSymbolic,
+            reason: "no validated trace corpus exists yet; ML must not affect production behavior"
+                .to_string(),
+            minimum_successful_traces: MINIMUM_SUCCESSFUL_TRACES,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PlanStatus {
@@ -461,6 +510,42 @@ pub struct PlanScore {
     pub total_steps: usize,
     pub layer_order_ambiguity: usize,
     pub simultaneous_candidates: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PlannerTrace {
+    pub schema_version: u32,
+    pub planner_version: String,
+    pub status: PlanStatus,
+    pub score: PlanScore,
+    pub search: SearchStats,
+    pub candidates: Vec<TraceCandidate>,
+    pub diagnostics: Vec<String>,
+    pub ml_decision: MlReadinessDecision,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TraceCandidate {
+    pub step_id: String,
+    pub kind: String,
+    pub affected_creases: Vec<usize>,
+    pub accepted: bool,
+    pub unresolved_after: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MlReadinessDecision {
+    pub recommendation: MlRecommendation,
+    pub reason: String,
+    pub minimum_successful_traces: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MlRecommendation {
+    KeepSymbolic,
+    CollectMoreTraces,
+    ConsiderOfflineRanker,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1064,6 +1149,65 @@ impl SimpleFoldRule {
     }
 }
 
+fn trace_candidate_for_step(
+    index: usize,
+    step: &InstructionStep,
+    plan: &SequencePlan,
+) -> TraceCandidate {
+    let unresolved_after = plan
+        .states
+        .get(index + 1)
+        .map(|state| state.active_creases.len())
+        .unwrap_or_else(|| plan.search.best_unresolved_creases);
+    match step {
+        InstructionStep::PrecreaseRegion(details)
+        | InstructionStep::SimpleFold(details)
+        | InstructionStep::ReverseFold(details)
+        | InstructionStep::SquashFold(details)
+        | InstructionStep::RabbitEar(details)
+        | InstructionStep::MoleculeCollapse(details)
+        | InstructionStep::SimultaneousCollapse(details) => TraceCandidate {
+            step_id: details.id.clone(),
+            kind: instruction_kind(step).to_string(),
+            affected_creases: details.affected_creases.clone(),
+            accepted: true,
+            unresolved_after,
+        },
+        InstructionStep::ManualChoice(step) => TraceCandidate {
+            step_id: step.id.clone(),
+            kind: "manual_choice".to_string(),
+            affected_creases: step
+                .choices
+                .iter()
+                .flat_map(|choice| choice.affected_creases.iter().copied())
+                .collect(),
+            accepted: false,
+            unresolved_after,
+        },
+        InstructionStep::UnsupportedRegion(step) => TraceCandidate {
+            step_id: step.id.clone(),
+            kind: "unsupported_region".to_string(),
+            affected_creases: step.region.creases.clone(),
+            accepted: false,
+            unresolved_after,
+        },
+    }
+}
+
+fn instruction_kind(step: &InstructionStep) -> &'static str {
+    match step {
+        InstructionStep::PrecreaseRegion(_) => "precrease_region",
+        InstructionStep::SimpleFold(_) => "simple_fold",
+        InstructionStep::ReverseFold(_) => "reverse_fold",
+        InstructionStep::SquashFold(_) => "squash_fold",
+        InstructionStep::RabbitEar(_) => "rabbit_ear",
+        InstructionStep::MoleculeCollapse(_) => "molecule_collapse",
+        InstructionStep::SimultaneousCollapse(_) => "simultaneous_collapse",
+        InstructionStep::ManualChoice(_) => "manual_choice",
+        InstructionStep::UnsupportedRegion(_) => "unsupported_region",
+    }
+}
+
 fn reject_zero_solution_limit(solution_limit: &SolutionLimit) -> Result<()> {
     if matches!(solution_limit, SolutionLimit::Count(0)) {
         return Err(SequenceError::InvalidInput(
@@ -1436,6 +1580,35 @@ mod tests {
         assert_eq!(
             serde_json::to_value(first).expect("first json"),
             serde_json::to_value(second).expect("second json")
+        );
+    }
+
+    #[test]
+    fn trace_schema_replays_plan_score() {
+        let target = resolve_target_state(&two_face_valley(), TargetStateOptions::default())
+            .expect("target state");
+        let plan = plan_folding_sequence(&target).expect("plan");
+        let trace = trace_plan(&plan);
+
+        assert_eq!(trace.schema_version, 1);
+        assert_eq!(trace.status, plan.status);
+        assert_eq!(trace.score, plan.score());
+        assert_eq!(trace.candidates.len(), plan.steps.len());
+        assert_eq!(
+            trace.ml_decision.recommendation,
+            MlRecommendation::CollectMoreTraces
+        );
+    }
+
+    #[test]
+    fn ml_decision_keeps_runtime_symbolic_without_trace_corpus() {
+        let decision = ml_readiness_decision(0, 0);
+
+        assert_eq!(decision.recommendation, MlRecommendation::KeepSymbolic);
+        assert!(
+            decision
+                .reason
+                .contains("ML must not affect production behavior")
         );
     }
 

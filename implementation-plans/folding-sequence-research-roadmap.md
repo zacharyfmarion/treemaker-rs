@@ -78,7 +78,7 @@ has a validated implementation.
 - [x] Phase 5: Add search, ranking, partial-plan handling, and diagnostics.
 - [x] Phase 6: Expose planner artifacts through WASM and add a research UI.
 - [x] Phase 7: Expand fixture/corpus validation and optional Oriedita cross-checks.
-- [ ] Phase 8: Decide whether ML/ranking data collection is warranted.
+- [x] Phase 8: Decide whether ML/ranking data collection is warranted.
 - [ ] Phase 9: V2 reference/precrease planner integration.
 
 ## Phase 0: Fixtures And Contracts
@@ -492,6 +492,16 @@ Exit criteria:
 
 - Either keep ML out of the product, or justify a narrow ranker with real planner
   trace data.
+
+Phase 8 implementation notes:
+
+- Added a stable planner trace schema with status, score, search stats,
+  candidate steps, diagnostics, and ML readiness recommendation.
+- Added trace replay-style tests that compare trace score to current planner
+  score.
+- Added `implementation-plans/folding-sequence-ml-readiness.md` documenting the
+  decision to keep V1 symbolic and collect more successful traces before any
+  offline ranker experiment.
 
 ## Phase 9: V2 Reference And Precrease Planning
 

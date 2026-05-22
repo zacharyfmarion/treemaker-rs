@@ -1669,6 +1669,52 @@
   place-items: center;
 }
 
+.cp-diagnostic-hud {
+  position: absolute;
+  z-index: 12;
+  top: var(--space-4);
+  right: var(--space-4);
+  display: grid;
+  justify-items: end;
+  max-width: min(340px, calc(100% - var(--space-8)));
+  padding: 8px 11px;
+  border: 1px solid color-mix(in srgb, var(--border-strong) 68%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--bg-primary) 80%, transparent);
+  box-shadow: var(--shadow-soft);
+  color: var(--text-primary);
+  font-weight: 760;
+  line-height: 1.2;
+  pointer-events: none;
+  text-align: right;
+}
+
+.cp-diagnostic-hud small {
+  max-width: 100%;
+  margin-top: 3px;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 650;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cp-diagnostic-hud[data-tone='error'] {
+  border-color: color-mix(in srgb, var(--status-danger) 70%, transparent);
+  color: var(--status-danger);
+}
+
+.cp-diagnostic-hud[data-tone='warn'] {
+  border-color: color-mix(in srgb, var(--status-warning) 72%, transparent);
+  color: var(--status-warning);
+}
+
+.cp-diagnostic-hud[data-tone='ok'] {
+  border-color: color-mix(in srgb, var(--status-success) 72%, transparent);
+  color: var(--status-success);
+}
+
 .cp-tool-rail {
   z-index: 15;
   display: grid;

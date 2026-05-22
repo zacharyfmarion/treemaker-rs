@@ -13,6 +13,7 @@ import { ChevronDown, ChevronRight, GitBranch, Grid2X2, Magnet, ScanLine } from 
 import type {
   OristudioCpCommandPayload,
   OristudioCpCommandPreview,
+  OristudioCpCommandResult,
   OristudioCpCircle,
   OristudioCpCustomLineType,
   OristudioCpDiagnosticEntry,
@@ -107,10 +108,16 @@ function formatZoom(scale: number): string {
 
 const EMPTY_DIAGNOSTIC_ENTRIES: OristudioCpDiagnosticEntry[] = [];
 
+interface CpDiagnosticHudStatus {
+  label: string;
+  detail: string | null;
+  tone: 'ok' | 'warn' | 'error';
+}
+
 function diagnosticEntryFocusPoint(entry: OristudioCpDiagnosticEntry): Point | null {
   const points: Point[] = [];
   if (entry.point) points.push(entry.point);
-  for (const segment of entry.segments) {
+  for (const segment of entry.segments ?? []) {
     points.push(segment.a, segment.b);
   }
   if (points.length === 0) return null;
@@ -119,6 +126,63 @@ function diagnosticEntryFocusPoint(entry: OristudioCpDiagnosticEntry): Point | n
   const minY = Math.min(...points.map((point) => point.y));
   const maxY = Math.max(...points.map((point) => point.y));
   return { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
+}
+
+function diagnosticOperationLabel(operation: string): string {
+  switch (operation) {
+    case 'CheckCamv':
+      return 'CAMV';
+    case 'Check1':
+      return 'Check 1';
+    case 'Check2':
+      return 'Check 2';
+    case 'Check3':
+      return 'Check 3';
+    case 'Check4':
+      return 'Check 4';
+    case 'FlatFoldableCheck':
+      return 'Boundary';
+    default:
+      return operation;
+  }
+}
+
+function pluralizeCount(count: number, singular: string): string {
+  return `${count} ${singular}${count === 1 ? '' : 's'}`;
+}
+
+function diagnosticHudStatus(
+  result: OristudioCpCommandResult | null | undefined
+): CpDiagnosticHudStatus | null {
+  if (!result?.diagnostics.length) return null;
+  const entries = result.diagnostic_entries ?? EMPTY_DIAGNOSTIC_ENTRIES;
+  const label = diagnosticOperationLabel(result.operation);
+  const errorCount = entries.filter((entry) => entry.severity === 'error').length;
+  const warningCount = entries.filter((entry) => entry.severity === 'warning').length;
+  const detail =
+    entries.length === 1 ? entries[0]?.message ?? result.diagnostics[0] : result.diagnostics[0];
+
+  if (errorCount > 0) {
+    return {
+      label: `${pluralizeCount(errorCount, `${label} Error`)}`,
+      detail,
+      tone: 'error',
+    };
+  }
+
+  if (warningCount > 0) {
+    return {
+      label: `${pluralizeCount(warningCount, `${label} Warning`)}`,
+      detail,
+      tone: 'warn',
+    };
+  }
+
+  return {
+    label: `${label} OK`,
+    detail,
+    tone: 'ok',
+  };
 }
 
 function modelSelectionDistance(
@@ -643,6 +707,10 @@ export function CreasePatternPanel() {
   const renderedCommandPreviewCircles = cpCommandPreview?.circles ?? [];
   const latestDiagnosticEntries =
     oristudioCpDocument?.lastCommandResult?.diagnostic_entries ?? EMPTY_DIAGNOSTIC_ENTRIES;
+  const diagnosticStatus = useMemo(
+    () => diagnosticHudStatus(oristudioCpDocument?.lastCommandResult),
+    [oristudioCpDocument?.lastCommandResult]
+  );
   const activeDiagnosticEntry = useMemo(
     () =>
       latestDiagnosticEntries.find((entry) => entry.id === oristudioCpActiveDiagnosticId) ?? null,
@@ -1819,6 +1887,18 @@ export function CreasePatternPanel() {
               />
             )}
             <div className="cp-panel__viewport">
+              {diagnosticStatus && (
+                <div
+                  className="cp-diagnostic-hud"
+                  data-tone={diagnosticStatus.tone}
+                  aria-live="polite"
+                >
+                  <span>{diagnosticStatus.label}</span>
+                  {diagnosticStatus.detail && diagnosticStatus.detail !== diagnosticStatus.label && (
+                    <small>{diagnosticStatus.detail}</small>
+                  )}
+                </div>
+              )}
               <TransformWrapper
                 ref={transformRef}
                 initialScale={1}
@@ -2188,7 +2268,7 @@ function EditableCreasePattern({
         );
       })}
       {diagnostics.flatMap((diagnostic) =>
-        diagnostic.segments.map((segment, index) => {
+        (diagnostic.segments ?? []).map((segment, index) => {
           const a = modelPointToCpSvg(segment.a, bounds);
           const b = modelPointToCpSvg(segment.b, bounds);
           const active = diagnostic.id === activeDiagnosticId;

@@ -1069,6 +1069,38 @@ describe('CreasePatternPanel', () => {
     });
   });
 
+  it('renders point-only CAMV diagnostics without segment arrays', () => {
+    const state = editableCpState();
+    state.lastCommandResult = {
+      operation: 'CheckCamv',
+      status: 'OracleTested',
+      diagnostics: ['Check CAMV found 1 issue(s)'],
+      diagnostic_entries: [
+        {
+          id: 'CheckCamv-1',
+          kind: 'CheckCamv',
+          severity: 'error',
+          message: 'Flat-foldability violation: Maekawa',
+          point: { x: 0, y: 0 },
+          rule: 'Maekawa',
+        },
+      ],
+    };
+
+    const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
+      documentMode: 'crease-pattern',
+      importedCreasePattern: importedCpDocument(),
+      oristudioCpDocument: state,
+    });
+
+    expect(container.querySelectorAll('.cp-diagnostic-segment')).toHaveLength(0);
+    expect(container.querySelector('.cp-diagnostic-point')).not.toBeNull();
+    expect(container.querySelector('.cp-diagnostic-hud')?.textContent).toContain('1 CAMV Error');
+    expect(container.querySelector('.cp-diagnostic-hud')?.textContent).toContain(
+      'Flat-foldability violation: Maekawa'
+    );
+  });
+
   it('passes contextual circle color options with selected circles only after apply', async () => {
     const executeOristudioCpCommand = vi.fn(async () => true);
     const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {

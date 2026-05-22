@@ -113,7 +113,7 @@ export interface OristudioCpDiagnosticEntry {
   severity: string;
   message: string;
   point?: Point | null;
-  segments: OristudioCpLineSegment[];
+  segments?: OristudioCpLineSegment[];
   rule?: string | null;
 }
 

@@ -898,6 +898,8 @@ Done when:
       boundary workflow using Oriedita result colors.
 - [x] Stage 9 slice: Validate FlatFoldableCheck dispatch, undo neutrality,
       generated wasm, and web interaction tests without browser smoke tests.
+- [x] Stage 9 slice: Add the top-right diagnostic status HUD and guard
+      point-only diagnostic entries such as CAMV vertex errors.
 - [ ] Stage 9: Enable checks, diagnostics, issue navigation, and repair
       commands.
 - [ ] Stage 9: Validate diagnostic overlays and repair results against the

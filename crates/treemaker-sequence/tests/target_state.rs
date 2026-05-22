@@ -2,8 +2,8 @@ use std::path::Path;
 
 use treemaker_fold::FoldDocument;
 use treemaker_sequence::{
-    PlanStatus, SequenceError, SolutionLimit, TargetStateOptions, plan_folding_sequence,
-    resolve_target_state,
+    ComplexMoveKind, PlanStatus, SequenceError, SequenceState, SolutionLimit, TargetStateOptions,
+    plan_folding_sequence, recognize_complex_moves, resolve_target_state,
 };
 
 fn fixture_root() -> &'static Path {
@@ -78,6 +78,61 @@ fn phase0_simple_fixtures_have_complete_phase3_plans() {
         assert_eq!(plan.steps.len(), expected_steps, "{fixture}");
         assert!(plan.unresolved_regions.is_empty(), "{fixture}");
         assert_eq!(plan.search.best_unresolved_creases, 0, "{fixture}");
+    }
+}
+
+#[test]
+fn phase0_complex_fixtures_are_recognized_but_not_faked() {
+    let root = fixture_root().join("tests/fixtures/folding-sequence/fold");
+    for (fixture, expected_kind, expected_status) in [
+        (
+            "kite-rabbit-ear-local.fold",
+            ComplexMoveKind::RabbitEar,
+            PlanStatus::Partial,
+        ),
+        (
+            "squash-local.fold",
+            ComplexMoveKind::SquashFold,
+            PlanStatus::Partial,
+        ),
+        (
+            "treemaker-triad-base.fold",
+            ComplexMoveKind::MoleculeCollapse,
+            PlanStatus::Partial,
+        ),
+        (
+            "simultaneous-collapse-unsupported.fold",
+            ComplexMoveKind::SimultaneousCollapse,
+            PlanStatus::Unsupported,
+        ),
+    ] {
+        let document = read_fold(root.join(fixture));
+        let target = resolve_target_state(&document, TargetStateOptions::default())
+            .unwrap_or_else(|error| panic!("{fixture}: {error}"));
+        let state = SequenceState::from_target("target", &target);
+        let candidates =
+            recognize_complex_moves(&state).unwrap_or_else(|error| panic!("{fixture}: {error}"));
+        let plan =
+            plan_folding_sequence(&target).unwrap_or_else(|error| panic!("{fixture}: {error}"));
+
+        assert!(
+            candidates
+                .iter()
+                .any(|candidate| candidate.kind == expected_kind),
+            "{fixture}: {candidates:?}"
+        );
+        assert_eq!(plan.status, expected_status, "{fixture}");
+        assert!(
+            plan.steps.iter().any(|step| matches!(
+                step,
+                treemaker_sequence::InstructionStep::UnsupportedRegion(_)
+            )),
+            "{fixture}"
+        );
+        assert!(
+            !plan.unresolved_regions.is_empty(),
+            "{fixture}: complex moves must not be silently dropped"
+        );
     }
 }
 

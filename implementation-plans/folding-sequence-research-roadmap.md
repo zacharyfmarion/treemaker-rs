@@ -73,7 +73,7 @@ has a validated implementation.
       `treemaker-flatfold`.
 - [x] Phase 2: Implement sequence-state snapshots and deterministic validators.
 - [x] Phase 3: Build the first reverse rewrite rules for simple folds.
-- [ ] Phase 4: Add hierarchical complex moves for common base-collapse
+- [x] Phase 4: Add hierarchical complex moves for common base-collapse
       techniques.
 - [ ] Phase 5: Add search, ranking, partial-plan handling, and diagnostics.
 - [ ] Phase 6: Expose planner artifacts through WASM and add a research UI.
@@ -310,6 +310,19 @@ Exit criteria:
   simple and complex moves.
 - Simultaneous moves are labeled honestly rather than decomposed into invalid
   simple folds.
+
+Phase 4 implementation notes:
+
+- Added topology-only complex move candidates for reverse folds, squash folds,
+  rabbit ears, molecule collapses, and simultaneous collapses.
+- Complex recognizers attach difficulty, layer-mode, confidence, affected
+  crease/face groups, and diagnostics.
+- Complex transforms intentionally remain unimplemented. Plans expose
+  `unsupported_region` steps and unresolved regions instead of fake fold
+  sequences.
+- The Phase 0 rabbit-ear, squash, TreeMaker-triad, and simultaneous-collapse
+  fixtures now assert recognition behavior and status without accepting invalid
+  one-fold-at-a-time decompositions.
 
 ## Phase 5: Search, Ranking, And Partial Plans
 

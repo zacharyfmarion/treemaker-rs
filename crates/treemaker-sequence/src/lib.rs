@@ -281,10 +281,14 @@ pub fn plan_folding_sequence_with_options(
         applied_steps += 1;
     }
 
+    let complex_candidates = recognize_complex_moves(&current)?;
     let unresolved_regions = unresolved_regions_for_state(&current);
     let status = if unresolved_regions.is_empty() {
         PlanStatus::Complete
-    } else if reverse_steps.is_empty() {
+    } else if complex_candidates
+        .iter()
+        .any(|candidate| candidate.kind == ComplexMoveKind::SimultaneousCollapse)
+    {
         PlanStatus::Unsupported
     } else {
         PlanStatus::Partial
@@ -295,6 +299,15 @@ pub fn plan_folding_sequence_with_options(
         diagnostics.push(SequenceDiagnostic::warning(
             "unsupported_region",
             "planner stopped with crease groups outside the Phase 3 simple-fold rule set",
+        ));
+    }
+    for candidate in &complex_candidates {
+        diagnostics.push(SequenceDiagnostic::warning(
+            candidate.kind.diagnostic_code(),
+            format!(
+                "{:?} pattern recognized for creases {:?}, but the move transform is not implemented yet",
+                candidate.kind, candidate.creases
+            ),
         ));
     }
 
@@ -310,6 +323,22 @@ pub fn plan_folding_sequence_with_options(
         if let InstructionStep::SimpleFold(details) = step {
             details.id = format!("step-{}", index + 1);
         }
+    }
+    if let Some(region) = unresolved_regions.first() {
+        let mut step_diagnostics = Vec::new();
+        if let Some(candidate) = complex_candidates.first() {
+            step_diagnostics.push(SequenceDiagnostic::warning(
+                candidate.kind.diagnostic_code(),
+                "recognized move has no validated Phase 4 transform yet",
+            ));
+        }
+        steps.push(InstructionStep::UnsupportedRegion(UnsupportedRegionStep {
+            id: format!("step-{}", steps.len() + 1),
+            label: "Unsupported collapse region".to_string(),
+            before_state: current.id.clone(),
+            region: region.clone(),
+            diagnostics: step_diagnostics,
+        }));
     }
 
     let mut states = reverse_states;
@@ -378,6 +407,38 @@ pub struct SimpleFoldRule {
     pub crease: usize,
     pub faces: Vec<usize>,
     pub assignment: Assignment,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ComplexMoveKind {
+    ReverseFold,
+    SquashFold,
+    RabbitEar,
+    MoleculeCollapse,
+    SimultaneousCollapse,
+}
+
+impl ComplexMoveKind {
+    fn diagnostic_code(&self) -> &'static str {
+        match self {
+            ComplexMoveKind::ReverseFold => "reverse_fold_not_implemented",
+            ComplexMoveKind::SquashFold => "squash_fold_not_implemented",
+            ComplexMoveKind::RabbitEar => "rabbit_ear_not_implemented",
+            ComplexMoveKind::MoleculeCollapse => "molecule_collapse_not_implemented",
+            ComplexMoveKind::SimultaneousCollapse => "simultaneous_collapse_unsupported",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ComplexMoveCandidate {
+    pub kind: ComplexMoveKind,
+    pub center_vertex: Option<usize>,
+    pub creases: Vec<usize>,
+    pub faces: Vec<usize>,
+    pub metadata: MoveMetadata,
+    pub diagnostics: Vec<SequenceDiagnostic>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -713,6 +774,115 @@ pub fn detect_simple_fold(state: &SequenceState) -> Result<Option<SimpleFoldRule
         }
     }
     Ok(None)
+}
+
+pub fn recognize_complex_moves(state: &SequenceState) -> Result<Vec<ComplexMoveCandidate>> {
+    if state.active_creases.is_empty() {
+        return Ok(Vec::new());
+    }
+    let edges_faces = if state.document.edges_faces.is_empty() {
+        build_edges_faces(&state.document)
+            .map_err(|error| SequenceError::InvalidInput(error.to_string()))?
+    } else {
+        state.document.edges_faces.clone()
+    };
+    let boundary_vertices = boundary_vertex_flags(&state.document);
+    let mut active_by_vertex = vec![Vec::new(); state.document.vertices_coords.len()];
+    for crease in &state.active_creases {
+        let Some([a, b]) = state.document.edges_vertices.get(*crease).copied() else {
+            continue;
+        };
+        if let Some(creases) = active_by_vertex.get_mut(a) {
+            creases.push(*crease);
+        }
+        if let Some(creases) = active_by_vertex.get_mut(b) {
+            creases.push(*crease);
+        }
+    }
+
+    let mut candidates = Vec::new();
+    for (vertex, creases) in active_by_vertex.into_iter().enumerate() {
+        if boundary_vertices.get(vertex).copied().unwrap_or(false) || creases.len() < 3 {
+            continue;
+        }
+        let kind = classify_complex_candidate(state, &creases);
+        let mut faces = Vec::new();
+        for crease in &creases {
+            if let Some(edge_faces) = edges_faces.get(*crease) {
+                faces.extend(edge_faces.iter().copied());
+            }
+        }
+        faces.sort_unstable();
+        faces.dedup();
+        candidates.push(ComplexMoveCandidate {
+            kind: kind.clone(),
+            center_vertex: Some(vertex),
+            creases,
+            faces,
+            metadata: MoveMetadata {
+                difficulty: match kind {
+                    ComplexMoveKind::ReverseFold => MoveDifficulty::Intermediate,
+                    ComplexMoveKind::SquashFold
+                    | ComplexMoveKind::RabbitEar
+                    | ComplexMoveKind::MoleculeCollapse
+                    | ComplexMoveKind::SimultaneousCollapse => MoveDifficulty::Complex,
+                },
+                layer_mode: match kind {
+                    ComplexMoveKind::SimultaneousCollapse => LayerMode::Simultaneous,
+                    ComplexMoveKind::ReverseFold
+                    | ComplexMoveKind::SquashFold
+                    | ComplexMoveKind::RabbitEar => LayerMode::MultiLayer,
+                    ComplexMoveKind::MoleculeCollapse => LayerMode::Simultaneous,
+                },
+                confidence: 0.6,
+                notes: vec![
+                    "topology-only recognition; transform intentionally not implemented"
+                        .to_string(),
+                ],
+            },
+            diagnostics: vec![SequenceDiagnostic::warning(
+                kind.diagnostic_code(),
+                "recognized complex move pattern, but no validated rewrite exists yet",
+            )],
+        });
+    }
+    candidates.sort_by_key(|candidate| {
+        (
+            complex_kind_rank(&candidate.kind),
+            candidate.center_vertex.unwrap_or(usize::MAX),
+        )
+    });
+    Ok(candidates)
+}
+
+fn classify_complex_candidate(state: &SequenceState, creases: &[usize]) -> ComplexMoveKind {
+    match creases.len() {
+        3 => ComplexMoveKind::ReverseFold,
+        4 => ComplexMoveKind::RabbitEar,
+        5..=6 => ComplexMoveKind::MoleculeCollapse,
+        _ => {
+            let valley_count = creases
+                .iter()
+                .filter(|crease| state.document.assignment_for_edge(**crease) == Assignment::Valley)
+                .count();
+            let mountain_count = creases.len().saturating_sub(valley_count);
+            if valley_count > mountain_count {
+                ComplexMoveKind::SimultaneousCollapse
+            } else {
+                ComplexMoveKind::SquashFold
+            }
+        }
+    }
+}
+
+fn complex_kind_rank(kind: &ComplexMoveKind) -> usize {
+    match kind {
+        ComplexMoveKind::ReverseFold => 0,
+        ComplexMoveKind::RabbitEar => 1,
+        ComplexMoveKind::SquashFold => 2,
+        ComplexMoveKind::MoleculeCollapse => 3,
+        ComplexMoveKind::SimultaneousCollapse => 4,
+    }
 }
 
 fn apply_reverse_simple_fold(

@@ -8,7 +8,10 @@ import {
   type TreeProject,
 } from '../../lib/sampleProject';
 import type { ImportedCreasePatternDocument } from '../../lib/creasePatternImport';
-import type { OristudioCpDocumentState } from '../../engine/oristudioCpTypes';
+import type {
+  OristudioCpCommandPayload,
+  OristudioCpDocumentState,
+} from '../../engine/oristudioCpTypes';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { TooltipProvider } from '../ui/Tooltip';
 import { CreasePatternPanel } from './CreasePatternPanel';
@@ -211,6 +214,27 @@ function editableCpState(): OristudioCpDocumentState {
       },
     },
   };
+}
+
+function setCanvasClientRect(container: HTMLElement): SVGSVGElement {
+  const canvas = container.querySelector<SVGSVGElement>('.cp-canvas');
+  if (!canvas) throw new Error('expected CP canvas');
+  Object.defineProperty(canvas, 'getBoundingClientRect', {
+    configurable: true,
+    value: () =>
+      ({
+        x: 0,
+        y: 0,
+        left: 0,
+        top: 0,
+        right: 720,
+        bottom: 720,
+        width: 720,
+        height: 720,
+        toJSON: () => ({}),
+      }) as DOMRect,
+  });
+  return canvas;
 }
 
 afterEach(() => {
@@ -477,10 +501,15 @@ describe('CreasePatternPanel', () => {
     const makeMountainButton = container.querySelector<HTMLButtonElement>(
       'button[aria-label="Make mountain"]'
     );
+    const moveButton = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Move selected creases"]'
+    );
     expect(drawCreaseButton?.getAttribute('aria-disabled')).toBe('true');
     expect(drawCreaseButton?.getAttribute('data-ui-status')).toBe('not-implemented');
     expect(makeMountainButton?.getAttribute('aria-disabled')).toBe('false');
     expect(makeMountainButton?.getAttribute('data-ui-status')).toBe('ready');
+    expect(moveButton?.getAttribute('aria-disabled')).toBe('false');
+    expect(moveButton?.getAttribute('data-ui-status')).toBe('ready');
     expect(foldEstimateButton?.getAttribute('aria-disabled')).toBe('true');
     expect(foldEstimateButton?.getAttribute('data-ui-status')).toBe('porting');
 
@@ -557,5 +586,72 @@ describe('CreasePatternPanel', () => {
     expect(executeOristudioCpCommand).toHaveBeenCalledWith('CreaseMakeMountain', {
       line_ids: [1],
     });
+  });
+
+  it('runs ready multi-step CP transform commands with resolved model points', async () => {
+    const executeOristudioCpCommand = vi.fn(
+      async (_operationId: string, _payload?: OristudioCpCommandPayload) => true
+    );
+    const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
+      documentMode: 'crease-pattern',
+      importedCreasePattern: importedCpDocument(),
+      oristudioCpDocument: editableCpState(),
+      oristudioCpViewport: {
+        gridVisible: true,
+        snapToGrid: false,
+        snapToVertices: false,
+        snapToLines: false,
+      },
+      executeOristudioCpCommand,
+    });
+    const canvas = setCanvasClientRect(container);
+
+    act(() => {
+      container.querySelector<SVGLineElement>('[data-cp-line-id="1"]')?.dispatchEvent(
+        new MouseEvent('click', { bubbles: true })
+      );
+    });
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>('button[aria-label="Move selected creases"]')
+        ?.click();
+      await Promise.resolve();
+    });
+    expect(container.textContent).toContain('Move selected creases: Pick source point');
+
+    act(() => {
+      canvas.dispatchEvent(
+        new MouseEvent('pointerdown', {
+          bubbles: true,
+          button: 0,
+          clientX: 360,
+          clientY: 348,
+        })
+      );
+    });
+    expect(container.textContent).toContain('Move selected creases: Pick destination point');
+
+    await act(async () => {
+      canvas.dispatchEvent(
+        new MouseEvent('pointerdown', {
+          bubbles: true,
+          button: 0,
+          clientX: 360,
+          clientY: 230.4,
+        })
+      );
+      await Promise.resolve();
+    });
+
+    expect(executeOristudioCpCommand).toHaveBeenCalledOnce();
+    const [operation, payload] = executeOristudioCpCommand.mock.calls[0] ?? [];
+    const points = payload?.points ?? [];
+    expect(operation).toBe('CreaseMove');
+    expect(payload?.line_ids).toEqual([1]);
+    expect(points[0].x).toBeCloseTo(0);
+    expect(points[0].y).toBeCloseTo(0);
+    expect(points[1].x).toBeCloseTo(0);
+    expect(points[1].y).toBeCloseTo(80);
   });
 });

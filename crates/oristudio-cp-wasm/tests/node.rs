@@ -48,6 +48,7 @@ fn command_dispatch_accepts_resolved_line_payloads() {
         serde_wasm_bindgen::to_value("CreaseMakeMountain").expect("operation id should serialize"),
         serde_wasm_bindgen::to_value(&oristudio_cp::CreasePatternCommandPayload {
             line_ids: vec![1, 2],
+            ..oristudio_cp::CreasePatternCommandPayload::default()
         })
         .expect("payload should serialize"),
     )
@@ -58,5 +59,31 @@ fn command_dispatch_accepts_resolved_line_payloads() {
 
     assert_eq!(result["operation"], "CreaseMakeMountain");
     assert!(exported.lines().all(|line| line.starts_with("3 ")));
+    oristudio_cp_wasm::free_document(handle).expect("document handle should free");
+}
+
+#[wasm_bindgen_test]
+fn command_dispatch_accepts_resolved_point_payloads() {
+    let handle =
+        oristudio_cp_wasm::load_cp("1 0 0 1 0\n", "sample").expect("cp import should succeed");
+    let result = oristudio_cp_wasm::execute_cp_command(
+        handle,
+        serde_wasm_bindgen::to_value("CreaseCopy").expect("operation id should serialize"),
+        serde_wasm_bindgen::to_value(&oristudio_cp::CreasePatternCommandPayload {
+            line_ids: vec![1],
+            points: vec![
+                oristudio_cp::geometry::Point::new(0.0, 0.0),
+                oristudio_cp::geometry::Point::new(0.0, 2.0),
+            ],
+        })
+        .expect("payload should serialize"),
+    )
+    .expect("selected line transform command should execute");
+    let result: serde_json::Value =
+        serde_wasm_bindgen::from_value(result).expect("result should deserialize");
+    let exported = oristudio_cp_wasm::export_cp(handle).expect("cp export should succeed");
+
+    assert_eq!(result["operation"], "CreaseCopy");
+    assert!(exported.contains("1 0.0 2.0 1.0 2.0"));
     oristudio_cp_wasm::free_document(handle).expect("document handle should free");
 }

@@ -80,6 +80,9 @@ pub struct CreasePatternCommandPayload {
     /// One-based Oriedita line IDs resolved by the UI.
     #[serde(default)]
     pub line_ids: Vec<usize>,
+    /// Resolved model-space points, in the same order as the active tool steps.
+    #[serde(default)]
+    pub points: Vec<geometry::Point>,
 }
 
 /// Result returned by a successfully executed command.
@@ -1231,6 +1234,48 @@ pub fn execute_command(
             let line_indices = required_line_indices(&command)?;
             operations::color::toggle_mountain_valley(&mut document.crease_pattern, &line_indices)
         }
+        OperationId::CreaseMove => {
+            let line_indices = required_line_indices(&command)?;
+            let points = required_points(&command, 2)?;
+            set_selected_line_flags(&mut document.crease_pattern, &line_indices);
+            operations::transform::move_selected_lines(
+                &mut document.crease_pattern,
+                points[0].delta(points[1]),
+            )
+        }
+        OperationId::CreaseCopy => {
+            let line_indices = required_line_indices(&command)?;
+            let points = required_points(&command, 2)?;
+            set_selected_line_flags(&mut document.crease_pattern, &line_indices);
+            operations::transform::copy_selected_lines(
+                &mut document.crease_pattern,
+                points[0].delta(points[1]),
+            )
+        }
+        OperationId::CreaseMove4p => {
+            let line_indices = required_line_indices(&command)?;
+            let points = required_points(&command, 4)?;
+            set_selected_line_flags(&mut document.crease_pattern, &line_indices);
+            operations::transform::move_selected_lines_by_points(
+                &mut document.crease_pattern,
+                points[0],
+                points[1],
+                points[2],
+                points[3],
+            )
+        }
+        OperationId::CreaseCopy4p => {
+            let line_indices = required_line_indices(&command)?;
+            let points = required_points(&command, 4)?;
+            set_selected_line_flags(&mut document.crease_pattern, &line_indices);
+            operations::transform::copy_selected_lines_by_points(
+                &mut document.crease_pattern,
+                points[0],
+                points[1],
+                points[2],
+                points[3],
+            )
+        }
         _ => {
             return Err(CommandError::NotImplemented {
                 operation: command.operation,
@@ -1266,6 +1311,21 @@ fn required_line_indices(command: &CreasePatternCommand) -> Result<Vec<usize>> {
                 })
         })
         .collect()
+}
+
+fn required_points(command: &CreasePatternCommand, count: usize) -> Result<Vec<geometry::Point>> {
+    if command.payload.points.len() != count {
+        return Err(CommandError::InvalidInput {
+            operation: command.operation,
+            message: format!("expected {count} resolved point(s)"),
+        });
+    }
+    Ok(command.payload.points.clone())
+}
+
+fn set_selected_line_flags(model: &mut CreasePatternModel, line_indices: &[usize]) {
+    operations::selection::unselect_all(model);
+    operations::selection::select_indices(model, line_indices);
 }
 
 #[cfg(test)]
@@ -1366,6 +1426,7 @@ mod tests {
             CreasePatternCommand::new(OperationId::CreaseMakeMountain).with_payload(
                 CreasePatternCommandPayload {
                     line_ids: vec![1, 2],
+                    ..CreasePatternCommandPayload::default()
                 },
             ),
         )
@@ -1400,6 +1461,7 @@ mod tests {
             CreasePatternCommand::new(OperationId::LineSegmentDelete).with_payload(
                 CreasePatternCommandPayload {
                     line_ids: vec![1, 3],
+                    ..CreasePatternCommandPayload::default()
                 },
             ),
         )
@@ -1408,6 +1470,117 @@ mod tests {
         assert_eq!(result.diagnostics, vec!["Changed 2 line(s)"]);
         assert_eq!(document.crease_pattern.line_segments.len(), 1);
         assert_eq!(document.crease_pattern.line_segments[0].a.x, 1.0);
+    }
+
+    #[test]
+    fn command_dispatch_moves_resolved_selected_lines() {
+        let mut document = CreasePatternDocument::default();
+        document.crease_pattern.add_line(
+            Point::new(0.0, 0.0),
+            Point::new(1.0, 0.0),
+            LineColor::Red1,
+        );
+        document.crease_pattern.add_line(
+            Point::new(0.0, 2.0),
+            Point::new(1.0, 2.0),
+            LineColor::Blue2,
+        );
+
+        let result = execute_command(
+            &mut document,
+            CreasePatternCommand::new(OperationId::CreaseMove).with_payload(
+                CreasePatternCommandPayload {
+                    line_ids: vec![1],
+                    points: vec![Point::new(0.0, 0.0), Point::new(2.0, 3.0)],
+                },
+            ),
+        )
+        .expect("move command should execute");
+
+        assert_eq!(result.status, OperationStatus::OracleTested);
+        assert_eq!(result.diagnostics, vec!["Changed 1 line(s)"]);
+        assert_eq!(document.crease_pattern.line_segments.len(), 2);
+        assert_eq!(
+            document.crease_pattern.line_segments[0].a,
+            Point::new(0.0, 2.0)
+        );
+        assert_eq!(
+            document.crease_pattern.line_segments[1].a,
+            Point::new(2.0, 3.0)
+        );
+        assert_eq!(
+            document.crease_pattern.line_segments[1].b,
+            Point::new(3.0, 3.0)
+        );
+    }
+
+    #[test]
+    fn command_dispatch_copies_resolved_selected_lines() {
+        let mut document = CreasePatternDocument::default();
+        document.crease_pattern.add_line(
+            Point::new(0.0, 0.0),
+            Point::new(1.0, 0.0),
+            LineColor::Red1,
+        );
+
+        let result = execute_command(
+            &mut document,
+            CreasePatternCommand::new(OperationId::CreaseCopy).with_payload(
+                CreasePatternCommandPayload {
+                    line_ids: vec![1],
+                    points: vec![Point::new(0.0, 0.0), Point::new(0.0, 2.0)],
+                },
+            ),
+        )
+        .expect("copy command should execute");
+
+        assert_eq!(result.diagnostics, vec!["Changed 1 line(s)"]);
+        assert_eq!(document.crease_pattern.line_segments.len(), 2);
+        assert_eq!(
+            document.crease_pattern.line_segments[0].a,
+            Point::new(0.0, 0.0)
+        );
+        assert_eq!(
+            document.crease_pattern.line_segments[1].a,
+            Point::new(0.0, 2.0)
+        );
+        assert_eq!(
+            document.crease_pattern.line_segments[1].b,
+            Point::new(1.0, 2.0)
+        );
+    }
+
+    #[test]
+    fn command_dispatch_copies_resolved_selected_lines_by_four_points() {
+        let mut document = CreasePatternDocument::default();
+        document.crease_pattern.add_line(
+            Point::new(1.0, 0.0),
+            Point::new(1.0, 1.0),
+            LineColor::Red1,
+        );
+
+        let result = execute_command(
+            &mut document,
+            CreasePatternCommand::new(OperationId::CreaseCopy4p).with_payload(
+                CreasePatternCommandPayload {
+                    line_ids: vec![1],
+                    points: vec![
+                        Point::new(0.0, 0.0),
+                        Point::new(1.0, 0.0),
+                        Point::new(0.0, 0.0),
+                        Point::new(0.0, 2.0),
+                    ],
+                },
+            ),
+        )
+        .expect("four-point copy command should execute");
+
+        assert_eq!(result.status, OperationStatus::OracleTested);
+        assert_eq!(document.crease_pattern.line_segments.len(), 2);
+        assert_close(document.crease_pattern.line_segments[1].a.x, 0.0);
+        assert_close(document.crease_pattern.line_segments[1].a.y, 2.0);
+        assert_close(document.crease_pattern.line_segments[1].b.x, -2.0);
+        assert_close(document.crease_pattern.line_segments[1].b.y, 2.0);
     }
 
     #[test]
@@ -1426,6 +1599,42 @@ mod tests {
                 operation: OperationId::CreaseMakeValley,
                 message: "select at least one line".to_string(),
             }
+        );
+    }
+
+    #[test]
+    fn command_dispatch_requires_resolved_points_for_transform_commands() {
+        let mut document = CreasePatternDocument::default();
+        document.crease_pattern.add_line(
+            Point::new(0.0, 0.0),
+            Point::new(1.0, 0.0),
+            LineColor::Red1,
+        );
+
+        let error = execute_command(
+            &mut document,
+            CreasePatternCommand::new(OperationId::CreaseMove).with_payload(
+                CreasePatternCommandPayload {
+                    line_ids: vec![1],
+                    points: vec![Point::new(0.0, 0.0)],
+                },
+            ),
+        )
+        .expect_err("move commands require a source and destination point");
+
+        assert_eq!(
+            error,
+            CommandError::InvalidInput {
+                operation: OperationId::CreaseMove,
+                message: "expected 2 resolved point(s)".to_string(),
+            }
+        );
+    }
+
+    fn assert_close(actual: f64, expected: f64) {
+        assert!(
+            (actual - expected).abs() < 1e-9,
+            "expected {actual} to be within tolerance of {expected}"
         );
     }
 }

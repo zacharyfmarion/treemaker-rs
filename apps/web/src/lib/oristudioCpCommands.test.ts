@@ -37,6 +37,19 @@ describe('oristudio CP command registry', () => {
       uiStatus: 'ready',
       selectionRequirement: 'selected lines',
     });
+    expect(cpCommandByOperation('CreaseMove')).toMatchObject({
+      uiStatus: 'ready',
+      toolSteps: ['Pick source point', 'Pick destination point'],
+    });
+    expect(cpCommandByOperation('CreaseMove4p')).toMatchObject({
+      uiStatus: 'ready',
+      toolSteps: [
+        'Pick source first point',
+        'Pick source second point',
+        'Pick target first point',
+        'Pick target second point',
+      ],
+    });
   });
 
   it('keeps the left rail populated by ordered command groups', () => {

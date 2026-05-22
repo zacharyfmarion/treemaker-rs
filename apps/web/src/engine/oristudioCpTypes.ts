@@ -102,6 +102,7 @@ export interface OristudioCpCommandResult {
 
 export interface OristudioCpCommandPayload {
   line_ids?: number[];
+  points?: Point[];
 }
 
 export interface OristudioCpDocumentState {

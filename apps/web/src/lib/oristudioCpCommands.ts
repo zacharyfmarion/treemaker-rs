@@ -245,11 +245,11 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
     shortcut: 'V',
   }),
   notImplemented('CreaseUnselect', 'Unselect crease', 'select-edit', 'mouse-pointer-click', 'MouseHandlerCreaseUnselect'),
-  notImplemented('CreaseMove', 'Move selected creases', 'transform', 'move', 'MouseHandlerCreaseMove', {
+  ready('CreaseMove', 'Move selected creases', 'transform', 'move', 'MouseHandlerCreaseMove', {
     selectionRequirement: 'selected creases',
     toolSteps: ['Pick source point', 'Pick destination point'],
   }),
-  notImplemented('CreaseCopy', 'Copy selected creases', 'transform', 'copy', 'MouseHandlerCreaseCopy', {
+  ready('CreaseCopy', 'Copy selected creases', 'transform', 'copy', 'MouseHandlerCreaseCopy', {
     selectionRequirement: 'selected creases',
     toolSteps: ['Pick source point', 'Pick destination point'],
   }),
@@ -277,8 +277,24 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
   notImplemented('LineSegmentRatioSet', 'Divide line by ratio', 'draw', 'divide', 'MouseHandlerLineSegmentRatioSet'),
   notImplemented('PolygonSetNoCorners', 'Regular polygon', 'generators', 'hexagon', 'MouseHandlerPolygonSetNoCorners'),
   notImplemented('CreaseAdvanceType', 'Advance crease type', 'color', 'list-restart', 'MouseHandlerCreaseAdvanceType'),
-  notImplemented('CreaseMove4p', 'Move by four points', 'transform', 'scan-line', 'MouseHandlerCreaseMove4p'),
-  notImplemented('CreaseCopy4p', 'Copy by four points', 'transform', 'scan-line', 'MouseHandlerCreaseCopy4p'),
+  ready('CreaseMove4p', 'Move by four points', 'transform', 'scan-line', 'MouseHandlerCreaseMove4p', {
+    selectionRequirement: 'selected creases',
+    toolSteps: [
+      'Pick source first point',
+      'Pick source second point',
+      'Pick target first point',
+      'Pick target second point',
+    ],
+  }),
+  ready('CreaseCopy4p', 'Copy by four points', 'transform', 'scan-line', 'MouseHandlerCreaseCopy4p', {
+    selectionRequirement: 'selected creases',
+    toolSteps: [
+      'Pick source first point',
+      'Pick source second point',
+      'Pick target first point',
+      'Pick target second point',
+    ],
+  }),
   notImplemented('FishBoneDraw', 'Fishbone draw', 'construct', 'git-branch', 'MouseHandlerFishBoneDraw'),
   notImplemented('CreaseMakeMv', 'Make alternating M/V', 'color', 'git-branch', 'MouseHandlerCreaseMakeMV'),
   notImplemented('DoubleSymmetricDraw', 'Double symmetric draw', 'construct', 'fold-horizontal', 'MouseHandlerDoubleSymmetricDraw'),

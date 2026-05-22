@@ -482,7 +482,10 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
     inputMode: 'drag-path',
     tooltip: 'Unselect creases touched by a freehand lasso path',
   }),
-  notImplemented('Text', 'Text annotation', 'annotations', 'text-cursor-input', 'MouseHandlerText'),
+  ready('Text', 'Text annotation', 'annotations', 'text-cursor-input', 'MouseHandlerText', {
+    toolSteps: ['Click text position'],
+    tooltip: 'Create, select, drag, and edit text annotations',
+  }),
   ready('DrawBlintz', 'Blintz base', 'generators', 'sparkles', 'MouseHandlerDrawBlintz', {
     toolSteps: ['Pick first anchor point', 'Pick second anchor point'],
   }),

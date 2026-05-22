@@ -860,6 +860,10 @@ Done when:
       through the contextual tool panel.
 - [x] Stage 8 slice: Validate Voronoi dispatch, preview payloads, wasm bridge,
       and web interaction state without browser smoke tests.
+- [x] Stage 8 slice: Enable text annotation create, select, edit, drag, and
+      selected-delete through the contextual tool panel.
+- [x] Stage 8 slice: Validate text command payloads, wasm bridge behavior, and
+      undo-aware web interaction state without browser smoke tests.
 - [ ] Stage 8: Enable circles, text, generators, and measurement tools.
 - [ ] Stage 8: Validate annotation preservation and non-mutating measurement
       behavior.

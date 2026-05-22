@@ -250,6 +250,12 @@ function setNumberInputValue(input: HTMLInputElement, value: string) {
   input.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
+function setTextAreaValue(textarea: HTMLTextAreaElement, value: string) {
+  const valueSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
+  valueSetter?.call(textarea, value);
+  textarea.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
 function setSelectValue(select: HTMLSelectElement, value: string) {
   const valueSetter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set;
   valueSetter?.call(select, value);
@@ -1556,6 +1562,152 @@ describe('CreasePatternPanel', () => {
 
     expect(executeOristudioCpCommand).not.toHaveBeenCalled();
     expect(container.textContent).toContain('0 seed presses pending');
+  });
+
+  it('creates text annotations with the contextual text draft', async () => {
+    const executeOristudioCpCommand = vi.fn(
+      async (_operationId: string, _payload?: OristudioCpCommandPayload) => true
+    );
+    const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
+      documentMode: 'crease-pattern',
+      importedCreasePattern: importedCpDocument(),
+      oristudioCpDocument: editableCpState(),
+      executeOristudioCpCommand,
+    });
+    const canvas = setCanvasClientRect(container);
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('button[aria-label="Text annotation"]')?.click();
+      await Promise.resolve();
+    });
+    const textArea = container.querySelector<HTMLTextAreaElement>(
+      'textarea[aria-label="Text annotation content"]'
+    );
+    expect(textArea).not.toBeNull();
+
+    await act(async () => {
+      if (textArea) setTextAreaValue(textArea, 'new label');
+      canvas.dispatchEvent(
+        new MouseEvent('pointerdown', {
+          bubbles: true,
+          button: 0,
+          clientX: 360,
+          clientY: 348,
+        })
+      );
+      await Promise.resolve();
+    });
+
+    expect(executeOristudioCpCommand).toHaveBeenCalledOnce();
+    const [operation, payload] = executeOristudioCpCommand.mock.calls[0] ?? [];
+    expect(operation).toBe('Text');
+    expect(payload).toMatchObject({
+      text_action: 'Create',
+      text_content: 'new label',
+      points: [{ x: 0, y: 0 }],
+    });
+  });
+
+  it('edits, deletes, and drags selected text annotations', async () => {
+    const executeOristudioCpCommand = vi.fn(
+      async (_operationId: string, _payload?: OristudioCpCommandPayload) => true
+    );
+    const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
+      documentMode: 'crease-pattern',
+      importedCreasePattern: importedCpDocument(),
+      oristudioCpDocument: editableCpState(),
+      executeOristudioCpCommand,
+    });
+    const canvas = setCanvasClientRect(container);
+    const textElement = container.querySelector<SVGTextElement>('[data-cp-text-id="1"]');
+    expect(textElement).not.toBeNull();
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('button[aria-label="Text annotation"]')?.click();
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      textElement?.dispatchEvent(
+        new MouseEvent('pointerdown', {
+          bubbles: true,
+          button: 0,
+          clientX: 418.8,
+          clientY: 254.4,
+        })
+      );
+      await Promise.resolve();
+    });
+    expect(useWorkspaceStore.getState().oristudioCpSelection.texts).toEqual([1]);
+
+    const textArea = container.querySelector<HTMLTextAreaElement>(
+      'textarea[aria-label="Text annotation content"]'
+    );
+    await act(async () => {
+      if (textArea) setTextAreaValue(textArea, 'updated note');
+      Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
+        .find((button) => button.textContent?.trim() === 'Apply text')
+        ?.click();
+      await Promise.resolve();
+    });
+    expect(executeOristudioCpCommand).toHaveBeenCalledWith(
+      'Text',
+      expect.objectContaining({
+        text_action: 'SetContent',
+        text_ids: [1],
+        text_content: 'updated note',
+      })
+    );
+
+    await act(async () => {
+      textElement?.dispatchEvent(
+        new MouseEvent('pointerdown', {
+          bubbles: true,
+          button: 0,
+          clientX: 418.8,
+          clientY: 254.4,
+        })
+      );
+      canvas.dispatchEvent(
+        new MouseEvent('pointermove', {
+          bubbles: true,
+          button: 0,
+          clientX: 477.6,
+          clientY: 230.4,
+        })
+      );
+      canvas.dispatchEvent(
+        new MouseEvent('pointerup', {
+          bubbles: true,
+          button: 0,
+          clientX: 477.6,
+          clientY: 230.4,
+        })
+      );
+      await Promise.resolve();
+    });
+    expect(executeOristudioCpCommand).toHaveBeenCalledWith(
+      'Text',
+      expect.objectContaining({
+        text_action: 'Move',
+        text_ids: [1],
+        points: expect.any(Array),
+      })
+    );
+
+    await act(async () => {
+      Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
+        .find((button) => button.textContent?.trim() === 'Delete text')
+        ?.click();
+      await Promise.resolve();
+    });
+    expect(executeOristudioCpCommand).toHaveBeenCalledWith(
+      'Text',
+      expect.objectContaining({
+        text_action: 'DeleteSelected',
+        text_ids: [1],
+      })
+    );
   });
 
   it('runs ready lengthen CP commands with three resolved model points and current color', async () => {

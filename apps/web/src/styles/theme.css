@@ -2768,7 +2768,8 @@
 }
 
 .cp-context-panel__field input,
-.cp-context-panel__field select {
+.cp-context-panel__field select,
+.cp-context-panel__field textarea {
   height: 22px;
   min-width: 0;
   border: 1px solid var(--border-subtle);
@@ -2780,6 +2781,17 @@
   padding: 2px 5px;
 }
 
+.cp-context-panel__field textarea {
+  height: auto;
+  min-height: 54px;
+  resize: vertical;
+}
+
+.cp-context-panel__field--textarea {
+  grid-template-columns: 42px minmax(0, 1fr);
+  align-items: start;
+}
+
 .cp-context-panel__field input:disabled {
   opacity: 0.55;
 }
@@ -2789,7 +2801,8 @@
 }
 
 .cp-context-panel__field input:focus-visible,
-.cp-context-panel__field select:focus-visible {
+.cp-context-panel__field select:focus-visible,
+.cp-context-panel__field textarea:focus-visible {
   border-color: var(--accent-primary);
   outline: none;
 }

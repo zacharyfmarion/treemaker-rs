@@ -116,6 +116,7 @@ export interface OristudioCpCommandPreview {
 export interface OristudioCpCommandPayload {
   line_ids?: number[];
   circle_ids?: number[];
+  text_ids?: number[];
   points?: Point[];
   line_color?: OristudioCpLineColor;
   selection_distance?: number;
@@ -135,7 +136,17 @@ export interface OristudioCpCommandPayload {
   fix_precision_use_22_5?: boolean;
   polygon_corners?: number;
   custom_circle_color?: OristudioCpRgbColor;
+  text_action?: OristudioCpTextCommandAction;
+  text_content?: string;
 }
+
+export type OristudioCpTextCommandAction =
+  | 'Create'
+  | 'Move'
+  | 'SetContent'
+  | 'DeleteSelected'
+  | 'DeleteAt'
+  | 'DeleteBox';
 
 export type OristudioCpLineColor =
   | 'Angle'

@@ -62,6 +62,7 @@ import {
   cpLineColorClass,
   cpSelectionSize,
   cpSvgPointToModel,
+  emptyOristudioCpSelection,
   getCpGridLines,
   getCpVertices,
   getEditableCpModelBounds,
@@ -270,6 +271,7 @@ function activeActionInputMode(
 }
 
 function cpCommandRequiresContextApply(command: OristudioCpCommandDefinition): boolean {
+  if (command.operationId === 'Text') return true;
   if (command.operationId === 'VoronoiCreate') return true;
   if ((command.toolSteps?.length ?? 0) > 0) return false;
   return cpToolSettingGroupsForCommand(command).some(
@@ -283,11 +285,26 @@ function isVariablePointSequenceOperation(
   return operationId === 'VoronoiCreate';
 }
 
+function isTextAnnotationOperation(
+  operationId: OristudioCpCommandDefinition['operationId'] | null | undefined
+): boolean {
+  return operationId === 'Text';
+}
+
 function isCpLineEventTarget(target: EventTarget | null): boolean {
   return (
     target instanceof Element &&
     target.closest('[data-cp-line-id], [data-cp-line-hit-id]') !== null
   );
+}
+
+function cpTextIdFromEventTarget(target: EventTarget | null): number | null {
+  if (!(target instanceof Element)) return null;
+  const element = target.closest('[data-cp-text-id]');
+  const id = element?.getAttribute('data-cp-text-id');
+  if (!id) return null;
+  const parsed = Number.parseInt(id, 10);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 type CpMeasurementSlotId = 'length1' | 'length2' | 'angle1' | 'angle2' | 'angle3';
@@ -395,9 +412,10 @@ export function CreasePatternPanel() {
   const cpToolDragRef = useRef<{
     operationId: OristudioCpCommandDefinition['operationId'];
     actionId: OristudioCpCommandActionDefinition['id'] | null;
-    mode: 'drag-line' | 'drag-path';
+    mode: 'drag-line' | 'drag-path' | 'text-drag';
     pointerId: number;
     points: Point[];
+    textId?: number;
   } | null>(null);
 
   const project = useWorkspaceStore((state) => state.project);
@@ -432,6 +450,7 @@ export function CreasePatternPanel() {
   const toggleOristudioCpTextSelection = useWorkspaceStore(
     (state) => state.toggleOristudioCpTextSelection
   );
+  const setOristudioCpSelection = useWorkspaceStore((state) => state.setOristudioCpSelection);
   const clearOristudioCpSelection = useWorkspaceStore((state) => state.clearOristudioCpSelection);
   const executeOristudioCpCommand = useWorkspaceStore(
     (state) => state.executeOristudioCpCommand
@@ -644,11 +663,15 @@ export function CreasePatternPanel() {
       !activeCpCommand ||
       activeCpCommand.uiStatus !== 'ready' ||
       ((activeCpCommand.toolSteps?.length ?? 0) > 0 &&
-        !isVariablePointSequenceOperation(activeCpCommand.operationId))
+        !isVariablePointSequenceOperation(activeCpCommand.operationId) &&
+        !isTextAnnotationOperation(activeCpCommand.operationId))
     ) {
       return;
     }
     if (activeCpCommand.operationId === 'VoronoiCreate' && cpToolPoints.length === 0) {
+      return;
+    }
+    if (activeCpCommand.operationId === 'Text' && oristudioCpSelection.texts.length === 0) {
       return;
     }
 
@@ -661,6 +684,11 @@ export function CreasePatternPanel() {
       }
       if (activeCpCommand.operationId === 'VoronoiCreate') {
         selectionPayload.points = cpToolPoints;
+      }
+      if (activeCpCommand.operationId === 'Text') {
+        selectionPayload.text_ids = oristudioCpSelection.texts;
+        selectionPayload.text_action = 'SetContent';
+        selectionPayload.text_content = cpToolOptions.textContent;
       }
       const succeeded = await executeOristudioCpCommand(
         activeCpCommand.operationId,
@@ -677,7 +705,9 @@ export function CreasePatternPanel() {
               succeeded
                 ? {
                     type: 'commit',
-                    keepActive: activeCpCommand.operationId === 'VoronoiCreate',
+                    keepActive:
+                      activeCpCommand.operationId === 'VoronoiCreate' ||
+                      activeCpCommand.operationId === 'Text',
                   }
                 : {
                     type: 'commandError',
@@ -691,10 +721,12 @@ export function CreasePatternPanel() {
     activeCpCommand,
     buildCpCommandPayload,
     cpToolPoints,
+    cpToolOptions.textContent,
     editableCp,
     executeOristudioCpCommand,
     oristudioCpSelection.circles,
     oristudioCpSelection.lines,
+    oristudioCpSelection.texts,
   ]);
 
   const handleClearActiveContextInput = useCallback(() => {
@@ -707,6 +739,50 @@ export function CreasePatternPanel() {
         : state
     );
   }, [activeCpCommand]);
+
+  const handleDeleteSelectedText = useCallback(() => {
+    if (
+      !editableCp ||
+      !activeCpCommand ||
+      activeCpCommand.operationId !== 'Text' ||
+      oristudioCpSelection.texts.length === 0
+    ) {
+      return;
+    }
+
+    void (async () => {
+      const succeeded = await executeOristudioCpCommand(
+        activeCpCommand.operationId,
+        buildCpCommandPayload(activeCpCommand, {
+          text_action: 'DeleteSelected',
+          text_ids: oristudioCpSelection.texts,
+        })
+      );
+      if (succeeded) {
+        setOristudioCpSelection(emptyOristudioCpSelection());
+      }
+      setCpToolState((state) =>
+        state.activeOperationId === activeCpCommand.operationId
+          ? transitionOristudioCpToolState(
+              state,
+              succeeded
+                ? { type: 'commit', keepActive: true }
+                : {
+                    type: 'commandError',
+                    message: useWorkspaceStore.getState().oristudioCpError ?? 'Command failed',
+                  }
+            )
+          : state
+      );
+    })();
+  }, [
+    activeCpCommand,
+    buildCpCommandPayload,
+    editableCp,
+    executeOristudioCpCommand,
+    oristudioCpSelection.texts,
+    setOristudioCpSelection,
+  ]);
 
   const eventToEditableModelPoint = useCallback(
     (event: PointerEvent<SVGElement>): Point | null => {
@@ -819,6 +895,71 @@ export function CreasePatternPanel() {
         isLineClickSelectionOperation(activeCpCommand.operationId) &&
         isCpLineEventTarget(event.target)
       ) {
+        return;
+      }
+
+      if (isTextAnnotationOperation(activeCpCommand.operationId)) {
+        const point = eventToEditableModelPoint(event);
+        if (!point) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const textId = cpTextIdFromEventTarget(event.target);
+        if (textId) {
+          const text = editableCp.crease_pattern.texts[textId - 1];
+          setOristudioCpSelection({ ...emptyOristudioCpSelection(), texts: [textId] });
+          if (text) {
+            setCpToolOptions((current) => ({ ...current, textContent: text.text }));
+          }
+          cpToolDragRef.current = {
+            operationId: activeCpCommand.operationId,
+            actionId: activeCpAction?.kind === 'command' ? activeCpAction.id : null,
+            mode: 'text-drag',
+            pointerId: event.pointerId,
+            points: [point],
+            textId,
+          };
+          if (typeof event.pointerId === 'number') {
+            event.currentTarget.setPointerCapture?.(event.pointerId);
+          }
+          return;
+        }
+
+        void (async () => {
+          const previousTextCount = editableCp.crease_pattern.texts.length;
+          const succeeded = await executeOristudioCpCommand(
+            activeCpCommand.operationId,
+            buildCpCommandPayload(activeCpCommand, {
+              text_action: 'Create',
+              text_content: cpToolOptions.textContent,
+              points: [point],
+            })
+          );
+          if (succeeded) {
+            const nextTextCount =
+              useWorkspaceStore.getState().oristudioCpDocument?.document.crease_pattern.texts
+                .length ?? previousTextCount;
+            if (nextTextCount > previousTextCount) {
+              setOristudioCpSelection({
+                ...emptyOristudioCpSelection(),
+                texts: [nextTextCount],
+              });
+            }
+          }
+          setCpToolState((state) =>
+            state.activeOperationId === activeCpCommand.operationId
+              ? transitionOristudioCpToolState(
+                  state,
+                  succeeded
+                    ? { type: 'commit', keepActive: true }
+                    : {
+                        type: 'commandError',
+                        message:
+                          useWorkspaceStore.getState().oristudioCpError ?? 'Command failed',
+                      }
+                )
+              : state
+          );
+        })();
         return;
       }
 
@@ -943,6 +1084,7 @@ export function CreasePatternPanel() {
       activeCpInputMode,
       buildCpCommandPayload,
       cpToolPoints,
+      cpToolOptions.textContent,
       cpToolState.phase,
       editableCp,
       eventToEditableModelPoint,
@@ -950,6 +1092,7 @@ export function CreasePatternPanel() {
       oristudioCpSelection.lines,
       resolveEditableDrawPoint,
       resolveEditableToolPoint,
+      setOristudioCpSelection,
       spacePressed,
     ]
   );
@@ -959,6 +1102,13 @@ export function CreasePatternPanel() {
       updateEditablePointerStatus(event);
       const drag = cpToolDragRef.current;
       if (!drag || drag.pointerId !== event.pointerId) return;
+      if (drag.mode === 'text-drag') {
+        const point = eventToEditableModelPoint(event);
+        const startPoint = drag.points[0];
+        if (!point || !startPoint) return;
+        drag.points = [startPoint, point];
+        return;
+      }
       if (drag.mode === 'drag-line') {
         const resolved = resolveEditableDrawPoint(event, false);
         const startPoint = drag.points[0];
@@ -1022,6 +1172,44 @@ export function CreasePatternPanel() {
       if (typeof event.pointerId === 'number') {
         event.currentTarget.releasePointerCapture?.(event.pointerId);
       }
+      if (drag.mode === 'text-drag') {
+        const [startPoint, endPoint] = drag.points;
+        if (
+          !drag.textId ||
+          !startPoint ||
+          !endPoint ||
+          pointDistanceSquared(startPoint, endPoint) <
+            modelSelectionDistance(editableCpBounds, zoomPercent / 100) ** 2 / 16
+        ) {
+          return;
+        }
+
+        void (async () => {
+          const succeeded = await executeOristudioCpCommand(
+            command.operationId,
+            buildCpCommandPayload(command, {
+              text_action: 'Move',
+              text_ids: [drag.textId as number],
+              points: [startPoint, endPoint],
+            })
+          );
+          setCpToolState((state) =>
+            state.activeOperationId === command.operationId
+              ? transitionOristudioCpToolState(
+                  state,
+                  succeeded
+                    ? { type: 'commit', keepActive: true }
+                    : {
+                        type: 'commandError',
+                        message:
+                          useWorkspaceStore.getState().oristudioCpError ?? 'Command failed',
+                      }
+                )
+              : state
+          );
+        })();
+        return;
+      }
       setCpToolPath([]);
       setCpToolPoints([]);
       if (points.length < 2) {
@@ -1065,10 +1253,12 @@ export function CreasePatternPanel() {
     },
     [
       buildCpCommandPayload,
+      editableCpBounds,
       eventToEditableModelPoint,
       executeOristudioCpCommand,
       oristudioCpSelection.lines,
       resolveEditableDrawPoint,
+      zoomPercent,
     ]
   );
 
@@ -1372,6 +1562,18 @@ export function CreasePatternPanel() {
     setCpMeasurementSlots(createEmptyCpMeasurementSlots());
   }, [editableCpHandle]);
 
+  useEffect(() => {
+    if (!editableCp || activeCpCommand?.operationId !== 'Text') return;
+    if (oristudioCpSelection.texts.length !== 1) return;
+    const selectedText = editableCp.crease_pattern.texts[oristudioCpSelection.texts[0] - 1];
+    if (!selectedText) return;
+    setCpToolOptions((current) =>
+      current.textContent === selectedText.text
+        ? current
+        : { ...current, textContent: selectedText.text }
+    );
+  }, [activeCpCommand?.operationId, editableCp, oristudioCpSelection.texts]);
+
   return (
     <section className="panel-shell cp-panel">
       <div className="panel-toolbar">
@@ -1579,6 +1781,7 @@ export function CreasePatternPanel() {
                   activeLineColor={activeCpLineColor}
                   measurementSlots={cpMeasurementSlots}
                   pendingPointCount={cpToolPoints.length}
+                  selectedTextCount={oristudioCpSelection.texts.length}
                   onApply={
                     cpCommandRequiresContextApply(activeCpCommand)
                       ? handleApplyActiveContextCommand
@@ -1587,6 +1790,12 @@ export function CreasePatternPanel() {
                   onClearInput={
                     activeCpCommand.operationId === 'VoronoiCreate' && cpToolPoints.length > 0
                       ? handleClearActiveContextInput
+                      : undefined
+                  }
+                  onDeleteText={
+                    activeCpCommand.operationId === 'Text' &&
+                    oristudioCpSelection.texts.length > 0
+                      ? handleDeleteSelectedText
                       : undefined
                   }
                 />
@@ -1793,6 +2002,7 @@ function EditableCreasePattern({
             className={['cp-text', selection.texts.includes(id) ? 'cp-text--selected' : ''].join(
               ' '
             )}
+            data-cp-text-id={id}
             x={position.x}
             y={position.y}
             onClick={(event) => {
@@ -1979,8 +2189,10 @@ function CpContextToolPanel({
   activeLineColor,
   measurementSlots,
   pendingPointCount,
+  selectedTextCount,
   onApply,
   onClearInput,
+  onDeleteText,
 }: {
   command: OristudioCpCommandDefinition;
   options: OristudioCpToolOptions;
@@ -1988,12 +2200,16 @@ function CpContextToolPanel({
   activeLineColor: OristudioCpLineColor;
   measurementSlots: CpMeasurementSlots;
   pendingPointCount: number;
+  selectedTextCount: number;
   onApply?: () => void;
   onClearInput?: () => void;
+  onDeleteText?: () => void;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const groups = cpToolSettingGroupsForCommand(command);
-  const applyDisabled = command.operationId === 'VoronoiCreate' && pendingPointCount === 0;
+  const applyDisabled =
+    (command.operationId === 'VoronoiCreate' && pendingPointCount === 0) ||
+    (command.operationId === 'Text' && selectedTextCount === 0);
 
   if (groups.length === 0) return null;
 
@@ -2029,6 +2245,7 @@ function CpContextToolPanel({
               activeOperationId={command.operationId}
               measurementSlots={measurementSlots}
               pendingPointCount={pendingPointCount}
+              selectedTextCount={selectedTextCount}
             />
           ))}
           {onApply && (
@@ -2038,7 +2255,16 @@ function CpContextToolPanel({
               disabled={applyDisabled}
               onClick={onApply}
             >
-              {command.operationId === 'VoronoiCreate' ? 'Apply Voronoi' : 'Apply to selection'}
+              {command.operationId === 'VoronoiCreate'
+                ? 'Apply Voronoi'
+                : command.operationId === 'Text'
+                  ? 'Apply text'
+                  : 'Apply to selection'}
+            </button>
+          )}
+          {onDeleteText && (
+            <button className="cp-context-panel__secondary" type="button" onClick={onDeleteText}>
+              Delete text
             </button>
           )}
           {onClearInput && (
@@ -2061,6 +2287,7 @@ function CpContextToolGroup({
   activeOperationId,
   measurementSlots,
   pendingPointCount,
+  selectedTextCount,
 }: {
   group: OristudioCpToolSettingGroup;
   options: OristudioCpToolOptions;
@@ -2070,6 +2297,7 @@ function CpContextToolGroup({
   activeOperationId: OristudioCpCommandDefinition['operationId'];
   measurementSlots: CpMeasurementSlots;
   pendingPointCount: number;
+  selectedTextCount: number;
 }) {
   if (group === 'line-color') {
     return (
@@ -2349,6 +2577,23 @@ function CpContextToolGroup({
     );
   }
 
+  if (group === 'text-content') {
+    return (
+      <div className="cp-context-panel__group">
+        <div className="cp-context-panel__group-title">Text annotation</div>
+        <TextAreaToolOption
+          label="Text"
+          ariaLabel="Text annotation content"
+          value={options.textContent}
+          onChange={(textContent) => setOptions((current) => ({ ...current, textContent }))}
+        />
+        <div className="cp-context-panel__readout">
+          {selectedTextCount === 0 ? 'No text selected' : `${selectedTextCount} selected`}
+        </div>
+      </div>
+    );
+  }
+
   if (group === 'line-select-help') {
     return (
       <div className="cp-context-panel__group">
@@ -2602,6 +2847,30 @@ function TextToolOption({
         value={value}
         aria-invalid={invalid}
         data-invalid={invalid || undefined}
+        onChange={(event) => onChange(event.currentTarget.value)}
+      />
+    </label>
+  );
+}
+
+function TextAreaToolOption({
+  label,
+  ariaLabel,
+  value,
+  onChange,
+}: {
+  label: string;
+  ariaLabel: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="cp-context-panel__field cp-context-panel__field--textarea">
+      <span>{label}</span>
+      <textarea
+        aria-label={ariaLabel}
+        rows={3}
+        value={value}
         onChange={(event) => onChange(event.currentTarget.value)}
       />
     </label>

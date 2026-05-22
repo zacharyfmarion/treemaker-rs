@@ -108,6 +108,10 @@ describe('oristudio CP command registry', () => {
       uiStatus: 'ready',
       toolSteps: ['Click seed point'],
     });
+    expect(cpCommandByOperation('Text')).toMatchObject({
+      uiStatus: 'ready',
+      toolSteps: ['Click text position'],
+    });
   });
 
   it('keeps the left rail populated by ordered command groups', () => {

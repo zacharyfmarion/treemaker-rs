@@ -54,6 +54,7 @@ describe('oristudioCpToolSettings', () => {
     expect(cpToolSettingGroupsForOperation('CircleChangeColor')).toEqual([
       'custom-circle-color',
     ]);
+    expect(cpToolSettingGroupsForOperation('Text')).toEqual(['text-content']);
     expect(cpToolSettingGroupsForOperation('DisplayLengthBetweenPoints1')).toEqual([
       'measurement-readout',
     ]);

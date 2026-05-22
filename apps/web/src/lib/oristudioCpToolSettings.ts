@@ -21,7 +21,8 @@ export type OristudioCpToolSettingGroup =
   | 'line-select-help'
   | 'apply-lines'
   | 'measurement-readout'
-  | 'custom-circle-color';
+  | 'custom-circle-color'
+  | 'text-content';
 
 export interface OristudioCpRatioExpression {
   a: number;
@@ -53,6 +54,7 @@ export interface OristudioCpToolOptions {
   parallelWidth: number;
   candidateIndex: number | null;
   customCircleColor: OristudioCpRgbColor;
+  textContent: string;
 }
 
 export const DEFAULT_ORISTUDIO_CP_TOOL_OPTIONS: OristudioCpToolOptions = {
@@ -77,6 +79,7 @@ export const DEFAULT_ORISTUDIO_CP_TOOL_OPTIONS: OristudioCpToolOptions = {
   parallelWidth: 1,
   candidateIndex: null,
   customCircleColor: { red: 100, green: 200, blue: 200 },
+  textContent: '',
 };
 
 export const ORISTUDIO_CP_CUSTOM_LINE_TYPE_OPTIONS = [
@@ -187,6 +190,7 @@ const TOOL_SETTING_GROUPS_BY_OPERATION: Partial<
   DisplayAngleBetweenThreePoints2: ['measurement-readout'],
   DisplayAngleBetweenThreePoints3: ['measurement-readout'],
   CircleChangeColor: ['custom-circle-color'],
+  Text: ['text-content'],
   VoronoiCreate: ['apply-lines'],
   Axiom5: ['candidate-choice'],
   Axiom7: ['candidate-choice'],

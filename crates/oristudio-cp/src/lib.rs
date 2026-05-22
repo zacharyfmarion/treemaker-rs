@@ -98,6 +98,9 @@ pub struct CreasePatternCommandPayload {
     /// One-based Oriedita circle IDs resolved by the UI.
     #[serde(default)]
     pub circle_ids: Vec<usize>,
+    /// One-based Oriedita text annotation IDs resolved by the UI.
+    #[serde(default)]
+    pub text_ids: Vec<usize>,
     /// Resolved model-space points, in the same order as the active tool steps.
     #[serde(default)]
     pub points: Vec<geometry::Point>,
@@ -155,6 +158,22 @@ pub struct CreasePatternCommandPayload {
     /// Optional custom color for circle and auxiliary-line recoloring commands.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub custom_circle_color: Option<geometry::RgbColor>,
+    /// Optional text-annotation command action.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text_action: Option<TextCommandAction>,
+    /// Optional text content used by text creation and editing commands.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text_content: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TextCommandAction {
+    Create,
+    Move,
+    SetContent,
+    DeleteSelected,
+    DeleteAt,
+    DeleteBox,
 }
 
 /// Result returned by a successfully executed command.
@@ -2106,6 +2125,7 @@ pub fn execute_command(
             let polygon = required_selection_polygon(&command)?;
             operations::selection::unselect_lasso(&mut document.crease_pattern, &polygon)
         }
+        OperationId::Text => execute_text_command(document, &command)?,
         _ => {
             return Err(CommandError::NotImplemented {
                 operation: command.operation,
@@ -2464,6 +2484,29 @@ fn optional_circle_indices(command: &CreasePatternCommand) -> Result<Vec<usize>>
         .collect()
 }
 
+fn required_text_indices(command: &CreasePatternCommand) -> Result<Vec<usize>> {
+    if command.payload.text_ids.is_empty() {
+        return Err(CommandError::InvalidInput {
+            operation: command.operation,
+            message: "select at least one text annotation".to_string(),
+        });
+    }
+
+    command
+        .payload
+        .text_ids
+        .iter()
+        .map(|text_id| {
+            text_id
+                .checked_sub(1)
+                .ok_or_else(|| CommandError::InvalidInput {
+                    operation: command.operation,
+                    message: "text IDs are one-based".to_string(),
+                })
+        })
+        .collect()
+}
+
 fn required_points(command: &CreasePatternCommand, count: usize) -> Result<Vec<geometry::Point>> {
     if command.payload.points.len() != count {
         return Err(CommandError::InvalidInput {
@@ -2601,6 +2644,101 @@ fn voronoi_state_from_points(
         operations::generators::voronoi_press(model, &mut state, *point, selection_distance);
     }
     state
+}
+
+fn execute_text_command(
+    document: &mut CreasePatternDocument,
+    command: &CreasePatternCommand,
+) -> Result<usize> {
+    match command
+        .payload
+        .text_action
+        .unwrap_or(TextCommandAction::Create)
+    {
+        TextCommandAction::Create => {
+            let points = required_points(command, 1)?;
+            let before = document.crease_pattern.texts.len();
+            let mut state = operations::text::TextSelectionState::default();
+            operations::text::text_create_or_select_pressed(
+                &mut document.crease_pattern,
+                &mut state,
+                points[0],
+            );
+            if document.crease_pattern.texts.len() > before {
+                if let Some(content) = &command.payload.text_content
+                    && let Some(text) = document.crease_pattern.texts.last_mut()
+                {
+                    text.text = content.clone();
+                }
+                return Ok(1);
+            }
+            Ok(0)
+        }
+        TextCommandAction::Move => {
+            let text_indices = required_text_indices(command)?;
+            let points = required_points(command, 2)?;
+            let before = document.crease_pattern.texts.clone();
+            let mut state = operations::text::TextSelectionState {
+                selected: text_indices.first().copied(),
+                is_selected: true,
+                dirty: false,
+                selection_start: Some(points[0]),
+            };
+            operations::text::text_drag_selected(
+                &mut document.crease_pattern,
+                &mut state,
+                points[1],
+            );
+            Ok(usize::from(document.crease_pattern.texts != before))
+        }
+        TextCommandAction::SetContent => {
+            let text_indices = required_text_indices(command)?;
+            let content = command.payload.text_content.clone().unwrap_or_default();
+            let mut changed = 0;
+            for index in text_indices {
+                let Some(text) = document.crease_pattern.texts.get_mut(index) else {
+                    continue;
+                };
+                if text.text != content {
+                    text.text = content.clone();
+                    changed += 1;
+                }
+            }
+            Ok(changed)
+        }
+        TextCommandAction::DeleteSelected => {
+            let mut text_indices = required_text_indices(command)?;
+            text_indices.sort_unstable();
+            text_indices.dedup();
+            let mut deleted = 0;
+            for index in text_indices.into_iter().rev() {
+                if index < document.crease_pattern.texts.len() {
+                    document.crease_pattern.texts.remove(index);
+                    deleted += 1;
+                }
+            }
+            Ok(deleted)
+        }
+        TextCommandAction::DeleteAt => {
+            let points = required_points(command, 1)?;
+            let mut state = operations::text::TextSelectionState::default();
+            Ok(usize::from(operations::text::text_delete_at(
+                &mut document.crease_pattern,
+                &mut state,
+                points[0],
+            )))
+        }
+        TextCommandAction::DeleteBox => {
+            let points = required_points(command, 2)?;
+            let mut state = operations::text::TextSelectionState::default();
+            Ok(operations::text::text_delete_box(
+                &mut document.crease_pattern,
+                &mut state,
+                points[0],
+                points[1],
+            ))
+        }
+    }
 }
 
 fn custom_circle_color(command: &CreasePatternCommand) -> RgbColor {
@@ -3729,6 +3867,72 @@ mod tests {
         assert_eq!(result.diagnostics, vec!["Changed 2 line(s)"]);
         assert_eq!(document.crease_pattern.circles.len(), 1);
         assert_eq!(document.crease_pattern.circles[0].r, 2.0);
+    }
+
+    #[test]
+    fn command_dispatch_routes_stage_eight_text_annotations() {
+        let mut document = CreasePatternDocument::default();
+
+        let create_result = execute_command(
+            &mut document,
+            CreasePatternCommand::new(OperationId::Text).with_payload(
+                CreasePatternCommandPayload {
+                    text_action: Some(TextCommandAction::Create),
+                    points: vec![Point::new(10.0, 10.0)],
+                    text_content: Some("note".to_string()),
+                    ..CreasePatternCommandPayload::default()
+                },
+            ),
+        )
+        .expect("text create command should execute");
+
+        assert_eq!(create_result.status, OperationStatus::OracleTested);
+        assert_eq!(document.crease_pattern.texts.len(), 1);
+        assert_eq!(document.crease_pattern.texts[0].text, "note");
+
+        execute_command(
+            &mut document,
+            CreasePatternCommand::new(OperationId::Text).with_payload(
+                CreasePatternCommandPayload {
+                    text_action: Some(TextCommandAction::Move),
+                    text_ids: vec![1],
+                    points: vec![Point::new(10.0, 10.0), Point::new(15.0, 12.0)],
+                    ..CreasePatternCommandPayload::default()
+                },
+            ),
+        )
+        .expect("text move command should execute");
+        assert_eq!(
+            document.crease_pattern.texts[0].position(),
+            Point::new(15.0, 12.0)
+        );
+
+        execute_command(
+            &mut document,
+            CreasePatternCommand::new(OperationId::Text).with_payload(
+                CreasePatternCommandPayload {
+                    text_action: Some(TextCommandAction::SetContent),
+                    text_ids: vec![1],
+                    text_content: Some("updated".to_string()),
+                    ..CreasePatternCommandPayload::default()
+                },
+            ),
+        )
+        .expect("text content command should execute");
+        assert_eq!(document.crease_pattern.texts[0].text, "updated");
+
+        execute_command(
+            &mut document,
+            CreasePatternCommand::new(OperationId::Text).with_payload(
+                CreasePatternCommandPayload {
+                    text_action: Some(TextCommandAction::DeleteSelected),
+                    text_ids: vec![1],
+                    ..CreasePatternCommandPayload::default()
+                },
+            ),
+        )
+        .expect("text delete command should execute");
+        assert!(document.crease_pattern.texts.is_empty());
     }
 
     #[test]

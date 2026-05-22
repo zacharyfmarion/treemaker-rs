@@ -79,7 +79,9 @@ final UX:
 - It is positioned top-right instead of bottom-right.
 - It is component-local instead of registry-backed.
 - The ratio UI is simplified to `S:T`; Oriedita uses
-  `A + B * sqrt(C) : D + E * sqrt(F)`.
+  `A + B * sqrt(C) : D + E * sqrt(F)`. The implemented panel now presents a
+  friendlier left/right ratio editor and presets first, with the exact
+  coefficient editor tucked under an `Exact form` disclosure.
 - The default ratio should come from Oriedita's model (`1 : sqrt(2)`), not the
   temporary web default of `1:1`.
 
@@ -98,7 +100,7 @@ the web UI must surface for full UX parity.
 | `SWITCH_COLOR` | `SetLineColorUi`, `CanvasModel.customFromLineType/customToLineType` | `ReplaceLineTypeSelect` | Source line type select, destination line type select, swap button | Destination list is Edge/Mountain/Valley/Aux. Swap is disabled when source is Any or M/V. |
 | `POLYGON_POINT_COUNT` | `PolygonUi`, `ApplicationModel.numPolygonCorners` | `PolygonSetNoCorners` | Integer stepper/input for corner count | Oriedita defaults to 5 and clamps to 3..100. |
 | `LINE_DIVISION_COUNT` | `LineDivisionUi`, `ApplicationModel.foldLineDividingNumber` | `LineSegmentDivision` | Integer stepper/input for division count | Oriedita defaults to 2 and clamps to at least 1. Confirm whether `1` should be allowed as a no-op before keeping the current web minimum of 2. |
-| `LINE_DIVISION_RATIO` | `LineDivisonRatioUi`, `InternalDivisionRatioModel` | `LineSegmentRatioSet` | Six numeric fields for `A + B * sqrt(C)` over `D + E * sqrt(F)`, plus computed `S:T` readout | Default is `A=1, B=0, C=0, D=0, E=1, F=2`, which computes `1 : sqrt(2)`. Negative radicands clamp to 0; negative computed halves clear the corresponding multiplier. |
+| `LINE_DIVISION_RATIO` | `LineDivisonRatioUi`, `InternalDivisionRatioModel` | `LineSegmentRatioSet` | Left/right ratio fields, presets, computed `S:T` readout, and an exact `A + B * sqrt(C)` over `D + E * sqrt(F)` disclosure | Default is `A=1, B=0, C=0, D=0, E=1, F=2`, which computes `1 : sqrt(2)`. Negative radicands clamp to 0; negative computed halves clear the corresponding multiplier. |
 | `APPLY_LINES` | `ApplyLinesUi` | `VoronoiCreate` | Apply button, seed count/readout, clear/reset affordance if the web state needs one | Oriedita's panel only exposes Apply; seed add/remove happens through canvas clicks. The web panel can show seed count without changing behavior. |
 | `LINE_SELECT_HELP_TEXT` | `LineSelectHelpTextUI`, `BaseMouseHandlerLineSelect` | Intersecting line select/unselect/delete handlers that inherit `BaseMouseHandlerLineSelect` | Help text/readout, not a mutable setting | Oriedita says "Hold CTRL to use snapping." The web equivalent should match actual modifier behavior after snap parity is finalized. |
 | `FIX_PRECISION` | `FixPrecisionUi`, `FixPrecisionModel` | `FixInaccurate` | 22.5 deg toggle, box-pleating toggle, precision slider, numeric precision field | Oriedita defaults to precision `0.05`, `useBP=true`, `use22_5=true`. Current web dispatch hardcodes defaults and the payload has no fields for these options yet. |

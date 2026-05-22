@@ -39,12 +39,18 @@ import {
 import {
   DEFAULT_ORISTUDIO_CP_TOOL_OPTIONS,
   ORISTUDIO_CP_CUSTOM_LINE_TYPE_OPTIONS,
+  ORISTUDIO_CP_RATIO_PRESETS,
   ORISTUDIO_CP_REPLACE_TARGET_LINE_TYPE_OPTIONS,
   cpToolSettingGroupsForCommand,
   evaluateOrieditaRatioExpression,
+  formatOrieditaRatioHalf,
+  formatOrieditaRatioNumber,
+  parseOrieditaRatioHalfInput,
   type OristudioCpRatioExpression,
   type OristudioCpToolOptions,
   type OristudioCpToolSettingGroup,
+  ratioExpressionFromHalves,
+  ratioHalvesFromExpression,
 } from '../../lib/oristudioCpToolSettings';
 import {
   CP_PAPER_RECT,
@@ -1858,29 +1864,7 @@ function CpContextToolGroup({
   }
 
   if (group === 'division-ratio') {
-    const ratio = evaluateOrieditaRatioExpression(options.divisionRatio);
-    return (
-      <div className="cp-context-panel__group">
-        <div className="cp-context-panel__group-title">Divide by exact ratio</div>
-        <div className="cp-context-panel__ratio-grid">
-          {RATIO_FIELDS.map((field) => (
-            <NumericToolOption
-              key={field.key}
-              label={field.label}
-              ariaLabel={field.ariaLabel}
-              min={field.min}
-              max={999}
-              step={field.step}
-              value={options.divisionRatio[field.key]}
-              onChange={(value) => updateDivisionRatioField(setOptions, field.key, value)}
-            />
-          ))}
-        </div>
-        <div className="cp-context-panel__readout">
-          Computed {formatToolNumber(ratio.ratioS)} : {formatToolNumber(ratio.ratioT)}
-        </div>
-      </div>
-    );
+    return <DivisionRatioOptions options={options} setOptions={setOptions} />;
   }
 
   if (group === 'angle-system') {
@@ -2142,6 +2126,129 @@ const RATIO_FIELDS: readonly {
   { key: 'f', label: 'F', ariaLabel: 'Ratio F', min: 0, step: 0.1 },
 ];
 
+function DivisionRatioOptions({
+  options,
+  setOptions,
+}: {
+  options: OristudioCpToolOptions;
+  setOptions: Dispatch<SetStateAction<OristudioCpToolOptions>>;
+}) {
+  const initialHalves = ratioHalvesFromExpression(options.divisionRatio);
+  const [leftDraft, setLeftDraft] = useState(() => formatOrieditaRatioHalf(initialHalves.left));
+  const [rightDraft, setRightDraft] = useState(() => formatOrieditaRatioHalf(initialHalves.right));
+  const ratio = evaluateOrieditaRatioExpression(options.divisionRatio);
+  const leftInvalid = parseOrieditaRatioHalfInput(leftDraft) === null;
+  const rightInvalid = parseOrieditaRatioHalfInput(rightDraft) === null;
+
+  const applyRatioExpression = useCallback(
+    (divisionRatio: OristudioCpRatioExpression) => {
+      const halves = ratioHalvesFromExpression(divisionRatio);
+      setLeftDraft(formatOrieditaRatioHalf(halves.left));
+      setRightDraft(formatOrieditaRatioHalf(halves.right));
+      setOptions((current) => ({ ...current, divisionRatio }));
+    },
+    [setOptions]
+  );
+
+  const updateSimpleHalf = useCallback(
+    (side: 'left' | 'right', value: string) => {
+      if (side === 'left') {
+        setLeftDraft(value);
+      } else {
+        setRightDraft(value);
+      }
+      const parsed = parseOrieditaRatioHalfInput(value);
+      if (!parsed) return;
+      setOptions((current) => {
+        const halves = ratioHalvesFromExpression(current.divisionRatio);
+        return {
+          ...current,
+          divisionRatio: ratioExpressionFromHalves(
+            side === 'left' ? parsed : halves.left,
+            side === 'right' ? parsed : halves.right
+          ),
+        };
+      });
+    },
+    [setOptions]
+  );
+
+  const updateExactField = useCallback(
+    (field: keyof OristudioCpRatioExpression, value: number) => {
+      const divisionRatio = {
+        ...options.divisionRatio,
+        [field]: value,
+      };
+      applyRatioExpression(divisionRatio);
+    },
+    [applyRatioExpression, options.divisionRatio]
+  );
+
+  return (
+    <div className="cp-context-panel__group">
+      <div className="cp-context-panel__group-title">Divide by ratio</div>
+      <div className="cp-context-panel__ratio-simple">
+        <TextToolOption
+          label="Left"
+          ariaLabel="Left segment ratio"
+          value={leftDraft}
+          invalid={leftInvalid}
+          onChange={(value) => updateSimpleHalf('left', value)}
+        />
+        <TextToolOption
+          label="Right"
+          ariaLabel="Right segment ratio"
+          value={rightDraft}
+          invalid={rightInvalid}
+          onChange={(value) => updateSimpleHalf('right', value)}
+        />
+      </div>
+      <div className="cp-context-panel__preset-grid" aria-label="Ratio presets">
+        {ORISTUDIO_CP_RATIO_PRESETS.map((preset) => (
+          <button
+            key={preset.label}
+            type="button"
+            className="cp-context-panel__preset"
+            data-active={sameRatioExpression(options.divisionRatio, preset.expression) || undefined}
+            aria-label={`Use ${preset.label} ratio`}
+            onClick={() => applyRatioExpression(preset.expression)}
+          >
+            {preset.label}
+          </button>
+        ))}
+      </div>
+      <div className="cp-context-panel__readout">
+        Computed ratio {formatOrieditaRatioNumber(ratio.ratioS)} :{' '}
+        {formatOrieditaRatioNumber(ratio.ratioT)}
+      </div>
+      <details className="cp-context-panel__details">
+        <summary>Exact form</summary>
+        <div className="cp-context-panel__ratio-grid">
+          {RATIO_FIELDS.map((field) => (
+            <NumericToolOption
+              key={field.key}
+              label={field.label}
+              ariaLabel={field.ariaLabel}
+              min={field.min}
+              max={999}
+              step={field.step}
+              value={options.divisionRatio[field.key]}
+              onChange={(value) => updateExactField(field.key, value)}
+            />
+          ))}
+        </div>
+      </details>
+    </div>
+  );
+}
+
+function sameRatioExpression(
+  left: OristudioCpRatioExpression,
+  right: OristudioCpRatioExpression
+): boolean {
+  return RATIO_FIELDS.every((field) => left[field.key] === right[field.key]);
+}
+
 const ANGLE_FIELDS = ['A', 'B', 'C', 'D', 'E', 'F'] as const;
 
 const RGB_FIELDS: readonly {
@@ -2153,20 +2260,6 @@ const RGB_FIELDS: readonly {
   { key: 'green', label: 'G', ariaLabel: 'Circle color green' },
   { key: 'blue', label: 'B', ariaLabel: 'Circle color blue' },
 ];
-
-function updateDivisionRatioField(
-  setOptions: Dispatch<SetStateAction<OristudioCpToolOptions>>,
-  field: keyof OristudioCpRatioExpression,
-  value: number
-) {
-  setOptions((current) => ({
-    ...current,
-    divisionRatio: {
-      ...current.divisionRatio,
-      [field]: value,
-    },
-  }));
-}
 
 function updateAngleField(
   setOptions: Dispatch<SetStateAction<OristudioCpToolOptions>>,
@@ -2195,10 +2288,6 @@ function updateCustomCircleColor(
       [field]: Math.round(value),
     },
   }));
-}
-
-function formatToolNumber(value: number): string {
-  return Number.isInteger(value) ? value.toString() : value.toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
 }
 
 function NumericToolOption({
@@ -2236,6 +2325,34 @@ function NumericToolOption({
           if (!Number.isFinite(parsed)) return;
           onChange(clampToolNumber(parsed, min, max));
         }}
+      />
+    </label>
+  );
+}
+
+function TextToolOption({
+  label,
+  ariaLabel,
+  value,
+  invalid,
+  onChange,
+}: {
+  label: string;
+  ariaLabel: string;
+  value: string;
+  invalid: boolean;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="cp-context-panel__field">
+      <span>{label}</span>
+      <input
+        aria-label={ariaLabel}
+        type="text"
+        value={value}
+        aria-invalid={invalid}
+        data-invalid={invalid || undefined}
+        onChange={(event) => onChange(event.currentTarget.value)}
       />
     </label>
   );

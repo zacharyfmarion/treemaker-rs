@@ -32,6 +32,12 @@ export interface OristudioCpRatioExpression {
   f: number;
 }
 
+export interface OristudioCpRatioHalf {
+  a: number;
+  b: number;
+  c: number;
+}
+
 export interface OristudioCpToolOptions {
   divisionCount: number;
   divisionRatio: OristudioCpRatioExpression;
@@ -89,6 +95,41 @@ export const ORISTUDIO_CP_REPLACE_TARGET_LINE_TYPE_OPTIONS =
   ORISTUDIO_CP_CUSTOM_LINE_TYPE_OPTIONS.filter(
     (option) => option.value !== 'Any' && option.value !== 'MountainAndValley'
   );
+
+export const ORISTUDIO_CP_RATIO_PRESETS = [
+  {
+    label: '1:1',
+    expression: ratioExpressionFromHalves(
+      { a: 1, b: 0, c: 0 },
+      { a: 1, b: 0, c: 0 }
+    ),
+  },
+  {
+    label: '1:2',
+    expression: ratioExpressionFromHalves(
+      { a: 1, b: 0, c: 0 },
+      { a: 2, b: 0, c: 0 }
+    ),
+  },
+  {
+    label: '2:1',
+    expression: ratioExpressionFromHalves(
+      { a: 2, b: 0, c: 0 },
+      { a: 1, b: 0, c: 0 }
+    ),
+  },
+  {
+    label: '1:sqrt(2)',
+    expression: DEFAULT_ORISTUDIO_CP_TOOL_OPTIONS.divisionRatio,
+  },
+  {
+    label: 'sqrt(2):1',
+    expression: ratioExpressionFromHalves(
+      { a: 0, b: 1, c: 2 },
+      { a: 1, b: 0, c: 0 }
+    ),
+  },
+] as const;
 
 const LINE_COLOR_OPERATION_IDS = new Set<OristudioCpOperationId>([
   'CreaseMakeMv',
@@ -176,4 +217,119 @@ function evaluateRatioPart(a: number, b: number, c: number): number {
   const radicand = Number.isFinite(c) ? Math.max(0, c) : 0;
   const value = linear + radical * Math.sqrt(radicand);
   return Number.isFinite(value) ? Math.max(0, value) : 0;
+}
+
+export function ratioExpressionFromHalves(
+  left: OristudioCpRatioHalf,
+  right: OristudioCpRatioHalf
+): OristudioCpRatioExpression {
+  return {
+    a: left.a,
+    b: left.b,
+    c: left.c,
+    d: right.a,
+    e: right.b,
+    f: right.c,
+  };
+}
+
+export function ratioHalvesFromExpression(
+  expression: OristudioCpRatioExpression
+): { left: OristudioCpRatioHalf; right: OristudioCpRatioHalf } {
+  return {
+    left: { a: expression.a, b: expression.b, c: expression.c },
+    right: { a: expression.d, b: expression.e, c: expression.f },
+  };
+}
+
+export function formatOrieditaRatioHalf(half: OristudioCpRatioHalf): string {
+  const a = normalizedRatioNumber(half.a);
+  const b = normalizedRatioNumber(half.b);
+  const c = normalizedRatioNumber(half.c);
+  if (b === 0) return formatOrieditaRatioNumber(a);
+
+  const radical = `${formatRatioCoefficient(Math.abs(b))}sqrt(${formatOrieditaRatioNumber(c)})`;
+  if (a === 0) return b < 0 ? `-${radical}` : radical;
+  return `${formatOrieditaRatioNumber(a)} ${b < 0 ? '-' : '+'} ${radical}`;
+}
+
+export function parseOrieditaRatioHalfInput(
+  input: string
+): OristudioCpRatioHalf | null {
+  const normalized = input.trim().toLowerCase().replace(/\s+/g, '');
+  if (normalized.length === 0) return null;
+  const number = parseFiniteNumber(normalized);
+  if (number !== null) {
+    return { a: number, b: 0, c: 0 };
+  }
+
+  const sqrtStart = normalized.indexOf('sqrt(');
+  if (sqrtStart < 0 || normalized.indexOf('sqrt(', sqrtStart + 1) >= 0) {
+    return null;
+  }
+  if (!normalized.endsWith(')')) return null;
+
+  const prefix = normalized.slice(0, sqrtStart);
+  const radicand = parseFiniteNumber(normalized.slice(sqrtStart + 5, -1));
+  if (radicand === null || radicand < 0) return null;
+  const coefficients = parseRatioPrefix(prefix);
+  if (!coefficients) return null;
+  return {
+    a: coefficients.a,
+    b: coefficients.b,
+    c: radicand,
+  };
+}
+
+export function formatOrieditaRatioNumber(value: number): string {
+  const normalized = normalizedRatioNumber(value);
+  return Number.isInteger(normalized)
+    ? normalized.toString()
+    : normalized.toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
+}
+
+function normalizedRatioNumber(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.abs(value) < 1e-9 ? 0 : value;
+}
+
+function formatRatioCoefficient(value: number): string {
+  return value === 1 ? '' : `${formatOrieditaRatioNumber(value)}*`;
+}
+
+function parseFiniteNumber(value: string): number | null {
+  if (!/^[+-]?(?:\d+(?:\.\d+)?|\.\d+)$/.test(value)) return null;
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function parseRatioPrefix(prefix: string): OristudioCpRatioHalf | null {
+  const normalized = prefix.endsWith('*') ? prefix.slice(0, -1) : prefix;
+  if (normalized === '' || normalized === '+') return { a: 0, b: 1, c: 0 };
+  if (normalized === '-') return { a: 0, b: -1, c: 0 };
+
+  const separatorIndex = lastSignIndexAfterFirstCharacter(normalized);
+  if (separatorIndex < 0) {
+    const coefficient = parseSignedCoefficient(normalized);
+    return coefficient === null ? null : { a: 0, b: coefficient, c: 0 };
+  }
+
+  const a = parseFiniteNumber(normalized.slice(0, separatorIndex));
+  const b = parseSignedCoefficient(normalized.slice(separatorIndex));
+  if (a === null || b === null) return null;
+  return { a, b, c: 0 };
+}
+
+function lastSignIndexAfterFirstCharacter(value: string): number {
+  for (let index = value.length - 1; index > 0; index -= 1) {
+    if (value[index] === '+' || value[index] === '-') return index;
+  }
+  return -1;
+}
+
+function parseSignedCoefficient(value: string): number | null {
+  const trimmed = value.endsWith('*') ? value.slice(0, -1) : value;
+  if (trimmed === '' || trimmed === '+') return 1;
+  if (trimmed === '-') return -1;
+  return parseFiniteNumber(trimmed);
 }

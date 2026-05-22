@@ -2784,10 +2784,77 @@
   opacity: 0.55;
 }
 
+.cp-context-panel__field input[data-invalid='true'] {
+  border-color: var(--status-danger);
+}
+
 .cp-context-panel__field input:focus-visible,
 .cp-context-panel__field select:focus-visible {
   border-color: var(--accent-primary);
   outline: none;
+}
+
+.cp-context-panel__ratio-simple {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.cp-context-panel__ratio-simple .cp-context-panel__field {
+  grid-template-columns: 42px minmax(0, 1fr);
+}
+
+.cp-context-panel__preset-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.cp-context-panel__preset {
+  min-width: 0;
+  height: 24px;
+  padding: 2px 4px;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.62rem;
+  font-weight: 720;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.cp-context-panel__preset:hover,
+.cp-context-panel__preset:focus-visible {
+  border-color: var(--border-default);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  outline: none;
+}
+
+.cp-context-panel__preset[data-active] {
+  border-color: color-mix(in srgb, var(--accent-primary) 55%, var(--border-default));
+  background: color-mix(in srgb, var(--accent-primary) 16%, var(--bg-tertiary));
+  color: var(--text-primary);
+}
+
+.cp-context-panel__details {
+  display: grid;
+  gap: 6px;
+}
+
+.cp-context-panel__details summary {
+  color: var(--text-secondary);
+  font-size: 0.64rem;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.cp-context-panel__details[open] summary {
+  margin-bottom: 6px;
 }
 
 .cp-context-panel__ratio-grid,

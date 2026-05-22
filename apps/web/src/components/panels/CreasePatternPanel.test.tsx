@@ -978,18 +978,25 @@ describe('CreasePatternPanel', () => {
       await Promise.resolve();
     });
 
-    const ratioAInput = container.querySelector<HTMLInputElement>('input[aria-label="Ratio A"]');
-    const ratioDInput = container.querySelector<HTMLInputElement>('input[aria-label="Ratio D"]');
-    const ratioEInput = container.querySelector<HTMLInputElement>('input[aria-label="Ratio E"]');
-    const ratioFInput = container.querySelector<HTMLInputElement>('input[aria-label="Ratio F"]');
-    expect(ratioAInput?.value).toBe('1');
-    expect(ratioDInput?.value).toBe('0');
-    expect(ratioEInput?.value).toBe('1');
-    expect(ratioFInput?.value).toBe('2');
+    const leftInput = container.querySelector<HTMLInputElement>(
+      'input[aria-label="Left segment ratio"]'
+    );
+    const rightInput = container.querySelector<HTMLInputElement>(
+      'input[aria-label="Right segment ratio"]'
+    );
+    expect(leftInput?.value).toBe('1');
+    expect(rightInput?.value).toBe('sqrt(2)');
+    expect(container.textContent).toContain('Computed ratio 1 : 1.414');
+
     act(() => {
-      if (ratioAInput) setNumberInputValue(ratioAInput, '2');
-      if (ratioDInput) setNumberInputValue(ratioDInput, '3');
-      if (ratioEInput) setNumberInputValue(ratioEInput, '0');
+      container.querySelector<HTMLButtonElement>('button[aria-label="Use 1:2 ratio"]')?.click();
+    });
+    expect(leftInput?.value).toBe('1');
+    expect(rightInput?.value).toBe('2');
+
+    act(() => {
+      if (leftInput) setNumberInputValue(leftInput, '2');
+      if (rightInput) setNumberInputValue(rightInput, '3');
     });
 
     await act(async () => {

@@ -1,6 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle2, CircleDashed, Layers3, Play } from 'lucide-react';
-import type { FoldDocument, SequenceInstructionStep, SequencePlan, SequenceStateSnapshot } from '../../engine/types';
+import { useMemo } from 'react';
+import { AlertTriangle, ArrowRight, CheckCircle2, CircleDashed, Layers3, Play } from 'lucide-react';
+import type {
+  FoldDocument,
+  SequenceInstructionStep,
+  SequencePlan,
+  SequenceStateSnapshot,
+  SequenceTargetState,
+} from '../../engine/types';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { Button } from '../ui/Button';
 
@@ -15,7 +21,6 @@ export function SequencePanel() {
   const sequencePlanning = useWorkspaceStore((state) => state.sequencePlanning);
   const sequenceError = useWorkspaceStore((state) => state.sequenceError);
   const planFoldingSequence = useWorkspaceStore((state) => state.planFoldingSequence);
-  const [selectedStepIndex, setSelectedStepIndex] = useState(0);
 
   const statusTone =
     sequenceError || sequencePlan?.status === 'unsupported'
@@ -32,18 +37,18 @@ export function SequencePanel() {
       : foldArtifacts
         ? 'Sequence not planned'
         : foldArtifactError || 'Crease pattern pending';
-  const selectedStep =
-    sequencePlan?.steps[Math.min(selectedStepIndex, Math.max(0, sequencePlan.steps.length - 1))] ?? null;
-
-  useEffect(() => {
-    setSelectedStepIndex(0);
-  }, [sequencePlan]);
+  const headerSummary = sequencePlan
+    ? `${formatStatus(sequencePlan.status)} | ${sequencePlan.steps.length} step${sequencePlan.steps.length === 1 ? '' : 's'}`
+    : statusLabel;
 
   return (
     <section className="panel-shell sequence-panel">
       <div className="panel-toolbar">
         <div className="panel-toolbar__group">
           <span className="panel-title">Sequence</span>
+          <span className="sequence-panel__toolbar-summary" data-tone={statusTone}>
+            {headerSummary}
+          </span>
         </div>
         <Button
           size="sm"
@@ -56,113 +61,136 @@ export function SequencePanel() {
         </Button>
       </div>
       <div className="panel-body sequence-panel__body">
-        <div className="metric-grid">
-          <Metric label="Status" value={sequencePlan ? formatStatus(sequencePlan.status) : 'Idle'} />
-          <Metric label="Steps" value={sequencePlan?.steps.length ?? 0} />
-          <Metric label="Open" value={sequencePlan?.search.best_unresolved_creases ?? 0} />
-          <Metric label="States" value={sequencePlan?.search.states_explored ?? 0} />
-        </div>
-        <div className="status-row" data-tone={statusTone}>
-          {statusTone === 'good' ? <CheckCircle2 size={15} /> : <AlertTriangle size={15} />}
-          <span>{statusLabel}</span>
-        </div>
-        {sequenceTarget && (
-          <div className="status-row" data-tone="good">
-            <CheckCircle2 size={15} />
-            <span>
-              {sequenceTarget.normalized.faces_vertices.length} faces, {sequenceTarget.states} layer
-              state{sequenceTarget.states === '1' ? '' : 's'}
-            </span>
-          </div>
-        )}
-        {sequencePlan?.search.budget_exhausted && (
-          <div className="status-row" data-tone="warn">
-            <CircleDashed size={15} />
-            <span>Search budget reached with a partial result</span>
-          </div>
-        )}
-        {sequencePlan?.diagnostics.slice(0, 4).map((diagnostic) => (
-          <div
-            key={`${diagnostic.code}:${diagnostic.message}`}
-            className="status-row"
-            data-tone={diagnostic.severity === 'error' ? 'bad' : 'warn'}
-          >
-            <CircleDashed size={15} />
-            <span>{diagnostic.message}</span>
-          </div>
-        ))}
+        <SequenceDetails
+          sequencePlan={sequencePlan}
+          sequenceTarget={sequenceTarget}
+          statusTone={statusTone}
+          statusLabel={statusLabel}
+        />
         {sequencePlan && (
-          <>
-            <SequenceStepViewer plan={sequencePlan} step={selectedStep} />
-            <ol className="sequence-panel__steps">
-              {sequencePlan.steps.map((step, index) => (
-                <li key={step.id} className="sequence-panel__step">
-                  <button
-                    type="button"
-                    className="sequence-panel__step-button"
-                    data-selected={index === selectedStepIndex || undefined}
-                    onClick={() => setSelectedStepIndex(index)}
-                  >
-                    <span className="sequence-panel__step-title">
-                      <span>{step.label}</span>
-                      <span>{formatKind(step.kind)}</span>
-                    </span>
-                    <span className="sequence-panel__step-meta">
-                      {stepCreaseCount(step)} creases
-                      {step.after_state ? ` | ${step.before_state} -> ${step.after_state}` : ''}
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ol>
-          </>
+          <SequenceDiagramList plan={sequencePlan} />
         )}
       </div>
     </section>
   );
 }
 
-function SequenceStepViewer({
-  plan,
-  step,
+function SequenceDetails({
+  sequencePlan,
+  sequenceTarget,
+  statusTone,
+  statusLabel,
 }: {
-  plan: SequencePlan;
-  step: SequenceInstructionStep | null;
+  sequencePlan: SequencePlan | null;
+  sequenceTarget: SequenceTargetState | null;
+  statusTone: 'good' | 'warn' | 'bad';
+  statusLabel: string;
 }) {
+  return (
+    <details className="sequence-panel__details">
+      <summary>
+        <span>Details</span>
+        <span>{sequencePlan ? formatStatus(sequencePlan.status) : statusLabel}</span>
+      </summary>
+      <div className="metric-grid sequence-panel__metrics">
+        <Metric label="Status" value={sequencePlan ? formatStatus(sequencePlan.status) : 'Idle'} />
+        <Metric label="Steps" value={sequencePlan?.steps.length ?? 0} />
+        <Metric label="Open" value={sequencePlan?.search.best_unresolved_creases ?? 0} />
+        <Metric label="States" value={sequencePlan?.search.states_explored ?? 0} />
+      </div>
+      <div className="status-row" data-tone={statusTone}>
+        {statusTone === 'good' ? <CheckCircle2 size={15} /> : <AlertTriangle size={15} />}
+        <span>{statusLabel}</span>
+      </div>
+      {sequenceTarget && (
+        <div className="status-row" data-tone="good">
+          <CheckCircle2 size={15} />
+          <span>
+            {sequenceTarget.normalized.faces_vertices.length} faces, {sequenceTarget.states} layer
+            state{sequenceTarget.states === '1' ? '' : 's'}
+          </span>
+        </div>
+      )}
+      {sequencePlan?.search.budget_exhausted && (
+        <div className="status-row" data-tone="warn">
+          <CircleDashed size={15} />
+          <span>Search budget reached with a partial result</span>
+        </div>
+      )}
+      {sequencePlan?.diagnostics.slice(0, 4).map((diagnostic) => (
+        <div
+          key={`${diagnostic.code}:${diagnostic.message}`}
+          className="status-row"
+          data-tone={diagnostic.severity === 'error' ? 'bad' : 'warn'}
+        >
+          <CircleDashed size={15} />
+          <span>{diagnostic.message}</span>
+        </div>
+      ))}
+    </details>
+  );
+}
+
+function SequenceDiagramList({ plan }: { plan: SequencePlan }) {
   const stateById = useMemo(
     () => new Map(plan.states.map((state) => [state.id, state])),
     [plan.states]
   );
-  if (!step) {
+
+  if (plan.steps.length === 0) {
     return (
-      <div className="sequence-panel__viewer">
-        <div className="sequence-panel__viewer-empty">No sequence steps</div>
-      </div>
+      <ol className="sequence-panel__steps">
+        <li className="sequence-panel__empty-step">No sequence steps</li>
+      </ol>
     );
   }
 
-  const beforeState = step.before_state ? stateById.get(step.before_state) : null;
-  const afterState = step.after_state ? stateById.get(step.after_state) : null;
-  const highlights = highlightsForStep(step);
-
   return (
-    <div className="sequence-panel__viewer" aria-label="Sequence step visual">
-      <div className="sequence-panel__viewer-header">
-        <div>
-          <span>{step.id}</span>
-          <strong>{formatKind(step.kind)}</strong>
-        </div>
-        <span>
-          {stepCreaseCount(step)} crease{stepCreaseCount(step) === 1 ? '' : 's'}
-        </span>
-      </div>
-      <div className="sequence-panel__preview-grid">
-        <SequencePreview title="Before CP" state={beforeState} mode="paper" highlights={highlights} />
-        <SequencePreview title="After CP" state={afterState} mode="paper" highlights={highlights} />
-        <SequencePreview title="Before Folded" state={beforeState} mode="folded" highlights={highlights} />
-        <SequencePreview title="After Folded" state={afterState} mode="folded" highlights={highlights} />
-      </div>
-    </div>
+    <ol className="sequence-panel__steps" aria-label="Folding sequence diagram">
+      {plan.steps.map((step, index) => {
+        const beforeState = step.before_state ? stateById.get(step.before_state) : null;
+        const afterState = step.after_state ? stateById.get(step.after_state) : null;
+        const highlights = highlightsForStep(step);
+        return (
+          <li key={step.id} className="sequence-diagram-step">
+            <div className="sequence-diagram-step__header">
+              <div>
+                <span>Step {index + 1}</span>
+                <strong>{formatKind(step.kind)}</strong>
+              </div>
+              <span>
+                {stepCreaseCount(step)} crease{stepCreaseCount(step) === 1 ? '' : 's'}
+              </span>
+            </div>
+            <div className="sequence-diagram-step__visuals">
+              <SequencePreview
+                title="Before"
+                state={beforeState}
+                mode="folded"
+                highlights={highlights}
+                stepLabel={`Step ${index + 1}`}
+              />
+              <div className="sequence-diagram-step__arrow" aria-hidden="true">
+                <ArrowRight size={17} />
+              </div>
+              <SequencePreview
+                title="After"
+                state={afterState}
+                mode="folded"
+                highlights={highlights}
+                stepLabel={`Step ${index + 1}`}
+              />
+            </div>
+            <div className="sequence-diagram-step__copy">
+              <div className="sequence-diagram-step__label">{step.label}</div>
+              <div className="sequence-diagram-step__meta">
+                {step.after_state ? `${step.before_state} to ${step.after_state}` : formatKind(step.kind)}
+              </div>
+            </div>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 
@@ -171,11 +199,13 @@ function SequencePreview({
   state,
   mode,
   highlights,
+  stepLabel,
 }: {
   title: string;
   state: SequenceStateSnapshot | null | undefined;
   mode: 'paper' | 'folded';
   highlights: SequenceHighlights;
+  stepLabel?: string;
 }) {
   const projection = useMemo(() => {
     if (!state) return null;
@@ -207,7 +237,9 @@ function SequencePreview({
         className="sequence-preview-canvas"
         viewBox={`0 0 ${PREVIEW_VIEWBOX} ${PREVIEW_VIEWBOX}`}
         role="img"
-        aria-label={`${title} ${state.id}`}
+        aria-label={[stepLabel, title, mode === 'folded' ? 'folded state' : 'crease pattern', state.id]
+          .filter(Boolean)
+          .join(' ')}
       >
         <rect className="sequence-preview-plane" x="12" y="12" width="296" height="296" rx="4" />
         {state.document.faces_vertices.map((face, index) => {

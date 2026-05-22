@@ -27,10 +27,20 @@ describe('SequencePanel', () => {
   it('renders before and after previews for a simple fold step', () => {
     const rendered = renderPanel(simplePlan());
 
-    expect(rendered.querySelector('[aria-label="Sequence step visual"]')).not.toBeNull();
-    expect(rendered.querySelector('[aria-label="Before CP unfolded"]')).not.toBeNull();
-    expect(rendered.querySelector('[aria-label="After Folded target"]')).not.toBeNull();
-    expect(rendered.querySelectorAll('.sequence-preview-crease--highlight')).toHaveLength(4);
+    expect(rendered.querySelector('[aria-label="Folding sequence diagram"]')).not.toBeNull();
+    expect(rendered.querySelector('[aria-label="Step 1 Before folded state unfolded"]')).not.toBeNull();
+    expect(rendered.querySelector('[aria-label="Step 1 After folded state target"]')).not.toBeNull();
+    expect(rendered.querySelectorAll('.sequence-preview-crease--highlight')).toHaveLength(2);
+    expect(rendered.querySelector<HTMLDetailsElement>('.sequence-panel__details')?.open).toBe(false);
+    expect(rendered.querySelector('.sequence-diagram-step__header')?.textContent).toContain('Step 1');
+    expect(rendered.querySelector('.sequence-diagram-step__label')?.textContent).toContain(
+      'Make a valley fold on crease 6'
+    );
+    expect(
+      rendered
+        .querySelector('.sequence-diagram-step__visuals')
+        ?.compareDocumentPosition(rendered.querySelector('.sequence-diagram-step__copy') as Node)
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     expect(rendered.textContent).toContain('Make a valley fold on crease 6');
   });
 
@@ -55,8 +65,8 @@ describe('SequencePanel', () => {
     const rendered = renderPanel(plan);
 
     expect(rendered.textContent).toContain('Unsupported collapse region');
-    expect(rendered.querySelector('[aria-label="Before CP target"]')).not.toBeNull();
-    expect(rendered.querySelectorAll('.sequence-preview-crease--highlight')).toHaveLength(4);
+    expect(rendered.querySelector('[aria-label="Step 1 Before folded state target"]')).not.toBeNull();
+    expect(rendered.querySelectorAll('.sequence-preview-crease--highlight')).toHaveLength(2);
     expect(rendered.querySelector('.sequence-preview-face--highlight')).not.toBeNull();
   });
 });

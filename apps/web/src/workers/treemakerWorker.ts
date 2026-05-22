@@ -15,6 +15,7 @@ import init, {
   save_tmd5,
   sequence_analyze_fold,
   sequence_plan_fold,
+  sequence_plan_fold_with_target,
   tree_snapshot,
 } from '../generated/treemaker-wasm/treemaker_wasm';
 import type {
@@ -22,6 +23,7 @@ import type {
   FoldArtifacts,
   OptimizationReport,
   SequencePlan,
+  SequencePlanFoldResult,
   SequenceTargetState,
   TreeEdit,
   TreeSnapshot,
@@ -113,6 +115,19 @@ const api = {
     }
   ): Promise<SequencePlan> {
     return call(() => sequence_plan_fold(foldJson, options ?? null) as SequencePlan);
+  },
+  async sequencePlanFoldWithTarget(
+    foldJson: string,
+    options?: {
+      solution_limit?: number;
+      max_steps?: number;
+      max_states?: number;
+      require_unique_layer_order?: boolean;
+    }
+  ): Promise<SequencePlanFoldResult> {
+    return call(
+      () => sequence_plan_fold_with_target(foldJson, options ?? null) as SequencePlanFoldResult
+    );
   },
   async saveTmd5(handle: number): Promise<string> {
     return call(() => save_tmd5(handle));

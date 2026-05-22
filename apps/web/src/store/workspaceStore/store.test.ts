@@ -404,6 +404,37 @@ function createMockEngineApi(initialSnapshot: TreeSnapshot) {
         timed_out: false,
         budget_exhausted: false,
         best_unresolved_creases: 0,
+        target_solves: 0,
+        target_solve_cache_hits: 0,
+        duplicate_candidates_pruned: 0,
+      },
+    })),
+    sequencePlanFoldWithTarget: vi.fn(async (foldJson: string) => ({
+      target: {
+        normalized: JSON.parse(foldJson) as FoldDocument,
+        folded_vertices: [],
+        faces_flip: [],
+        face_orders: [],
+        states: '1',
+        diagnostics: [],
+      },
+      plan: {
+        status: 'complete',
+        steps: [],
+        states: [],
+        diagnostics: [],
+        unresolved_regions: [],
+        search: {
+          states_explored: 1,
+          branches_pruned: 0,
+          repeated_states: 0,
+          timed_out: false,
+          budget_exhausted: false,
+          best_unresolved_creases: 0,
+          target_solves: 0,
+          target_solve_cache_hits: 0,
+          duplicate_candidates_pruned: 0,
+        },
       },
     })),
     optimizeScale: vi.fn(async (): Promise<OptimizationReport> => {
@@ -1488,8 +1519,9 @@ describe('workspace store slices', () => {
 
     const plan = await useWorkspaceStore.getState().planFoldingSequence();
 
-    expect(api.sequenceAnalyzeFold).toHaveBeenCalledOnce();
-    expect(api.sequencePlanFold).toHaveBeenCalledOnce();
+    expect(api.sequencePlanFoldWithTarget).toHaveBeenCalledOnce();
+    expect(api.sequenceAnalyzeFold).not.toHaveBeenCalled();
+    expect(api.sequencePlanFold).not.toHaveBeenCalled();
     expect(plan?.status).toBe('complete');
     expect(useWorkspaceStore.getState().sequencePlan?.status).toBe('complete');
     expect(useWorkspaceStore.getState().sequenceSimulationFocus).toEqual({ kind: 'whole' });

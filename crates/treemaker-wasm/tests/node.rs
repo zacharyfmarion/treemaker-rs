@@ -5,7 +5,7 @@ use wasm_bindgen_test::*;
 use treemaker_wasm::{
     apply_edit, build_crease_pattern, cp_status_report, export_v4, flat_fold_artifacts, free_tree,
     load_tmd, new_design, optimize_scale, save_tmd5, sequence_analyze_fold, sequence_plan_fold,
-    tree_design, tree_snapshot, tree_summary,
+    sequence_plan_fold_with_target, tree_design, tree_snapshot, tree_summary,
 };
 
 const FIXTURE_1: &str = include_str!("../testdata/tmModelTester_1.tmd5");
@@ -185,10 +185,19 @@ fn sequence_analyze_and_plan_fold_return_research_artifacts() {
         6
     );
 
-    let plan = json(sequence_plan_fold(&fold.to_string(), options).expect("plan"));
+    let plan = json(sequence_plan_fold(&fold.to_string(), options.clone()).expect("plan"));
     assert_eq!(plan["status"], "complete");
     assert_eq!(plan["steps"].as_array().expect("steps").len(), 1);
     assert_eq!(plan["search"]["best_unresolved_creases"], 0);
+
+    let combined =
+        json(sequence_plan_fold_with_target(&fold.to_string(), options).expect("combined"));
+    assert_eq!(combined["target"]["selected_solution_index"], 0);
+    assert_eq!(combined["plan"]["status"], "complete");
+    assert_eq!(
+        combined["plan"]["steps"].as_array().expect("steps").len(),
+        1
+    );
 }
 
 #[wasm_bindgen_test]

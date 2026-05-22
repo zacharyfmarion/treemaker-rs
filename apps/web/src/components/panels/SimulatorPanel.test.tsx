@@ -158,6 +158,9 @@ function manualCollapsePlan(): SequencePlan {
       timed_out: false,
       budget_exhausted: false,
       best_unresolved_creases: 0,
+      target_solves: 0,
+      target_solve_cache_hits: 0,
+      duplicate_candidates_pruned: 0,
     },
   };
 }

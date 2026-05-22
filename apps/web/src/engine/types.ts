@@ -133,6 +133,9 @@ export interface SequenceSearchStats {
   timed_out: boolean;
   budget_exhausted: boolean;
   best_unresolved_creases: number;
+  target_solves: number;
+  target_solve_cache_hits: number;
+  duplicate_candidates_pruned: number;
 }
 
 export interface SequencePlan {
@@ -151,6 +154,11 @@ export interface SequenceTargetState {
   face_orders: [number, number, number][];
   states: string;
   diagnostics: SequenceDiagnostic[];
+}
+
+export interface SequencePlanFoldResult {
+  target: SequenceTargetState;
+  plan: SequencePlan;
 }
 
 export interface TreeSummary {

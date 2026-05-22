@@ -231,14 +231,11 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
         if (!foldArtifacts) return null;
         const api = await getEngine();
         const foldJson = JSON.stringify(foldArtifacts.fold);
-        const [target, plan] = await Promise.all([
-          api.sequenceAnalyzeFold(foldJson, { solution_limit: 10 }),
-          api.sequencePlanFold(foldJson, {
-            solution_limit: 10,
-            max_steps: 64,
-            max_states: 1024,
-          }),
-        ]);
+        const { target, plan } = await api.sequencePlanFoldWithTarget(foldJson, {
+          solution_limit: 10,
+          max_steps: 64,
+          max_states: 1024,
+        });
         set({
           sequenceTarget: target,
           sequencePlan: plan,

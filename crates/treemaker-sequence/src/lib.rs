@@ -259,12 +259,10 @@ pub fn plan_folding_sequence_with_options(
 
     let mut frontier = vec![SearchNode::initial(target_state.clone())];
     let mut best_node = frontier[0].clone();
-    let mut seen = HashSet::from([sequence_state_key(&target_state)]);
+    let mut context = PlanningContext::new(&target_state, target);
     let mut explored_states = 1usize;
     let mut branches_pruned = 0usize;
-    let mut repeated_states = 0usize;
     let mut budget_exhausted = false;
-    let mut next_state_serial = 0usize;
 
     'search: while let Some(node) = frontier.pop() {
         if search_node_is_better(&node, &best_node) {
@@ -278,17 +276,12 @@ pub fn plan_folding_sequence_with_options(
             budget_exhausted = true;
             continue;
         }
-        let transitions = reverse_transitions_for_state(&node.state, &mut next_state_serial)?;
+        let transitions = reverse_transitions_for_state(&node.state, &mut context)?;
         branches_pruned += transitions.len().saturating_sub(1);
         for transition in transitions.into_iter().rev() {
             if explored_states >= options.max_states {
                 budget_exhausted = true;
                 break 'search;
-            }
-            let key = sequence_state_key(&transition.state);
-            if !seen.insert(key) {
-                repeated_states += 1;
-                continue;
             }
             transition.state.validate()?;
             explored_states += 1;
@@ -303,7 +296,7 @@ pub fn plan_folding_sequence_with_options(
         .map(|candidate| {
             apply_complex_transform(
                 &current,
-                &format!("diagnostic-state-{}", next_state_serial + 1),
+                &format!("diagnostic-state-{}", context.next_state_serial + 1),
                 candidate,
             )
         })
@@ -371,12 +364,85 @@ pub fn plan_folding_sequence_with_options(
         search: SearchStats {
             states_explored: explored_states,
             branches_pruned,
-            repeated_states,
+            repeated_states: context.repeated_states,
             timed_out: budget_exhausted,
             budget_exhausted,
             best_unresolved_creases: current.active_creases.len(),
+            target_solves: context.target_solves,
+            target_solve_cache_hits: context.target_solve_cache_hits,
+            duplicate_candidates_pruned: context.duplicate_candidates_pruned,
         },
     })
+}
+
+#[derive(Debug, Clone)]
+struct PlanningContext {
+    next_state_serial: usize,
+    seen_state_keys: HashSet<String>,
+    target_cache: HashMap<String, TargetState>,
+    target_solves: usize,
+    target_solve_cache_hits: usize,
+    duplicate_candidates_pruned: usize,
+    repeated_states: usize,
+}
+
+impl PlanningContext {
+    fn new(target_state: &SequenceState, target: &TargetState) -> Self {
+        let mut target_cache = HashMap::new();
+        target_cache.insert(sequence_document_key(&target.normalized), target.clone());
+        Self {
+            next_state_serial: 0,
+            seen_state_keys: HashSet::from([sequence_state_key(target_state)]),
+            target_cache,
+            target_solves: 0,
+            target_solve_cache_hits: 0,
+            duplicate_candidates_pruned: 0,
+            repeated_states: 0,
+        }
+    }
+
+    fn next_state_id(&mut self) -> String {
+        self.next_state_serial += 1;
+        format!("search-state-{}", self.next_state_serial)
+    }
+
+    fn document_key_is_seen(&mut self, document: &FoldDocument) -> bool {
+        if self
+            .seen_state_keys
+            .contains(&sequence_document_key(document))
+        {
+            self.note_duplicate_candidate();
+            true
+        } else {
+            false
+        }
+    }
+
+    fn reserve_state(&mut self, state: &SequenceState) -> bool {
+        if self.seen_state_keys.insert(sequence_state_key(state)) {
+            true
+        } else {
+            self.note_duplicate_candidate();
+            false
+        }
+    }
+
+    fn resolve_target(&mut self, document: &FoldDocument) -> Result<TargetState> {
+        let key = sequence_document_key(document);
+        if let Some(target) = self.target_cache.get(&key) {
+            self.target_solve_cache_hits += 1;
+            return Ok(target.clone());
+        }
+        self.target_solves += 1;
+        let target = resolve_target_state(document, TargetStateOptions::default())?;
+        self.target_cache.insert(key, target.clone());
+        Ok(target)
+    }
+
+    fn note_duplicate_candidate(&mut self) {
+        self.duplicate_candidates_pruned += 1;
+        self.repeated_states += 1;
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -422,13 +488,26 @@ struct ReverseTransition {
 
 fn reverse_transitions_for_state(
     state: &SequenceState,
-    next_state_serial: &mut usize,
+    context: &mut PlanningContext,
 ) -> Result<Vec<ReverseTransition>> {
     let mut transitions = Vec::new();
     for simple_fold in detect_simple_folds(state)? {
-        *next_state_serial += 1;
-        let next_state_id = format!("search-state-{}", *next_state_serial);
-        if let Ok(next) = apply_reverse_simple_fold(state, &next_state_id, &simple_fold) {
+        let document =
+            document_with_creases_reset(state, std::slice::from_ref(&simple_fold.crease));
+        if context.document_key_is_seen(&document) {
+            continue;
+        }
+        let next_state_id = context.next_state_id();
+        if let Ok(next) = apply_reverse_simple_fold_with_context(
+            state,
+            &next_state_id,
+            &simple_fold,
+            document,
+            context,
+        ) {
+            if !context.reserve_state(&next) {
+                continue;
+            }
             transitions.push(ReverseTransition {
                 step: simple_fold.to_forward_step(0, next.id.clone(), state.id.clone()),
                 state: next,
@@ -438,12 +517,13 @@ fn reverse_transitions_for_state(
     }
 
     for candidate in recognize_complex_moves(state)? {
-        *next_state_serial += 1;
-        let next_state_id = format!("search-state-{}", *next_state_serial);
-        let result = apply_complex_transform(state, &next_state_id, &candidate)?;
+        let result = apply_complex_transform_with_context(state, context, &candidate)?;
         if result.status == ComplexTransformStatus::Applied
             && let (Some(next), Some(step)) = (result.after_state, result.step)
         {
+            if !context.reserve_state(&next) {
+                continue;
+            }
             transitions.push(ReverseTransition {
                 state: next,
                 step,
@@ -469,14 +549,31 @@ fn search_node_score(node: &SearchNode) -> (usize, usize, usize) {
 fn sequence_state_key(state: &SequenceState) -> String {
     let mut active_creases = state.active_creases.clone();
     active_creases.sort_unstable();
-    let assignments = state
-        .document
-        .edges_assignment
+    sequence_assignment_key(&active_creases, &state.document.edges_assignment)
+}
+
+fn sequence_document_key(document: &FoldDocument) -> String {
+    let active_creases = active_creases_for_assignments(&document.edges_assignment);
+    sequence_assignment_key(&active_creases, &document.edges_assignment)
+}
+
+fn sequence_assignment_key(active_creases: &[usize], assignments: &[Assignment]) -> String {
+    let assignments = assignments
         .iter()
         .map(|assignment| assignment.as_str())
         .collect::<Vec<_>>()
         .join("");
     format!("{active_creases:?}|{assignments}")
+}
+
+fn active_creases_for_assignments(assignments: &[Assignment]) -> Vec<usize> {
+    assignments
+        .iter()
+        .enumerate()
+        .filter_map(|(edge, assignment)| {
+            matches!(assignment, Assignment::Mountain | Assignment::Valley).then_some(edge)
+        })
+        .collect()
 }
 
 fn flat_cp_state(id: impl Into<String>, target: &TargetState) -> SequenceState {
@@ -739,6 +836,9 @@ pub struct SearchStats {
     pub timed_out: bool,
     pub budget_exhausted: bool,
     pub best_unresolved_creases: usize,
+    pub target_solves: usize,
+    pub target_solve_cache_hits: usize,
+    pub duplicate_candidates_pruned: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -1350,10 +1450,10 @@ pub fn recognize_complex_moves(state: &SequenceState) -> Result<Vec<ComplexMoveC
 
 pub fn apply_complex_transform(
     state: &SequenceState,
-    _next_state_id: &str,
+    next_state_id: &str,
     candidate: &ComplexMoveCandidate,
 ) -> Result<ComplexTransformResult> {
-    let mut diagnostics = inspect_complex_transform_candidate(state, candidate);
+    let diagnostics = inspect_complex_transform_candidate(state, candidate);
     if diagnostics
         .iter()
         .any(|diagnostic| diagnostic.severity == DiagnosticSeverity::Error)
@@ -1369,9 +1469,71 @@ pub fn apply_complex_transform(
     }
 
     if local_complex_transform_is_supported(state, candidate) {
-        return apply_reverse_complex_group(state, _next_state_id, candidate, diagnostics);
+        return apply_reverse_complex_group(state, next_state_id, candidate, diagnostics);
     }
 
+    Ok(unsupported_complex_transform_result(
+        state,
+        candidate,
+        diagnostics,
+    ))
+}
+
+fn apply_complex_transform_with_context(
+    state: &SequenceState,
+    context: &mut PlanningContext,
+    candidate: &ComplexMoveCandidate,
+) -> Result<ComplexTransformResult> {
+    let diagnostics = inspect_complex_transform_candidate(state, candidate);
+    if diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.severity == DiagnosticSeverity::Error)
+    {
+        return Ok(ComplexTransformResult {
+            status: ComplexTransformStatus::InvalidCandidate,
+            candidate: candidate.clone(),
+            before_state: state.id.clone(),
+            after_state: None,
+            step: None,
+            diagnostics,
+        });
+    }
+
+    if !local_complex_transform_is_supported(state, candidate) {
+        return Ok(unsupported_complex_transform_result(
+            state,
+            candidate,
+            diagnostics,
+        ));
+    }
+
+    let document = document_with_creases_reset(state, &candidate.creases);
+    if context.document_key_is_seen(&document) {
+        return Ok(ComplexTransformResult {
+            status: ComplexTransformStatus::Unsupported,
+            candidate: candidate.clone(),
+            before_state: state.id.clone(),
+            after_state: None,
+            step: None,
+            diagnostics,
+        });
+    }
+    let next_state_id = context.next_state_id();
+    apply_reverse_complex_group_with_context(
+        state,
+        &next_state_id,
+        candidate,
+        diagnostics,
+        document,
+        context,
+    )
+}
+
+fn unsupported_complex_transform_result(
+    state: &SequenceState,
+    candidate: &ComplexMoveCandidate,
+    mut diagnostics: Vec<SequenceDiagnostic>,
+) -> ComplexTransformResult {
     let diagnostic_code = match candidate.kind {
         ComplexMoveKind::SimultaneousCollapse => candidate.kind.diagnostic_code(),
         _ => "complex_transform_unsupported",
@@ -1384,14 +1546,14 @@ pub fn apply_complex_transform(
         ),
     ));
 
-    Ok(ComplexTransformResult {
+    ComplexTransformResult {
         status: ComplexTransformStatus::Unsupported,
         candidate: candidate.clone(),
         before_state: state.id.clone(),
         after_state: None,
         step: None,
         diagnostics,
-    })
+    }
 }
 
 fn local_complex_transform_is_supported(
@@ -1420,16 +1582,7 @@ fn apply_reverse_complex_group(
     candidate: &ComplexMoveCandidate,
     mut diagnostics: Vec<SequenceDiagnostic>,
 ) -> Result<ComplexTransformResult> {
-    let mut document = state.document.clone();
-    for crease in &candidate.creases {
-        if let Some(assignment) = document.edges_assignment.get_mut(*crease) {
-            *assignment = Assignment::Flat;
-        }
-        if let Some(angle) = document.edges_fold_angle.get_mut(*crease) {
-            *angle = Some(0.0);
-        }
-    }
-
+    let document = document_with_creases_reset(state, &candidate.creases);
     let target = match resolve_target_state(&document, TargetStateOptions::default()) {
         Ok(target) => target,
         Err(error) => {
@@ -1451,7 +1604,49 @@ fn apply_reverse_complex_group(
         }
     };
 
-    let mut next = SequenceState::from_target(next_state_id.to_string(), &target);
+    finish_reverse_complex_group(state, next_state_id, candidate, diagnostics, &target)
+}
+
+fn apply_reverse_complex_group_with_context(
+    state: &SequenceState,
+    next_state_id: &str,
+    candidate: &ComplexMoveCandidate,
+    mut diagnostics: Vec<SequenceDiagnostic>,
+    document: FoldDocument,
+    context: &mut PlanningContext,
+) -> Result<ComplexTransformResult> {
+    let target = match context.resolve_target(&document) {
+        Ok(target) => target,
+        Err(error) => {
+            diagnostics.push(SequenceDiagnostic::warning(
+                "complex_transform_target_solve_failed",
+                format!(
+                    "{:?} candidate could not be accepted because the reverse state failed target resolution: {error}",
+                    candidate.kind
+                ),
+            ));
+            return Ok(ComplexTransformResult {
+                status: ComplexTransformStatus::Unsupported,
+                candidate: candidate.clone(),
+                before_state: state.id.clone(),
+                after_state: None,
+                step: None,
+                diagnostics,
+            });
+        }
+    };
+
+    finish_reverse_complex_group(state, next_state_id, candidate, diagnostics, &target)
+}
+
+fn finish_reverse_complex_group(
+    state: &SequenceState,
+    next_state_id: &str,
+    candidate: &ComplexMoveCandidate,
+    mut diagnostics: Vec<SequenceDiagnostic>,
+    target: &TargetState,
+) -> Result<ComplexTransformResult> {
+    let mut next = SequenceState::from_target(next_state_id.to_string(), target);
     next.provenance = StateProvenance::rewrite(
         &state.id,
         format!(
@@ -1605,24 +1800,32 @@ fn has_duplicates(values: &[usize]) -> bool {
     sorted.windows(2).any(|pair| pair[0] == pair[1])
 }
 
-fn apply_reverse_simple_fold(
+fn apply_reverse_simple_fold_with_context(
     state: &SequenceState,
     next_state_id: &str,
     rule: &SimpleFoldRule,
+    document: FoldDocument,
+    context: &mut PlanningContext,
 ) -> Result<SequenceState> {
-    let mut document = state.document.clone();
-    if let Some(assignment) = document.edges_assignment.get_mut(rule.crease) {
-        *assignment = Assignment::Flat;
-    }
-    if let Some(angle) = document.edges_fold_angle.get_mut(rule.crease) {
-        *angle = Some(0.0);
-    }
-    let target = resolve_target_state(&document, TargetStateOptions::default())?;
+    let target = context.resolve_target(&document)?;
     let mut next = SequenceState::from_target(next_state_id.to_string(), &target);
     next.provenance =
         StateProvenance::rewrite(&state.id, format!("reverse-simple-{}", rule.crease));
     next.active_creases.retain(|crease| *crease != rule.crease);
     Ok(next)
+}
+
+fn document_with_creases_reset(state: &SequenceState, creases: &[usize]) -> FoldDocument {
+    let mut document = state.document.clone();
+    for crease in creases {
+        if let Some(assignment) = document.edges_assignment.get_mut(*crease) {
+            *assignment = Assignment::Flat;
+        }
+        if let Some(angle) = document.edges_fold_angle.get_mut(*crease) {
+            *angle = Some(0.0);
+        }
+    }
+    document
 }
 
 fn unresolved_regions_for_state(state: &SequenceState) -> Vec<UnresolvedRegion> {
@@ -2334,6 +2537,9 @@ mod tests {
         assert_eq!(plan.steps.len(), 1);
         assert!(plan.unresolved_regions.is_empty());
         assert_eq!(plan.search.best_unresolved_creases, 0);
+        assert_eq!(plan.search.target_solves, 1);
+        assert_eq!(plan.search.target_solve_cache_hits, 0);
+        assert_eq!(plan.search.duplicate_candidates_pruned, 0);
         match &plan.steps[0] {
             InstructionStep::SimpleFold(details) => {
                 assert_eq!(details.affected_creases, vec![4]);
@@ -2341,6 +2547,60 @@ mod tests {
             }
             other => panic!("expected simple fold step, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn planning_context_reuses_cached_target_resolutions() {
+        let target = resolve_target_state(&two_face_valley(), TargetStateOptions::default())
+            .expect("target state");
+        let state = SequenceState::from_target("target", &target);
+        let mut context = PlanningContext::new(&state, &target);
+
+        let cached = context
+            .resolve_target(&state.document)
+            .expect("initial document is cached");
+        assert_eq!(
+            cached.selected_solution_index,
+            target.selected_solution_index
+        );
+        assert_eq!(context.target_solves, 0);
+        assert_eq!(context.target_solve_cache_hits, 1);
+
+        let unfolded = document_with_creases_reset(&state, &[4]);
+        let first = context
+            .resolve_target(&unfolded)
+            .expect("first rewritten document solve");
+        let second = context
+            .resolve_target(&unfolded)
+            .expect("second rewritten document cache hit");
+
+        assert_eq!(
+            first.normalized.edges_assignment,
+            second.normalized.edges_assignment
+        );
+        assert_eq!(context.target_solves, 1);
+        assert_eq!(context.target_solve_cache_hits, 2);
+    }
+
+    #[test]
+    fn planning_context_prunes_reserved_candidate_documents_before_solving() {
+        let target = resolve_target_state(&two_face_valley(), TargetStateOptions::default())
+            .expect("target state");
+        let state = SequenceState::from_target("target", &target);
+        let mut context = PlanningContext::new(&state, &target);
+        let unfolded = document_with_creases_reset(&state, &[4]);
+
+        assert!(!context.document_key_is_seen(&unfolded));
+        let rewritten_target = context
+            .resolve_target(&unfolded)
+            .expect("rewritten document target");
+        let mut rewritten = SequenceState::from_target("state-1", &rewritten_target);
+        rewritten.active_creases.retain(|crease| *crease != 4);
+
+        assert!(context.reserve_state(&rewritten));
+        assert!(context.document_key_is_seen(&unfolded));
+        assert_eq!(context.duplicate_candidates_pruned, 1);
+        assert_eq!(context.repeated_states, 1);
     }
 
     #[test]

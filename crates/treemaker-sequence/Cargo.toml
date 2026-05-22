@@ -10,7 +10,7 @@ documentation = "https://docs.rs/treemaker-sequence"
 readme = "README.md"
 keywords = ["origami", "fold", "crease-pattern", "planning"]
 categories = ["algorithms", "mathematics"]
-include = ["Cargo.toml", "README.md", "src/**", "tests/**"]
+include = ["Cargo.toml", "README.md", "src/**", "tests/**", "examples/**"]
 
 [dependencies]
 serde.workspace = true

@@ -131,6 +131,26 @@ export async function executeOristudioCpCommand(
   return refreshed;
 }
 
+export async function exportOristudioCpDocumentAsCp(): Promise<string> {
+  if (handle === null) {
+    throw new Error('No editable crease-pattern document is loaded');
+  }
+  const api = await getOristudioCpClient();
+  return api.exportCp(handle);
+}
+
+export async function exportOristudioCpDocumentAsFold(): Promise<string> {
+  if (handle === null) {
+    throw new Error('No editable crease-pattern document is loaded');
+  }
+  const api = await getOristudioCpClient();
+  return api.exportFold(handle);
+}
+
+export function setOristudioCpDocumentSource(source: OristudioCpDocumentState['source']): void {
+  currentSource = source;
+}
+
 async function replaceHandle(api: OristudioCpClient, nextHandle: number) {
   if (handle !== null) {
     await api.freeDocument(handle).catch(() => undefined);

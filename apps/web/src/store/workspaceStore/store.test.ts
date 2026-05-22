@@ -35,9 +35,12 @@ const engineMocks = vi.hoisted(() => ({
 
 const oristudioCpMocks = vi.hoisted(() => ({
   executeOristudioCpCommand: vi.fn(),
+  exportOristudioCpDocumentAsCp: vi.fn(),
+  exportOristudioCpDocumentAsFold: vi.fn(),
   getOristudioCpOperationDescriptors: vi.fn(),
   loadOristudioCpDocumentFromText: vi.fn(),
   releaseOristudioCpDocument: vi.fn(),
+  setOristudioCpDocumentSource: vi.fn(),
 }));
 
 const exportMocks = vi.hoisted(() => ({
@@ -65,9 +68,12 @@ vi.mock('./oristudioCpRuntime', async (importOriginal) => {
   return {
     ...actual,
     executeOristudioCpCommand: oristudioCpMocks.executeOristudioCpCommand,
+    exportOristudioCpDocumentAsCp: oristudioCpMocks.exportOristudioCpDocumentAsCp,
+    exportOristudioCpDocumentAsFold: oristudioCpMocks.exportOristudioCpDocumentAsFold,
     getOristudioCpOperationDescriptors: oristudioCpMocks.getOristudioCpOperationDescriptors,
     loadOristudioCpDocumentFromText: oristudioCpMocks.loadOristudioCpDocumentFromText,
     releaseOristudioCpDocument: oristudioCpMocks.releaseOristudioCpDocument,
+    setOristudioCpDocumentSource: oristudioCpMocks.setOristudioCpDocumentSource,
   };
 });
 
@@ -859,6 +865,13 @@ function resetStores(snapshot = makeSnapshot()) {
     .mockReset()
     .mockResolvedValue(cpOperationDescriptors);
   oristudioCpMocks.releaseOristudioCpDocument.mockReset().mockResolvedValue(undefined);
+  oristudioCpMocks.exportOristudioCpDocumentAsCp
+    .mockReset()
+    .mockResolvedValue('1 0 0 1 0\n');
+  oristudioCpMocks.exportOristudioCpDocumentAsFold
+    .mockReset()
+    .mockResolvedValue('{"file_spec":1.1}');
+  oristudioCpMocks.setOristudioCpDocumentSource.mockReset();
   oristudioCpMocks.loadOristudioCpDocumentFromText
     .mockReset()
     .mockImplementation(async (_text: string, source: { format: 'cp' | 'fold'; filename: string; path?: string | null; title?: string }) => ({
@@ -980,6 +993,7 @@ describe('workspace store slices', () => {
     expect(state.loadCreasePatternText).toBeTypeOf('function');
     expect(state.executeOristudioCpCommand).toBeTypeOf('function');
     expect(state.saveProject).toBeTypeOf('function');
+    expect(state.exportCp).toBeTypeOf('function');
     expect(state.exportFold).toBeTypeOf('function');
     expect(state.undo).toBeTypeOf('function');
     expect(state.copySelection).toBeTypeOf('function');
@@ -1143,14 +1157,49 @@ describe('workspace store slices', () => {
     expect(api.flatFoldArtifacts).toHaveBeenCalledOnce();
     expect(activatePanel).toHaveBeenCalledWith('crease-pattern');
 
-    await expect(useWorkspaceStore.getState().saveProject(fileService)).resolves.toBe(false);
-    expect(useWorkspaceStore.getState().error?.message).toBe(
-      'Imported crease patterns are exported, not saved as Ori Studio projects'
+    useWorkspaceStore.setState({ dirty: true });
+    await expect(useWorkspaceStore.getState().saveProject(fileService)).resolves.toBe(true);
+    expect(oristudioCpMocks.exportOristudioCpDocumentAsCp).toHaveBeenCalledOnce();
+    expect(fileService.saveTextFile).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        title: 'Save Crease Pattern',
+        contents: '1 0 0 1 0\n',
+        suggestedName: 'square.cp',
+        path: '/tmp/square.cp',
+        extensions: ['cp'],
+      })
+    );
+    expect(oristudioCpMocks.setOristudioCpDocumentSource).toHaveBeenCalledWith({
+      format: 'cp',
+      filename: 'square.cp',
+      path: '/tmp/square.cp',
+    });
+    expect(useWorkspaceStore.getState()).toMatchObject({
+      currentFileName: 'square.cp',
+      currentFilePath: '/tmp/square.cp',
+      dirty: false,
+    });
+
+    await expect(useWorkspaceStore.getState().exportCp(fileService)).resolves.toBe(true);
+    expect(oristudioCpMocks.exportOristudioCpDocumentAsCp).toHaveBeenCalledTimes(2);
+    expect(fileService.saveTextFile).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        title: 'Export CP Document',
+        contents: '1 0 0 1 0\n',
+        suggestedName: 'square.cp',
+        path: null,
+        extensions: ['cp'],
+      })
     );
 
     await expect(useWorkspaceStore.getState().exportFold(fileService)).resolves.toBe(true);
+    expect(oristudioCpMocks.exportOristudioCpDocumentAsFold).toHaveBeenCalledOnce();
     expect(fileService.saveTextFile).toHaveBeenLastCalledWith(
-      expect.objectContaining({ title: 'Export FOLD Document', extensions: ['fold'] })
+      expect.objectContaining({
+        title: 'Export FOLD Document',
+        contents: '{"file_spec":1.1}',
+        extensions: ['fold'],
+      })
     );
   });
 
@@ -1170,6 +1219,46 @@ describe('workspace store slices', () => {
     expect(useWorkspaceStore.getState().oristudioCpError).toContain('DrawCreaseFree');
     expect(useWorkspaceStore.getState().error).toMatchObject({
       code: 'not_implemented',
+    });
+  });
+
+  it('saves imported FOLD documents as CP without overwriting the source FOLD path', async () => {
+    resetStores(seedSnapshot());
+    await useWorkspaceStore.getState().loadCreasePatternText(
+      JSON.stringify({
+        file_spec: 1.1,
+        vertices_coords: [
+          [0, 0],
+          [1, 0],
+        ],
+        edges_vertices: [[0, 1]],
+        edges_assignment: ['B'],
+      }),
+      {
+        filename: 'line.fold',
+        path: '/tmp/line.fold',
+      }
+    );
+    const fileService = createFileService();
+
+    await expect(useWorkspaceStore.getState().saveProject(fileService)).resolves.toBe(true);
+
+    expect(fileService.saveTextFile).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        title: 'Save Crease Pattern',
+        suggestedName: 'line.cp',
+        path: null,
+        extensions: ['cp'],
+      })
+    );
+    expect(useWorkspaceStore.getState()).toMatchObject({
+      currentFileName: 'line.cp',
+      currentFilePath: '/tmp/line.cp',
+    });
+    expect(useWorkspaceStore.getState().oristudioCpDocument?.source).toEqual({
+      format: 'cp',
+      filename: 'line.cp',
+      path: '/tmp/line.cp',
     });
   });
 

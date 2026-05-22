@@ -640,7 +640,7 @@ Done when:
 - [x] Stage 3: Add the left-side tool rail, command groups, active-tool
       prompts, and Not-implemented presentation.
 - [x] Stage 3: Add CP tool-state transitions for multi-step commands.
-- [ ] Stage 4: Add CP open/import/save/export workflows and dirty-state
+- [x] Stage 4: Add CP open/import/save/export workflows and dirty-state
       handling.
 - [ ] Stage 4: Validate file workflows with oracle-backed round trips.
 - [ ] Stage 5: Enable core selection, deletion, color, assignment, move, copy,

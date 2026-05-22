@@ -11,6 +11,7 @@ function createDeps() {
       saveProject: vi.fn().mockResolvedValue(true),
       saveProjectAs: vi.fn().mockResolvedValue(true),
       exportV4: vi.fn().mockResolvedValue(true),
+      exportCp: vi.fn().mockResolvedValue(true),
       exportFold: vi.fn().mockResolvedValue(true),
       exportSvg: vi.fn().mockResolvedValue(true),
       exportPng: vi.fn().mockResolvedValue(true),
@@ -165,7 +166,9 @@ describe('menu actions', () => {
     expect(deps.workspace.saveProjectAs).toHaveBeenCalledWith(deps.fileService);
 
     await expect(createMenuActionHandler(deps)('file.exportFold')).resolves.toBe(true);
+    await expect(createMenuActionHandler(deps)('file.exportCp')).resolves.toBe(true);
     expect(deps.workspace.exportFold).toHaveBeenCalledWith(deps.fileService);
+    expect(deps.workspace.exportCp).toHaveBeenCalledWith(deps.fileService);
   });
 
   it('does not dispatch disabled capabilities', async () => {
@@ -179,6 +182,7 @@ describe('menu actions', () => {
         edgeCount: 0,
         creaseCount: 4,
         facetCount: 1,
+        hasEditableCreasePattern: false,
         hasImportedCreasePattern: true,
         hasSimulationModel: true,
         historyPastCount: 0,

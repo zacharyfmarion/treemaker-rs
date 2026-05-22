@@ -6,6 +6,7 @@ export type WorkspaceCapabilityId =
   | 'file.save'
   | 'file.saveAs'
   | 'file.exportV4'
+  | 'file.exportCp'
   | 'file.exportFold'
   | 'file.exportSvg'
   | 'file.exportPng'
@@ -67,6 +68,7 @@ export interface WorkspaceCapabilityInput {
   edgeCount: number;
   creaseCount: number;
   facetCount: number;
+  hasEditableCreasePattern: boolean;
   hasImportedCreasePattern: boolean;
   hasSimulationModel: boolean;
   historyPastCount: number;
@@ -90,6 +92,8 @@ export function getWorkspaceCapabilities(input: WorkspaceCapabilityInput): Works
     (input.status === 'optimized' || input.status === 'crease_pattern_ready');
   const canExportTreeFold = treeMode && hasCreasePattern && !isBusy;
   const canExportImportedFold = creasePatternMode && input.hasImportedCreasePattern;
+  const canSaveEditableCreasePattern = creasePatternMode && input.hasEditableCreasePattern;
+  const canExportEditableCp = creasePatternMode && input.hasEditableCreasePattern;
   const canExportCreasePattern = hasCreasePattern && !isBusy;
   const hasSelection = selectionHasEditableParts(input.selection);
   const hasSelectedEdges = selectedEdgeCount(input.selection) > 0;
@@ -103,19 +107,34 @@ export function getWorkspaceCapabilities(input: WorkspaceCapabilityInput): Works
     'file.new': capability(!isBusy, 'New', isBusy ? busyReason(input.status) : 'Create a new Ori Studio project'),
     'file.open': capability(!isBusy, 'Open...', isBusy ? busyReason(input.status) : 'Open a project or crease pattern'),
     'file.save': capability(
-      treeMode && !isBusy,
+      (treeMode || canSaveEditableCreasePattern) && !isBusy,
       'Save',
-      treeMode ? busyOr('Save Ori Studio project', input.status) : 'Imported crease patterns are exported, not saved as Ori Studio projects'
+      treeMode
+        ? busyOr('Save Ori Studio project', input.status)
+        : canSaveEditableCreasePattern
+          ? busyOr('Save editable crease pattern as CP', input.status)
+          : 'Editable crease-pattern kernel is unavailable'
     ),
     'file.saveAs': capability(
-      treeMode && !isBusy,
+      (treeMode || canSaveEditableCreasePattern) && !isBusy,
       'Save As...',
-      treeMode ? busyOr('Save Ori Studio project as a new file', input.status) : 'Imported crease patterns are exported, not saved as Ori Studio projects'
+      treeMode
+        ? busyOr('Save Ori Studio project as a new file', input.status)
+        : canSaveEditableCreasePattern
+          ? busyOr('Save editable crease pattern as a new CP file', input.status)
+          : 'Editable crease-pattern kernel is unavailable'
     ),
     'file.exportV4': capability(
       treeMode && !isBusy,
       'Export TreeMaker 4...',
       treeMode ? busyOr('Export TreeMaker 4 project', input.status) : 'TreeMaker 4 export requires a tree document'
+    ),
+    'file.exportCp': capability(
+      canExportEditableCp && !isBusy,
+      'Export CP...',
+      canExportEditableCp
+        ? busyOr('Export editable crease pattern as CP', input.status)
+        : 'Open an editable crease pattern before exporting CP'
     ),
     'file.exportFold': capability(
       (canExportTreeFold || canExportImportedFold) && !isBusy,

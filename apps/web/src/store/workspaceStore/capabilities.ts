@@ -13,6 +13,7 @@ export function workspaceCapabilityInput(state: WorkspaceState): WorkspaceCapabi
     edgeCount: state.project.edges.length,
     creaseCount: state.project.creases.length,
     facetCount: state.project.facets.length,
+    hasEditableCreasePattern: state.oristudioCpDocument !== null,
     hasImportedCreasePattern: state.importedCreasePattern !== null,
     hasSimulationModel: state.foldArtifacts?.simulation_model != null,
     historyPastCount: state.historyPast.length,

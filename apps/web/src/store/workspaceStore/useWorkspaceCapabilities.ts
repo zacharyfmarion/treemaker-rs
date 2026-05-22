@@ -9,6 +9,7 @@ export function useWorkspaceCapabilities() {
   const edgeCount = useWorkspaceStore((state) => state.project.edges.length);
   const creaseCount = useWorkspaceStore((state) => state.project.creases.length);
   const facetCount = useWorkspaceStore((state) => state.project.facets.length);
+  const hasEditableCreasePattern = useWorkspaceStore((state) => state.oristudioCpDocument !== null);
   const hasImportedCreasePattern = useWorkspaceStore((state) => state.importedCreasePattern !== null);
   const hasSimulationModel = useWorkspaceStore((state) => state.foldArtifacts?.simulation_model != null);
   const historyPastCount = useWorkspaceStore((state) => state.historyPast.length);
@@ -25,6 +26,7 @@ export function useWorkspaceCapabilities() {
         edgeCount,
         creaseCount,
         facetCount,
+        hasEditableCreasePattern,
         hasImportedCreasePattern,
         hasSimulationModel,
         historyPastCount,
@@ -39,6 +41,7 @@ export function useWorkspaceCapabilities() {
       edgeCount,
       engineReady,
       facetCount,
+      hasEditableCreasePattern,
       hasImportedCreasePattern,
       hasSimulationModel,
       historyFutureCount,

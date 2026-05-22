@@ -26,6 +26,7 @@ pub fn setup_menu(app: &App) -> Result<(), Box<dyn std::error::Error>> {
         .build(app)?;
     let file_export_v4 =
         MenuItemBuilder::with_id("file.exportV4", "Export TreeMaker 4...").build(app)?;
+    let file_export_cp = MenuItemBuilder::with_id("file.exportCp", "Export CP...").build(app)?;
     let file_export_fold =
         MenuItemBuilder::with_id("file.exportFold", "Export FOLD...").build(app)?;
     let file_export_svg = MenuItemBuilder::with_id("file.exportSvg", "Export SVG...").build(app)?;
@@ -42,6 +43,7 @@ pub fn setup_menu(app: &App) -> Result<(), Box<dyn std::error::Error>> {
         .item(&file_save_as)
         .separator()
         .item(&file_export_v4)
+        .item(&file_export_cp)
         .item(&file_export_fold)
         .item(&file_export_svg)
         .item(&file_export_png)

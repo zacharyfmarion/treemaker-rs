@@ -29,10 +29,13 @@ import {
 } from '../engineRuntime';
 import {
   executeOristudioCpCommand as executeRuntimeOristudioCpCommand,
+  exportOristudioCpDocumentAsCp,
+  exportOristudioCpDocumentAsFold,
   getOristudioCpOperationDescriptors,
   loadOristudioCpDocumentFromText,
   oristudioCpError,
   releaseOristudioCpDocument,
+  setOristudioCpDocumentSource,
 } from '../oristudioCpRuntime';
 import type { ProjectSlice, RecentProject, WorkspaceSliceCreator } from '../types';
 
@@ -115,6 +118,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
       edgeCount: get().project.edges.length,
       creaseCount: get().project.creases.length,
       facetCount: get().project.facets.length,
+      hasEditableCreasePattern: get().oristudioCpDocument !== null,
       hasImportedCreasePattern: get().importedCreasePattern !== null,
       hasSimulationModel: get().foldArtifacts?.simulation_model != null,
       historyPastCount: get().historyPast.length,
@@ -286,6 +290,70 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
     rememberRecent({
       id: result.path ?? result.name,
       title: get().project.title,
+      filename: result.name,
+      savedAt: nowIso(),
+      text: contents,
+    });
+    return true;
+  };
+
+  const saveEditableCreasePattern = async (
+    fileService: FileService,
+    forceSaveAs: boolean
+  ) => {
+    const documentState = get().oristudioCpDocument;
+    if (!documentState) {
+      set({
+        error: {
+          code: 'invalid_operation',
+          message: 'No editable crease-pattern document is loaded',
+        },
+        projectMessage: null,
+      });
+      return false;
+    }
+
+    const contents = await exportOristudioCpDocumentAsCp();
+    const suggestedName = defaultFilename(
+      documentState.summary.title || get().importedCreasePattern?.title || get().project.title,
+      'cp'
+    );
+    const canOverwriteCurrentCp = /\.cp$/i.test(get().currentFileName);
+    const result = await fileService.saveTextFile({
+      title: forceSaveAs ? 'Save Crease Pattern As' : 'Save Crease Pattern',
+      contents,
+      suggestedName: canOverwriteCurrentCp ? get().currentFileName : suggestedName,
+      path: forceSaveAs || !canOverwriteCurrentCp ? null : get().currentFilePath,
+      extensions: ['cp'],
+    });
+    if (!result) return false;
+
+    const source = {
+      format: 'cp' as const,
+      filename: result.name,
+      path: result.path,
+    };
+    const importedCreasePattern = get().importedCreasePattern;
+    setOristudioCpDocumentSource(source);
+    set({
+      currentFileName: result.name,
+      currentFilePath: result.path,
+      dirty: false,
+      projectMessage: `Saved ${result.name}`,
+      oristudioCpDocument: {
+        ...documentState,
+        source,
+      },
+      importedCreasePattern: importedCreasePattern
+        ? {
+            ...importedCreasePattern,
+            source,
+          }
+        : importedCreasePattern,
+    });
+    rememberRecent({
+      id: result.path ?? result.name,
+      title: documentState.summary.title || get().project.title,
       filename: result.name,
       savedAt: nowIso(),
       text: contents,
@@ -513,6 +581,9 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
     saveProject: async (fileService = getFileService()) => {
       try {
         if (rejectDisabled('file.save')) return false;
+        if (get().documentMode === 'crease-pattern') {
+          return await saveEditableCreasePattern(fileService, false);
+        }
         return await saveTmd5(fileService, false);
       } catch (error) {
         set({ status: 'error', error: engineError(error) });
@@ -523,6 +594,9 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
     saveProjectAs: async (fileService = getFileService()) => {
       try {
         if (rejectDisabled('file.saveAs')) return false;
+        if (get().documentMode === 'crease-pattern') {
+          return await saveEditableCreasePattern(fileService, true);
+        }
         return await saveTmd5(fileService, true);
       } catch (error) {
         set({ status: 'error', error: engineError(error) });
@@ -551,11 +625,36 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
       }
     },
 
+    exportCp: async (fileService = getFileService()) => {
+      try {
+        if (rejectDisabled('file.exportCp')) return false;
+        const contents = await exportOristudioCpDocumentAsCp();
+        const result = await fileService.saveTextFile({
+          title: 'Export CP Document',
+          contents,
+          suggestedName: defaultFilename(
+            get().oristudioCpDocument?.summary.title || get().project.title,
+            'cp'
+          ),
+          path: null,
+          extensions: ['cp'],
+        });
+        if (!result) return false;
+        set({ projectMessage: `Exported ${result.name}` });
+        return true;
+      } catch (error) {
+        set({ status: 'error', error: engineError(error) });
+        return false;
+      }
+    },
+
     exportFold: async (fileService = getFileService()) => {
       try {
         if (rejectDisabled('file.exportFold')) return false;
         const contents =
-          get().documentMode === 'crease-pattern' && get().importedCreasePattern
+          get().documentMode === 'crease-pattern' && get().oristudioCpDocument
+            ? await exportOristudioCpDocumentAsFold()
+            : get().documentMode === 'crease-pattern' && get().importedCreasePattern
             ? JSON.stringify(get().importedCreasePattern?.fold, null, 2)
             : await (async () => {
                 const { api, treeHandle } = await ensureTreeHandle();

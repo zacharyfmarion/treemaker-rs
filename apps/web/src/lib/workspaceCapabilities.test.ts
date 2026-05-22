@@ -11,6 +11,7 @@ function capabilities({
   creaseCount = 0,
   facetCount = 0,
   engineReady = true,
+  hasEditableCreasePattern = false,
   hasImportedCreasePattern = false,
   selection = treeSelection,
 }: {
@@ -20,6 +21,7 @@ function capabilities({
   creaseCount?: number;
   facetCount?: number;
   engineReady?: boolean;
+  hasEditableCreasePattern?: boolean;
   hasImportedCreasePattern?: boolean;
   selection?: Selection;
 } = {}) {
@@ -30,6 +32,7 @@ function capabilities({
     edgeCount,
     creaseCount,
     facetCount,
+    hasEditableCreasePattern,
     hasImportedCreasePattern,
     hasSimulationModel: false,
     historyPastCount: 0,
@@ -119,11 +122,36 @@ describe('workspace capabilities', () => {
     expect(state['cp.build'].enabled).toBe(false);
     expect(state['cp.build'].reason).toBe('Build CP requires an editable tree document');
     expect(state['file.save'].enabled).toBe(false);
+    expect(state['file.exportCp'].enabled).toBe(false);
     expect(state['file.exportFold'].enabled).toBe(true);
     expect(state['file.exportSvg'].enabled).toBe(true);
     expect(state['view.foldedBase'].enabled).toBe(true);
     expect(state['foldedBase.refresh'].enabled).toBe(false);
     expect(getNextDocumentAction(state)).toBe(null);
+  });
+
+  it('enables CP save actions when an editable CP kernel is available', () => {
+    const state = capabilities({
+      documentMode: 'crease-pattern',
+      status: 'crease_pattern_ready',
+      creaseCount: 5,
+      facetCount: 1,
+      hasEditableCreasePattern: true,
+      hasImportedCreasePattern: true,
+    });
+
+    expect(state['file.save']).toMatchObject({
+      enabled: true,
+      reason: 'Save editable crease pattern as CP',
+    });
+    expect(state['file.saveAs']).toMatchObject({
+      enabled: true,
+      reason: 'Save editable crease pattern as a new CP file',
+    });
+    expect(state['file.exportCp']).toMatchObject({
+      enabled: true,
+      reason: 'Export editable crease pattern as CP',
+    });
   });
 
   it('disables workflow actions while the engine is busy or unavailable', () => {

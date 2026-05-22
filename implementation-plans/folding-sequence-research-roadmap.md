@@ -81,7 +81,7 @@ has a validated implementation.
 - [x] Phase 8: Decide whether ML/ranking data collection is warranted.
 - [x] Phase 9: V2 reference/precrease planner integration.
 - [x] Phase 10: Add visual step playback for current planner artifacts.
-- [ ] Phase 11: Add complex-transform validation harness and invariants.
+- [x] Phase 11: Add complex-transform validation harness and invariants.
 - [ ] Phase 12: Implement first validated local complex transforms.
 - [ ] Phase 13: Implement rabbit-ear and molecule transforms.
 - [ ] Phase 14: Promote visual/corpus review for complex sequences.
@@ -618,6 +618,18 @@ Exit criteria:
 
 - Adding a new complex move transform requires passing the invariant harness.
 - Non-implemented transforms still produce `unsupported_region` diagnostics.
+
+Phase 11 implementation notes:
+
+- Added typed complex-transform statuses and result artifacts.
+- Routed recognized complex candidates through an explicit transform harness
+  before unsupported-region diagnostics are emitted.
+- Added invariant checks for candidate creases, faces, center vertex, active
+  crease membership, and MV assignment requirements.
+- Kept every complex transform unsupported until Phase 12+ supplies a validated
+  rewrite.
+- Added unit tests for unsupported transform routing and invalid-candidate
+  rejection.
 
 ## Phase 12: First Local Complex Transforms
 

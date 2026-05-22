@@ -292,6 +292,16 @@ pub fn plan_folding_sequence_with_options(
     }
 
     let complex_candidates = recognize_complex_moves(&current)?;
+    let complex_transform_results = complex_candidates
+        .iter()
+        .map(|candidate| {
+            apply_complex_transform(
+                &current,
+                &format!("state-{}", reverse_states.len()),
+                candidate,
+            )
+        })
+        .collect::<Result<Vec<_>>>()?;
     let unresolved_regions = unresolved_regions_for_state(&current);
     let status = if unresolved_regions.is_empty() {
         PlanStatus::Complete
@@ -317,14 +327,8 @@ pub fn plan_folding_sequence_with_options(
             "planner returned the best partial state reached before the configured search budget",
         ));
     }
-    for candidate in &complex_candidates {
-        diagnostics.push(SequenceDiagnostic::warning(
-            candidate.kind.diagnostic_code(),
-            format!(
-                "{:?} pattern recognized for creases {:?}, but the move transform is not implemented yet",
-                candidate.kind, candidate.creases
-            ),
-        ));
+    for transform in &complex_transform_results {
+        diagnostics.extend(transform.diagnostics.clone());
     }
 
     let mut steps = reverse_steps
@@ -342,11 +346,8 @@ pub fn plan_folding_sequence_with_options(
     }
     if let Some(region) = unresolved_regions.first() {
         let mut step_diagnostics = Vec::new();
-        if let Some(candidate) = complex_candidates.first() {
-            step_diagnostics.push(SequenceDiagnostic::warning(
-                candidate.kind.diagnostic_code(),
-                "recognized move has no validated Phase 4 transform yet",
-            ));
+        if let Some(transform) = complex_transform_results.first() {
+            step_diagnostics.extend(transform.diagnostics.clone());
         }
         steps.push(InstructionStep::UnsupportedRegion(UnsupportedRegionStep {
             id: format!("step-{}", steps.len() + 1),
@@ -636,6 +637,24 @@ pub struct ComplexMoveCandidate {
     pub creases: Vec<usize>,
     pub faces: Vec<usize>,
     pub metadata: MoveMetadata,
+    pub diagnostics: Vec<SequenceDiagnostic>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ComplexTransformStatus {
+    Applied,
+    Unsupported,
+    InvalidCandidate,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ComplexTransformResult {
+    pub status: ComplexTransformStatus,
+    pub candidate: ComplexMoveCandidate,
+    pub before_state: String,
+    pub after_state: Option<SequenceState>,
+    pub step: Option<InstructionStep>,
     pub diagnostics: Vec<SequenceDiagnostic>,
 }
 
@@ -1073,6 +1092,138 @@ pub fn recognize_complex_moves(state: &SequenceState) -> Result<Vec<ComplexMoveC
     Ok(candidates)
 }
 
+pub fn apply_complex_transform(
+    state: &SequenceState,
+    _next_state_id: &str,
+    candidate: &ComplexMoveCandidate,
+) -> Result<ComplexTransformResult> {
+    let mut diagnostics = inspect_complex_transform_candidate(state, candidate);
+    if diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.severity == DiagnosticSeverity::Error)
+    {
+        return Ok(ComplexTransformResult {
+            status: ComplexTransformStatus::InvalidCandidate,
+            candidate: candidate.clone(),
+            before_state: state.id.clone(),
+            after_state: None,
+            step: None,
+            diagnostics,
+        });
+    }
+
+    diagnostics.push(SequenceDiagnostic::warning(
+        "complex_transform_not_implemented",
+        format!(
+            "{:?} transform is routed through the Phase 11 harness, but no validated rewrite has been implemented yet",
+            candidate.kind
+        ),
+    ));
+    diagnostics.push(SequenceDiagnostic::warning(
+        candidate.kind.diagnostic_code(),
+        format!(
+            "{:?} pattern recognized for creases {:?}, but the move transform is not implemented yet",
+            candidate.kind, candidate.creases
+        ),
+    ));
+
+    Ok(ComplexTransformResult {
+        status: ComplexTransformStatus::Unsupported,
+        candidate: candidate.clone(),
+        before_state: state.id.clone(),
+        after_state: None,
+        step: None,
+        diagnostics,
+    })
+}
+
+pub fn inspect_complex_transform_candidate(
+    state: &SequenceState,
+    candidate: &ComplexMoveCandidate,
+) -> Vec<SequenceDiagnostic> {
+    let mut diagnostics = Vec::new();
+    let edge_count = state.document.edges_vertices.len();
+    let face_count = state.document.faces_vertices.len();
+    let vertex_count = state.document.vertices_coords.len();
+
+    if candidate.creases.is_empty() {
+        diagnostics.push(SequenceDiagnostic::error(
+            "complex_candidate_empty",
+            "complex transform candidate has no creases",
+        ));
+    }
+    if has_duplicates(&candidate.creases) {
+        diagnostics.push(SequenceDiagnostic::error(
+            "complex_candidate_duplicate_crease",
+            "complex transform candidate contains duplicate creases",
+        ));
+    }
+    if has_duplicates(&candidate.faces) {
+        diagnostics.push(SequenceDiagnostic::error(
+            "complex_candidate_duplicate_face",
+            "complex transform candidate contains duplicate faces",
+        ));
+    }
+
+    for crease in &candidate.creases {
+        if *crease >= edge_count {
+            diagnostics.push(SequenceDiagnostic::error(
+                "complex_candidate_crease_out_of_bounds",
+                format!("complex candidate crease {crease} is outside edge range 0..{edge_count}"),
+            ));
+            continue;
+        }
+        if !state.active_creases.contains(crease) {
+            diagnostics.push(SequenceDiagnostic::error(
+                "complex_candidate_crease_not_active",
+                format!(
+                    "complex candidate crease {crease} is not active in state {}",
+                    state.id
+                ),
+            ));
+        }
+        let assignment = state.document.assignment_for_edge(*crease);
+        if !matches!(assignment, Assignment::Mountain | Assignment::Valley) {
+            diagnostics.push(SequenceDiagnostic::error(
+                "complex_candidate_crease_not_mv",
+                format!(
+                    "complex candidate crease {crease} has assignment {}; expected M or V",
+                    assignment.as_str()
+                ),
+            ));
+        }
+    }
+
+    for face in &candidate.faces {
+        if *face >= face_count {
+            diagnostics.push(SequenceDiagnostic::error(
+                "complex_candidate_face_out_of_bounds",
+                format!("complex candidate face {face} is outside face range 0..{face_count}"),
+            ));
+        }
+    }
+
+    if let Some(vertex) = candidate.center_vertex {
+        if vertex >= vertex_count {
+            diagnostics.push(SequenceDiagnostic::error(
+                "complex_candidate_center_out_of_bounds",
+                format!("complex candidate center vertex {vertex} is outside vertex range 0..{vertex_count}"),
+            ));
+        } else if boundary_vertex_flags(&state.document)
+            .get(vertex)
+            .copied()
+            .unwrap_or(false)
+        {
+            diagnostics.push(SequenceDiagnostic::error(
+                "complex_candidate_center_on_boundary",
+                format!("complex candidate center vertex {vertex} lies on the paper boundary"),
+            ));
+        }
+    }
+
+    diagnostics
+}
+
 fn classify_complex_candidate(state: &SequenceState, creases: &[usize]) -> ComplexMoveKind {
     match creases.len() {
         3 => ComplexMoveKind::ReverseFold,
@@ -1101,6 +1252,12 @@ fn complex_kind_rank(kind: &ComplexMoveKind) -> usize {
         ComplexMoveKind::MoleculeCollapse => 3,
         ComplexMoveKind::SimultaneousCollapse => 4,
     }
+}
+
+fn has_duplicates(values: &[usize]) -> bool {
+    let mut sorted = values.to_vec();
+    sorted.sort_unstable();
+    sorted.windows(2).any(|pair| pair[0] == pair[1])
 }
 
 fn apply_reverse_simple_fold(
@@ -1534,6 +1691,57 @@ mod tests {
         document
     }
 
+    fn rabbit_ear_local() -> FoldDocument {
+        let mut document = FoldDocument::new(
+            vec![
+                vec![0.0, 0.0],
+                vec![1.0, 0.0],
+                vec![1.0, 1.0],
+                vec![0.0, 1.0],
+                vec![0.5, 0.0],
+                vec![1.0, 0.5],
+                vec![0.5, 1.0],
+                vec![0.0, 0.5],
+                vec![0.5, 0.5],
+            ],
+            vec![
+                [0, 4],
+                [4, 1],
+                [1, 5],
+                [5, 2],
+                [2, 6],
+                [6, 3],
+                [3, 7],
+                [7, 0],
+                [4, 8],
+                [5, 8],
+                [6, 8],
+                [7, 8],
+            ],
+        );
+        document.edges_assignment = vec![
+            Assignment::Boundary,
+            Assignment::Boundary,
+            Assignment::Boundary,
+            Assignment::Boundary,
+            Assignment::Boundary,
+            Assignment::Boundary,
+            Assignment::Boundary,
+            Assignment::Boundary,
+            Assignment::Mountain,
+            Assignment::Mountain,
+            Assignment::Mountain,
+            Assignment::Valley,
+        ];
+        document.faces_vertices = vec![
+            vec![0, 4, 8, 7],
+            vec![4, 1, 5, 8],
+            vec![8, 5, 2, 6],
+            vec![7, 8, 6, 3],
+        ];
+        document
+    }
+
     #[test]
     fn target_state_wraps_flatfold_result() {
         let target = resolve_target_state(&two_face_valley(), TargetStateOptions::default())
@@ -1601,6 +1809,65 @@ mod tests {
             }
             other => panic!("expected simple fold step, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn complex_transform_harness_keeps_unimplemented_moves_unsupported() {
+        let target = resolve_target_state(&rabbit_ear_local(), TargetStateOptions::default())
+            .expect("target state");
+        let state = SequenceState::from_target("target", &target);
+        let candidate = recognize_complex_moves(&state)
+            .expect("complex candidates")
+            .into_iter()
+            .find(|candidate| candidate.kind == ComplexMoveKind::RabbitEar)
+            .expect("rabbit-ear candidate");
+
+        let result =
+            apply_complex_transform(&state, "state-1", &candidate).expect("transform result");
+
+        assert_eq!(result.status, ComplexTransformStatus::Unsupported);
+        assert!(result.after_state.is_none());
+        assert!(result.step.is_none());
+        assert!(result.diagnostics.iter().any(|diagnostic| {
+            diagnostic.code == "complex_transform_not_implemented"
+                && diagnostic.severity == DiagnosticSeverity::Warning
+        }));
+        assert!(
+            result
+                .diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.code == "rabbit_ear_not_implemented")
+        );
+    }
+
+    #[test]
+    fn complex_transform_harness_rejects_invalid_candidates() {
+        let target = resolve_target_state(&two_face_valley(), TargetStateOptions::default())
+            .expect("target state");
+        let state = SequenceState::from_target("target", &target);
+        let candidate = ComplexMoveCandidate {
+            kind: ComplexMoveKind::ReverseFold,
+            center_vertex: Some(99),
+            creases: vec![4, 99],
+            faces: vec![0],
+            metadata: MoveMetadata::default(),
+            diagnostics: Vec::new(),
+        };
+
+        let result =
+            apply_complex_transform(&state, "state-1", &candidate).expect("transform result");
+
+        assert_eq!(result.status, ComplexTransformStatus::InvalidCandidate);
+        assert!(result.after_state.is_none());
+        assert!(result.step.is_none());
+        assert!(result.diagnostics.iter().any(|diagnostic| {
+            diagnostic.code == "complex_candidate_crease_out_of_bounds"
+                && diagnostic.severity == DiagnosticSeverity::Error
+        }));
+        assert!(result.diagnostics.iter().any(|diagnostic| {
+            diagnostic.code == "complex_candidate_center_out_of_bounds"
+                && diagnostic.severity == DiagnosticSeverity::Error
+        }));
     }
 
     #[test]

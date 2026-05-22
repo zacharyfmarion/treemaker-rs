@@ -663,7 +663,7 @@ Exit criteria:
 
 Phase 12 implementation notes:
 
-- Implemented an isolated local squash transform that accepts the checked-in
+- Implemented a validated local squash transform that accepts the checked-in
   `squash-local` fixture as one high-level `squash_fold` step.
 - The reverse transform deactivates the whole local crease group, re-solves the
   resulting state with `treemaker-flatfold`, and validates the produced
@@ -707,11 +707,14 @@ Exit criteria:
 
 Phase 13 implementation notes:
 
-- Extended the isolated whole-region complex transform to rabbit-ear and small
+- Extended the validated local complex transform to rabbit-ear and small
   molecule-collapse candidates.
 - `kite-rabbit-ear-local` and `treemaker-triad-base` now complete as high-level
   complex steps when the recognized candidate accounts for the whole active
   crease group and the reverse state re-solves cleanly.
+- Local complex candidates can also be applied inside larger unresolved regions
+  when flattening that candidate subset re-solves and validates; otherwise the
+  planner reports the specific unsupported reason.
 - Simultaneous-collapse candidates remain unsupported.
 - Updated fixture expectations and tests so completed complex fixtures must use
   their matching complex instruction kind.

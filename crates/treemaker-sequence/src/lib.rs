@@ -1139,21 +1139,18 @@ pub fn apply_complex_transform(
         });
     }
 
-    if isolated_complex_transform_is_supported(state, candidate) {
+    if local_complex_transform_is_supported(state, candidate) {
         return apply_reverse_complex_group(state, _next_state_id, candidate, diagnostics);
     }
 
+    let diagnostic_code = match candidate.kind {
+        ComplexMoveKind::SimultaneousCollapse => candidate.kind.diagnostic_code(),
+        _ => "complex_transform_unsupported",
+    };
     diagnostics.push(SequenceDiagnostic::warning(
-        "complex_transform_not_implemented",
+        diagnostic_code,
         format!(
-            "{:?} transform is routed through the Phase 11 harness, but no validated rewrite has been implemented yet",
-            candidate.kind
-        ),
-    ));
-    diagnostics.push(SequenceDiagnostic::warning(
-        candidate.kind.diagnostic_code(),
-        format!(
-            "{:?} pattern recognized for creases {:?}, but the move transform is not implemented yet",
+            "{:?} pattern recognized for creases {:?}, but this move is outside the currently validated local transform set",
             candidate.kind, candidate.creases
         ),
     ));
@@ -1168,7 +1165,7 @@ pub fn apply_complex_transform(
     })
 }
 
-fn isolated_complex_transform_is_supported(
+fn local_complex_transform_is_supported(
     state: &SequenceState,
     candidate: &ComplexMoveCandidate,
 ) -> bool {
@@ -1178,15 +1175,14 @@ fn isolated_complex_transform_is_supported(
             | ComplexMoveKind::SquashFold
             | ComplexMoveKind::RabbitEar
             | ComplexMoveKind::MoleculeCollapse
-    ) && active_creases_match_candidate(state, candidate)
+    ) && candidate_creases_are_active(state, candidate)
 }
 
-fn active_creases_match_candidate(state: &SequenceState, candidate: &ComplexMoveCandidate) -> bool {
-    let mut active = state.active_creases.clone();
-    let mut candidate_creases = candidate.creases.clone();
-    active.sort_unstable();
-    candidate_creases.sort_unstable();
-    active == candidate_creases
+fn candidate_creases_are_active(state: &SequenceState, candidate: &ComplexMoveCandidate) -> bool {
+    candidate
+        .creases
+        .iter()
+        .all(|crease| state.active_creases.contains(crease))
 }
 
 fn apply_reverse_complex_group(
@@ -1241,7 +1237,7 @@ fn apply_reverse_complex_group(
     diagnostics.push(SequenceDiagnostic::info(
         "complex_transform_applied",
         format!(
-            "{:?} transform accepted as an isolated local complex collapse over creases {:?}",
+            "{:?} transform accepted as a validated local complex collapse over creases {:?}",
             candidate.kind, candidate.creases
         ),
     ));
@@ -1494,7 +1490,7 @@ fn complex_candidate_to_forward_step(
     details.metadata = candidate.metadata.clone();
     details.metadata.confidence = details.metadata.confidence.max(0.7);
     details.metadata.notes.push(
-        "accepted as an isolated local complex move; lower-level sub-folds are not decomposed"
+        "accepted as a validated local complex move; lower-level sub-folds are not decomposed"
             .to_string(),
     );
     match candidate.kind {
@@ -2130,6 +2126,21 @@ mod tests {
             diagnostic.code == "complex_transform_applied"
                 && diagnostic.severity == DiagnosticSeverity::Info
         }));
+    }
+
+    #[test]
+    fn local_complex_transform_allows_candidate_subset_of_active_region() {
+        let target = resolve_target_state(&rabbit_ear_local(), TargetStateOptions::default())
+            .expect("target state");
+        let mut state = SequenceState::from_target("target", &target);
+        let candidate = recognize_complex_moves(&state)
+            .expect("complex candidates")
+            .into_iter()
+            .find(|candidate| candidate.kind == ComplexMoveKind::RabbitEar)
+            .expect("rabbit-ear candidate");
+        state.active_creases.push(0);
+
+        assert!(local_complex_transform_is_supported(&state, &candidate));
     }
 
     #[test]

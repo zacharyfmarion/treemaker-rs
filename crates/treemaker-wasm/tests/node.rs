@@ -213,6 +213,40 @@ fn sequence_analyze_accepts_signed_fold_face_orders() {
     assert_eq!(target["selected_solution_index"], 0);
 }
 
+#[wasm_bindgen_test]
+fn sequence_plan_fold_completes_complex_local_move() {
+    let fold = serde_json::json!({
+        "file_spec": 1.2,
+        "frame_classes": ["creasePattern"],
+        "vertices_coords": [
+            [0, 0], [1, 0], [1, 1], [0, 1],
+            [0.5, 0], [1, 0.5], [0.5, 1], [0, 0.5], [0.5, 0.5]
+        ],
+        "edges_vertices": [
+            [0, 4], [4, 1], [1, 5], [5, 2], [2, 6], [6, 3], [3, 7], [7, 0],
+            [4, 8], [5, 8], [6, 8], [7, 8]
+        ],
+        "edges_assignment": ["B", "B", "B", "B", "B", "B", "B", "B", "M", "M", "M", "V"],
+        "edges_foldAngle": [null, null, null, null, null, null, null, null, -180, -180, -180, 180],
+        "faces_vertices": [[0, 4, 8, 7], [4, 1, 5, 8], [8, 5, 2, 6], [7, 8, 6, 3]]
+    });
+    let options = serde_wasm_bindgen::to_value(&serde_json::json!({
+        "solution_limit": 10,
+        "max_steps": 8
+    }))
+    .expect("options");
+
+    let plan = json(sequence_plan_fold(&fold.to_string(), options).expect("plan"));
+    assert_eq!(plan["status"], "complete");
+    assert_eq!(plan["steps"][0]["kind"], "rabbit_ear");
+    let diagnostics = plan["diagnostics"].as_array().expect("diagnostics");
+    assert!(!diagnostics.iter().any(|diagnostic| {
+        diagnostic["code"]
+            .as_str()
+            .is_some_and(|code| code.contains("not_implemented"))
+    }));
+}
+
 fn json(value: JsValue) -> Value {
     serde_wasm_bindgen::from_value(value).expect("json value")
 }

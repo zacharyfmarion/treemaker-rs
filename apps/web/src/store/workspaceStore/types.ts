@@ -3,6 +3,8 @@ import type {
   ConditionKind,
   FoldArtifacts,
   OptimizationReport,
+  SequencePlan,
+  SequenceTargetState,
   TreeEdit,
   WasmErrorEnvelope,
 } from '../../engine/types';
@@ -197,6 +199,10 @@ export interface CreasePatternSliceState {
   creaseColorMode: CreaseColorMode;
   foldArtifacts: FoldArtifacts | null;
   foldArtifactError: string | null;
+  sequenceTarget: SequenceTargetState | null;
+  sequencePlan: SequencePlan | null;
+  sequencePlanning: boolean;
+  sequenceError: string | null;
 }
 
 export interface CreasePatternSliceActions {
@@ -205,6 +211,8 @@ export interface CreasePatternSliceActions {
   optimizeStrain: () => Promise<void>;
   buildCreasePattern: () => Promise<void>;
   refreshFoldArtifacts: () => Promise<FoldArtifacts | null>;
+  analyzeSequenceTarget: () => Promise<SequenceTargetState | null>;
+  planFoldingSequence: () => Promise<SequencePlan | null>;
   setCreaseColorMode: (mode: CreaseColorMode) => void;
 }
 

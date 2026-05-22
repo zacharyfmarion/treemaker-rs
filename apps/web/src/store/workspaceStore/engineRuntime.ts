@@ -162,6 +162,10 @@ export function projectStateFromSnapshot(snapshot: TreeSnapshot, title?: string)
     error: null,
     foldArtifacts: null,
     foldArtifactError: null,
+    sequenceTarget: null,
+    sequencePlan: null,
+    sequencePlanning: false,
+    sequenceError: null,
   };
 }
 

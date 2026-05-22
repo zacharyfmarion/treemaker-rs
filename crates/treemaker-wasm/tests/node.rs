@@ -4,7 +4,8 @@ use wasm_bindgen_test::*;
 
 use treemaker_wasm::{
     apply_edit, build_crease_pattern, cp_status_report, export_v4, flat_fold_artifacts, free_tree,
-    load_tmd, new_design, optimize_scale, save_tmd5, tree_design, tree_snapshot, tree_summary,
+    load_tmd, new_design, optimize_scale, save_tmd5, sequence_analyze_fold, sequence_plan_fold,
+    tree_design, tree_snapshot, tree_summary,
 };
 
 const FIXTURE_1: &str = include_str!("../testdata/tmModelTester_1.tmd5");
@@ -155,6 +156,39 @@ fn flat_folder_artifacts_returns_imported_folded_base() {
     );
     assert!(artifacts["fold"]["face_orders"].is_array());
     assert!(artifacts["simulation_model"].is_object());
+}
+
+#[wasm_bindgen_test]
+fn sequence_analyze_and_plan_fold_return_research_artifacts() {
+    let fold = serde_json::json!({
+        "file_spec": 1.2,
+        "frame_classes": ["creasePattern"],
+        "vertices_coords": [[0, 0], [1, 0], [1, 1], [0, 1], [0, 0.5], [1, 0.5]],
+        "edges_vertices": [[0, 1], [1, 5], [5, 2], [2, 3], [3, 4], [4, 0], [4, 5]],
+        "edges_assignment": ["B", "B", "B", "B", "B", "B", "V"],
+        "edges_foldAngle": [null, null, null, null, null, null, 180],
+        "faces_vertices": [[0, 1, 5, 4], [4, 5, 2, 3]]
+    });
+    let options = serde_wasm_bindgen::to_value(&serde_json::json!({
+        "solution_limit": 10,
+        "max_steps": 8
+    }))
+    .expect("options");
+
+    let target = json(sequence_analyze_fold(&fold.to_string(), options.clone()).expect("target"));
+    assert_eq!(target["selected_solution_index"], 0);
+    assert_eq!(
+        target["folded_vertices"]
+            .as_array()
+            .expect("vertices")
+            .len(),
+        6
+    );
+
+    let plan = json(sequence_plan_fold(&fold.to_string(), options).expect("plan"));
+    assert_eq!(plan["status"], "complete");
+    assert_eq!(plan["steps"].as_array().expect("steps").len(), 1);
+    assert_eq!(plan["search"]["best_unresolved_creases"], 0);
 }
 
 fn json(value: JsValue) -> Value {

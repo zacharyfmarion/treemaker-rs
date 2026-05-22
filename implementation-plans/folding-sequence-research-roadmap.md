@@ -76,7 +76,7 @@ has a validated implementation.
 - [x] Phase 4: Add hierarchical complex moves for common base-collapse
       techniques.
 - [x] Phase 5: Add search, ranking, partial-plan handling, and diagnostics.
-- [ ] Phase 6: Expose planner artifacts through WASM and add a research UI.
+- [x] Phase 6: Expose planner artifacts through WASM and add a research UI.
 - [ ] Phase 7: Expand fixture/corpus validation and optional Oriedita cross-checks.
 - [ ] Phase 8: Decide whether ML/ranking data collection is warranted.
 - [ ] Phase 9: V2 reference/precrease planner integration.
@@ -408,6 +408,16 @@ Exit criteria:
 
 - A user can load or generate a CP, run the planner, and inspect every returned
   step without opening developer tools.
+
+Phase 6 implementation notes:
+
+- Added wasm bindings for `sequence_analyze_fold` and `sequence_plan_fold`.
+- Added worker and Zustand actions for target-state analysis and sequence
+  planning from current FOLD artifacts.
+- Added an experimental Sequence dock panel with plan status, search metrics,
+  diagnostics, unresolved-region reporting, and step timeline.
+- Added wasm Node tests, web store tests, and a browser smoke check for the new
+  panel.
 
 ## Phase 7: Corpus And Optional Oriedita Cross-Checks
 

@@ -383,6 +383,29 @@ function createMockEngineApi(initialSnapshot: TreeSnapshot) {
     flatFoldArtifacts: vi.fn(async (foldJson: string) =>
       foldArtifactsFromFold(JSON.parse(foldJson) as FoldDocument)
     ),
+    sequenceAnalyzeFold: vi.fn(async (foldJson: string) => ({
+      normalized: JSON.parse(foldJson) as FoldDocument,
+      folded_vertices: [],
+      faces_flip: [],
+      face_orders: [],
+      states: '1',
+      diagnostics: [],
+    })),
+    sequencePlanFold: vi.fn(async () => ({
+      status: 'complete',
+      steps: [],
+      states: [],
+      diagnostics: [],
+      unresolved_regions: [],
+      search: {
+        states_explored: 1,
+        branches_pruned: 0,
+        repeated_states: 0,
+        timed_out: false,
+        budget_exhausted: false,
+        best_unresolved_creases: 0,
+      },
+    })),
     optimizeScale: vi.fn(async (): Promise<OptimizationReport> => {
       const oldScale = snapshotState.paper.scale;
       snapshotState = makeSnapshot({
@@ -746,6 +769,10 @@ function loadSnapshotIntoStore(snapshot: TreeSnapshot, title = 'Seed project') {
     creaseColorMode: DEFAULT_CREASE_COLOR_MODE,
     foldArtifacts: null,
     foldArtifactError: null,
+    sequenceTarget: null,
+    sequencePlan: null,
+    sequencePlanning: false,
+    sequenceError: null,
   });
 }
 
@@ -1446,6 +1473,23 @@ describe('workspace store slices', () => {
 
     useWorkspaceStore.getState().setCreaseColorMode('mvf');
     expect(useWorkspaceStore.getState().creaseColorMode).toBe('mvf');
+  });
+
+  it('plans a folding sequence from loaded fold artifacts', async () => {
+    const api = resetStores(seedSnapshot());
+    loadSnapshotIntoStore(seedSnapshot());
+    const activatePanel = vi.fn();
+    useLayoutStore.setState({ activatePanel });
+    await useWorkspaceStore.getState().buildCreasePattern();
+
+    const plan = await useWorkspaceStore.getState().planFoldingSequence();
+
+    expect(api.sequenceAnalyzeFold).toHaveBeenCalledOnce();
+    expect(api.sequencePlanFold).toHaveBeenCalledOnce();
+    expect(plan?.status).toBe('complete');
+    expect(useWorkspaceStore.getState().sequencePlan?.status).toBe('complete');
+    expect(useWorkspaceStore.getState().sequenceError).toBeNull();
+    expect(activatePanel).toHaveBeenCalledWith('sequence');
   });
 
   it('does not mark CP ready when build returns no drawable crease pattern', async () => {

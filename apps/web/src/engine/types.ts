@@ -86,6 +86,73 @@ export interface FoldArtifacts {
   simulation_model_error?: string | null;
 }
 
+export type SequencePlanStatus = 'complete' | 'partial' | 'unsupported' | 'invalid_input';
+export type SequenceDiagnosticSeverity = 'info' | 'warning' | 'error';
+
+export interface SequenceDiagnostic {
+  severity: SequenceDiagnosticSeverity;
+  code: string;
+  message: string;
+}
+
+export interface SequenceUnresolvedRegion {
+  id: string;
+  creases: number[];
+  faces: number[];
+  reason: string;
+}
+
+export interface SequenceStateSnapshot {
+  id: string;
+  document: FoldDocument;
+  active_creases: number[];
+  face_orders: [number, number, number][];
+  folded_vertices: [number, number][];
+  unresolved_regions: SequenceUnresolvedRegion[];
+  diagnostics: SequenceDiagnostic[];
+}
+
+export interface SequenceStepDetails {
+  id: string;
+  label: string;
+  affected_creases?: number[];
+  affected_faces?: number[];
+  before_state?: string;
+  after_state?: string;
+  diagnostics?: SequenceDiagnostic[];
+}
+
+export type SequenceInstructionStep =
+  | ({ kind: 'unsupported_region'; region: SequenceUnresolvedRegion } & SequenceStepDetails)
+  | ({ kind: string } & SequenceStepDetails);
+
+export interface SequenceSearchStats {
+  states_explored: number;
+  branches_pruned: number;
+  repeated_states: number;
+  timed_out: boolean;
+  budget_exhausted: boolean;
+  best_unresolved_creases: number;
+}
+
+export interface SequencePlan {
+  status: SequencePlanStatus;
+  steps: SequenceInstructionStep[];
+  states: SequenceStateSnapshot[];
+  diagnostics: SequenceDiagnostic[];
+  unresolved_regions: SequenceUnresolvedRegion[];
+  search: SequenceSearchStats;
+}
+
+export interface SequenceTargetState {
+  normalized: FoldDocument;
+  folded_vertices: [number, number][];
+  faces_flip: boolean[];
+  face_orders: [number, number, number][];
+  states: string;
+  diagnostics: SequenceDiagnostic[];
+}
+
 export interface TreeSummary {
   scale: number;
   is_feasible: boolean;

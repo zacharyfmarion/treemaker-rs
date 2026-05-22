@@ -13,6 +13,10 @@ use treemaker_core::{
 };
 use treemaker_flatfold::{FlatFoldError, SolutionLimit, SolveOptions, solve_flat_fold};
 use treemaker_fold::{Assignment, FoldDocument};
+use treemaker_sequence::{
+    SequenceError, SequencePlanOptions, TargetStateOptions, plan_folding_sequence_with_options,
+    resolve_target_state,
+};
 use wasm_bindgen::prelude::*;
 
 thread_local! {
@@ -103,6 +107,14 @@ struct FlatFoldOptions {
     solution_limit: Option<usize>,
 }
 
+#[derive(Deserialize)]
+struct SequenceOptions {
+    solution_limit: Option<usize>,
+    max_steps: Option<usize>,
+    max_states: Option<usize>,
+    require_unique_layer_order: Option<bool>,
+}
+
 #[derive(Serialize)]
 struct ImportedFoldArtifacts {
     fold: serde_json::Value,
@@ -169,6 +181,54 @@ pub fn flat_fold_artifacts(
     };
     let serializer = serde_wasm_bindgen::Serializer::json_compatible();
     artifacts.serialize(&serializer).map_err(to_js_value)
+}
+
+#[wasm_bindgen]
+pub fn sequence_analyze_fold(
+    fold_json: &str,
+    options: JsValue,
+) -> std::result::Result<JsValue, JsValue> {
+    let options = parse_sequence_options(options)?;
+    let document = parse_fold_json(fold_json)?;
+    let target = resolve_target_state(
+        &document,
+        TargetStateOptions {
+            solution_limit: SolutionLimit::Count(options.solution_limit.unwrap_or(10)),
+            require_unique_layer_order: options.require_unique_layer_order.unwrap_or(false),
+            ..TargetStateOptions::default()
+        },
+    )
+    .map_err(to_js_sequence_error)?;
+    let serializer = serde_wasm_bindgen::Serializer::json_compatible();
+    target.serialize(&serializer).map_err(to_js_value)
+}
+
+#[wasm_bindgen]
+pub fn sequence_plan_fold(
+    fold_json: &str,
+    options: JsValue,
+) -> std::result::Result<JsValue, JsValue> {
+    let options = parse_sequence_options(options)?;
+    let document = parse_fold_json(fold_json)?;
+    let target = resolve_target_state(
+        &document,
+        TargetStateOptions {
+            solution_limit: SolutionLimit::Count(options.solution_limit.unwrap_or(10)),
+            require_unique_layer_order: options.require_unique_layer_order.unwrap_or(false),
+            ..TargetStateOptions::default()
+        },
+    )
+    .map_err(to_js_sequence_error)?;
+    let plan = plan_folding_sequence_with_options(
+        &target,
+        SequencePlanOptions {
+            max_steps: options.max_steps.unwrap_or(64),
+            max_states: options.max_states.unwrap_or(1024),
+        },
+    )
+    .map_err(to_js_sequence_error)?;
+    let serializer = serde_wasm_bindgen::Serializer::json_compatible();
+    plan.serialize(&serializer).map_err(to_js_value)
 }
 
 #[wasm_bindgen]
@@ -311,8 +371,34 @@ fn to_js_flatfold_error(error: FlatFoldError) -> JsValue {
     js_error(code, message)
 }
 
+fn to_js_sequence_error(error: SequenceError) -> JsValue {
+    js_error(error.code(), error.to_string())
+}
+
 fn to_js_value(error: impl std::fmt::Display) -> JsValue {
     js_error("js_value", error.to_string())
+}
+
+fn parse_sequence_options(options: JsValue) -> std::result::Result<SequenceOptions, JsValue> {
+    if options.is_null() || options.is_undefined() {
+        Ok(SequenceOptions {
+            solution_limit: None,
+            max_steps: None,
+            max_states: None,
+            require_unique_layer_order: None,
+        })
+    } else {
+        serde_wasm_bindgen::from_value(options).map_err(to_js_value)
+    }
+}
+
+fn parse_fold_json(fold_json: &str) -> std::result::Result<FoldDocument, JsValue> {
+    serde_json::from_str(fold_json).map_err(|error| {
+        js_error(
+            "invalid_input",
+            format!("failed to parse FOLD document: {error}"),
+        )
+    })
 }
 
 fn js_error(code: &'static str, message: impl Into<String>) -> JsValue {

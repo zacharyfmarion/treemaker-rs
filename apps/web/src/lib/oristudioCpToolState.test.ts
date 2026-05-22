@@ -37,19 +37,19 @@ describe('oristudio CP tool state', () => {
   it('selects unavailable commands as blocked but keeps the active command visible', () => {
     const state = transitionOristudioCpToolState(IDLE_ORISTUDIO_CP_TOOL_STATE, {
       type: 'selectAction',
-      action: action('cp.action.display-length-between-points1'),
+      action: action('cp.action.circle-draw'),
       editable: true,
     });
 
     expect(state).toMatchObject({
-      activeActionId: 'cp.action.display-length-between-points1',
-      activeOperationId: 'DisplayLengthBetweenPoints1',
+      activeActionId: 'cp.action.circle-draw',
+      activeOperationId: 'CircleDraw',
       phase: 'blocked',
-      prompt: 'Measure length 1: Not implemented',
+      prompt: 'Draw circle: Not implemented',
       status: 'not-implemented',
       stepIndex: 0,
     });
-    expect(state.steps).toEqual(['Pick first point', 'Pick second point']);
+    expect(state.steps).toEqual([]);
   });
 
   it('starts ready action tools and keeps repeatable draw tools active after commit', () => {

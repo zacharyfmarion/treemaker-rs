@@ -841,6 +841,10 @@ Done when:
       and all additional web context inputs.
 - [x] Stage 7.5: Validate settings defaults, undo neutrality, preview/commit
       payload agreement, and responsive panel placement.
+- [x] Stage 8 slice: Enable length and angle measurement tools as local
+      contextual readouts.
+- [x] Stage 8 slice: Validate measurement probes as non-mutating UI state with
+      no CP undo/redo history entries.
 - [ ] Stage 8: Enable circles, text, generators, and measurement tools.
 - [ ] Stage 8: Validate annotation preservation and non-mutating measurement
       behavior.

@@ -1018,6 +1018,126 @@ describe('CreasePatternPanel', () => {
     expect(payload?.ratio_t).toBe(3);
   });
 
+  it('records length measurements locally without mutating CP history', async () => {
+    const executeOristudioCpCommand = vi.fn(
+      async (_operationId: string, _payload?: OristudioCpCommandPayload) => true
+    );
+    const { container, previewOristudioCpCommand } = renderPanel(
+      createSampleProject(),
+      'crease_pattern_ready',
+      {
+        documentMode: 'crease-pattern',
+        importedCreasePattern: importedCpDocument(),
+        oristudioCpDocument: editableCpState(),
+        oristudioCpViewport: {
+          gridVisible: true,
+          snapToGrid: false,
+          snapToVertices: false,
+          snapToLines: false,
+        },
+        executeOristudioCpCommand,
+      }
+    );
+    const canvas = setCanvasClientRect(container);
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('button[aria-label="Measure length 1"]')?.click();
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).toContain('Measure length 1: Pick first point');
+    expect(
+      container.querySelector<HTMLElement>('[data-measurement-slot="length1"]')?.textContent
+    ).toBe('L1-');
+
+    act(() => {
+      canvas.dispatchEvent(
+        new MouseEvent('pointerdown', {
+          bubbles: true,
+          button: 0,
+          clientX: 360,
+          clientY: 348,
+        })
+      );
+    });
+    expect(container.textContent).toContain('Measure length 1: Pick second point');
+
+    await act(async () => {
+      canvas.dispatchEvent(
+        new MouseEvent('pointerdown', {
+          bubbles: true,
+          button: 0,
+          clientX: 477.6,
+          clientY: 348,
+        })
+      );
+      await Promise.resolve();
+    });
+
+    expect(
+      container.querySelector<HTMLElement>('[data-measurement-slot="length1"]')?.textContent
+    ).toBe('L180');
+    expect(container.textContent).toContain('Measure length 1: Pick first point');
+    expect(executeOristudioCpCommand).not.toHaveBeenCalled();
+    expect(previewOristudioCpCommand).not.toHaveBeenCalled();
+    expect(useWorkspaceStore.getState().oristudioCpHistoryPast).toHaveLength(0);
+    expect(useWorkspaceStore.getState().historyPast).toHaveLength(0);
+  });
+
+  it('records oriented angle measurements locally without mutating CP history', async () => {
+    const executeOristudioCpCommand = vi.fn(
+      async (_operationId: string, _payload?: OristudioCpCommandPayload) => true
+    );
+    const { container, previewOristudioCpCommand } = renderPanel(
+      createSampleProject(),
+      'crease_pattern_ready',
+      {
+        documentMode: 'crease-pattern',
+        importedCreasePattern: importedCpDocument(),
+        oristudioCpDocument: editableCpState(),
+        oristudioCpViewport: {
+          gridVisible: true,
+          snapToGrid: false,
+          snapToVertices: false,
+          snapToLines: false,
+        },
+        executeOristudioCpCommand,
+      }
+    );
+    const canvas = setCanvasClientRect(container);
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('button[aria-label="Measure angle 1"]')?.click();
+      await Promise.resolve();
+    });
+
+    for (const [clientX, clientY] of [
+      [477.6, 348],
+      [360, 348],
+      [360, 230.4],
+    ]) {
+      await act(async () => {
+        canvas.dispatchEvent(
+          new MouseEvent('pointerdown', {
+            bubbles: true,
+            button: 0,
+            clientX,
+            clientY,
+          })
+        );
+        await Promise.resolve();
+      });
+    }
+
+    expect(
+      container.querySelector<HTMLElement>('[data-measurement-slot="angle1"]')?.textContent
+    ).toBe('A190 deg');
+    expect(executeOristudioCpCommand).not.toHaveBeenCalled();
+    expect(previewOristudioCpCommand).not.toHaveBeenCalled();
+    expect(useWorkspaceStore.getState().oristudioCpHistoryPast).toHaveLength(0);
+    expect(useWorkspaceStore.getState().historyPast).toHaveLength(0);
+  });
+
   it('runs ready lengthen CP commands with three resolved model points and current color', async () => {
     const executeOristudioCpCommand = vi.fn(
       async (_operationId: string, _payload?: OristudioCpCommandPayload) => true

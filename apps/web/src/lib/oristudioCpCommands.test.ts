@@ -76,6 +76,14 @@ describe('oristudio CP command registry', () => {
       uiStatus: 'ready',
       selectionRequirement: 'selected folding lines',
     });
+    expect(cpCommandByOperation('DisplayLengthBetweenPoints1')).toMatchObject({
+      uiStatus: 'ready',
+      toolSteps: ['Pick first point', 'Pick second point'],
+    });
+    expect(cpCommandByOperation('DisplayAngleBetweenThreePoints1')).toMatchObject({
+      uiStatus: 'ready',
+      toolSteps: ['Pick first point', 'Pick vertex point', 'Pick second point'],
+    });
   });
 
   it('keeps the left rail populated by ordered command groups', () => {

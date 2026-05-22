@@ -267,6 +267,88 @@ function isCpLineEventTarget(target: EventTarget | null): boolean {
   );
 }
 
+type CpMeasurementSlotId = 'length1' | 'length2' | 'angle1' | 'angle2' | 'angle3';
+type CpMeasurementSlots = Record<CpMeasurementSlotId, number | null>;
+
+const CP_MEASUREMENT_SLOT_LABELS: Record<CpMeasurementSlotId, string> = {
+  length1: 'L1',
+  length2: 'L2',
+  angle1: 'A1',
+  angle2: 'A2',
+  angle3: 'A3',
+};
+
+const CP_MEASUREMENT_SLOT_ORDER: readonly CpMeasurementSlotId[] = [
+  'length1',
+  'length2',
+  'angle1',
+  'angle2',
+  'angle3',
+];
+
+function createEmptyCpMeasurementSlots(): CpMeasurementSlots {
+  return {
+    length1: null,
+    length2: null,
+    angle1: null,
+    angle2: null,
+    angle3: null,
+  };
+}
+
+function cpMeasurementSlotForOperation(
+  operationId: OristudioCpCommandDefinition['operationId'] | null | undefined
+): CpMeasurementSlotId | null {
+  switch (operationId) {
+    case 'DisplayLengthBetweenPoints1':
+      return 'length1';
+    case 'DisplayLengthBetweenPoints2':
+      return 'length2';
+    case 'DisplayAngleBetweenThreePoints1':
+      return 'angle1';
+    case 'DisplayAngleBetweenThreePoints2':
+      return 'angle2';
+    case 'DisplayAngleBetweenThreePoints3':
+      return 'angle3';
+    default:
+      return null;
+  }
+}
+
+function isCpMeasurementOperation(
+  operationId: OristudioCpCommandDefinition['operationId'] | null | undefined
+): boolean {
+  return cpMeasurementSlotForOperation(operationId) !== null;
+}
+
+function computeCpMeasurementValue(
+  operationId: OristudioCpCommandDefinition['operationId'],
+  points: readonly Point[]
+): number | null {
+  const slot = cpMeasurementSlotForOperation(operationId);
+  if (!slot) return null;
+
+  if (slot === 'length1' || slot === 'length2') {
+    const [a, b] = points;
+    if (!a || !b) return null;
+    return Math.hypot(b.x - a.x, b.y - a.y);
+  }
+
+  const [a, center, b] = points;
+  if (!a || !center || !b) return null;
+  const start = Math.atan2(a.y - center.y, a.x - center.x);
+  const end = Math.atan2(b.y - center.y, b.x - center.x);
+  const degrees = ((end - start) * 180) / Math.PI;
+  return ((degrees % 360) + 360) % 360;
+}
+
+function formatCpMeasurementValue(slot: CpMeasurementSlotId, value: number | null): string {
+  if (value === null) return '-';
+  const precision = slot.startsWith('angle') ? 2 : 3;
+  const unit = slot.startsWith('angle') ? ' deg' : '';
+  return `${formatNumber(value, precision)}${unit}`;
+}
+
 export function CreasePatternPanel() {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -282,6 +364,9 @@ export function CreasePatternPanel() {
   );
   const [cpToolPoints, setCpToolPoints] = useState<Point[]>([]);
   const [cpToolPath, setCpToolPath] = useState<Point[]>([]);
+  const [cpMeasurementSlots, setCpMeasurementSlots] = useState<CpMeasurementSlots>(
+    createEmptyCpMeasurementSlots
+  );
   const [cpCommandPreview, setCpCommandPreview] = useState<OristudioCpCommandPreview | null>(null);
   const cpPreviewRequestRef = useRef(0);
   const cpToolDragRef = useRef<{
@@ -333,6 +418,8 @@ export function CreasePatternPanel() {
   );
 
   const editableCp = documentMode === 'crease-pattern' ? oristudioCpDocument?.document : null;
+  const editableCpHandle =
+    documentMode === 'crease-pattern' ? (oristudioCpDocument?.handle ?? null) : null;
   const editableCpSummary = oristudioCpDocument?.summary ?? null;
   const editableCpBounds = useMemo(() => getEditableCpModelBounds(editableCp), [editableCp]);
   const editableCpVisibleGrid = useMemo(
@@ -435,6 +522,7 @@ export function CreasePatternPanel() {
       !activeCpCommand ||
       activeCpCommand.uiStatus !== 'ready' ||
       cpToolState.phase !== 'active' ||
+      isCpMeasurementOperation(activeCpCommand.operationId) ||
       activeCpInputMode === 'drag-path' ||
       activeCpInputMode === 'drag-line' ||
       liveCommandPreviewPoints.length === 0
@@ -730,6 +818,23 @@ export function CreasePatternPanel() {
         setCpToolState((state) =>
           state.activeOperationId === activeCpCommand.operationId
             ? transitionOristudioCpToolState(state, { type: 'advanceStep' })
+            : state
+        );
+        return;
+      }
+
+      const measurementSlot = cpMeasurementSlotForOperation(activeCpCommand.operationId);
+      if (measurementSlot) {
+        const value = computeCpMeasurementValue(activeCpCommand.operationId, nextPoints);
+        if (value === null) return;
+        setCpMeasurementSlots((current) => ({
+          ...current,
+          [measurementSlot]: value,
+        }));
+        setCpToolPoints([]);
+        setCpToolState((state) =>
+          state.activeOperationId === activeCpCommand.operationId
+            ? transitionOristudioCpToolState(state, { type: 'commit', keepActive: true })
             : state
         );
         return;
@@ -1190,6 +1295,10 @@ export function CreasePatternPanel() {
     }
   }, [editableCp]);
 
+  useEffect(() => {
+    setCpMeasurementSlots(createEmptyCpMeasurementSlots());
+  }, [editableCpHandle]);
+
   return (
     <section className="panel-shell cp-panel">
       <div className="panel-toolbar">
@@ -1394,6 +1503,7 @@ export function CreasePatternPanel() {
                   options={cpToolOptions}
                   setOptions={setCpToolOptions}
                   activeLineColor={activeCpLineColor}
+                  measurementSlots={cpMeasurementSlots}
                   onApply={
                     cpCommandRequiresContextApply(activeCpCommand)
                       ? handleApplyActiveContextCommand
@@ -1770,12 +1880,14 @@ function CpContextToolPanel({
   options,
   setOptions,
   activeLineColor,
+  measurementSlots,
   onApply,
 }: {
   command: OristudioCpCommandDefinition;
   options: OristudioCpToolOptions;
   setOptions: Dispatch<SetStateAction<OristudioCpToolOptions>>;
   activeLineColor: OristudioCpLineColor;
+  measurementSlots: CpMeasurementSlots;
   onApply?: () => void;
 }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -1811,6 +1923,8 @@ function CpContextToolPanel({
               options={options}
               setOptions={setOptions}
               activeLineColor={activeLineColor}
+              activeMeasurementSlot={cpMeasurementSlotForOperation(command.operationId)}
+              measurementSlots={measurementSlots}
             />
           ))}
           {onApply && (
@@ -1829,11 +1943,15 @@ function CpContextToolGroup({
   options,
   setOptions,
   activeLineColor,
+  activeMeasurementSlot,
+  measurementSlots,
 }: {
   group: OristudioCpToolSettingGroup;
   options: OristudioCpToolOptions;
   setOptions: Dispatch<SetStateAction<OristudioCpToolOptions>>;
   activeLineColor: OristudioCpLineColor;
+  activeMeasurementSlot: CpMeasurementSlotId | null;
+  measurementSlots: CpMeasurementSlots;
 }) {
   if (group === 'line-color') {
     return (
@@ -2063,8 +2181,18 @@ function CpContextToolGroup({
     return (
       <div className="cp-context-panel__group">
         <div className="cp-context-panel__group-title">Measurement</div>
-        <div className="cp-context-panel__readout">
-          Slot values will appear here when measurement tools are ported.
+        <div className="cp-context-panel__measurement-grid">
+          {CP_MEASUREMENT_SLOT_ORDER.map((slot) => (
+            <div
+              key={slot}
+              className="cp-context-panel__measurement-row"
+              data-active={slot === activeMeasurementSlot || undefined}
+              data-measurement-slot={slot}
+            >
+              <span>{CP_MEASUREMENT_SLOT_LABELS[slot]}</span>
+              <span>{formatCpMeasurementValue(slot, measurementSlots[slot])}</span>
+            </div>
+          ))}
         </div>
       </div>
     );

@@ -49,6 +49,7 @@ describe('SimulatorPanel', () => {
 
     expect(rendered.querySelector('[aria-label="Fold percent"]')).not.toBeNull();
     expect(rendered.querySelector('[aria-label="Simulator scope"]')?.textContent).toContain('Whole');
+    expect(rendered.querySelector('[aria-label="Step simulation accuracy"]')).toBeNull();
     expect(rendered.textContent).not.toContain('Manual preview');
     expect(putImageDataMock).toHaveBeenCalled();
   });
@@ -70,6 +71,29 @@ describe('SimulatorPanel', () => {
     expect(rendered.querySelector('[aria-label="Step percent"]')).not.toBeNull();
     expect(rendered.textContent).toContain('Step 1: manual collapse');
     expect(rendered.textContent).toContain('Manual preview');
+    expect(rendered.querySelector('[aria-label="Step simulation accuracy"]')?.textContent).toContain(
+      'Accurate'
+    );
+    expect(activeAccuracyButton(rendered)?.textContent).toBe('Accurate');
+  });
+
+  it('lets step simulation switch between accurate and fast solver work', () => {
+    const plan = manualCollapsePlan();
+    const rendered = renderPanel({
+      foldArtifacts: { fold: simpleFold() },
+      sequencePlan: plan,
+      sequenceSimulationFocus: { kind: 'sequence_step', stepId: 'manual' },
+    });
+    const accuracyControl = rendered.querySelector('[aria-label="Step simulation accuracy"]');
+    const fastButton = Array.from(accuracyControl?.querySelectorAll('button') ?? []).find(
+      (button) => button.textContent === 'Fast'
+    );
+
+    expect(activeAccuracyButton(rendered)?.textContent).toBe('Accurate');
+    act(() => {
+      fastButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(activeAccuracyButton(rendered)?.textContent).toBe('Fast');
   });
 });
 
@@ -97,6 +121,15 @@ function renderPanel(state: Partial<ReturnType<typeof useWorkspaceStore.getState
     );
   });
   return container;
+}
+
+function activeAccuracyButton(rendered: HTMLDivElement): HTMLButtonElement | null {
+  const accuracyControl = rendered.querySelector('[aria-label="Step simulation accuracy"]');
+  return (
+    Array.from(accuracyControl?.querySelectorAll('button') ?? []).find(
+      (button) => button.getAttribute('aria-pressed') === 'true'
+    ) ?? null
+  );
 }
 
 function manualCollapsePlan(): SequencePlan {

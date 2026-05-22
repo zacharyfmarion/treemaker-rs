@@ -30,6 +30,11 @@ import {
 } from '@treemaker/origami-simulator';
 import { buildSequenceStepSimulation } from '../../lib/sequenceSimulation';
 import {
+  STEP_SIMULATION_ACCURACY_OPTIONS,
+  simulatorRunConfig,
+  type StepSimulationAccuracy,
+} from '../../lib/simulatorRunConfig';
+import {
   nextSimulatorOrbitView,
   type SimulatorOrbitView as SimulatorView,
 } from '../../lib/simulatorOrbit';
@@ -79,13 +84,6 @@ interface DepthSurface {
   height: number;
 }
 
-const INITIAL_SETTLE_STEPS = 300;
-const FOLD_CHANGE_IMMEDIATE_STEPS = 200;
-const FOLD_CHANGE_SETTLE_BATCH = 200;
-const FOLD_CHANGE_SETTLE_FRAMES = 40;
-const FOLD_PLAY_STEP_BATCH = 160;
-const FOLD_PLAY_PERCENT_PER_SECOND = 28;
-const FOLD_STEP_PERCENT = 5;
 const SETTLE_DELTA_EPSILON = 0.0002;
 const PAPER_EDGE_DEPTH_EPSILON = 0.006;
 const INITIAL_FOLD_PERCENT = 0;
@@ -132,6 +130,7 @@ export function SimulatorPanel() {
   const [strain, setStrain] = useState(0);
   const [modelStats, setModelStats] = useState({ vertices: 0, triangles: 0 });
   const [viewSettings, setViewSettings] = useState<SimulatorViewSettings>(DEFAULT_VIEW_SETTINGS);
+  const [stepAccuracy, setStepAccuracy] = useState<StepSimulationAccuracy>('accurate');
   const refreshCapability = capabilities['simulator.refresh'];
   const stepSimulationResult = useMemo(
     () =>
@@ -144,6 +143,10 @@ export function SimulatorPanel() {
   const stepSimulationError =
     stepSimulationResult && !stepSimulationResult.ok ? stepSimulationResult.reason : null;
   const simulatorMode = sequenceSimulationFocus.kind === 'sequence_step' ? 'step' : 'whole';
+  const runConfig = useMemo(
+    () => simulatorRunConfig(simulatorMode, stepAccuracy),
+    [simulatorMode, stepAccuracy]
+  );
   const simulationFold = activeStepSimulation
     ? activeStepSimulation.fold
     : (foldArtifacts?.simulation_model?.fold ?? foldArtifacts?.fold ?? null);
@@ -204,7 +207,7 @@ export function SimulatorPanel() {
   }, []);
 
   const startSettling = useCallback(
-    (frames = FOLD_CHANGE_SETTLE_FRAMES) => {
+    (frames = runConfig.foldChangeSettleFrames) => {
       if (typeof window === 'undefined') return;
       clearSettling();
       let remaining = frames;
@@ -212,7 +215,7 @@ export function SimulatorPanel() {
 
       const tick = () => {
         const previous = frameRef.current?.positions;
-        const next = stepSimulation(FOLD_CHANGE_SETTLE_BATCH);
+        const next = stepSimulation(runConfig.foldChangeSettleBatch);
         if (!next) {
           settleRafRef.current = null;
           return;
@@ -231,7 +234,7 @@ export function SimulatorPanel() {
 
       settleRafRef.current = window.requestAnimationFrame(tick);
     },
-    [clearSettling, stepSimulation]
+    [clearSettling, runConfig, stepSimulation]
   );
 
   useEffect(() => {
@@ -332,12 +335,16 @@ export function SimulatorPanel() {
       );
       const controller = createOrigamiSimulator({
         model,
-        options: { foldPercent: initialFoldPercent, foldProfile: simulationFoldProfile },
+        options: {
+          ...runConfig.solverOptions,
+          foldPercent: initialFoldPercent,
+          foldProfile: simulationFoldProfile,
+        },
       });
       modelRef.current = model;
       controllerRef.current = controller;
       setModelStats({ vertices: model.vertexCount, triangles: model.faceCount });
-      frameRef.current = controller.step(INITIAL_SETTLE_STEPS);
+      frameRef.current = controller.step(runConfig.initialSettleSteps);
       setLoadState('ready');
       drawCurrentFrame();
       if (initialFoldPercent !== 0) startSettling();
@@ -367,6 +374,7 @@ export function SimulatorPanel() {
     simulationFoldProfile,
     simulationModelError,
     simulationSourceKey,
+    runConfig,
     startSettling,
     activeStepSimulation,
   ]);
@@ -376,18 +384,21 @@ export function SimulatorPanel() {
       clearPlayback();
       setPlaying(false);
       applyFoldPercent(percent);
-      if (stepSimulation(FOLD_CHANGE_IMMEDIATE_STEPS)) {
+      if (stepSimulation(runConfig.foldChangeImmediateSteps)) {
         startSettling();
       }
     },
-    [applyFoldPercent, clearPlayback, startSettling, stepSimulation]
+    [applyFoldPercent, clearPlayback, runConfig, startSettling, stepSimulation]
   );
 
   const stepFoldTarget = useCallback(() => {
     setFoldTarget(
-      Math.min(100, Math.floor(foldPercentRef.current / FOLD_STEP_PERCENT + 1) * FOLD_STEP_PERCENT)
+      Math.min(
+        100,
+        Math.floor(foldPercentRef.current / runConfig.foldStepPercent + 1) * runConfig.foldStepPercent
+      )
     );
-  }, [setFoldTarget]);
+  }, [runConfig.foldStepPercent, setFoldTarget]);
 
   const replayFromFlat = useCallback(() => {
     clearPlayback();
@@ -395,9 +406,9 @@ export function SimulatorPanel() {
     setPlaying(false);
     controllerRef.current?.reset();
     applyFoldPercent(0);
-    frameRef.current = controllerRef.current?.step(INITIAL_SETTLE_STEPS) ?? null;
+    frameRef.current = controllerRef.current?.step(runConfig.initialSettleSteps) ?? null;
     drawCurrentFrame();
-  }, [applyFoldPercent, clearPlayback, clearSettling, drawCurrentFrame]);
+  }, [applyFoldPercent, clearPlayback, clearSettling, drawCurrentFrame, runConfig.initialSettleSteps]);
 
   useEffect(() => {
     if (!playing || typeof window === 'undefined') return;
@@ -406,7 +417,7 @@ export function SimulatorPanel() {
     if (foldPercentRef.current >= 100) {
       controllerRef.current?.reset();
       applyFoldPercent(0);
-      frameRef.current = controllerRef.current?.step(INITIAL_SETTLE_STEPS) ?? null;
+      frameRef.current = controllerRef.current?.step(runConfig.initialSettleSteps) ?? null;
       drawCurrentFrame();
     }
 
@@ -417,11 +428,11 @@ export function SimulatorPanel() {
       previousTime = time;
       const nextPercent = Math.min(
         100,
-        foldPercentRef.current + elapsedSeconds * FOLD_PLAY_PERCENT_PER_SECOND
+        foldPercentRef.current + elapsedSeconds * runConfig.foldPlayPercentPerSecond
       );
 
       applyFoldPercent(nextPercent);
-      stepSimulation(FOLD_PLAY_STEP_BATCH);
+      stepSimulation(runConfig.foldPlayStepBatch);
 
       if (nextPercent >= 100) {
         rafRef.current = null;
@@ -440,6 +451,7 @@ export function SimulatorPanel() {
     clearSettling,
     drawCurrentFrame,
     playing,
+    runConfig,
     startSettling,
     stepSimulation,
   ]);
@@ -551,6 +563,16 @@ export function SimulatorPanel() {
               <AlertTriangle size={12} />
               Manual preview
             </span>
+          )}
+          {simulatorMode === 'step' && (
+            <div className="simulator-accuracy-controls">
+              <SegmentedControl
+                aria-label="Step simulation accuracy"
+                value={stepAccuracy}
+                onChange={setStepAccuracy}
+                options={STEP_SIMULATION_ACCURACY_OPTIONS}
+              />
+            </div>
           )}
         </div>
         <div className="panel-toolbar__group simulator-view-settings" aria-label="Simulator view settings">

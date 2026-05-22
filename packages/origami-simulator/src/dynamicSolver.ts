@@ -21,6 +21,7 @@ const DEFAULT_OPTIONS: Required<SimulatorOptions> = {
   faceStiffness: 0.2,
   damping: 0.45,
   timeStep: 0,
+  timeStepScale: 1,
   stepsPerFrame: 100,
   autoRender: true,
   integrationType: 'euler',
@@ -420,7 +421,7 @@ export class DynamicSolver {
       }
     }
     if (maxFrequency <= EPSILON) return 1 / 60;
-    return 0.9 / (TWO_PI * maxFrequency);
+    return (0.9 / (TWO_PI * maxFrequency)) * normalizedTimeStepScale(this.options.timeStepScale);
   }
 
   private relativePointAt(vertex: number): Vec3 {
@@ -535,6 +536,11 @@ function clamp(value: number, min: number, max: number): number {
 function clampFoldPercent(percent: number): number {
   if (!Number.isFinite(percent)) return 0;
   return clamp(percent, 0, 100);
+}
+
+function normalizedTimeStepScale(scale: number): number {
+  if (!Number.isFinite(scale) || scale <= 0) return 1;
+  return clamp(scale, 0.05, 1);
 }
 
 function foldProfileRangeMap(ranges: CreaseFoldRange[]): Map<number, CreaseFoldRange> {

@@ -122,6 +122,31 @@ describe('createOrigamiSimulator', () => {
     simulator.dispose();
   });
 
+  it('can scale the adaptive timestep down for higher-accuracy settling', () => {
+    const standardPrepared = prepareFoldModel(makeBookFoldFixture());
+    const accuratePrepared = prepareFoldModel(makeBookFoldFixture());
+    const standard = createOrigamiSimulator({
+      model: standardPrepared,
+      options: { foldPercent: 100 },
+    });
+    const accurate = createOrigamiSimulator({
+      model: accuratePrepared,
+      options: { foldPercent: 100, timeStepScale: 0.25 },
+    });
+    const standardBefore = standard.readFrame().positions;
+    const accurateBefore = accurate.readFrame().positions;
+    const standardAfter = standard.step(1).positions;
+    const accurateAfter = accurate.step(1).positions;
+
+    expect(maxPositionDelta(standardBefore, standardAfter)).toBeGreaterThan(0);
+    expect(maxPositionDelta(accurateBefore, accurateAfter)).toBeGreaterThan(0);
+    expect(maxPositionDelta(accurateBefore, accurateAfter)).toBeLessThan(
+      maxPositionDelta(standardBefore, standardAfter)
+    );
+    standard.dispose();
+    accurate.dispose();
+  });
+
   it('leaves a flat model still when the target fold percent is zero', () => {
     const prepared = prepareFoldModel(makeBookFoldFixture());
     const simulator = createOrigamiSimulator({ model: prepared, options: { foldPercent: 0 } });

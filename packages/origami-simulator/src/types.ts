@@ -69,6 +69,7 @@ export interface SimulatorOptions {
   faceStiffness?: number;
   damping?: number;
   timeStep?: number;
+  timeStepScale?: number;
   stepsPerFrame?: number;
   autoRender?: boolean;
   integrationType?: 'euler' | 'verlet';

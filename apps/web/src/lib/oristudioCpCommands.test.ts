@@ -76,6 +76,19 @@ describe('oristudio CP command registry', () => {
       uiStatus: 'ready',
       selectionRequirement: 'selected folding lines',
     });
+    expect(cpCommandByOperation('Check1')).toMatchObject({
+      uiStatus: 'ready',
+      tooltip: 'Find overlapping or contained non-auxiliary crease pairs',
+    });
+    expect(cpCommandByOperation('CheckCamv')).toMatchObject({
+      uiStatus: 'ready',
+    });
+    expect(cpCommandByOperation('Fix1')).toMatchObject({
+      uiStatus: 'ready',
+    });
+    expect(cpCommandByOperation('Fix2')).toMatchObject({
+      uiStatus: 'ready',
+    });
     expect(cpCommandByOperation('DisplayLengthBetweenPoints1')).toMatchObject({
       uiStatus: 'ready',
       toolSteps: ['Pick first point', 'Pick second point'],

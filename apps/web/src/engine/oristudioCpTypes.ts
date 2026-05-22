@@ -104,6 +104,17 @@ export interface OristudioCpCommandResult {
   operation: OristudioCpOperationId;
   status: OristudioCpOperationStatus;
   diagnostics: string[];
+  diagnostic_entries?: OristudioCpDiagnosticEntry[];
+}
+
+export interface OristudioCpDiagnosticEntry {
+  id: string;
+  kind: string;
+  severity: string;
+  message: string;
+  point?: Point | null;
+  segments: OristudioCpLineSegment[];
+  rule?: string | null;
 }
 
 export interface OristudioCpCommandPreview {

@@ -15,6 +15,7 @@ import type {
   OristudioCpCommandPreview,
   OristudioCpCircle,
   OristudioCpCustomLineType,
+  OristudioCpDiagnosticEntry,
   OristudioCpDocumentSnapshot,
   OristudioCpLineColor,
   OristudioCpLineSegment,
@@ -617,6 +618,8 @@ export function CreasePatternPanel() {
       ? localDragLinePreviewSegments
       : (cpCommandPreview?.segments ?? []);
   const renderedCommandPreviewCircles = cpCommandPreview?.circles ?? [];
+  const latestDiagnosticEntries =
+    oristudioCpDocument?.lastCommandResult?.diagnostic_entries ?? [];
   const buildCpCommandPayload = useCallback(
     (
       command: OristudioCpCommandDefinition,
@@ -1818,6 +1821,7 @@ export function CreasePatternPanel() {
                         commandPreviewCircles={renderedCommandPreviewCircles}
                         commandPreviewPoints={renderedCommandPreviewPoints}
                         commandPreviewSegments={renderedCommandPreviewSegments}
+                        diagnostics={latestDiagnosticEntries}
                         selection={oristudioCpSelection}
                         snapTarget={snapTarget}
                         spacePressed={spacePressed}
@@ -1956,6 +1960,7 @@ interface EditableCreasePatternProps {
   commandPreviewCircles: OristudioCpCircle[];
   commandPreviewPoints: Point[];
   commandPreviewSegments: OristudioCpLineSegment[];
+  diagnostics: OristudioCpDiagnosticEntry[];
   selection: OristudioCpSelection;
   snapTarget: CpSnapTarget | null;
   spacePressed: boolean;
@@ -1978,6 +1983,7 @@ function EditableCreasePattern({
   commandPreviewCircles,
   commandPreviewPoints,
   commandPreviewSegments,
+  diagnostics,
   selection,
   snapTarget,
   spacePressed,
@@ -2105,6 +2111,36 @@ function EditableCreasePattern({
           />
         );
       })}
+      {diagnostics.flatMap((diagnostic) =>
+        diagnostic.segments.map((segment, index) => {
+          const a = modelPointToCpSvg(segment.a, bounds);
+          const b = modelPointToCpSvg(segment.b, bounds);
+          return (
+            <line
+              key={`${diagnostic.id}-segment-${index}`}
+              className="cp-diagnostic-segment"
+              x1={a.x}
+              y1={a.y}
+              x2={b.x}
+              y2={b.y}
+            />
+          );
+        })
+      )}
+      {diagnostics
+        .filter((diagnostic) => diagnostic.point)
+        .map((diagnostic) => {
+          const point = modelPointToCpSvg(diagnostic.point as Point, bounds);
+          return (
+            <circle
+              key={`${diagnostic.id}-point`}
+              className="cp-diagnostic-point"
+              cx={point.x}
+              cy={point.y}
+              r="6"
+            />
+          );
+        })}
       {document.crease_pattern.texts.map((text, index) => {
         const id = index + 1;
         const position = modelPointToCpSvg(

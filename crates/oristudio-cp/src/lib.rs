@@ -177,7 +177,7 @@ pub enum TextCommandAction {
 }
 
 /// Result returned by a successfully executed command.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CommandResult {
     /// Oriedita operation that was executed.
     pub operation: OperationId,
@@ -185,6 +185,23 @@ pub struct CommandResult {
     pub status: OperationStatus,
     /// Human-readable diagnostics emitted by the command.
     pub diagnostics: Vec<String>,
+    /// Structured diagnostic markers emitted by non-mutating check commands.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub diagnostic_entries: Vec<CommandDiagnostic>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CommandDiagnostic {
+    pub id: String,
+    pub kind: String,
+    pub severity: String,
+    pub message: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub point: Option<geometry::Point>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub segments: Vec<geometry::LineSegment>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rule: Option<String>,
 }
 
 /// Transient candidate geometry for active construction tools.
@@ -1310,6 +1327,7 @@ pub fn execute_command(
         | OperationStatus::DocumentedDifference => {}
     }
 
+    let mut diagnostic_entries = Vec::new();
     let changed = match command.operation {
         OperationId::DrawCreaseFree | OperationId::DrawCreaseRestricted => {
             let points = required_points(&command, 2)?;
@@ -2152,6 +2170,47 @@ pub fn execute_command(
                 &selection,
             )
         }
+        OperationId::Check1 => {
+            diagnostic_entries = line_pair_diagnostics(
+                OperationId::Check1,
+                "Check1",
+                "Overlapping or contained non-auxiliary creases",
+                checks::check1(&document.crease_pattern),
+            );
+            0
+        }
+        OperationId::Check2 => {
+            diagnostic_entries = line_pair_diagnostics(
+                OperationId::Check2,
+                "Check2",
+                "Near T-intersection between non-auxiliary creases",
+                checks::check2(&document.crease_pattern),
+            );
+            0
+        }
+        OperationId::Check3 => {
+            diagnostic_entries =
+                point_marker_diagnostics("Check3", checks::check3(&document.crease_pattern));
+            0
+        }
+        OperationId::Check4 => {
+            diagnostic_entries =
+                flat_foldability_diagnostics("Check4", checks::check4(&document.crease_pattern));
+            0
+        }
+        OperationId::CheckCamv => {
+            let result = checks::check_camv_task(&document.crease_pattern);
+            diagnostic_entries = flat_foldability_diagnostics("CheckCamv", result.violations);
+            0
+        }
+        OperationId::Fix1 => {
+            usize::from(operations::arrangement::fix1(&mut document.crease_pattern))
+        }
+        OperationId::Fix2 => {
+            let before = document.crease_pattern.line_segments.clone();
+            operations::arrangement::fix2(&mut document.crease_pattern);
+            usize::from(document.crease_pattern.line_segments != before)
+        }
         OperationId::FixInaccurate => {
             let line_indices = required_line_indices(&command)?;
             checks::fix_inaccurate_for_indices(
@@ -2223,11 +2282,113 @@ pub fn execute_command(
         }
     };
 
+    let diagnostics = if matches!(
+        command.operation,
+        OperationId::Check1
+            | OperationId::Check2
+            | OperationId::Check3
+            | OperationId::Check4
+            | OperationId::CheckCamv
+    ) {
+        vec![format!(
+            "{} found {} issue(s)",
+            diagnostic_operation_label(command.operation),
+            diagnostic_entries.len()
+        )]
+    } else {
+        vec![format!("Changed {changed} line(s)")]
+    };
+
     Ok(CommandResult {
         operation: command.operation,
         status,
-        diagnostics: vec![format!("Changed {changed} line(s)")],
+        diagnostics,
+        diagnostic_entries,
     })
+}
+
+fn diagnostic_operation_label(operation: OperationId) -> &'static str {
+    match operation {
+        OperationId::Check1 => "Check1",
+        OperationId::Check2 => "Check2",
+        OperationId::Check3 => "Check3",
+        OperationId::Check4 => "Check4",
+        OperationId::CheckCamv => "Check CAMV",
+        _ => "Diagnostics",
+    }
+}
+
+fn line_pair_diagnostics(
+    operation: OperationId,
+    kind: &str,
+    message: &str,
+    segments: Vec<LineSegment>,
+) -> Vec<CommandDiagnostic> {
+    segments
+        .chunks(2)
+        .enumerate()
+        .map(|(index, pair)| CommandDiagnostic {
+            id: format!("{kind}-{}", index + 1),
+            kind: kind.to_string(),
+            severity: "error".to_string(),
+            message: message.to_string(),
+            point: None,
+            segments: pair.to_vec(),
+            rule: Some(format!("{operation:?}")),
+        })
+        .collect()
+}
+
+fn point_marker_diagnostics(kind: &str, markers: Vec<LineSegment>) -> Vec<CommandDiagnostic> {
+    markers
+        .into_iter()
+        .enumerate()
+        .map(|(index, marker)| CommandDiagnostic {
+            id: format!("{kind}-{}", index + 1),
+            kind: kind.to_string(),
+            severity: "error".to_string(),
+            message: "Invalid vertex flat-foldability marker".to_string(),
+            point: Some(marker.a),
+            segments: vec![marker],
+            rule: Some("VertexFlatFoldability".to_string()),
+        })
+        .collect()
+}
+
+fn flat_foldability_diagnostics(
+    kind: &str,
+    violations: Vec<checks::FlatFoldabilityViolation>,
+) -> Vec<CommandDiagnostic> {
+    violations
+        .into_iter()
+        .enumerate()
+        .map(|(index, violation)| {
+            let rule = flat_foldability_rule_label(violation.rule);
+            CommandDiagnostic {
+                id: format!("{kind}-{}", index + 1),
+                kind: kind.to_string(),
+                severity: "error".to_string(),
+                message: format!("Flat-foldability violation: {rule}"),
+                point: Some(violation.point),
+                segments: violation
+                    .little_big_little
+                    .into_iter()
+                    .map(|segment| segment.segment)
+                    .collect(),
+                rule: Some(rule.to_string()),
+            }
+        })
+        .collect()
+}
+
+fn flat_foldability_rule_label(rule: checks::FlatFoldabilityRule) -> &'static str {
+    match rule {
+        checks::FlatFoldabilityRule::NumberOfFolds => "NumberOfFolds",
+        checks::FlatFoldabilityRule::Angles => "Angles",
+        checks::FlatFoldabilityRule::Maekawa => "Maekawa",
+        checks::FlatFoldabilityRule::LittleBigLittle => "LittleBigLittle",
+        checks::FlatFoldabilityRule::None => "None",
+    }
 }
 
 /// Query transient candidate geometry for an active construction command.
@@ -4210,6 +4371,76 @@ mod tests {
         assert_eq!(result.diagnostics, vec!["Changed 2 line(s)"]);
         assert_eq!(document.crease_pattern.circles.len(), 1);
         assert_eq!(document.crease_pattern.circles[0].r, 2.0);
+    }
+
+    #[test]
+    fn command_dispatch_routes_stage_nine_diagnostics_and_repairs() {
+        let mut document = CreasePatternDocument::default();
+        document.crease_pattern.add_line(
+            Point::new(0.0, 0.0),
+            Point::new(10.0, 0.0),
+            LineColor::Red1,
+        );
+        document.crease_pattern.add_line(
+            Point::new(5.0, 0.0),
+            Point::new(15.0, 0.0),
+            LineColor::Blue2,
+        );
+
+        let before = document.clone();
+        let check1 = execute_command(
+            &mut document,
+            CreasePatternCommand::new(OperationId::Check1),
+        )
+        .expect("Check1 should execute");
+        assert_eq!(document, before);
+        assert_eq!(check1.diagnostics, vec!["Check1 found 1 issue(s)"]);
+        assert_eq!(check1.diagnostic_entries.len(), 1);
+        assert_eq!(check1.diagnostic_entries[0].segments.len(), 2);
+
+        let fix1 = execute_command(&mut document, CreasePatternCommand::new(OperationId::Fix1))
+            .expect("Fix1 should execute");
+        assert_eq!(fix1.diagnostics, vec!["Changed 0 line(s)"]);
+        assert!(
+            document
+                .crease_pattern
+                .line_segments
+                .iter()
+                .any(|line| line.selected != 0)
+        );
+
+        document.crease_pattern.line_segments.clear();
+        document.crease_pattern.add_line(
+            Point::new(0.0, 0.0),
+            Point::new(10.0, 0.0),
+            LineColor::Red1,
+        );
+        document.crease_pattern.add_line(
+            Point::new(5.0, 0.0),
+            Point::new(5.0, 5.0),
+            LineColor::Blue2,
+        );
+        let check2 = execute_command(
+            &mut document,
+            CreasePatternCommand::new(OperationId::Check2),
+        )
+        .expect("Check2 should execute");
+        assert_eq!(check2.diagnostic_entries.len(), 1);
+        let fix2 = execute_command(&mut document, CreasePatternCommand::new(OperationId::Fix2))
+            .expect("Fix2 should execute");
+        assert_eq!(fix2.diagnostics, vec!["Changed 1 line(s)"]);
+
+        let check4 = execute_command(
+            &mut document,
+            CreasePatternCommand::new(OperationId::Check4),
+        )
+        .expect("Check4 should execute");
+        assert!(
+            check4
+                .diagnostic_entries
+                .iter()
+                .any(|entry| entry.point.is_some())
+        );
     }
 
     #[test]

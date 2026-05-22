@@ -946,6 +946,45 @@ describe('CreasePatternPanel', () => {
     });
   });
 
+  it('runs diagnostic checks and renders latest diagnostic markers', async () => {
+    const executeOristudioCpCommand = vi.fn(async () => true);
+    const state = editableCpState();
+    state.lastCommandResult = {
+      operation: 'Check1',
+      status: 'OracleTested',
+      diagnostics: ['Check1 found 1 issue(s)'],
+      diagnostic_entries: [
+        {
+          id: 'Check1-1',
+          kind: 'Check1',
+          severity: 'error',
+          message: 'Overlapping or contained non-auxiliary creases',
+          point: { x: 0, y: 0 },
+          segments: state.document.crease_pattern.line_segments,
+          rule: 'Check1',
+        },
+      ],
+    };
+    const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
+      documentMode: 'crease-pattern',
+      importedCreasePattern: importedCpDocument(),
+      oristudioCpDocument: state,
+      executeOristudioCpCommand,
+    });
+
+    expect(container.querySelectorAll('.cp-diagnostic-segment')).toHaveLength(2);
+    expect(container.querySelector('.cp-diagnostic-point')).not.toBeNull();
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('button[aria-label="Check 1"]')?.click();
+      await Promise.resolve();
+    });
+
+    expect(executeOristudioCpCommand).toHaveBeenCalledWith('Check1', {
+      line_ids: [],
+    });
+  });
+
   it('passes contextual circle color options with selected circles only after apply', async () => {
     const executeOristudioCpCommand = vi.fn(async () => true);
     const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {

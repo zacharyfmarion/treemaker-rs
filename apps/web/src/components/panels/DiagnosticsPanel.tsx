@@ -5,6 +5,7 @@ export function DiagnosticsPanel() {
   const project = useWorkspaceStore((state) => state.project);
   const documentMode = useWorkspaceStore((state) => state.documentMode);
   const importedCreasePattern = useWorkspaceStore((state) => state.importedCreasePattern);
+  const oristudioCpDocument = useWorkspaceStore((state) => state.oristudioCpDocument);
   const status = useWorkspaceStore((state) => state.status);
   const engineReady = useWorkspaceStore((state) => state.engineReady);
   const error = useWorkspaceStore((state) => state.error);
@@ -30,6 +31,8 @@ export function DiagnosticsPanel() {
 
   if (documentMode === 'crease-pattern') {
     const diagnostics = importedCreasePattern?.diagnostics;
+    const cpDiagnosticEntries = oristudioCpDocument?.lastCommandResult?.diagnostic_entries ?? [];
+    const cpDiagnosticSummary = oristudioCpDocument?.lastCommandResult?.diagnostics[0] ?? null;
     const hasErrors = Boolean(diagnostics?.errors.length);
     const hasWarnings = Boolean(diagnostics?.warnings.length);
     return (
@@ -39,11 +42,42 @@ export function DiagnosticsPanel() {
         </div>
         <div className="panel-body">
           <div className="metric-grid">
-            <Metric label="Vertices" value={importedCreasePattern?.stats.vertices ?? 0} />
-            <Metric label="Edges" value={importedCreasePattern?.stats.edges ?? 0} />
+            <Metric
+              label="Vertices"
+              value={
+                importedCreasePattern?.stats.vertices ??
+                oristudioCpDocument?.summary.points ??
+                0
+              }
+            />
+            <Metric
+              label="Edges"
+              value={
+                importedCreasePattern?.stats.edges ??
+                oristudioCpDocument?.summary.line_segments ??
+                0
+              }
+            />
             <Metric label="Faces" value={importedCreasePattern?.stats.faces ?? 0} />
             <Metric label="Mode" value="CP-only" />
           </div>
+          <div
+            className="status-row"
+            data-tone={cpDiagnosticEntries.length > 0 ? 'bad' : cpDiagnosticSummary ? 'good' : 'warn'}
+          >
+            {cpDiagnosticEntries.length > 0 ? <AlertTriangle size={15} /> : <CheckCircle2 size={15} />}
+            <span>{cpDiagnosticSummary ?? 'No Oriedita check has been run'}</span>
+          </div>
+          {cpDiagnosticEntries.length > 0 && (
+            <div className="diagnostic-list" aria-label="Oriedita check results">
+              {cpDiagnosticEntries.slice(0, 12).map((entry) => (
+                <div className="diagnostic-list__item" key={entry.id}>
+                  <span>{entry.kind}</span>
+                  <span>{entry.message}</span>
+                </div>
+              ))}
+            </div>
+          )}
           <div className="status-row" data-tone={hasErrors ? 'bad' : hasWarnings ? 'warn' : 'good'}>
             {hasErrors ? <AlertTriangle size={15} /> : <CheckCircle2 size={15} />}
             <span>

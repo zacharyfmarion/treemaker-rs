@@ -94,6 +94,14 @@ const SYNC_CP_LINE_SELECTION_AFTER_OPERATIONS = new Set<OristudioCpOperationId>(
   'UnselectLasso',
 ]);
 
+const NON_MUTATING_CP_OPERATIONS = new Set<OristudioCpOperationId>([
+  'Check1',
+  'Check2',
+  'Check3',
+  'Check4',
+  'CheckCamv',
+]);
+
 function oristudioCpSelectionAfterCommand(
   operationId: OristudioCpOperationId,
   selection: OristudioCpSelection,
@@ -598,6 +606,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
         const previousDocument = get().oristudioCpDocument?.document ?? null;
         const previousSelection = get().oristudioCpSelection;
         const nextDocument = await executeRuntimeOristudioCpCommand(operationId, payload);
+        const mutatesDocument = !NON_MUTATING_CP_OPERATIONS.has(operationId);
         set({
           oristudioCpDocument: nextDocument,
           oristudioCpOperationDescriptors: nextDocument.operationDescriptors,
@@ -608,14 +617,16 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
             nextDocument.document
           ),
           oristudioCpHistoryPast: previousDocument
-            ? [
+            ? mutatesDocument
+              ? [
                 ...get().oristudioCpHistoryPast,
                 cpHistoryEntry(previousDocument, String(operationId), previousSelection),
               ]
+              : get().oristudioCpHistoryPast
             : get().oristudioCpHistoryPast,
-          oristudioCpHistoryFuture: [],
+          oristudioCpHistoryFuture: mutatesDocument ? [] : get().oristudioCpHistoryFuture,
           error: null,
-          dirty: true,
+          dirty: mutatesDocument ? true : get().dirty,
         });
         return true;
       } catch (error) {

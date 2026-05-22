@@ -793,6 +793,29 @@
   }
 }
 
+.diagnostic-list {
+  display: grid;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.diagnostic-list__item {
+  display: grid;
+  grid-template-columns: minmax(56px, max-content) 1fr;
+  gap: var(--space-2);
+  padding: 7px var(--space-3);
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+}
+
+.diagnostic-list__item + .diagnostic-list__item {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.diagnostic-list__item span:first-child {
+  color: var(--status-danger);
+  font-weight: 750;
+}
+
 .tooltip-content {
   z-index: var(--z-portaled-popover);
   max-width: 220px;
@@ -1885,6 +1908,23 @@
   stroke: var(--bg-primary);
   stroke-width: 1.3;
   opacity: 0.86;
+  pointer-events: none;
+  vector-effect: non-scaling-stroke;
+}
+
+.cp-diagnostic-segment {
+  stroke: var(--status-danger);
+  stroke-width: 3.2;
+  stroke-linecap: round;
+  opacity: 0.78;
+  pointer-events: none;
+  vector-effect: non-scaling-stroke;
+}
+
+.cp-diagnostic-point {
+  fill: color-mix(in srgb, var(--status-danger) 18%, transparent);
+  stroke: var(--status-danger);
+  stroke-width: 2;
   pointer-events: none;
   vector-effect: non-scaling-stroke;
 }

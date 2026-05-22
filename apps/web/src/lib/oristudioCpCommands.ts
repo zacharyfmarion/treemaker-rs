@@ -544,7 +544,9 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
   notImplemented('SaveVersionDetect', 'Detect save version', 'file', 'file-search', 'FileVersionTester', {
     placement: 'palette',
   }),
-  notImplemented('CheckCamv', 'Check CAMV', 'check-fix', 'shield-alert', 'CheckCAMVTask'),
+  ready('CheckCamv', 'Check CAMV', 'check-fix', 'shield-alert', 'CheckCAMVTask', {
+    tooltip: 'Run Oriedita CAMV flat-foldability diagnostics without changing the CP',
+  }),
   porting('FoldingEstimate', 'Fold estimate', 'folding', 'origami', 'FoldingEstimateTask'),
   porting('FoldingEstimateSpecific', 'Fold to case', 'folding', 'list-ordered', 'FoldingEstimateSpecificTask'),
   porting('FoldingEstimateSave100', 'Save 100 simulations', 'folding', 'download', 'FoldingEstimateSave100Task'),
@@ -552,12 +554,24 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
   notImplemented('Fold', 'Fold', 'folding', 'origami', 'FoldingServiceImpl.fold'),
   porting('FoldAnother', 'Another solution', 'folding', 'skip-forward', 'FoldingServiceImpl.foldAnother'),
   porting('DuplicateFoldedModel', 'Duplicate folded model', 'folding', 'copy', 'FoldingServiceImpl.duplicate'),
-  notImplemented('Check1', 'Check 1', 'check-fix', 'badge-alert', 'Check1'),
-  notImplemented('Check2', 'Check 2', 'check-fix', 'badge-alert', 'Check2'),
-  notImplemented('Check3', 'Check 3', 'check-fix', 'badge-alert', 'Check3'),
-  notImplemented('Check4', 'Check 4', 'check-fix', 'badge-alert', 'Check4'),
-  notImplemented('Fix1', 'Fix 1', 'check-fix', 'wrench', 'Fix1'),
-  notImplemented('Fix2', 'Fix 2', 'check-fix', 'wrench', 'Fix2'),
+  ready('Check1', 'Check 1', 'check-fix', 'badge-alert', 'Check1', {
+    tooltip: 'Find overlapping or contained non-auxiliary crease pairs',
+  }),
+  ready('Check2', 'Check 2', 'check-fix', 'badge-alert', 'Check2', {
+    tooltip: 'Find near T-intersections between non-auxiliary crease pairs',
+  }),
+  ready('Check3', 'Check 3', 'check-fix', 'badge-alert', 'Check3', {
+    tooltip: 'Find Oriedita vertex flat-foldability markers',
+  }),
+  ready('Check4', 'Check 4', 'check-fix', 'badge-alert', 'Check4', {
+    tooltip: 'Find Maekawa, angle, and little-big-little violations',
+  }),
+  ready('Fix1', 'Fix 1', 'check-fix', 'wrench', 'Fix1', {
+    tooltip: 'Run Oriedita Fix1 overlap repair or selection pass',
+  }),
+  ready('Fix2', 'Fix 2', 'check-fix', 'wrench', 'Fix2', {
+    tooltip: 'Run Oriedita Fix2 near-T-intersection split pass',
+  }),
   ready('OrganizeCircles', 'Organize circles', 'annotations', 'circle-ellipsis', 'OrganizeCircles', {
     tooltip: 'Prune invalid zero-radius circles using Oriedita cleanup rules',
   }),

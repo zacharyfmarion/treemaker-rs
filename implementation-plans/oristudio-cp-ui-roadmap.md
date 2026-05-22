@@ -580,6 +580,10 @@ UX work:
 
 - Enable Check1, Check2, Check3, Check4, CAMV, flat-foldable boundary checks,
   little-big-little diagnostics, Fix1, Fix2, and fix inaccurate.
+- Current slice: Check1, Check2, Check3, Check4, CAMV, Fix1, and Fix2 are
+  wired through the shared command path with renderable diagnostic markers.
+- Keep FlatFoldableCheck as a later boundary-drawing workflow because Oriedita
+  treats it as an interactive temporary boundary, not a document-wide button.
 - Add a diagnostics layer with clickable issue markers.
 - Add a diagnostics panel list that filters, focuses, and explains issues.
 - Keep repair commands explicit. Do not auto-fix without a user command.
@@ -588,6 +592,9 @@ Technical work:
 
 - Add diagnostic result models with codes, locations, involved entity IDs,
   severity, and repair availability.
+- Current slice stores severity, message, optional point, optional involved
+  line segments, and rule labels. Entity IDs, repair availability, clickable
+  issue selection, and per-issue canvas focus remain follow-up work.
 - Connect diagnostics panel selection to canvas focus/highlight.
 - Persist or invalidate diagnostics according to document mutations.
 
@@ -874,6 +881,15 @@ Done when:
 - [x] Stage 8: Enable circles, text, generators, and measurement tools.
 - [x] Stage 8: Validate annotation preservation and non-mutating measurement
       behavior.
+- [x] Stage 9 slice: Enable Check1, Check2, Check3, Check4, and CAMV as
+      non-mutating structured diagnostic checks.
+- [x] Stage 9 slice: Enable Fix1 and Fix2 repair commands through undo-aware
+      CP command dispatch.
+- [x] Stage 9 slice: Render latest diagnostic line/point markers in the CP pane
+      and summarize them in the Diagnostics panel.
+- [x] Stage 9 slice: Validate diagnostic command results, repair dispatch,
+      history neutrality, wasm bridge behavior, and panel rendering without
+      browser smoke tests.
 - [ ] Stage 9: Enable checks, diagnostics, issue navigation, and repair
       commands.
 - [ ] Stage 9: Validate diagnostic overlays and repair results against the

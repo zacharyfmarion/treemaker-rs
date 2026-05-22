@@ -1329,6 +1329,46 @@ describe('workspace store slices', () => {
     expect(useWorkspaceStore.getState().dirty).toBe(true);
   });
 
+  it('keeps editable CP diagnostic checks out of undo history', async () => {
+    resetStores(seedSnapshot());
+    await useWorkspaceStore.getState().loadCreasePatternText('1 0 0 1 0\n2 0 0 0 1', {
+      filename: 'lines.cp',
+      path: '/tmp/lines.cp',
+    });
+    useWorkspaceStore.setState({ dirty: false });
+    const currentDocument = useWorkspaceStore.getState().oristudioCpDocument;
+    if (!currentDocument) throw new Error('expected editable CP document');
+    oristudioCpMocks.executeOristudioCpCommand.mockResolvedValueOnce({
+      ...currentDocument,
+      lastCommandResult: {
+        operation: 'Check1',
+        status: 'OracleTested',
+        diagnostics: ['Check1 found 1 issue(s)'],
+        diagnostic_entries: [
+          {
+            id: 'Check1-1',
+            kind: 'Check1',
+            severity: 'error',
+            message: 'Overlapping or contained non-auxiliary creases',
+            segments: currentDocument.document.crease_pattern.line_segments,
+            rule: 'Check1',
+          },
+        ],
+      },
+    });
+
+    await expect(useWorkspaceStore.getState().executeOristudioCpCommand('Check1')).resolves.toBe(
+      true
+    );
+
+    expect(useWorkspaceStore.getState().oristudioCpHistoryPast).toHaveLength(0);
+    expect(useWorkspaceStore.getState().oristudioCpHistoryFuture).toHaveLength(0);
+    expect(useWorkspaceStore.getState().dirty).toBe(false);
+    expect(
+      useWorkspaceStore.getState().oristudioCpDocument?.lastCommandResult?.diagnostic_entries
+    ).toHaveLength(1);
+  });
+
   it('clears editable CP selection after destructive kernel commands', async () => {
     resetStores(seedSnapshot());
     await useWorkspaceStore.getState().loadCreasePatternText('1 0 0 1 0\n2 0 0 0 1', {

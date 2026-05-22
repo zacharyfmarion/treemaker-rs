@@ -75,7 +75,7 @@ has a validated implementation.
 - [x] Phase 3: Build the first reverse rewrite rules for simple folds.
 - [x] Phase 4: Add hierarchical complex moves for common base-collapse
       techniques.
-- [ ] Phase 5: Add search, ranking, partial-plan handling, and diagnostics.
+- [x] Phase 5: Add search, ranking, partial-plan handling, and diagnostics.
 - [ ] Phase 6: Expose planner artifacts through WASM and add a research UI.
 - [ ] Phase 7: Expand fixture/corpus validation and optional Oriedita cross-checks.
 - [ ] Phase 8: Decide whether ML/ranking data collection is warranted.
@@ -358,6 +358,17 @@ Exit criteria:
 
 - Search never blocks indefinitely.
 - Complete, partial, and unsupported outcomes are stable enough for CI snapshots.
+
+Phase 5 implementation notes:
+
+- Added deterministic simple-fold candidate ordering and bounded search options
+  for maximum steps and maximum states.
+- Added `SearchStats`, budget-exhaustion diagnostics, and best unresolved crease
+  counts so partial plans are first-class artifacts.
+- Added `PlanScore` for deterministic ranking/inspection across complete,
+  partial, and unsupported plans.
+- Added determinism and zero-budget tests proving the planner returns a stable
+  best partial result instead of running indefinitely.
 
 ## Phase 6: WASM And Research UI
 

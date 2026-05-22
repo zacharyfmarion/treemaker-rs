@@ -260,17 +260,27 @@ pub fn plan_folding_sequence_with_options(
     let mut current = target_state;
     let mut explored_states = 1usize;
     let mut applied_steps = 0usize;
+    let mut branches_pruned = 0usize;
+    let mut budget_exhausted = false;
 
     loop {
         if current.active_creases.is_empty() {
             break;
         }
         if applied_steps >= options.max_steps {
+            budget_exhausted = true;
             break;
         }
-        let Some(simple_fold) = detect_simple_fold(&current)? else {
+        if explored_states >= options.max_states {
+            budget_exhausted = true;
+            break;
+        }
+        let simple_folds = detect_simple_folds(&current)?;
+        let pruned = simple_folds.len().saturating_sub(1);
+        let Some(simple_fold) = choose_simple_fold(simple_folds) else {
             break;
         };
+        branches_pruned += pruned;
         let next_state_id = format!("state-{}", reverse_states.len());
         let next = apply_reverse_simple_fold(&current, &next_state_id, &simple_fold)?;
         next.validate()?;
@@ -299,6 +309,12 @@ pub fn plan_folding_sequence_with_options(
         diagnostics.push(SequenceDiagnostic::warning(
             "unsupported_region",
             "planner stopped with crease groups outside the Phase 3 simple-fold rule set",
+        ));
+    }
+    if budget_exhausted {
+        diagnostics.push(SequenceDiagnostic::warning(
+            "search_budget_exhausted",
+            "planner returned the best partial state reached before the configured search budget",
         ));
     }
     for candidate in &complex_candidates {
@@ -351,9 +367,10 @@ pub fn plan_folding_sequence_with_options(
         unresolved_regions,
         search: SearchStats {
             states_explored: explored_states,
-            branches_pruned: 0,
+            branches_pruned,
             repeated_states: 0,
-            timed_out: false,
+            timed_out: budget_exhausted,
+            budget_exhausted,
             best_unresolved_creases: current.active_creases.len(),
         },
     })
@@ -382,24 +399,68 @@ pub struct SequencePlan {
     pub search: SearchStats,
 }
 
+impl SequencePlan {
+    pub fn score(&self) -> PlanScore {
+        PlanScore {
+            unresolved_creases: self
+                .unresolved_regions
+                .iter()
+                .map(|region| region.creases.len())
+                .sum(),
+            unresolved_regions: self.unresolved_regions.len(),
+            unsupported_steps: self
+                .steps
+                .iter()
+                .filter(|step| matches!(step, InstructionStep::UnsupportedRegion(_)))
+                .count(),
+            total_steps: self.steps.len(),
+            layer_order_ambiguity: self
+                .diagnostics
+                .iter()
+                .filter(|diagnostic| diagnostic.code == "ambiguous_layer_order")
+                .count(),
+            simultaneous_candidates: self
+                .diagnostics
+                .iter()
+                .filter(|diagnostic| diagnostic.code == "simultaneous_collapse_unsupported")
+                .count(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SearchStats {
     pub states_explored: usize,
     pub branches_pruned: usize,
     pub repeated_states: usize,
     pub timed_out: bool,
+    pub budget_exhausted: bool,
     pub best_unresolved_creases: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SequencePlanOptions {
     pub max_steps: usize,
+    pub max_states: usize,
 }
 
 impl Default for SequencePlanOptions {
     fn default() -> Self {
-        Self { max_steps: 64 }
+        Self {
+            max_steps: 64,
+            max_states: 1024,
+        }
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct PlanScore {
+    pub unresolved_creases: usize,
+    pub unresolved_regions: usize,
+    pub unsupported_steps: usize,
+    pub total_steps: usize,
+    pub layer_order_ambiguity: usize,
+    pub simultaneous_candidates: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -744,6 +805,10 @@ pub fn validate_sequence_state(state: &SequenceState) -> Result<ValidationReport
 }
 
 pub fn detect_simple_fold(state: &SequenceState) -> Result<Option<SimpleFoldRule>> {
+    Ok(choose_simple_fold(detect_simple_folds(state)?))
+}
+
+pub fn detect_simple_folds(state: &SequenceState) -> Result<Vec<SimpleFoldRule>> {
     let edges_faces = if state.document.edges_faces.is_empty() {
         build_edges_faces(&state.document)
             .map_err(|error| SequenceError::InvalidInput(error.to_string()))?
@@ -753,6 +818,7 @@ pub fn detect_simple_fold(state: &SequenceState) -> Result<Option<SimpleFoldRule
     let boundary_vertices = boundary_vertex_flags(&state.document);
     let mut active_creases = state.active_creases.clone();
     active_creases.sort_unstable();
+    let mut out = Vec::new();
     for crease in active_creases {
         let assignment = state.document.assignment_for_edge(crease);
         if !matches!(assignment, Assignment::Mountain | Assignment::Valley) {
@@ -766,14 +832,29 @@ pub fn detect_simple_fold(state: &SequenceState) -> Result<Option<SimpleFoldRule
             && boundary_vertices.get(a).copied().unwrap_or(false)
             && boundary_vertices.get(b).copied().unwrap_or(false)
         {
-            return Ok(Some(SimpleFoldRule {
+            out.push(SimpleFoldRule {
                 crease,
                 faces,
                 assignment,
-            }));
+            });
         }
     }
-    Ok(None)
+    out.sort_by_key(simple_fold_sort_key);
+    Ok(out)
+}
+
+fn choose_simple_fold(mut simple_folds: Vec<SimpleFoldRule>) -> Option<SimpleFoldRule> {
+    simple_folds.sort_by_key(simple_fold_sort_key);
+    simple_folds.into_iter().next()
+}
+
+fn simple_fold_sort_key(rule: &SimpleFoldRule) -> (usize, usize, u8) {
+    let assignment_rank = match rule.assignment {
+        Assignment::Valley => 0,
+        Assignment::Mountain => 1,
+        _ => 2,
+    };
+    (rule.faces.len(), rule.crease, assignment_rank)
 }
 
 pub fn recognize_complex_moves(state: &SequenceState) -> Result<Vec<ComplexMoveCandidate>> {
@@ -1324,6 +1405,38 @@ mod tests {
             }
             other => panic!("expected simple fold step, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn search_budget_returns_best_partial_plan() {
+        let target = resolve_target_state(&two_face_valley(), TargetStateOptions::default())
+            .expect("target state");
+        let plan = plan_folding_sequence_with_options(
+            &target,
+            SequencePlanOptions {
+                max_steps: 0,
+                ..SequencePlanOptions::default()
+            },
+        )
+        .expect("partial plan");
+
+        assert_eq!(plan.status, PlanStatus::Partial);
+        assert!(plan.search.budget_exhausted);
+        assert_eq!(plan.search.best_unresolved_creases, 1);
+        assert!(plan.score().unresolved_creases > 0);
+    }
+
+    #[test]
+    fn planner_output_is_deterministic() {
+        let target = resolve_target_state(&two_face_valley(), TargetStateOptions::default())
+            .expect("target state");
+        let first = plan_folding_sequence(&target).expect("first plan");
+        let second = plan_folding_sequence(&target).expect("second plan");
+
+        assert_eq!(
+            serde_json::to_value(first).expect("first json"),
+            serde_json::to_value(second).expect("second json")
+        );
     }
 
     #[test]

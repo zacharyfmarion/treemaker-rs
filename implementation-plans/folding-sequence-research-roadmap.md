@@ -77,7 +77,7 @@ has a validated implementation.
       techniques.
 - [x] Phase 5: Add search, ranking, partial-plan handling, and diagnostics.
 - [x] Phase 6: Expose planner artifacts through WASM and add a research UI.
-- [ ] Phase 7: Expand fixture/corpus validation and optional Oriedita cross-checks.
+- [x] Phase 7: Expand fixture/corpus validation and optional Oriedita cross-checks.
 - [ ] Phase 8: Decide whether ML/ranking data collection is warranted.
 - [ ] Phase 9: V2 reference/precrease planner integration.
 
@@ -450,6 +450,16 @@ Exit criteria:
 
 - Corpus validation produces actionable buckets rather than a single pass/fail
   number.
+
+Phase 7 implementation notes:
+
+- Added sequence fixture-corpus tests that assert the Phase 0 manifest's
+  expected V1 statuses against actual planner output.
+- Added checked-in Flat-Folder fixture smoke coverage, including structured
+  handling for intentionally rejected invalid/conflicting inputs.
+- Added an optional external `ORIEDITA_FOLD_CORPUS` smoke hook for the parallel
+  Oriedita core port or other local `.fold` corpora without committing private
+  files.
 
 ## Phase 8: ML Readiness Decision
 

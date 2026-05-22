@@ -60,7 +60,7 @@ The first complete product target is:
 
 ### UI Shape
 
-The Crease Pattern pane should grow into three coordinated regions:
+The Crease Pattern pane should grow into coordinated regions:
 
 - Canvas: the landed pane viewport already owns pan, zoom, fit, zoom presets,
   1:1, keyboard zoom, and space-drag panning. The roadmap should preserve that
@@ -70,8 +70,14 @@ The Crease Pattern pane should grow into three coordinated regions:
   side of the CP pane. It should be icon-first, vertically grouped, and stable
   while the viewport pans or zooms. Overflow, command search, and inspector
   controls can supplement it, but they should not replace the primary left rail.
-- Inspector/status region: selected entity properties, active tool options,
-  command prompts, validation messages, and operation results.
+- Bottom-right contextual tool panel: active action settings, readouts, and
+  step-specific controls should appear inside the CP pane in an OpenSCAD
+  Studio-style contextual panel. The left rail chooses actions; the contextual
+  panel edits the active action's options.
+- Inspector/status region: selected entity properties, command prompts,
+  validation messages, and operation results. The inspector can mirror selected
+  geometry state, but active tool options should not depend on the inspector
+  being open.
 
 The first viewport should still be the pattern itself. Controls should support
 serious work without covering the paper. The app should avoid oversized cards,
@@ -239,7 +245,8 @@ UX work:
   bottom viewport toolbar can remain focused on navigation unless later testing
   shows it conflicts with editing handles.
 - Add a command search/palette entrypoint for rare Oriedita commands.
-- Add active-tool option controls in the inspector/status area:
+- Add active-tool option controls in a bottom-right contextual panel rather
+  than making them depend on the inspector:
   - line color,
   - fold assignment,
   - angle system,
@@ -411,8 +418,8 @@ UX work:
   panes.
 - Add active tool options for line type now. Keep auxiliary input mode, angle
   system, division count/ratio, parallel width, and candidate choice as
-  action metadata or later per-tool controls until their handlers need visible
-  user-adjustable options.
+  action metadata until the Stage 7.5 contextual panel gives them visible
+  controls.
 - Make `Draw crease` behave like Oriedita's visible action: click-drag-release,
   using the current line type and input mode.
 - Distinguish free draw, restricted draw, and auxiliary-line draw as action
@@ -456,6 +463,77 @@ Done when:
 - The CP editor feels action-based: users choose an action and options, then act
   on the canvas. Kernel operation names are still traceable in code and tests
   but no longer define the visible editing UX.
+
+### Stage 7.5: Contextual Tool Options Panel
+
+Intent:
+
+- Replace the temporary active-tool input overlay with an OpenSCAD
+  Studio-style bottom-right contextual panel before enabling more
+  setting-heavy tools.
+- Preserve Oriedita's `MouseHandlerSettingGroup` model so controls are shown
+  because the active action needs them, not because individual components add
+  one-off overlays.
+
+Reference plan:
+
+- Detailed design and tool-setting inventory live in
+  `implementation-plans/oristudio-cp-contextual-tool-options.md`.
+
+UX work:
+
+- Add a collapsible `CpContextToolPanel` anchored to the bottom-right of the CP
+  viewport, separate from the bottom-center pan/zoom toolbar.
+- Keep M/V/E/A as persistent line type controls in the left rail, with their
+  red/blue/black/cyan color identity preserved even when active.
+- Show active action settings only when relevant:
+  - division count,
+  - exact division ratio,
+  - angle system divider/custom angles,
+  - replace/delete line type filters,
+  - fix-inaccurate precision toggles,
+  - polygon corner count,
+  - Voronoi apply state,
+  - measurement slot readouts,
+  - custom circle color,
+  - candidate choice/readout for ambiguous construction tools.
+- Keep text editing as an on-canvas editor, matching Oriedita, while allowing
+  the contextual panel to show selected-text metadata later if useful.
+- Collapse or compact the panel on narrow panes so it does not cover the paper
+  or conflict with drawing handles.
+
+Technical work:
+
+- Add an action setting-group registry equivalent to Oriedita's
+  `MouseHandlerSettingGroup`, modeled after OpenSCAD's optional
+  `contextPanel` tool registry.
+- Move the current `CpActiveToolOptions` spike into registry-backed panel
+  components.
+- Replace simplified ratio `S:T` state with Oriedita's exact
+  `A + B * sqrt(C) : D + E * sqrt(F)` model and computed readout.
+- Reconcile angle-system defaults before claiming parity. Oriedita's model
+  resets to divider/current 8, while the current Rust dispatch helper defaults
+  to 4.
+- Extend command payloads for settings that are currently hardcoded, especially
+  fix-inaccurate precision options and exact ratio coefficients.
+- Keep settings changes out of undo/redo history; only committed canvas actions
+  create checkpoints.
+
+Validation:
+
+- Unit-test the setting-group registry so every Oriedita group has a web home
+  or an explicit not-applicable reason.
+- Unit-test defaults for division count, exact ratio, angle system, polygon
+  count, line filters, and fix precision against Oriedita source defaults.
+- Web-test that changing settings updates previews and final command payloads
+  consistently without creating undo checkpoints.
+- Visual-test panel placement, collapsed state, narrow-pane behavior, and
+  non-overlap with the bottom viewport toolbar.
+
+Done when:
+
+- Active CP tools use one consistent bottom-right contextual settings surface,
+  and every known Oriedita tool setting or input has a planned web control.
 
 ### Stage 8: Circles, Text, Generators, And Measurement
 
@@ -665,6 +743,10 @@ Done when:
   make SVG unsuitable.
 - Navigation controls: keep the landed bottom viewport toolbar as the navigation
   surface. The left rail is for CP editing commands, not zoom presets.
+- Contextual tool options: use a bottom-right CP contextual tool panel modeled
+  after OpenSCAD Studio's 3D viewer. Do not put active tool settings in the
+  inspector as their primary home, and do not keep adding one-off viewport
+  overlays.
 - Document mode: keep TreeMaker design documents and editable CP documents
   explicit. Avoid silently converting generated CPs into editable CP files.
 - Left-rail density: expose all commands, but use groups, overflow, command
@@ -751,6 +833,14 @@ Done when:
       click-drag-release preview and commit semantics.
 - [x] Stage 7: Validate action registry coverage, preview/commit input
       agreement, and pointer-sequence-sensitive draw behavior.
+- [x] Stage 7.5 planning: Audit OpenSCAD's viewer contextual panel pattern and
+      Oriedita's contextual setting groups.
+- [ ] Stage 7.5: Replace temporary active-tool inputs with the bottom-right
+      contextual tool panel.
+- [ ] Stage 7.5: Add registry-backed controls for every Oriedita tool setting
+      and all additional web context inputs.
+- [ ] Stage 7.5: Validate settings defaults, undo neutrality, preview/commit
+      payload agreement, and responsive panel placement.
 - [ ] Stage 8: Enable circles, text, generators, and measurement tools.
 - [ ] Stage 8: Validate annotation preservation and non-mutating measurement
       behavior.

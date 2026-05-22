@@ -2014,17 +2014,51 @@
 }
 
 .cp-diagnostic-point {
-  fill: color-mix(in srgb, var(--status-danger) 18%, transparent);
-  stroke: var(--status-danger);
-  stroke-width: 2;
   cursor: pointer;
   pointer-events: all;
   vector-effect: non-scaling-stroke;
 }
 
+.cp-diagnostic-point__halo {
+  fill: color-mix(in srgb, var(--status-danger) 16%, transparent);
+  stroke: var(--status-danger);
+  stroke-width: 2.4;
+  vector-effect: non-scaling-stroke;
+}
+
+.cp-diagnostic-point__core {
+  fill: var(--status-danger);
+  stroke: var(--bg-paper);
+  stroke-width: 1.4;
+  vector-effect: non-scaling-stroke;
+}
+
+.cp-diagnostic-point__cross {
+  stroke: var(--status-danger);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
 .cp-diagnostic-point--active {
-  fill: color-mix(in srgb, var(--status-danger) 26%, transparent);
-  stroke-width: 3;
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--status-danger) 45%, transparent));
+}
+
+.cp-diagnostic-point--active .cp-diagnostic-point__halo {
+  stroke-width: 3.2;
+}
+
+.cp-diagnostic-point[data-severity='warning'] .cp-diagnostic-point__halo {
+  fill: color-mix(in srgb, var(--status-warning) 16%, transparent);
+  stroke: var(--status-warning);
+}
+
+.cp-diagnostic-point[data-severity='warning'] .cp-diagnostic-point__core {
+  fill: var(--status-warning);
+}
+
+.cp-diagnostic-point[data-severity='warning'] .cp-diagnostic-point__cross {
+  stroke: var(--status-warning);
 }
 
 .cp-operation-frame {

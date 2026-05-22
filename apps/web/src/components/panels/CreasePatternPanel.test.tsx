@@ -1095,10 +1095,31 @@ describe('CreasePatternPanel', () => {
 
     expect(container.querySelectorAll('.cp-diagnostic-segment')).toHaveLength(0);
     expect(container.querySelector('.cp-diagnostic-point')).not.toBeNull();
+    expect(container.querySelector('.cp-diagnostic-point')?.getAttribute('data-severity')).toBe(
+      'error'
+    );
+    expect(container.querySelector('.cp-diagnostic-point__cross')).not.toBeNull();
     expect(container.querySelector('.cp-diagnostic-hud')?.textContent).toContain('1 CAMV Error');
     expect(container.querySelector('.cp-diagnostic-hud')?.textContent).toContain(
       'Flat-foldability violation: Maekawa'
     );
+  });
+
+  it('does not show the diagnostic HUD for ordinary edit command results', () => {
+    const state = editableCpState();
+    state.lastCommandResult = {
+      operation: 'DrawCreaseRestricted',
+      status: 'OracleTested',
+      diagnostics: ['Changed 1 line(s)'],
+    };
+
+    const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
+      documentMode: 'crease-pattern',
+      importedCreasePattern: importedCpDocument(),
+      oristudioCpDocument: state,
+    });
+
+    expect(container.querySelector('.cp-diagnostic-hud')).toBeNull();
   });
 
   it('passes contextual circle color options with selected circles only after apply', async () => {

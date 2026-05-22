@@ -900,6 +900,8 @@ Done when:
       generated wasm, and web interaction tests without browser smoke tests.
 - [x] Stage 9 slice: Add the top-right diagnostic status HUD and guard
       point-only diagnostic entries such as CAMV vertex errors.
+- [x] Stage 9 slice: Restrict the diagnostic HUD to check results and render
+      CAMV/Maekawa point violations above normal vertex markers.
 - [ ] Stage 9: Enable checks, diagnostics, issue navigation, and repair
       commands.
 - [ ] Stage 9: Validate diagnostic overlays and repair results against the

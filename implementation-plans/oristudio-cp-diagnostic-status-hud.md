@@ -27,5 +27,9 @@ for Oriedita CP checks such as CAMV.
 - [x] Make diagnostic segment lists optional in TypeScript.
 - [x] Guard CP marker rendering against missing segment arrays.
 - [x] Add top-right CP diagnostic status HUD.
+- [x] Limit the status HUD to diagnostic/check commands instead of ordinary
+      edit command success messages.
+- [x] Render point-only theorem violations above normal vertex markers with a
+      readable target marker.
 - [x] Add focused web regression tests.
 - [x] Run non-browser validation and commit.

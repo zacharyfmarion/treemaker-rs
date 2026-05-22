@@ -154,6 +154,7 @@ function pluralizeCount(count: number, singular: string): string {
 function diagnosticHudStatus(
   result: OristudioCpCommandResult | null | undefined
 ): CpDiagnosticHudStatus | null {
+  if (!result || !isDiagnosticResultOperation(result.operation)) return null;
   if (!result?.diagnostics.length) return null;
   const entries = result.diagnostic_entries ?? EMPTY_DIAGNOSTIC_ENTRIES;
   const label = diagnosticOperationLabel(result.operation);
@@ -183,6 +184,17 @@ function diagnosticHudStatus(
     detail,
     tone: 'ok',
   };
+}
+
+function isDiagnosticResultOperation(operation: string): boolean {
+  return (
+    operation === 'Check1' ||
+    operation === 'Check2' ||
+    operation === 'Check3' ||
+    operation === 'Check4' ||
+    operation === 'CheckCamv' ||
+    operation === 'FlatFoldableCheck'
+  );
 }
 
 function modelSelectionDistance(
@@ -2295,31 +2307,6 @@ function EditableCreasePattern({
           );
         })
       )}
-      {diagnostics
-        .filter((diagnostic) => diagnostic.point)
-        .map((diagnostic) => {
-          const point = modelPointToCpSvg(diagnostic.point as Point, bounds);
-          const active = diagnostic.id === activeDiagnosticId;
-          return (
-            <circle
-              key={`${diagnostic.id}-point`}
-              className={[
-                'cp-diagnostic-point',
-                active ? 'cp-diagnostic-point--active' : '',
-              ].join(' ')}
-              data-active={active || undefined}
-              data-cp-diagnostic-id={diagnostic.id}
-              cx={point.x}
-              cy={point.y}
-              r="6"
-              onPointerDown={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                selectDiagnostic(diagnostic.id);
-              }}
-            />
-          );
-        })}
       {document.crease_pattern.texts.map((text, index) => {
         const id = index + 1;
         const position = modelPointToCpSvg(
@@ -2365,6 +2352,46 @@ function EditableCreasePattern({
           />
         );
       })}
+      {diagnostics
+        .filter((diagnostic) => diagnostic.point)
+        .map((diagnostic) => {
+          const point = modelPointToCpSvg(diagnostic.point as Point, bounds);
+          const active = diagnostic.id === activeDiagnosticId;
+          return (
+            <g
+              key={`${diagnostic.id}-point`}
+              className={[
+                'cp-diagnostic-point',
+                active ? 'cp-diagnostic-point--active' : '',
+              ].join(' ')}
+              data-active={active || undefined}
+              data-cp-diagnostic-id={diagnostic.id}
+              data-severity={diagnostic.severity}
+              onPointerDown={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                selectDiagnostic(diagnostic.id);
+              }}
+            >
+              <circle className="cp-diagnostic-point__halo" cx={point.x} cy={point.y} r="9" />
+              <circle className="cp-diagnostic-point__core" cx={point.x} cy={point.y} r="3.2" />
+              <line
+                className="cp-diagnostic-point__cross"
+                x1={point.x - 6}
+                y1={point.y}
+                x2={point.x + 6}
+                y2={point.y}
+              />
+              <line
+                className="cp-diagnostic-point__cross"
+                x1={point.x}
+                y1={point.y - 6}
+                x2={point.x}
+                y2={point.y + 6}
+              />
+            </g>
+          );
+        })}
       {document.operation_frame?.active && (
         <polygon
           className="cp-operation-frame"

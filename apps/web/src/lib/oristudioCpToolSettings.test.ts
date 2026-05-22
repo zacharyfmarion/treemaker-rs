@@ -54,6 +54,24 @@ describe('oristudioCpToolSettings', () => {
     expect(cpToolSettingGroupsForOperation('CircleChangeColor')).toEqual([
       'custom-circle-color',
     ]);
+    expect(cpToolSettingGroupsForOperation('CircleDrawTangentLine')).toEqual([
+      'line-color',
+      'circle-select-help',
+      'candidate-choice',
+    ]);
+    expect(cpToolSettingGroupsForOperation('CircleDrawInverted')).toEqual([
+      'circle-select-help',
+    ]);
+    expect(cpToolSettingGroupsForOperation('CircleDrawConcentric')).toEqual([
+      'circle-select-help',
+    ]);
+    expect(cpToolSettingGroupsForOperation('CircleDrawConcentricSelect')).toEqual([
+      'circle-select-help',
+      'candidate-choice',
+    ]);
+    expect(cpToolSettingGroupsForOperation('CircleDrawConcentricTwoCircleSelect')).toEqual([
+      'circle-select-help',
+    ]);
     expect(cpToolSettingGroupsForOperation('Text')).toEqual(['text-content']);
     expect(cpToolSettingGroupsForOperation('DisplayLengthBetweenPoints1')).toEqual([
       'measurement-readout',

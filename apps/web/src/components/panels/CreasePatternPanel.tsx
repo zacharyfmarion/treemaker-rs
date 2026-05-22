@@ -162,7 +162,8 @@ function cpCommandPayloadDefaults(
     operationId === 'DrawDoveBase' ||
     operationId === 'DrawBirdBase' ||
     operationId === 'DrawFrogBase' ||
-    operationId === 'VoronoiCreate'
+    operationId === 'VoronoiCreate' ||
+    operationId === 'CircleDrawTangentLine'
   ) {
     payload.line_color = lineColor;
   }
@@ -273,6 +274,7 @@ function activeActionInputMode(
 function cpCommandRequiresContextApply(command: OristudioCpCommandDefinition): boolean {
   if (command.operationId === 'Text') return true;
   if (command.operationId === 'VoronoiCreate') return true;
+  if (isSelectionCircleApplyOperation(command.operationId)) return true;
   if ((command.toolSteps?.length ?? 0) > 0) return false;
   return cpToolSettingGroupsForCommand(command).some(
     (group) => group !== 'line-color' && group !== 'line-select-help'
@@ -289,6 +291,76 @@ function isTextAnnotationOperation(
   operationId: OristudioCpCommandDefinition['operationId'] | null | undefined
 ): boolean {
   return operationId === 'Text';
+}
+
+function isSelectionCircleApplyOperation(
+  operationId: OristudioCpCommandDefinition['operationId'] | null | undefined
+): boolean {
+  return (
+    operationId === 'CircleDrawTangentLine' ||
+    operationId === 'CircleDrawInverted' ||
+    operationId === 'CircleDrawConcentricSelect' ||
+    operationId === 'CircleDrawConcentricTwoCircleSelect'
+  );
+}
+
+function isCircleTangentPointOperation(
+  operationId: OristudioCpCommandDefinition['operationId'] | null | undefined
+): boolean {
+  return operationId === 'CircleDrawTangentLine';
+}
+
+function canPreviewFromSelection(
+  command: OristudioCpCommandDefinition | null | undefined,
+  selection: OristudioCpSelection
+): boolean {
+  if (!command) return false;
+  switch (command.operationId) {
+    case 'CircleDrawTangentLine':
+      return selection.circles.length >= 2;
+    case 'CircleDrawInverted':
+      return selection.circles.length >= 2 || (selection.circles.length >= 1 && selection.lines.length >= 1);
+    case 'CircleDrawConcentricSelect':
+      return selection.circles.length >= 3;
+    case 'CircleDrawConcentricTwoCircleSelect':
+      return selection.circles.length >= 2;
+    default:
+      return false;
+  }
+}
+
+function contextApplyDisabledForCommand(
+  command: OristudioCpCommandDefinition,
+  selection: OristudioCpSelection,
+  pendingPointCount: number
+): boolean {
+  switch (command.operationId) {
+    case 'VoronoiCreate':
+      return pendingPointCount === 0;
+    case 'Text':
+      return selection.texts.length === 0;
+    case 'CircleChangeColor':
+      return selection.circles.length === 0 && selection.lines.length === 0;
+    case 'CircleDrawTangentLine':
+      return selection.circles.length < 2;
+    case 'CircleDrawInverted':
+      return selection.circles.length < 2 && !(selection.circles.length >= 1 && selection.lines.length >= 1);
+    case 'CircleDrawConcentricSelect':
+      return selection.circles.length < 3;
+    case 'CircleDrawConcentricTwoCircleSelect':
+      return selection.circles.length < 2;
+    default:
+      return false;
+  }
+}
+
+function keepContextCommandActive(operationId: OristudioCpCommandDefinition['operationId']): boolean {
+  return (
+    operationId === 'VoronoiCreate' ||
+    operationId === 'Text' ||
+    operationId === 'CircleChangeColor' ||
+    isSelectionCircleApplyOperation(operationId)
+  );
 }
 
 function isCpLineEventTarget(target: EventTarget | null): boolean {
@@ -572,7 +644,8 @@ export function CreasePatternPanel() {
       isCpMeasurementOperation(activeCpCommand.operationId) ||
       activeCpInputMode === 'drag-path' ||
       activeCpInputMode === 'drag-line' ||
-      liveCommandPreviewPoints.length === 0
+      (liveCommandPreviewPoints.length === 0 &&
+        !canPreviewFromSelection(activeCpCommand, oristudioCpSelection))
     ) {
       cpPreviewRequestRef.current += 1;
       setCpCommandPreview(null);
@@ -585,6 +658,7 @@ export function CreasePatternPanel() {
       activeCpCommand.operationId,
       buildCpCommandPayload(activeCpCommand, {
         line_ids: oristudioCpSelection.lines,
+        circle_ids: oristudioCpSelection.circles,
         points: liveCommandPreviewPoints,
       })
     ).then((preview) => {
@@ -599,7 +673,9 @@ export function CreasePatternPanel() {
     cpToolState.phase,
     editableCp,
     liveCommandPreviewPoints,
+    oristudioCpSelection.circles,
     oristudioCpSelection.lines,
+    oristudioCpSelection,
     previewOristudioCpCommand,
   ]);
 
@@ -679,7 +755,10 @@ export function CreasePatternPanel() {
       const selectionPayload: OristudioCpCommandPayload = {
         line_ids: oristudioCpSelection.lines,
       };
-      if (activeCpCommand.operationId === 'CircleChangeColor') {
+      if (
+        activeCpCommand.operationId === 'CircleChangeColor' ||
+        isSelectionCircleApplyOperation(activeCpCommand.operationId)
+      ) {
         selectionPayload.circle_ids = oristudioCpSelection.circles;
       }
       if (activeCpCommand.operationId === 'VoronoiCreate') {
@@ -705,9 +784,7 @@ export function CreasePatternPanel() {
               succeeded
                 ? {
                     type: 'commit',
-                    keepActive:
-                      activeCpCommand.operationId === 'VoronoiCreate' ||
-                      activeCpCommand.operationId === 'Text',
+                    keepActive: keepContextCommandActive(activeCpCommand.operationId),
                   }
                 : {
                     type: 'commandError',
@@ -890,6 +967,40 @@ export function CreasePatternPanel() {
         return;
       }
       const stepCount = activeCpCommand.toolSteps?.length ?? 0;
+      if (
+        stepCount === 0 &&
+        isCircleTangentPointOperation(activeCpCommand.operationId) &&
+        oristudioCpSelection.circles.length === 1
+      ) {
+        const point = resolveEditableToolPoint(event);
+        if (!point) return;
+        event.preventDefault();
+        event.stopPropagation();
+        void (async () => {
+          const succeeded = await executeOristudioCpCommand(
+            activeCpCommand.operationId,
+            buildCpCommandPayload(activeCpCommand, {
+              circle_ids: oristudioCpSelection.circles,
+              points: [point],
+            })
+          );
+          setCpToolState((state) =>
+            state.activeOperationId === activeCpCommand.operationId
+              ? transitionOristudioCpToolState(
+                  state,
+                  succeeded
+                    ? { type: 'commit', keepActive: true }
+                    : {
+                        type: 'commandError',
+                        message:
+                          useWorkspaceStore.getState().oristudioCpError ?? 'Command failed',
+                      }
+                )
+              : state
+          );
+        })();
+        return;
+      }
       if (stepCount === 0) return;
       if (
         isLineClickSelectionOperation(activeCpCommand.operationId) &&
@@ -1060,6 +1171,7 @@ export function CreasePatternPanel() {
           activeCpCommand.operationId,
           buildCpCommandPayload(activeCpCommand, {
             line_ids: oristudioCpSelection.lines,
+            circle_ids: oristudioCpSelection.circles,
             points: nextPoints,
           })
         );
@@ -1089,6 +1201,7 @@ export function CreasePatternPanel() {
       editableCp,
       eventToEditableModelPoint,
       executeOristudioCpCommand,
+      oristudioCpSelection.circles,
       oristudioCpSelection.lines,
       resolveEditableDrawPoint,
       resolveEditableToolPoint,
@@ -1230,6 +1343,7 @@ export function CreasePatternPanel() {
           command.operationId,
           buildCpCommandPayload(command, {
             line_ids: oristudioCpSelection.lines,
+            circle_ids: oristudioCpSelection.circles,
             points,
           })
         );
@@ -1256,6 +1370,7 @@ export function CreasePatternPanel() {
       editableCpBounds,
       eventToEditableModelPoint,
       executeOristudioCpCommand,
+      oristudioCpSelection.circles,
       oristudioCpSelection.lines,
       resolveEditableDrawPoint,
       zoomPercent,
@@ -1781,7 +1896,7 @@ export function CreasePatternPanel() {
                   activeLineColor={activeCpLineColor}
                   measurementSlots={cpMeasurementSlots}
                   pendingPointCount={cpToolPoints.length}
-                  selectedTextCount={oristudioCpSelection.texts.length}
+                  selection={oristudioCpSelection}
                   onApply={
                     cpCommandRequiresContextApply(activeCpCommand)
                       ? handleApplyActiveContextCommand
@@ -2189,7 +2304,7 @@ function CpContextToolPanel({
   activeLineColor,
   measurementSlots,
   pendingPointCount,
-  selectedTextCount,
+  selection,
   onApply,
   onClearInput,
   onDeleteText,
@@ -2200,16 +2315,14 @@ function CpContextToolPanel({
   activeLineColor: OristudioCpLineColor;
   measurementSlots: CpMeasurementSlots;
   pendingPointCount: number;
-  selectedTextCount: number;
+  selection: OristudioCpSelection;
   onApply?: () => void;
   onClearInput?: () => void;
   onDeleteText?: () => void;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const groups = cpToolSettingGroupsForCommand(command);
-  const applyDisabled =
-    (command.operationId === 'VoronoiCreate' && pendingPointCount === 0) ||
-    (command.operationId === 'Text' && selectedTextCount === 0);
+  const applyDisabled = contextApplyDisabledForCommand(command, selection, pendingPointCount);
 
   if (groups.length === 0) return null;
 
@@ -2245,7 +2358,7 @@ function CpContextToolPanel({
               activeOperationId={command.operationId}
               measurementSlots={measurementSlots}
               pendingPointCount={pendingPointCount}
-              selectedTextCount={selectedTextCount}
+              selection={selection}
             />
           ))}
           {onApply && (
@@ -2259,6 +2372,10 @@ function CpContextToolPanel({
                 ? 'Apply Voronoi'
                 : command.operationId === 'Text'
                   ? 'Apply text'
+                  : command.operationId === 'CircleChangeColor'
+                    ? 'Apply color'
+                    : isSelectionCircleApplyOperation(command.operationId)
+                      ? 'Apply circle'
                   : 'Apply to selection'}
             </button>
           )}
@@ -2287,7 +2404,7 @@ function CpContextToolGroup({
   activeOperationId,
   measurementSlots,
   pendingPointCount,
-  selectedTextCount,
+  selection,
 }: {
   group: OristudioCpToolSettingGroup;
   options: OristudioCpToolOptions;
@@ -2297,7 +2414,7 @@ function CpContextToolGroup({
   activeOperationId: OristudioCpCommandDefinition['operationId'];
   measurementSlots: CpMeasurementSlots;
   pendingPointCount: number;
-  selectedTextCount: number;
+  selection: OristudioCpSelection;
 }) {
   if (group === 'line-color') {
     return (
@@ -2479,12 +2596,15 @@ function CpContextToolGroup({
   }
 
   if (group === 'candidate-choice') {
+    const usesNearestCandidate =
+      activeOperationId !== 'CircleDrawTangentLine' &&
+      activeOperationId !== 'CircleDrawConcentricSelect';
     return (
       <div className="cp-context-panel__group">
         <div className="cp-context-panel__group-title">Candidate</div>
         <CheckboxToolOption
-          label="Auto nearest"
-          ariaLabel="Use nearest candidate"
+          label={usesNearestCandidate ? 'Auto nearest' : 'First candidate'}
+          ariaLabel={usesNearestCandidate ? 'Use nearest candidate' : 'Use first candidate'}
           checked={options.candidateIndex === null}
           onChange={(useNearest) =>
             setOptions((current) => ({
@@ -2508,6 +2628,20 @@ function CpContextToolGroup({
             }))
           }
         />
+      </div>
+    );
+  }
+
+  if (group === 'circle-select-help') {
+    return (
+      <div className="cp-context-panel__group">
+        <div className="cp-context-panel__group-title">Circle selection</div>
+        <div className="cp-context-panel__readout">
+          {selection.circles.length} circle{selection.circles.length === 1 ? '' : 's'} selected
+          {selection.lines.length > 0
+            ? `, ${selection.lines.length} crease${selection.lines.length === 1 ? '' : 's'} selected`
+            : ''}
+        </div>
       </div>
     );
   }
@@ -2588,7 +2722,7 @@ function CpContextToolGroup({
           onChange={(textContent) => setOptions((current) => ({ ...current, textContent }))}
         />
         <div className="cp-context-panel__readout">
-          {selectedTextCount === 0 ? 'No text selected' : `${selectedTextCount} selected`}
+          {selection.texts.length === 0 ? 'No text selected' : `${selection.texts.length} selected`}
         </div>
       </div>
     );

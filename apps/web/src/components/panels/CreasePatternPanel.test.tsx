@@ -223,6 +223,46 @@ function editableCpState(): OristudioCpDocumentState {
   };
 }
 
+function editableCpStateWithCircleSet(): OristudioCpDocumentState {
+  const state = editableCpState();
+  state.summary.circles = 4;
+  state.document.crease_pattern.circles = [
+    {
+      x: 0,
+      y: 0,
+      r: 0.25,
+      color: 'Cyan3',
+      customized: 0,
+      customized_color: { red: 100, green: 200, blue: 200 },
+    },
+    {
+      x: 1,
+      y: 0,
+      r: 0.25,
+      color: 'Cyan3',
+      customized: 0,
+      customized_color: { red: 100, green: 200, blue: 200 },
+    },
+    {
+      x: 2,
+      y: 0,
+      r: 0.5,
+      color: 'Cyan3',
+      customized: 0,
+      customized_color: { red: 100, green: 200, blue: 200 },
+    },
+    {
+      x: 3,
+      y: 0,
+      r: 1,
+      color: 'Cyan3',
+      customized: 0,
+      customized_color: { red: 100, green: 200, blue: 200 },
+    },
+  ];
+  return state;
+}
+
 function setCanvasClientRect(container: HTMLElement): SVGSVGElement {
   const canvas = container.querySelector<SVGSVGElement>('.cp-canvas');
   if (!canvas) throw new Error('expected CP canvas');
@@ -1307,6 +1347,169 @@ describe('CreasePatternPanel', () => {
     expect(payload?.points?.[0]).toEqual({ x: 0, y: 0 });
     expect(payload?.points?.[1].x).toBeCloseTo(80);
     expect(payload?.points?.[1].y).toBeCloseTo(0);
+  });
+
+  it('applies selected-circle circle modes from the contextual panel', async () => {
+    const executeOristudioCpCommand = vi.fn(
+      async (_operationId: string, _payload?: OristudioCpCommandPayload) => true
+    );
+    const previewOristudioCpCommand = vi.fn(
+      async (_operationId: string, _payload?: OristudioCpCommandPayload) => ({
+        segments: [
+          {
+            a: { x: 0, y: 0 },
+            b: { x: 1, y: 1 },
+            color: 'Purple8',
+            active: 'Inactive0',
+            selected: 0,
+            customized: 0,
+            customized_color: { red: 0, green: 0, blue: 0 },
+          },
+        ],
+        circles: [
+          {
+            x: 3,
+            y: 0,
+            r: 2,
+            color: 'Magenta5',
+            customized: 0,
+            customized_color: { red: 100, green: 200, blue: 200 },
+          },
+        ],
+        points: [],
+        diagnostics: [],
+      })
+    );
+    const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
+      documentMode: 'crease-pattern',
+      importedCreasePattern: importedCpDocument(),
+      oristudioCpDocument: editableCpStateWithCircleSet(),
+      executeOristudioCpCommand,
+      previewOristudioCpCommand,
+    });
+
+    const circles = () => Array.from(container.querySelectorAll<SVGCircleElement>('.cp-circle'));
+
+    act(() => {
+      circles()[0]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      circles()[1]?.dispatchEvent(new MouseEvent('click', { bubbles: true, shiftKey: true }));
+    });
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('button[aria-label="Circle tangent line"]')?.click();
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).toContain('Circle selection');
+    expect(previewOristudioCpCommand).toHaveBeenCalledWith(
+      'CircleDrawTangentLine',
+      expect.objectContaining({
+        circle_ids: [1, 2],
+        line_color: 'Red1',
+      })
+    );
+    const applyCircle = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find(
+      (button) => button.textContent?.trim() === 'Apply circle'
+    );
+    expect(applyCircle?.disabled).toBe(false);
+
+    await act(async () => {
+      applyCircle?.click();
+      await Promise.resolve();
+    });
+
+    expect(executeOristudioCpCommand).toHaveBeenLastCalledWith('CircleDrawTangentLine', {
+      line_ids: [],
+      circle_ids: [1, 2],
+      line_color: 'Red1',
+    });
+
+    previewOristudioCpCommand.mockClear();
+    act(() => {
+      useWorkspaceStore.getState().setOristudioCpSelection({
+        lines: [],
+        vertices: [],
+        points: [],
+        circles: [1, 3, 4],
+        texts: [],
+        faces: [],
+      });
+    });
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>('button[aria-label="Concentric from selection"]')
+        ?.click();
+      await Promise.resolve();
+    });
+
+    expect(previewOristudioCpCommand).toHaveBeenCalledWith(
+      'CircleDrawConcentricSelect',
+      expect.objectContaining({
+        circle_ids: [1, 3, 4],
+      })
+    );
+
+    await act(async () => {
+      Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
+        .find((button) => button.textContent?.trim() === 'Apply circle')
+        ?.click();
+      await Promise.resolve();
+    });
+
+    expect(executeOristudioCpCommand).toHaveBeenLastCalledWith('CircleDrawConcentricSelect', {
+      line_ids: [],
+      circle_ids: [1, 3, 4],
+    });
+  });
+
+  it('creates a tangent line from one selected circle plus a clicked point', async () => {
+    const executeOristudioCpCommand = vi.fn(
+      async (_operationId: string, _payload?: OristudioCpCommandPayload) => true
+    );
+    const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
+      documentMode: 'crease-pattern',
+      importedCreasePattern: importedCpDocument(),
+      oristudioCpDocument: editableCpStateWithCircleSet(),
+      oristudioCpViewport: {
+        gridVisible: true,
+        snapToGrid: false,
+        snapToVertices: false,
+        snapToLines: false,
+      },
+      executeOristudioCpCommand,
+    });
+    const canvas = setCanvasClientRect(container);
+
+    act(() => {
+      container
+        .querySelector<SVGCircleElement>('.cp-circle')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('button[aria-label="Circle tangent line"]')?.click();
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      canvas.dispatchEvent(
+        new MouseEvent('pointerdown', {
+          bubbles: true,
+          button: 0,
+          clientX: 477.6,
+          clientY: 348,
+        })
+      );
+      await Promise.resolve();
+    });
+
+    expect(executeOristudioCpCommand).toHaveBeenCalledOnce();
+    const [operation, payload] = executeOristudioCpCommand.mock.calls[0] ?? [];
+    expect(operation).toBe('CircleDrawTangentLine');
+    expect(payload?.circle_ids).toEqual([1]);
+    expect(payload?.line_color).toBe('Red1');
+    expect(payload?.points).toHaveLength(1);
   });
 
   it('runs regular polygon with contextual corner count and active line color', async () => {

@@ -1555,6 +1555,96 @@ pub fn execute_command(
                 points[2],
             ))
         }
+        OperationId::CircleDrawTangentLine => {
+            let circle_indices = required_circle_indices_at_least(&command, 1)?;
+            let candidates = if circle_indices.len() >= 2 {
+                let circle1 = circle_for_operation(document, command.operation, circle_indices[0])?;
+                let circle2 = circle_for_operation(document, command.operation, circle_indices[1])?;
+                operations::circle::tangent_lines_two_circles(circle1, circle2)
+            } else {
+                let points = required_points(&command, 1)?;
+                let circle = circle_for_operation(document, command.operation, circle_indices[0])?;
+                operations::circle::tangent_lines_point_circle(
+                    &document.crease_pattern,
+                    points[0],
+                    circle,
+                )
+            };
+            usize::from(operations::circle::commit_tangent_line(
+                &mut document.crease_pattern,
+                &candidates,
+                command.payload.candidate_index.unwrap_or(0),
+                active_line_color(&command),
+            ))
+        }
+        OperationId::CircleDrawInverted => {
+            let circle_indices = required_circle_indices_at_least(&command, 1)?;
+            if let Some(line_id) = command.payload.line_ids.first() {
+                let line_index =
+                    line_id
+                        .checked_sub(1)
+                        .ok_or_else(|| CommandError::InvalidInput {
+                            operation: command.operation,
+                            message: "line IDs are one-based".to_string(),
+                        })?;
+                let segment = line_segment_for_operation(document, command.operation, line_index)?;
+                let inversion =
+                    circle_for_operation(document, command.operation, circle_indices[0])?;
+                usize::from(
+                    operations::circle::invert_line_segment(
+                        &mut document.crease_pattern,
+                        &segment,
+                        inversion,
+                    ) != operations::circle::CircleInversionOutput::None,
+                )
+            } else {
+                let circle_indices = required_circle_indices_at_least(&command, 2)?;
+                let subject = circle_for_operation(document, command.operation, circle_indices[0])?;
+                let inversion =
+                    circle_for_operation(document, command.operation, circle_indices[1])?;
+                usize::from(
+                    operations::circle::invert_circle(
+                        &mut document.crease_pattern,
+                        subject,
+                        inversion,
+                    ) != operations::circle::CircleInversionOutput::None,
+                )
+            }
+        }
+        OperationId::CircleDrawConcentric => {
+            let circle_indices = required_circle_indices_at_least(&command, 1)?;
+            let points = required_points(&command, 2)?;
+            let circle = circle_for_operation(document, command.operation, circle_indices[0])?;
+            usize::from(operations::circle::concentric(
+                &mut document.crease_pattern,
+                circle,
+                points[0],
+                points[1],
+            ))
+        }
+        OperationId::CircleDrawConcentricSelect => {
+            let circle_indices = required_circle_indices_at_least(&command, 3)?;
+            let target = circle_for_operation(document, command.operation, circle_indices[0])?;
+            let reference1 = circle_for_operation(document, command.operation, circle_indices[1])?;
+            let reference2 = circle_for_operation(document, command.operation, circle_indices[2])?;
+            usize::from(operations::circle::concentric_select(
+                &mut document.crease_pattern,
+                target,
+                reference1,
+                reference2,
+                command.payload.candidate_index.unwrap_or(0),
+            ))
+        }
+        OperationId::CircleDrawConcentricTwoCircleSelect => {
+            let circle_indices = required_circle_indices_at_least(&command, 2)?;
+            let circle1 = circle_for_operation(document, command.operation, circle_indices[0])?;
+            let circle2 = circle_for_operation(document, command.operation, circle_indices[1])?;
+            operations::circle::concentric_two_circle_select(
+                &mut document.crease_pattern,
+                circle1,
+                circle2,
+            )
+        }
         OperationId::SquareBisector => {
             if command.payload.line_ids.len() >= 3 {
                 let line_indices = required_line_indices(&command)?;
@@ -2239,6 +2329,82 @@ pub fn preview_command(
             operations::circle::through_three_points(&mut model, points[0], points[1], points[2]);
             preview.circles = model.circles;
         }
+        OperationId::CircleDrawTangentLine => {
+            let circle_indices = optional_circle_indices(&command)?;
+            if circle_indices.len() >= 2 {
+                let circle1 = circle_for_operation(document, command.operation, circle_indices[0])?;
+                let circle2 = circle_for_operation(document, command.operation, circle_indices[1])?;
+                preview.segments = operations::circle::tangent_lines_two_circles(circle1, circle2);
+            } else if circle_indices.len() == 1 && !points.is_empty() {
+                let circle = circle_for_operation(document, command.operation, circle_indices[0])?;
+                preview.segments = operations::circle::tangent_lines_point_circle(
+                    &document.crease_pattern,
+                    points[0],
+                    circle,
+                );
+            }
+        }
+        OperationId::CircleDrawInverted => {
+            let circle_indices = optional_circle_indices(&command)?;
+            let mut model = CreasePatternModel::default();
+            if let Some(line_id) = command.payload.line_ids.first() {
+                if !circle_indices.is_empty() {
+                    let line_index =
+                        line_id
+                            .checked_sub(1)
+                            .ok_or_else(|| CommandError::InvalidInput {
+                                operation: command.operation,
+                                message: "line IDs are one-based".to_string(),
+                            })?;
+                    let segment =
+                        line_segment_for_operation(document, command.operation, line_index)?;
+                    let inversion =
+                        circle_for_operation(document, command.operation, circle_indices[0])?;
+                    operations::circle::invert_line_segment(&mut model, &segment, inversion);
+                }
+            } else if circle_indices.len() >= 2 {
+                let subject = circle_for_operation(document, command.operation, circle_indices[0])?;
+                let inversion =
+                    circle_for_operation(document, command.operation, circle_indices[1])?;
+                operations::circle::invert_circle(&mut model, subject, inversion);
+            }
+            preview.segments = model.line_segments;
+            preview.circles = model.circles;
+        }
+        OperationId::CircleDrawConcentric if points.len() >= 2 => {
+            let circle_indices = optional_circle_indices(&command)?;
+            if let Some(index) = circle_indices.first() {
+                let circle = circle_for_operation(document, command.operation, *index)?;
+                preview.circles.push(Circle::from_center(
+                    circle.determine_center(),
+                    circle.r + points[0].distance(points[1]),
+                    LineColor::Cyan3,
+                ));
+            }
+        }
+        OperationId::CircleDrawConcentricSelect => {
+            let circle_indices = optional_circle_indices(&command)?;
+            if circle_indices.len() >= 3 {
+                let target = circle_for_operation(document, command.operation, circle_indices[0])?;
+                let reference1 =
+                    circle_for_operation(document, command.operation, circle_indices[1])?;
+                let reference2 =
+                    circle_for_operation(document, command.operation, circle_indices[2])?;
+                preview.circles = operations::circle::concentric_select_candidates(
+                    target, reference1, reference2,
+                );
+            }
+        }
+        OperationId::CircleDrawConcentricTwoCircleSelect => {
+            let circle_indices = optional_circle_indices(&command)?;
+            if circle_indices.len() >= 2 {
+                let circle1 = circle_for_operation(document, command.operation, circle_indices[0])?;
+                let circle2 = circle_for_operation(document, command.operation, circle_indices[1])?;
+                let mut model = CreasePatternModel::default();
+                operations::circle::concentric_two_circle_select(&mut model, circle1, circle2);
+                preview.circles = model.circles;
+            }
+        }
         OperationId::Inward if points.len() >= 3 => {
             let center = geometry::center(points[0], points[1], points[2]);
             preview.segments.extend(
@@ -2482,6 +2648,19 @@ fn optional_circle_indices(command: &CreasePatternCommand) -> Result<Vec<usize>>
                 })
         })
         .collect()
+}
+
+fn required_circle_indices_at_least(
+    command: &CreasePatternCommand,
+    count: usize,
+) -> Result<Vec<usize>> {
+    if command.payload.circle_ids.len() < count {
+        return Err(CommandError::InvalidInput {
+            operation: command.operation,
+            message: format!("select at least {count} circle(s)"),
+        });
+    }
+    optional_circle_indices(command)
 }
 
 fn required_text_indices(command: &CreasePatternCommand) -> Result<Vec<usize>> {
@@ -2847,6 +3026,22 @@ fn line_segment_for_operation(
         .ok_or_else(|| CommandError::InvalidInput {
             operation,
             message: format!("line index {} is out of bounds", index + 1),
+        })
+}
+
+fn circle_for_operation(
+    document: &CreasePatternDocument,
+    operation: OperationId,
+    index: usize,
+) -> Result<Circle> {
+    document
+        .crease_pattern
+        .circles
+        .get(index)
+        .copied()
+        .ok_or_else(|| CommandError::InvalidInput {
+            operation,
+            message: format!("circle index {} is out of bounds", index + 1),
         })
 }
 
@@ -3707,6 +3902,154 @@ mod tests {
     }
 
     #[test]
+    fn command_dispatch_routes_stage_eight_selected_circle_commands() {
+        let mut document = CreasePatternDocument::default();
+        document
+            .crease_pattern
+            .add_circle(Circle::new(0.0, 0.0, 1.0, LineColor::Cyan3));
+        document
+            .crease_pattern
+            .add_circle(Circle::new(5.0, 0.0, 1.0, LineColor::Cyan3));
+        document
+            .crease_pattern
+            .add_circle(Circle::new(10.0, 0.0, 2.0, LineColor::Cyan3));
+        document
+            .crease_pattern
+            .add_circle(Circle::new(12.0, 0.0, 4.0, LineColor::Cyan3));
+        document.crease_pattern.add_line(
+            Point::new(2.0, -1.0),
+            Point::new(2.0, 1.0),
+            LineColor::Black0,
+        );
+
+        execute_command(
+            &mut document,
+            CreasePatternCommand::new(OperationId::CircleDrawConcentric).with_payload(
+                CreasePatternCommandPayload {
+                    circle_ids: vec![1],
+                    points: vec![Point::new(0.0, 0.0), Point::new(0.0, 2.0)],
+                    ..CreasePatternCommandPayload::default()
+                },
+            ),
+        )
+        .expect("concentric circle should execute");
+        assert_eq!(
+            document
+                .crease_pattern
+                .circles
+                .last()
+                .map(|circle| circle.r),
+            Some(3.0)
+        );
+
+        execute_command(
+            &mut document,
+            CreasePatternCommand::new(OperationId::CircleDrawConcentricSelect).with_payload(
+                CreasePatternCommandPayload {
+                    circle_ids: vec![4, 1, 3],
+                    candidate_index: Some(1),
+                    ..CreasePatternCommandPayload::default()
+                },
+            ),
+        )
+        .expect("concentric select should execute");
+        assert_eq!(
+            document
+                .crease_pattern
+                .circles
+                .last()
+                .map(|circle| circle.r),
+            Some(3.0)
+        );
+
+        let before_two_circle = document.crease_pattern.circles.len();
+        execute_command(
+            &mut document,
+            CreasePatternCommand::new(OperationId::CircleDrawConcentricTwoCircleSelect)
+                .with_payload(CreasePatternCommandPayload {
+                    circle_ids: vec![1, 2],
+                    ..CreasePatternCommandPayload::default()
+                }),
+        )
+        .expect("two-circle concentric select should execute");
+        assert_eq!(document.crease_pattern.circles.len(), before_two_circle + 2);
+
+        let before_tangent = document.crease_pattern.line_segments.len();
+        execute_command(
+            &mut document,
+            CreasePatternCommand::new(OperationId::CircleDrawTangentLine).with_payload(
+                CreasePatternCommandPayload {
+                    circle_ids: vec![1, 2],
+                    candidate_index: Some(0),
+                    line_color: Some(LineColor::Blue2),
+                    ..CreasePatternCommandPayload::default()
+                },
+            ),
+        )
+        .expect("two-circle tangent line should execute");
+        assert_eq!(
+            document.crease_pattern.line_segments.len(),
+            before_tangent + 1
+        );
+        assert_eq!(
+            document
+                .crease_pattern
+                .line_segments
+                .last()
+                .map(|line| line.color),
+            Some(LineColor::Blue2)
+        );
+
+        execute_command(
+            &mut document,
+            CreasePatternCommand::new(OperationId::CircleDrawTangentLine).with_payload(
+                CreasePatternCommandPayload {
+                    circle_ids: vec![1],
+                    points: vec![Point::new(5.0, 0.0)],
+                    candidate_index: Some(1),
+                    line_color: Some(LineColor::Red1),
+                    ..CreasePatternCommandPayload::default()
+                },
+            ),
+        )
+        .expect("point-circle tangent line should execute");
+        assert_eq!(
+            document
+                .crease_pattern
+                .line_segments
+                .last()
+                .map(|line| line.color),
+            Some(LineColor::Red1)
+        );
+
+        let before_invert = document.crease_pattern.circles.len();
+        execute_command(
+            &mut document,
+            CreasePatternCommand::new(OperationId::CircleDrawInverted).with_payload(
+                CreasePatternCommandPayload {
+                    circle_ids: vec![3, 1],
+                    ..CreasePatternCommandPayload::default()
+                },
+            ),
+        )
+        .expect("circle inversion should execute");
+        assert_eq!(document.crease_pattern.circles.len(), before_invert + 1);
+
+        execute_command(
+            &mut document,
+            CreasePatternCommand::new(OperationId::CircleDrawInverted).with_payload(
+                CreasePatternCommandPayload {
+                    line_ids: vec![1],
+                    circle_ids: vec![1],
+                    ..CreasePatternCommandPayload::default()
+                },
+            ),
+        )
+        .expect("line inversion should execute");
+        assert!(document.crease_pattern.circles.len() > before_invert + 1);
+    }
+
+    #[test]
     fn command_dispatch_routes_stage_eight_shape_generators() {
         let mut document = CreasePatternDocument::default();
 
@@ -3937,7 +4280,20 @@ mod tests {
 
     #[test]
     fn command_preview_returns_stage_eight_shape_candidates_without_mutating_document() {
-        let document = CreasePatternDocument::default();
+        let mut document = CreasePatternDocument::default();
+        document
+            .crease_pattern
+            .add_circle(Circle::new(0.0, 0.0, 1.0, LineColor::Cyan3));
+        document
+            .crease_pattern
+            .add_circle(Circle::new(5.0, 0.0, 1.0, LineColor::Cyan3));
+        document
+            .crease_pattern
+            .add_circle(Circle::new(10.0, 0.0, 2.0, LineColor::Cyan3));
+        document
+            .crease_pattern
+            .add_circle(Circle::new(12.0, 0.0, 4.0, LineColor::Cyan3));
+        let before = document.clone();
 
         let circle_preview = preview_command(
             &document,
@@ -3954,6 +4310,30 @@ mod tests {
         assert_eq!(circle_preview.circles.len(), 1);
         assert_eq!(circle_preview.circles[0].r, 5.0);
 
+        let tangent_preview = preview_command(
+            &document,
+            CreasePatternCommand::new(OperationId::CircleDrawTangentLine).with_payload(
+                CreasePatternCommandPayload {
+                    circle_ids: vec![1, 2],
+                    ..CreasePatternCommandPayload::default()
+                },
+            ),
+        )
+        .expect("circle tangent should expose line candidates");
+        assert_eq!(tangent_preview.segments.len(), 4);
+
+        let concentric_preview = preview_command(
+            &document,
+            CreasePatternCommand::new(OperationId::CircleDrawConcentricSelect).with_payload(
+                CreasePatternCommandPayload {
+                    circle_ids: vec![4, 1, 3],
+                    ..CreasePatternCommandPayload::default()
+                },
+            ),
+        )
+        .expect("concentric select should expose circle candidates");
+        assert_eq!(concentric_preview.circles.len(), 2);
+
         let polygon_preview = preview_command(
             &document,
             CreasePatternCommand::new(OperationId::PolygonSetNoCorners).with_payload(
@@ -3967,8 +4347,7 @@ mod tests {
         .expect("regular polygon should expose line previews");
 
         assert_eq!(polygon_preview.segments.len(), 3);
-        assert!(document.crease_pattern.line_segments.is_empty());
-        assert!(document.crease_pattern.circles.is_empty());
+        assert_eq!(document, before);
 
         let voronoi_preview = preview_command(
             &document,
@@ -3988,8 +4367,7 @@ mod tests {
 
         assert_eq!(voronoi_preview.segments.len(), 3);
         assert_eq!(voronoi_preview.points.len(), 3);
-        assert!(document.crease_pattern.line_segments.is_empty());
-        assert!(document.crease_pattern.circles.is_empty());
+        assert_eq!(document, before);
     }
 
     #[test]

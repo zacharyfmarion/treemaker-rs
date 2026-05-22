@@ -19,6 +19,7 @@ export type OristudioCpToolSettingGroup =
   | 'parallel-width'
   | 'candidate-choice'
   | 'line-select-help'
+  | 'circle-select-help'
   | 'apply-lines'
   | 'measurement-readout'
   | 'custom-circle-color'
@@ -165,6 +166,7 @@ const LINE_COLOR_OPERATION_IDS = new Set<OristudioCpOperationId>([
   'DrawBirdBase',
   'DrawFrogBase',
   'VoronoiCreate',
+  'CircleDrawTangentLine',
 ]);
 
 const TOOL_SETTING_GROUPS_BY_OPERATION: Partial<
@@ -190,6 +192,11 @@ const TOOL_SETTING_GROUPS_BY_OPERATION: Partial<
   DisplayAngleBetweenThreePoints2: ['measurement-readout'],
   DisplayAngleBetweenThreePoints3: ['measurement-readout'],
   CircleChangeColor: ['custom-circle-color'],
+  CircleDrawTangentLine: ['circle-select-help', 'candidate-choice'],
+  CircleDrawInverted: ['circle-select-help'],
+  CircleDrawConcentric: ['circle-select-help'],
+  CircleDrawConcentricSelect: ['circle-select-help', 'candidate-choice'],
+  CircleDrawConcentricTwoCircleSelect: ['circle-select-help'],
   Text: ['text-content'],
   VoronoiCreate: ['apply-lines'],
   Axiom5: ['candidate-choice'],

@@ -380,14 +380,29 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
   ready('CircleDrawSeparate', 'Separate circle', 'annotations', 'circle-dashed', 'MouseHandlerCircleDrawSeparate', {
     toolSteps: ['Pick center point', 'Pick radius start', 'Pick radius end'],
   }),
-  notImplemented('CircleDrawTangentLine', 'Circle tangent line', 'annotations', 'circle-slash', 'MouseHandlerCircleDrawTangentLine'),
-  notImplemented('CircleDrawInverted', 'Inverted circle', 'annotations', 'refresh-cw', 'MouseHandlerCircleDrawInverted'),
+  ready('CircleDrawTangentLine', 'Circle tangent line', 'annotations', 'circle-slash', 'MouseHandlerCircleDrawTangentLine', {
+    selectionRequirement: 'selected circle(s)',
+    tooltip: 'Create tangent lines from two selected circles, or from one selected circle plus a clicked point',
+  }),
+  ready('CircleDrawInverted', 'Inverted circle', 'annotations', 'refresh-cw', 'MouseHandlerCircleDrawInverted', {
+    selectionRequirement: 'selected circle and circle or crease',
+    tooltip: 'Invert a selected circle or crease through a selected circle',
+  }),
   ready('CircleDrawFree', 'Free circle', 'annotations', 'circle-plus', 'MouseHandlerCircleDrawFree', {
     toolSteps: ['Pick center point', 'Pick radius point'],
   }),
-  notImplemented('CircleDrawConcentric', 'Concentric circle', 'annotations', 'circle-dot-dashed', 'MouseHandlerCircleDrawConcentric'),
-  notImplemented('CircleDrawConcentricSelect', 'Concentric from selection', 'annotations', 'circle-dot', 'MouseHandlerCircleDrawConcentricSelect'),
-  notImplemented('CircleDrawConcentricTwoCircleSelect', 'Concentric from two circles', 'annotations', 'venetian-mask', 'MouseHandlerCircleDrawConcentricTwoCircleSelect'),
+  ready('CircleDrawConcentric', 'Concentric circle', 'annotations', 'circle-dot-dashed', 'MouseHandlerCircleDrawConcentric', {
+    selectionRequirement: 'selected circle',
+    toolSteps: ['Pick radius start', 'Pick radius end'],
+  }),
+  ready('CircleDrawConcentricSelect', 'Concentric from selection', 'annotations', 'circle-dot', 'MouseHandlerCircleDrawConcentricSelect', {
+    selectionRequirement: 'three selected circles',
+    tooltip: 'Create a concentric circle from a target circle and two reference circle radii',
+  }),
+  ready('CircleDrawConcentricTwoCircleSelect', 'Concentric from two circles', 'annotations', 'venetian-mask', 'MouseHandlerCircleDrawConcentricTwoCircleSelect', {
+    selectionRequirement: 'two selected circles',
+    tooltip: 'Create the two Oriedita concentric offset circles from selected circles',
+  }),
   ready('ParallelDrawWidth', 'Parallel draw by width', 'construct', 'between-horizontal-end', 'MouseHandlerParallelDrawWidth', {
     toolSteps: ['Pick source crease', 'Pick width point'],
   }),

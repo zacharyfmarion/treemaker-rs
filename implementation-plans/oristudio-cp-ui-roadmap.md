@@ -669,6 +669,9 @@ UX work:
   command search.
 - Add context-sensitive inspector actions for selected lines, vertices, circles,
   text, diagnostics, and folded faces.
+- Add the remaining text deletion affordances from Oriedita's text handler:
+  nearest-text delete and drag-box text delete should route through the ported
+  `Text` command actions instead of ad hoc document mutation.
 - Add accessibility labels, focus rings, keyboard navigation, and tooltip
   coverage.
 - Ensure compact responsive behavior for narrow panes.
@@ -864,8 +867,12 @@ Done when:
       selected-delete through the contextual tool panel.
 - [x] Stage 8 slice: Validate text command payloads, wasm bridge behavior, and
       undo-aware web interaction state without browser smoke tests.
-- [ ] Stage 8: Enable circles, text, generators, and measurement tools.
-- [ ] Stage 8: Validate annotation preservation and non-mutating measurement
+- [x] Stage 8 slice: Enable tangent, inverted, concentric, concentric-select,
+      and two-circle concentric circle modes through selected-circle workflows.
+- [x] Stage 8 slice: Validate selected-circle command dispatch, previews, wasm
+      bridge behavior, and contextual web payloads without browser smoke tests.
+- [x] Stage 8: Enable circles, text, generators, and measurement tools.
+- [x] Stage 8: Validate annotation preservation and non-mutating measurement
       behavior.
 - [ ] Stage 9: Enable checks, diagnostics, issue navigation, and repair
       commands.

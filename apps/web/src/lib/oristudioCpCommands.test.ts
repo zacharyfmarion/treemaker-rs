@@ -88,6 +88,27 @@ describe('oristudio CP command registry', () => {
       uiStatus: 'ready',
       toolSteps: ['Pick center point', 'Pick radius point'],
     });
+    expect(cpCommandByOperation('CircleDrawTangentLine')).toMatchObject({
+      uiStatus: 'ready',
+      selectionRequirement: 'selected circle(s)',
+    });
+    expect(cpCommandByOperation('CircleDrawInverted')).toMatchObject({
+      uiStatus: 'ready',
+      selectionRequirement: 'selected circle and circle or crease',
+    });
+    expect(cpCommandByOperation('CircleDrawConcentric')).toMatchObject({
+      uiStatus: 'ready',
+      selectionRequirement: 'selected circle',
+      toolSteps: ['Pick radius start', 'Pick radius end'],
+    });
+    expect(cpCommandByOperation('CircleDrawConcentricSelect')).toMatchObject({
+      uiStatus: 'ready',
+      selectionRequirement: 'three selected circles',
+    });
+    expect(cpCommandByOperation('CircleDrawConcentricTwoCircleSelect')).toMatchObject({
+      uiStatus: 'ready',
+      selectionRequirement: 'two selected circles',
+    });
     expect(cpCommandByOperation('PolygonSetNoCorners')).toMatchObject({
       uiStatus: 'ready',
       toolSteps: ['Pick first corner', 'Pick second corner'],

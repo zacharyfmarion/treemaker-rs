@@ -1,5 +1,6 @@
 import type {
   OristudioCpDocumentSnapshot,
+  OristudioCpGridMetadata,
   OristudioCpLineSegment,
 } from '../engine/oristudioCpTypes';
 import type { Point, PlotRect } from './geometry';
@@ -8,10 +9,22 @@ export const CP_VIEWBOX_SIZE = 720;
 export const CP_WORLD_RECT: PlotRect = { x: 0, y: 0, width: CP_VIEWBOX_SIZE, height: CP_VIEWBOX_SIZE };
 export const CP_PAPER_RECT: PlotRect = { x: 66, y: 54, width: 588, height: 588 };
 export const CP_PAPER_SHADOW_RECT: PlotRect = { x: 56, y: 44, width: 608, height: 608 };
+export const ORIEDITA_PAPER_MIN = -200;
+export const ORIEDITA_PAPER_MAX = 200;
+export const ORIEDITA_PAPER_SIZE = ORIEDITA_PAPER_MAX - ORIEDITA_PAPER_MIN;
+export const ORIEDITA_PAPER_BOUNDS: CpModelBounds = {
+  minX: ORIEDITA_PAPER_MIN,
+  minY: ORIEDITA_PAPER_MIN,
+  maxX: ORIEDITA_PAPER_MAX,
+  maxY: ORIEDITA_PAPER_MAX,
+  spanX: ORIEDITA_PAPER_SIZE,
+  spanY: ORIEDITA_PAPER_SIZE,
+};
 
 const MODEL_PADDING_RATIO = 0.04;
 const DEFAULT_SPAN = 1;
 const MAX_GRID_LINES = 80;
+const GRID_EPSILON = 1e-9;
 
 export interface OristudioCpSelection {
   lines: number[];
@@ -68,6 +81,20 @@ export interface CpSnapTarget {
   distance: number;
 }
 
+export type OrieditaGridBaseState = 'hidden' | 'within-paper' | 'full';
+
+export interface OrieditaGridBasis {
+  baseState: OrieditaGridBaseState;
+  gridSize: number;
+  gridWidth: number;
+  origin: Point;
+  a: Point;
+  b: Point;
+  c: Point;
+  diagonalMax: number;
+  diagonalMin: number;
+}
+
 export function emptyOristudioCpSelection(): OristudioCpSelection {
   return { ...EMPTY_ORISTUDIO_CP_SELECTION };
 }
@@ -88,11 +115,88 @@ export function toggleCpSelectionList(ids: number[], id: number): number[] {
     : Array.from(new Set([...ids, id])).sort((a, b) => a - b);
 }
 
+export function orieditaGridBaseState(state: string): OrieditaGridBaseState {
+  const normalized = state.replace(/[_\s-]/gu, '').toLowerCase();
+  switch (normalized) {
+    case 'hidden':
+      return 'hidden';
+    case 'full':
+      return 'full';
+    case 'withinpaper':
+      return 'within-paper';
+    default:
+      return 'within-paper';
+  }
+}
+
+export function getOrieditaGridBasis(grid: OristudioCpGridMetadata): OrieditaGridBasis {
+  const gridSize = Math.max(1, Math.trunc(grid.grid_size));
+  const gridWidth = ORIEDITA_PAPER_SIZE / gridSize;
+  const gridXLength = grid.grid_xa + grid.grid_xb * Math.sqrt(Math.max(0, grid.grid_xc));
+  const gridYLength = grid.grid_ya + grid.grid_yb * Math.sqrt(Math.max(0, grid.grid_yc));
+  // Oriedita Grid#setGrid stores the configured angle negated before calculating vector b.
+  const angleRadians = (-grid.grid_angle * Math.PI) / 180;
+  const a = { x: gridWidth * gridXLength, y: 0 };
+  const b = {
+    x: gridWidth * gridYLength * Math.cos(angleRadians),
+    y: gridWidth * gridYLength * Math.sin(angleRadians),
+  };
+  const c = { x: b.x - a.x, y: b.y - a.y };
+  const diagonalA = distance({ x: 0, y: 0 }, addPoints(a, b));
+  const diagonalB = distance(a, b);
+  return {
+    baseState: resolveOrieditaGridBaseState(grid, gridXLength, gridYLength),
+    gridSize,
+    gridWidth,
+    origin: { x: ORIEDITA_PAPER_MIN, y: ORIEDITA_PAPER_MAX },
+    a,
+    b,
+    c,
+    diagonalMax: Math.max(diagonalA, diagonalB),
+    diagonalMin: Math.min(diagonalA, diagonalB),
+  };
+}
+
+export function visibleOrieditaGridMetadata(
+  grid: OristudioCpGridMetadata
+): OristudioCpGridMetadata {
+  if (orieditaGridBaseState(grid.base_state) !== 'hidden') return grid;
+  return {
+    ...grid,
+    base_state: 'WithinPaper',
+  };
+}
+
+function resolveOrieditaGridBaseState(
+  grid: OristudioCpGridMetadata,
+  gridXLength: number,
+  gridYLength: number
+): OrieditaGridBaseState {
+  const baseState = orieditaGridBaseState(grid.base_state);
+  if (baseState !== 'within-paper') return baseState;
+  if (
+    !nearlyEqual(gridXLength, 1) ||
+    !nearlyEqual(gridYLength, 1) ||
+    !nearlyEqual(grid.grid_angle, 90)
+  ) {
+    return 'full';
+  }
+  return baseState;
+}
+
 export function getEditableCpModelBounds(
   document: OristudioCpDocumentSnapshot | null | undefined
 ): CpModelBounds {
   const points: Point[] = [];
+  const includeOrieditaPaper =
+    !!document && orieditaGridBaseState(document.crease_pattern.grid.base_state) !== 'hidden';
   if (document) {
+    if (includeOrieditaPaper) {
+      points.push(
+        { x: ORIEDITA_PAPER_MIN, y: ORIEDITA_PAPER_MIN },
+        { x: ORIEDITA_PAPER_MAX, y: ORIEDITA_PAPER_MAX }
+      );
+    }
     for (const segment of document.crease_pattern.line_segments) {
       points.push(segment.a, segment.b);
     }
@@ -124,6 +228,10 @@ export function getEditableCpModelBounds(
     minY = Math.min(minY, point.y);
     maxX = Math.max(maxX, point.x);
     maxY = Math.max(maxY, point.y);
+  }
+
+  if (includeOrieditaPaper && pointsWithinOrieditaPaper(points)) {
+    return { ...ORIEDITA_PAPER_BOUNDS };
   }
 
   const span = Math.max(maxX - minX, maxY - minY, DEFAULT_SPAN);
@@ -182,9 +290,14 @@ export function cpLineAssignmentLabel(color: string): string {
 
 export function getCpGridLines(
   bounds: CpModelBounds,
-  gridSize: number,
-  intervalSize: number
+  grid: OristudioCpGridMetadata | number,
+  intervalSize = 1
 ): CpGridLine[] {
+  if (typeof grid !== 'number') {
+    return getOrieditaGridLines(bounds, grid);
+  }
+
+  const gridSize = grid;
   const divisions = Math.min(MAX_GRID_LINES, Math.max(1, gridSize));
   const interval = Math.max(1, intervalSize);
   const lines: CpGridLine[] = [];
@@ -208,6 +321,107 @@ export function getCpGridLines(
   }
 
   return lines;
+}
+
+export function getOrieditaGridLines(
+  bounds: CpModelBounds,
+  grid: OristudioCpGridMetadata
+): CpGridLine[] {
+  const basis = getOrieditaGridBasis(grid);
+  if (basis.baseState === 'hidden' || !hasValidGridBasis(basis)) return [];
+
+  let { minA, maxA, minB, maxB } = gridIndexRange(gridDrawingBounds(bounds, basis), basis);
+  if (basis.baseState === 'within-paper') {
+    minA = Math.max(0, minA);
+    maxA = Math.min(basis.gridSize, maxA);
+    minB = Math.max(0, minB);
+    maxB = Math.min(basis.gridSize, maxB);
+  }
+  if (minA > maxA || minB > maxB) return [];
+
+  const offsetA = positiveModulo(minA, basis.gridSize);
+  const offsetB = positiveModulo(minB, basis.gridSize);
+  const startA = minA - offsetA;
+  const startB = minB - offsetB;
+  const lines: CpGridLine[] = [];
+
+  for (let i = startA; i <= maxA; i += 1) {
+    const a = gridPoint(basis, i, minB);
+    const b = gridPoint(basis, i, maxB);
+    lines.push({
+      id: `oriedita-a-${i}`,
+      a,
+      b,
+      major: isIntervalLine(i, grid.interval_grid_size, grid.vertical_scale_position),
+    });
+  }
+
+  for (let i = startB; i <= maxB; i += 1) {
+    const a = gridPoint(basis, minA, i);
+    const b = gridPoint(basis, maxA, i);
+    lines.push({
+      id: `oriedita-b-${i}`,
+      a,
+      b,
+      major: isIntervalLine(i, grid.interval_grid_size, grid.horizontal_scale_position),
+    });
+  }
+
+  if (grid.draw_diagonal_gridlines) {
+    for (let i = minA - (offsetA + offsetB); i <= maxA; i += 1) {
+      const a = gridPoint(basis, i, minB);
+      lines.push({
+        id: `oriedita-diagonal-a-${i}`,
+        a,
+        b: addPoints(a, scalePoint(basis.c, i - minA)),
+        major: isIntervalLine(i + minB, grid.interval_grid_size, 0),
+      });
+    }
+    for (let i = minB - (offsetA + offsetB); i <= maxB; i += 1) {
+      const a = gridPoint(basis, maxA, i);
+      lines.push({
+        id: `oriedita-diagonal-b-${i}`,
+        a,
+        b: addPoints(a, scalePoint(basis.c, maxB - i)),
+        major: isIntervalLine(i + maxA, grid.interval_grid_size, 0),
+      });
+    }
+  }
+
+  return lines;
+}
+
+export function closestOrieditaGridPoint(
+  point: Point,
+  grid: OristudioCpGridMetadata
+): Point | null {
+  const basis = getOrieditaGridBasis(grid);
+  if (basis.baseState === 'hidden' || !hasValidGridBasis(basis)) return null;
+
+  const searchRadius = basis.diagonalMax;
+  const bounds = boundsFromMinMax(
+    point.x - searchRadius,
+    point.y - searchRadius,
+    point.x + searchRadius,
+    point.y + searchRadius
+  );
+  const { minA, maxA, minB, maxB } = gridIndexRange(bounds, basis);
+  let bestPoint: Point | null = null;
+  let bestDistance = searchRadius;
+
+  for (let i = minA; i <= maxA; i += 1) {
+    for (let j = minB; j <= maxB; j += 1) {
+      const candidate = gridPoint(basis, i, j);
+      if (basis.baseState === 'within-paper' && !isWithinOrieditaPaper(candidate)) continue;
+      const candidateDistance = distance(point, candidate);
+      if (candidateDistance <= bestDistance) {
+        bestDistance = candidateDistance;
+        bestPoint = candidate;
+      }
+    }
+  }
+
+  return bestPoint;
 }
 
 export function nearestCpSnapTarget(
@@ -241,12 +455,13 @@ export function nearestCpSnapTarget(
   }
 
   if (options.snapToGrid) {
-    const gridSize = Math.max(1, document.crease_pattern.grid.grid_size);
-    const gridPoint = {
-      x: snapCoordinate(point.x, bounds.minX, bounds.spanX / gridSize),
-      y: snapCoordinate(point.y, bounds.minY, bounds.spanY / gridSize),
-    };
-    consider(pointTarget(gridPoint, point, 'grid', 'grid'));
+    const grid = options.gridVisible
+      ? visibleOrieditaGridMetadata(document.crease_pattern.grid)
+      : document.crease_pattern.grid;
+    const gridPoint = closestOrieditaGridPoint(point, grid);
+    if (gridPoint) {
+      consider(pointTarget(gridPoint, point, 'grid', 'grid'));
+    }
   }
 
   return best;
@@ -265,6 +480,114 @@ function boundsFromMinMax(minX: number, minY: number, maxX: number, maxY: number
     spanX: Math.max(DEFAULT_SPAN * 1e-6, maxX - minX),
     spanY: Math.max(DEFAULT_SPAN * 1e-6, maxY - minY),
   };
+}
+
+function pointsWithinOrieditaPaper(points: Point[]): boolean {
+  return points.every(isWithinOrieditaPaper);
+}
+
+function isWithinOrieditaPaper(point: Point): boolean {
+  return (
+    point.x >= ORIEDITA_PAPER_MIN - GRID_EPSILON &&
+    point.x <= ORIEDITA_PAPER_MAX + GRID_EPSILON &&
+    point.y >= ORIEDITA_PAPER_MIN - GRID_EPSILON &&
+    point.y <= ORIEDITA_PAPER_MAX + GRID_EPSILON
+  );
+}
+
+function hasValidGridBasis(basis: OrieditaGridBasis): boolean {
+  const determinant = basis.a.x * basis.b.y - basis.b.x * basis.a.y;
+  return Math.abs(determinant) > GRID_EPSILON;
+}
+
+function gridDrawingBounds(bounds: CpModelBounds, basis: OrieditaGridBasis): CpModelBounds {
+  if (basis.baseState !== 'full') return bounds;
+  const points = [
+    cpSvgPointToModel({ x: CP_WORLD_RECT.x, y: CP_WORLD_RECT.y }, bounds),
+    cpSvgPointToModel({ x: CP_WORLD_RECT.x + CP_WORLD_RECT.width, y: CP_WORLD_RECT.y }, bounds),
+    cpSvgPointToModel({ x: CP_WORLD_RECT.x, y: CP_WORLD_RECT.y + CP_WORLD_RECT.height }, bounds),
+    cpSvgPointToModel(
+      { x: CP_WORLD_RECT.x + CP_WORLD_RECT.width, y: CP_WORLD_RECT.y + CP_WORLD_RECT.height },
+      bounds
+    ),
+  ];
+  return boundsFromPoints(points);
+}
+
+function gridIndexRange(bounds: CpModelBounds, basis: OrieditaGridBasis) {
+  const indices = [
+    gridIndex({ x: bounds.minX, y: bounds.minY }, basis),
+    gridIndex({ x: bounds.minX, y: bounds.maxY }, basis),
+    gridIndex({ x: bounds.maxX, y: bounds.minY }, basis),
+    gridIndex({ x: bounds.maxX, y: bounds.maxY }, basis),
+  ];
+  return {
+    minA: floorGridIndex(Math.min(...indices.map((point) => point.x))),
+    maxA: ceilGridIndex(Math.max(...indices.map((point) => point.x))),
+    minB: floorGridIndex(Math.min(...indices.map((point) => point.y))),
+    maxB: ceilGridIndex(Math.max(...indices.map((point) => point.y))),
+  };
+}
+
+function boundsFromPoints(points: Point[]): CpModelBounds {
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  for (const point of points) {
+    minX = Math.min(minX, point.x);
+    minY = Math.min(minY, point.y);
+    maxX = Math.max(maxX, point.x);
+    maxY = Math.max(maxY, point.y);
+  }
+  return boundsFromMinMax(minX, minY, maxX, maxY);
+}
+
+function gridIndex(point: Point, basis: OrieditaGridBasis): Point {
+  const determinant = basis.a.x * basis.b.y - basis.b.x * basis.a.y;
+  const x = point.x - basis.origin.x;
+  const y = point.y - basis.origin.y;
+  return {
+    x: (basis.b.y / determinant) * x + (-basis.b.x / determinant) * y,
+    y: (-basis.a.y / determinant) * x + (basis.a.x / determinant) * y,
+  };
+}
+
+function gridPoint(basis: OrieditaGridBasis, aIndex: number, bIndex: number): Point {
+  return addPoints(
+    basis.origin,
+    addPoints(scalePoint(basis.a, aIndex), scalePoint(basis.b, bIndex))
+  );
+}
+
+function floorGridIndex(value: number): number {
+  return Math.floor(value + GRID_EPSILON);
+}
+
+function ceilGridIndex(value: number): number {
+  return Math.ceil(value - GRID_EPSILON);
+}
+
+function positiveModulo(value: number, modulo: number): number {
+  const safeModulo = Math.max(1, Math.trunc(modulo));
+  return ((value % safeModulo) + safeModulo) % safeModulo;
+}
+
+function isIntervalLine(index: number, intervalSize: number, position: number): boolean {
+  const interval = Math.max(1, Math.trunc(intervalSize));
+  return positiveModulo(index, interval) === positiveModulo(position, interval);
+}
+
+function addPoints(a: Point, b: Point): Point {
+  return { x: a.x + b.x, y: a.y + b.y };
+}
+
+function scalePoint(point: Point, scalar: number): Point {
+  return { x: point.x * scalar, y: point.y * scalar };
+}
+
+function nearlyEqual(a: number, b: number): boolean {
+  return Math.abs(a - b) <= GRID_EPSILON;
 }
 
 function pointTarget(
@@ -294,11 +617,6 @@ function closestPointOnSegment(point: Point, segment: OristudioCpLineSegment): P
     x: segment.a.x + dx * t,
     y: segment.a.y + dy * t,
   };
-}
-
-function snapCoordinate(value: number, origin: number, step: number): number {
-  if (step <= 0) return value;
-  return origin + Math.round((value - origin) / step) * step;
 }
 
 function distance(a: Point, b: Point): number {

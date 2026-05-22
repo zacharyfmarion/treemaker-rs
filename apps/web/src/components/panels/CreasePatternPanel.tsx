@@ -25,6 +25,7 @@ import {
   modelPointToCpSvg,
   nearestCpSnapTarget,
   textCoordinate,
+  visibleOrieditaGridMetadata,
   type CpSnapTarget,
   type OristudioCpSelection,
 } from '../../lib/creasePatternViewport';
@@ -98,16 +99,16 @@ export function CreasePatternPanel() {
   const editableCp = documentMode === 'crease-pattern' ? oristudioCpDocument?.document : null;
   const editableCpSummary = oristudioCpDocument?.summary ?? null;
   const editableCpBounds = useMemo(() => getEditableCpModelBounds(editableCp), [editableCp]);
-  const editableCpGridLines = useMemo(
+  const editableCpVisibleGrid = useMemo(
     () =>
-      editableCp
-        ? getCpGridLines(
-            editableCpBounds,
-            editableCp.crease_pattern.grid.grid_size,
-            editableCp.crease_pattern.grid.interval_grid_size
-          )
-        : [],
-    [editableCp, editableCpBounds]
+      editableCp && oristudioCpViewport.gridVisible
+        ? visibleOrieditaGridMetadata(editableCp.crease_pattern.grid)
+        : null,
+    [editableCp, oristudioCpViewport.gridVisible]
+  );
+  const editableCpGridLines = useMemo(
+    () => (editableCpVisibleGrid ? getCpGridLines(editableCpBounds, editableCpVisibleGrid) : []),
+    [editableCpBounds, editableCpVisibleGrid]
   );
   const hasEditableCreasePattern =
     !!editableCp &&

@@ -634,6 +634,8 @@ Done when:
       work from `main`.
 - [x] Stage 2: Extend the landed viewport with edit-grade CP viewport state.
 - [x] Stage 2: Add CP selection, hit testing, snapping, history, and status UI.
+- [x] Stage 2: Align editable CP grid rendering and grid snapping with
+      Oriedita's paper-coordinate grid model.
 - [x] Stage 2: Validate viewport behavior with unit and visual tests.
 - [ ] Stage 3: Add the left-side tool rail, command groups, active-tool
       prompts, and Not-implemented presentation.

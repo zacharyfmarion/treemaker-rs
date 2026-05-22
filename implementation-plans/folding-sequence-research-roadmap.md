@@ -83,7 +83,7 @@ has a validated implementation.
 - [x] Phase 10: Add visual step playback for current planner artifacts.
 - [x] Phase 11: Add complex-transform validation harness and invariants.
 - [x] Phase 12: Implement first validated local complex transforms.
-- [ ] Phase 13: Implement rabbit-ear and molecule transforms.
+- [x] Phase 13: Implement rabbit-ear and molecule transforms.
 - [ ] Phase 14: Promote visual/corpus review for complex sequences.
 
 ## Phase 0: Fixtures And Contracts
@@ -704,6 +704,17 @@ Exit criteria:
 - The planner can complete a small TreeMaker-style base that requires at least
   one complex move beyond simple folds.
 - Molecule/simultaneous claims are conservative and visually reviewable.
+
+Phase 13 implementation notes:
+
+- Extended the isolated whole-region complex transform to rabbit-ear and small
+  molecule-collapse candidates.
+- `kite-rabbit-ear-local` and `treemaker-triad-base` now complete as high-level
+  complex steps when the recognized candidate accounts for the whole active
+  crease group and the reverse state re-solves cleanly.
+- Simultaneous-collapse candidates remain unsupported.
+- Updated fixture expectations and tests so completed complex fixtures must use
+  their matching complex instruction kind.
 
 ## Phase 14: Visual And Corpus Promotion
 

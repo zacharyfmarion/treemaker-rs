@@ -1139,7 +1139,7 @@ pub fn apply_complex_transform(
         });
     }
 
-    if phase12_complex_transform_is_supported(state, candidate) {
+    if isolated_complex_transform_is_supported(state, candidate) {
         return apply_reverse_complex_group(state, _next_state_id, candidate, diagnostics);
     }
 
@@ -1168,13 +1168,16 @@ pub fn apply_complex_transform(
     })
 }
 
-fn phase12_complex_transform_is_supported(
+fn isolated_complex_transform_is_supported(
     state: &SequenceState,
     candidate: &ComplexMoveCandidate,
 ) -> bool {
     matches!(
         candidate.kind,
-        ComplexMoveKind::ReverseFold | ComplexMoveKind::SquashFold
+        ComplexMoveKind::ReverseFold
+            | ComplexMoveKind::SquashFold
+            | ComplexMoveKind::RabbitEar
+            | ComplexMoveKind::MoleculeCollapse
     ) && active_creases_match_candidate(state, candidate)
 }
 
@@ -1986,6 +1989,57 @@ mod tests {
         document
     }
 
+    fn triad_molecule() -> FoldDocument {
+        let mut document = FoldDocument::new(
+            vec![
+                vec![0.5, 0.5],
+                vec![0.5, 1.0],
+                vec![0.9330127018922193, 0.75],
+                vec![0.9330127018922193, 0.25],
+                vec![0.5, 0.0],
+                vec![0.0669872981077807, 0.25],
+                vec![0.0669872981077807, 0.75],
+            ],
+            vec![
+                [1, 2],
+                [2, 3],
+                [3, 4],
+                [4, 5],
+                [5, 6],
+                [6, 1],
+                [0, 1],
+                [0, 2],
+                [0, 3],
+                [0, 4],
+                [0, 5],
+                [0, 6],
+            ],
+        );
+        document.edges_assignment = vec![
+            Assignment::Boundary,
+            Assignment::Boundary,
+            Assignment::Boundary,
+            Assignment::Boundary,
+            Assignment::Boundary,
+            Assignment::Boundary,
+            Assignment::Mountain,
+            Assignment::Valley,
+            Assignment::Mountain,
+            Assignment::Mountain,
+            Assignment::Valley,
+            Assignment::Mountain,
+        ];
+        document.faces_vertices = vec![
+            vec![0, 1, 2],
+            vec![0, 2, 3],
+            vec![0, 3, 4],
+            vec![0, 4, 5],
+            vec![0, 5, 6],
+            vec![0, 6, 1],
+        ];
+        document
+    }
+
     #[test]
     fn target_state_wraps_flatfold_result() {
         let target = resolve_target_state(&two_face_valley(), TargetStateOptions::default())
@@ -2056,7 +2110,7 @@ mod tests {
     }
 
     #[test]
-    fn complex_transform_harness_keeps_unimplemented_moves_unsupported() {
+    fn isolated_rabbit_ear_transform_applies_as_complex_step() {
         let target = resolve_target_state(&rabbit_ear_local(), TargetStateOptions::default())
             .expect("target state");
         let state = SequenceState::from_target("target", &target);
@@ -2069,19 +2123,13 @@ mod tests {
         let result =
             apply_complex_transform(&state, "state-1", &candidate).expect("transform result");
 
-        assert_eq!(result.status, ComplexTransformStatus::Unsupported);
-        assert!(result.after_state.is_none());
-        assert!(result.step.is_none());
+        assert_eq!(result.status, ComplexTransformStatus::Applied);
+        assert!(result.after_state.is_some());
+        assert!(matches!(result.step, Some(InstructionStep::RabbitEar(_))));
         assert!(result.diagnostics.iter().any(|diagnostic| {
-            diagnostic.code == "complex_transform_not_implemented"
-                && diagnostic.severity == DiagnosticSeverity::Warning
+            diagnostic.code == "complex_transform_applied"
+                && diagnostic.severity == DiagnosticSeverity::Info
         }));
-        assert!(
-            result
-                .diagnostics
-                .iter()
-                .any(|diagnostic| diagnostic.code == "rabbit_ear_not_implemented")
-        );
     }
 
     #[test]
@@ -2111,6 +2159,23 @@ mod tests {
                 .first()
                 .is_some_and(|state| state.active_creases.is_empty())
         );
+    }
+
+    #[test]
+    fn isolated_molecule_transform_completes_as_complex_step() {
+        let target =
+            resolve_target_state(&triad_molecule(), TargetStateOptions::default()).expect("target");
+        let plan = plan_folding_sequence(&target).expect("molecule plan");
+
+        assert_eq!(plan.status, PlanStatus::Complete);
+        assert!(plan.unresolved_regions.is_empty());
+        match &plan.steps[0] {
+            InstructionStep::MoleculeCollapse(details) => {
+                assert_eq!(details.affected_creases.len(), 6);
+                assert_eq!(details.after_state, "target");
+            }
+            other => panic!("expected molecule collapse step, got {other:?}"),
+        }
     }
 
     #[test]

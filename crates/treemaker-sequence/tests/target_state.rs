@@ -88,7 +88,7 @@ fn phase0_complex_fixtures_are_recognized_but_not_faked() {
         (
             "kite-rabbit-ear-local.fold",
             ComplexMoveKind::RabbitEar,
-            PlanStatus::Partial,
+            PlanStatus::Complete,
         ),
         (
             "squash-local.fold",
@@ -98,7 +98,7 @@ fn phase0_complex_fixtures_are_recognized_but_not_faked() {
         (
             "treemaker-triad-base.fold",
             ComplexMoveKind::MoleculeCollapse,
-            PlanStatus::Partial,
+            PlanStatus::Complete,
         ),
         (
             "simultaneous-collapse-unsupported.fold",
@@ -126,7 +126,7 @@ fn phase0_complex_fixtures_are_recognized_but_not_faked() {
             assert!(
                 plan.steps
                     .iter()
-                    .any(|step| matches!(step, treemaker_sequence::InstructionStep::SquashFold(_))),
+                    .any(|step| step_matches_kind(step, &expected_kind)),
                 "{fixture}: completed complex fixture should use a complex step"
             );
             assert!(
@@ -147,6 +147,28 @@ fn phase0_complex_fixtures_are_recognized_but_not_faked() {
             );
         }
     }
+}
+
+fn step_matches_kind(step: &treemaker_sequence::InstructionStep, kind: &ComplexMoveKind) -> bool {
+    matches!(
+        (step, kind),
+        (
+            treemaker_sequence::InstructionStep::ReverseFold(_),
+            ComplexMoveKind::ReverseFold
+        ) | (
+            treemaker_sequence::InstructionStep::SquashFold(_),
+            ComplexMoveKind::SquashFold
+        ) | (
+            treemaker_sequence::InstructionStep::RabbitEar(_),
+            ComplexMoveKind::RabbitEar
+        ) | (
+            treemaker_sequence::InstructionStep::MoleculeCollapse(_),
+            ComplexMoveKind::MoleculeCollapse
+        ) | (
+            treemaker_sequence::InstructionStep::SimultaneousCollapse(_),
+            ComplexMoveKind::SimultaneousCollapse
+        )
+    )
 }
 
 #[test]

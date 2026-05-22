@@ -34,7 +34,7 @@
       "file": "fold/kite-rabbit-ear-local.fold",
       "expected_artifact": "expected/kite-rabbit-ear-local.sequence.json",
       "category": "complex_local_move",
-      "expected_v1_status": "partial",
+      "expected_v1_status": "complete",
       "target_state": "flat_foldable",
       "visual_checks": [
         "four creases meet at the center point",
@@ -60,7 +60,7 @@
       "file": "fold/treemaker-triad-base.fold",
       "expected_artifact": "expected/treemaker-triad-base.sequence.json",
       "category": "treemaker_base_proxy",
-      "expected_v1_status": "partial",
+      "expected_v1_status": "complete",
       "target_state": "flat_foldable",
       "visual_checks": [
         "three flap-like triangular regions meet near the center",

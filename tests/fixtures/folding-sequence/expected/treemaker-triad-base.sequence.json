@@ -2,7 +2,7 @@
   "schema_version": 1,
   "fixture_id": "treemaker-triad-base",
   "status": "not_implemented",
-  "expected_v1_status": "partial",
+  "expected_v1_status": "complete",
   "steps": [],
   "states": [],
   "diagnostics": [

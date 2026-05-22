@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowRight, CheckCircle2, CircleDashed, Layers3, Play, Waves } from 'lucide-react';
 import type {
   FoldDocument,
@@ -22,6 +22,7 @@ export function SequencePanel() {
   const sequencePlanning = useWorkspaceStore((state) => state.sequencePlanning);
   const sequenceError = useWorkspaceStore((state) => state.sequenceError);
   const planFoldingSequence = useWorkspaceStore((state) => state.planFoldingSequence);
+  const planningElapsedSeconds = usePlanningElapsed(sequencePlanning);
 
   const statusTone =
     sequenceError || sequencePlan?.status === 'unsupported'
@@ -31,16 +32,20 @@ export function SequencePanel() {
         : sequencePlan
           ? 'warn'
           : 'warn';
-  const statusLabel = sequenceError
-    ? sequenceError
+  const statusLabel = sequencePlanning
+    ? 'Planning sequence'
+    : sequenceError
+      ? sequenceError
+      : sequencePlan
+        ? formatStatus(sequencePlan.status)
+        : foldArtifacts
+          ? 'Sequence not planned'
+          : foldArtifactError || 'Crease pattern pending';
+  const headerSummary = sequencePlanning
+    ? `Planning | ${formatElapsed(planningElapsedSeconds)}`
     : sequencePlan
-      ? formatStatus(sequencePlan.status)
-      : foldArtifacts
-        ? 'Sequence not planned'
-        : foldArtifactError || 'Crease pattern pending';
-  const headerSummary = sequencePlan
-    ? `${formatStatus(sequencePlan.status)} | ${sequencePlan.steps.length} step${sequencePlan.steps.length === 1 ? '' : 's'}`
-    : statusLabel;
+      ? `${formatStatus(sequencePlan.status)} | ${sequencePlan.steps.length} step${sequencePlan.steps.length === 1 ? '' : 's'}`
+      : statusLabel;
 
   return (
     <section className="panel-shell sequence-panel">
@@ -67,7 +72,10 @@ export function SequencePanel() {
           sequenceTarget={sequenceTarget}
           statusTone={statusTone}
           statusLabel={statusLabel}
+          sequencePlanning={sequencePlanning}
+          planningElapsedSeconds={planningElapsedSeconds}
         />
+        {sequencePlanning && <SequencePlanningProgress elapsedSeconds={planningElapsedSeconds} />}
         {sequencePlan && (
           <SequenceDiagramList plan={sequencePlan} />
         )}
@@ -81,17 +89,27 @@ function SequenceDetails({
   sequenceTarget,
   statusTone,
   statusLabel,
+  sequencePlanning,
+  planningElapsedSeconds,
 }: {
   sequencePlan: SequencePlan | null;
   sequenceTarget: SequenceTargetState | null;
   statusTone: 'good' | 'warn' | 'bad';
   statusLabel: string;
+  sequencePlanning: boolean;
+  planningElapsedSeconds: number;
 }) {
   return (
     <details className="sequence-panel__details">
       <summary>
         <span>Details</span>
-        <span>{sequencePlan ? formatStatus(sequencePlan.status) : statusLabel}</span>
+        <span>
+          {sequencePlanning
+            ? `Planning ${formatElapsed(planningElapsedSeconds)}`
+            : sequencePlan
+              ? formatStatus(sequencePlan.status)
+              : statusLabel}
+        </span>
       </summary>
       <div className="metric-grid sequence-panel__metrics">
         <Metric label="Status" value={sequencePlan ? formatStatus(sequencePlan.status) : 'Idle'} />
@@ -129,6 +147,25 @@ function SequenceDetails({
         </div>
       ))}
     </details>
+  );
+}
+
+function SequencePlanningProgress({ elapsedSeconds }: { elapsedSeconds: number }) {
+  return (
+    <div className="sequence-planning-card" role="status" aria-live="polite">
+      <div className="sequence-planning-card__header">
+        <span>Planning folding sequence</span>
+        <span>{formatElapsed(elapsedSeconds)}</span>
+      </div>
+      <div
+        className="sequence-planning-progress"
+        role="progressbar"
+        aria-label="Sequence planning in progress"
+      >
+        <span />
+      </div>
+      <p>{planningMessage(elapsedSeconds)}</p>
+    </div>
   );
 }
 
@@ -303,6 +340,43 @@ function Metric({ label, value }: { label: string; value: number | string }) {
       <div className="metric__value">{value}</div>
     </div>
   );
+}
+
+function usePlanningElapsed(active: boolean): number {
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  useEffect(() => {
+    if (!active) {
+      setElapsedSeconds(0);
+      return;
+    }
+    const startedAt = Date.now();
+    setElapsedSeconds(0);
+    if (typeof window === 'undefined') return;
+    const interval = window.setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
+    }, 1000);
+    return () => window.clearInterval(interval);
+  }, [active]);
+
+  return elapsedSeconds;
+}
+
+function planningMessage(elapsedSeconds: number): string {
+  if (elapsedSeconds >= 60) {
+    return `Still planning after ${formatElapsed(elapsedSeconds)}. Large crease patterns can take a while; this run is still active.`;
+  }
+  if (elapsedSeconds >= 15) {
+    return 'Searching sequence states. Complex crease patterns may take longer than simple bases.';
+  }
+  return 'Resolving the flat-fold target and searching for fold steps.';
+}
+
+function formatElapsed(totalSeconds: number): string {
+  const safeSeconds = Math.max(0, Math.floor(totalSeconds));
+  const minutes = Math.floor(safeSeconds / 60);
+  const seconds = safeSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
 function formatStatus(status: string): string {

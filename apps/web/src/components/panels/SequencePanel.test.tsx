@@ -94,10 +94,22 @@ describe('SequencePanel', () => {
     });
     expect(activatePanel).toHaveBeenCalledWith('simulator');
   });
+
+  it('shows an indeterminate planning indicator while sequence planning is running', () => {
+    const rendered = renderPanel(null, { sequencePlanning: true });
+
+    expect(rendered.querySelector('.sequence-panel__toolbar-summary')?.textContent).toContain('Planning');
+    expect(rendered.textContent).toContain('Planning folding sequence');
+    expect(rendered.textContent).toContain('Resolving the flat-fold target');
+    expect(rendered.querySelector('[aria-label="Sequence planning in progress"]')).not.toBeNull();
+  });
 });
 
-function renderPanel(plan: SequencePlan) {
-  const fold = plan.states[0]?.document ?? simpleFold();
+function renderPanel(
+  plan: SequencePlan | null,
+  state: Partial<ReturnType<typeof useWorkspaceStore.getState>> = {}
+) {
+  const fold = plan?.states[0]?.document ?? simpleFold();
   useWorkspaceStore.setState(
     {
       ...useWorkspaceStore.getInitialState(),
@@ -107,6 +119,7 @@ function renderPanel(plan: SequencePlan) {
       engineReady: true,
       foldArtifacts: { fold } satisfies FoldArtifacts,
       sequencePlan: plan,
+      ...state,
     },
     true
   );

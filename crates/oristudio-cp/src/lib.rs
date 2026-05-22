@@ -1328,6 +1328,7 @@ pub fn execute_command(
     }
 
     let mut diagnostic_entries = Vec::new();
+    let mut diagnostics_override = None;
     let changed = match command.operation {
         OperationId::DrawCreaseFree | OperationId::DrawCreaseRestricted => {
             let points = required_points(&command, 2)?;
@@ -2203,6 +2204,42 @@ pub fn execute_command(
             diagnostic_entries = flat_foldability_diagnostics("CheckCamv", result.violations);
             0
         }
+        OperationId::FlatFoldableCheck => {
+            let (mut boundary, closed) = flat_foldable_boundary_from_points(
+                &command.payload.points,
+                command
+                    .payload
+                    .selection_distance
+                    .unwrap_or(Epsilon::UNKNOWN_1EN4),
+            );
+            if !closed {
+                diagnostics_override = Some(vec![
+                    "Flat-foldable boundary check needs a closed loop".to_string(),
+                ]);
+                diagnostic_entries = flat_foldable_boundary_input_diagnostics(
+                    "Boundary loop is not closed",
+                    "warning",
+                    boundary,
+                );
+            } else if boundary.len() < 3 {
+                diagnostics_override = Some(vec![
+                    "Flat-foldable boundary check needs at least three boundary segments"
+                        .to_string(),
+                ]);
+                diagnostic_entries = flat_foldable_boundary_input_diagnostics(
+                    "Boundary loop needs at least three segments",
+                    "warning",
+                    boundary,
+                );
+            } else {
+                let result =
+                    checks::flat_foldable_boundary_check(&document.crease_pattern, &mut boundary);
+                diagnostics_override =
+                    Some(vec![flat_foldable_boundary_summary(result).to_string()]);
+                diagnostic_entries = flat_foldable_boundary_result_diagnostics(result, boundary);
+            }
+            0
+        }
         OperationId::Fix1 => {
             usize::from(operations::arrangement::fix1(&mut document.crease_pattern))
         }
@@ -2282,13 +2319,16 @@ pub fn execute_command(
         }
     };
 
-    let diagnostics = if matches!(
+    let diagnostics = if let Some(diagnostics) = diagnostics_override {
+        diagnostics
+    } else if matches!(
         command.operation,
         OperationId::Check1
             | OperationId::Check2
             | OperationId::Check3
             | OperationId::Check4
             | OperationId::CheckCamv
+            | OperationId::FlatFoldableCheck
     ) {
         vec![format!(
             "{} found {} issue(s)",
@@ -2388,6 +2428,106 @@ fn flat_foldability_rule_label(rule: checks::FlatFoldabilityRule) -> &'static st
         checks::FlatFoldabilityRule::Maekawa => "Maekawa",
         checks::FlatFoldabilityRule::LittleBigLittle => "LittleBigLittle",
         checks::FlatFoldabilityRule::None => "None",
+    }
+}
+
+fn flat_foldable_boundary_from_points(
+    points: &[Point],
+    close_distance: f64,
+) -> (Vec<LineSegment>, bool) {
+    if points.len() < 2 {
+        return (Vec::new(), false);
+    }
+
+    let mut path = Vec::new();
+    for point in points {
+        if path
+            .last()
+            .is_none_or(|last: &Point| last.distance(*point) > Epsilon::SWEET_DISTANCE)
+        {
+            path.push(*point);
+        }
+    }
+
+    if path.len() < 2 {
+        return (Vec::new(), false);
+    }
+
+    let first = path[0];
+    let closed = path
+        .last()
+        .is_some_and(|last| first.distance(*last) <= close_distance.max(Epsilon::UNKNOWN_1EN4));
+    if closed {
+        if let Some(last) = path.last_mut() {
+            *last = first;
+        }
+    }
+
+    let boundary = path
+        .windows(2)
+        .filter_map(|window| {
+            let [a, b] = window else {
+                return None;
+            };
+            if a.distance(*b) <= Epsilon::SWEET_DISTANCE {
+                return None;
+            }
+            Some(LineSegment::with_color(*a, *b, LineColor::Yellow7))
+        })
+        .collect();
+
+    (boundary, closed)
+}
+
+fn flat_foldable_boundary_input_diagnostics(
+    message: &str,
+    severity: &str,
+    segments: Vec<LineSegment>,
+) -> Vec<CommandDiagnostic> {
+    vec![CommandDiagnostic {
+        id: "FlatFoldableCheck-1".to_string(),
+        kind: "FlatFoldableCheck".to_string(),
+        severity: severity.to_string(),
+        message: message.to_string(),
+        point: None,
+        segments,
+        rule: Some("BoundaryLoop".to_string()),
+    }]
+}
+
+fn flat_foldable_boundary_result_diagnostics(
+    result: checks::FlatFoldableBoundaryCheck,
+    segments: Vec<LineSegment>,
+) -> Vec<CommandDiagnostic> {
+    let (severity, message) = if !result.suitable_intersections {
+        (
+            "warning",
+            "Boundary crosses existing creases at invalid intersections",
+        )
+    } else if result.color == LineColor::Cyan3 {
+        ("info", "Boundary crossing order is flat-foldable")
+    } else {
+        ("error", "Boundary crossing order is not flat-foldable")
+    };
+
+    vec![CommandDiagnostic {
+        id: "FlatFoldableCheck-1".to_string(),
+        kind: "FlatFoldableCheck".to_string(),
+        severity: severity.to_string(),
+        message: message.to_string(),
+        point: None,
+        segments,
+        rule: Some("FlatFoldableBoundary".to_string()),
+    }]
+}
+
+fn flat_foldable_boundary_summary(result: checks::FlatFoldableBoundaryCheck) -> &'static str {
+    if !result.suitable_intersections {
+        "Flat-foldable boundary check found invalid boundary intersections"
+    } else if result.color == LineColor::Cyan3 {
+        "Flat-foldable boundary check passed"
+    } else {
+        "Flat-foldable boundary check failed"
     }
 }
 
@@ -4441,6 +4581,52 @@ mod tests {
                 .iter()
                 .any(|entry| entry.point.is_some())
         );
+
+        let mut boundary_document = CreasePatternDocument::default();
+        let flat_check = execute_command(
+            &mut boundary_document,
+            CreasePatternCommand::new(OperationId::FlatFoldableCheck).with_payload(
+                CreasePatternCommandPayload {
+                    points: vec![
+                        Point::new(-1.0, -1.0),
+                        Point::new(1.0, -1.0),
+                        Point::new(0.0, 1.0),
+                        Point::new(-1.0, -1.0),
+                    ],
+                    selection_distance: Some(0.01),
+                    ..CreasePatternCommandPayload::default()
+                },
+            ),
+        )
+        .expect("FlatFoldableCheck should execute");
+        assert_eq!(
+            flat_check.diagnostics,
+            vec!["Flat-foldable boundary check passed"]
+        );
+        assert_eq!(flat_check.diagnostic_entries[0].severity, "info");
+        assert!(
+            flat_check.diagnostic_entries[0]
+                .segments
+                .iter()
+                .all(|segment| segment.color == LineColor::Cyan3)
+        );
+
+        let open_check = execute_command(
+            &mut boundary_document,
+            CreasePatternCommand::new(OperationId::FlatFoldableCheck).with_payload(
+                CreasePatternCommandPayload {
+                    points: vec![Point::new(-1.0, -1.0), Point::new(1.0, -1.0)],
+                    selection_distance: Some(0.01),
+                    ..CreasePatternCommandPayload::default()
+                },
+            ),
+        )
+        .expect("open FlatFoldableCheck should return a warning result");
+        assert_eq!(
+            open_check.diagnostics,
+            vec!["Flat-foldable boundary check needs a closed loop"]
+        );
+        assert_eq!(open_check.diagnostic_entries[0].severity, "warning");
     }
 
     #[test]

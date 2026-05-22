@@ -445,7 +445,18 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
     toolSteps: ['Click seed point'],
     tooltip: 'Click seed points to preview a Voronoi diagram, then apply from the contextual panel',
   }),
-  notImplemented('FlatFoldableCheck', 'Flat-foldable boundary check', 'check-fix', 'shield-check', 'MouseHandlerFlatFoldableCheck'),
+  ready(
+    'FlatFoldableCheck',
+    'Flat-foldable boundary check',
+    'check-fix',
+    'shield-check',
+    'MouseHandlerFlatFoldableCheck',
+    {
+      toolSteps: ['Draw a closed boundary loop'],
+      inputMode: 'drag-path',
+      tooltip: 'Draw a closed Oriedita boundary loop and color the check result',
+    }
+  ),
   ready('CreaseDeleteOverlapping', 'Delete overlapping creases', 'select-edit', 'combine', 'MouseHandlerCreaseDeleteOverlapping', {
     toolSteps: ['Pick drag start point', 'Pick drag end point'],
     tooltip: 'Delete crease segments overlapping a dragged line',

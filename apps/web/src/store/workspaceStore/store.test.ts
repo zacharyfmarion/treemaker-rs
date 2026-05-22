@@ -1374,6 +1374,37 @@ describe('workspace store slices', () => {
     oristudioCpMocks.executeOristudioCpCommand.mockResolvedValueOnce({
       ...checkedDocument,
       lastCommandResult: {
+        operation: 'FlatFoldableCheck',
+        status: 'OracleTested',
+        diagnostics: ['Flat-foldable boundary check passed'],
+        diagnostic_entries: [
+          {
+            id: 'FlatFoldableCheck-1',
+            kind: 'FlatFoldableCheck',
+            severity: 'info',
+            message: 'Boundary crossing order is flat-foldable',
+            segments: [],
+            rule: 'FlatFoldableBoundary',
+          },
+        ],
+      },
+    });
+
+    await expect(
+      useWorkspaceStore.getState().executeOristudioCpCommand('FlatFoldableCheck')
+    ).resolves.toBe(true);
+
+    expect(useWorkspaceStore.getState().oristudioCpHistoryPast).toHaveLength(0);
+    expect(useWorkspaceStore.getState().dirty).toBe(false);
+    expect(useWorkspaceStore.getState().oristudioCpActiveDiagnosticId).toBe(
+      'FlatFoldableCheck-1'
+    );
+
+    const flatCheckedDocument = useWorkspaceStore.getState().oristudioCpDocument;
+    if (!flatCheckedDocument) throw new Error('expected flat-checked CP document');
+    oristudioCpMocks.executeOristudioCpCommand.mockResolvedValueOnce({
+      ...flatCheckedDocument,
+      lastCommandResult: {
         operation: 'Fix1',
         status: 'OracleTested',
         diagnostics: ['Changed 0 line(s)'],

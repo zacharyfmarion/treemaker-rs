@@ -83,6 +83,11 @@ describe('oristudio CP command registry', () => {
     expect(cpCommandByOperation('CheckCamv')).toMatchObject({
       uiStatus: 'ready',
     });
+    expect(cpCommandByOperation('FlatFoldableCheck')).toMatchObject({
+      uiStatus: 'ready',
+      inputMode: 'drag-path',
+      toolSteps: ['Draw a closed boundary loop'],
+    });
     expect(cpCommandByOperation('Fix1')).toMatchObject({
       uiStatus: 'ready',
     });

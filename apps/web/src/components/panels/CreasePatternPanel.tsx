@@ -2201,6 +2201,7 @@ function EditableCreasePattern({
               ].join(' ')}
               data-active={active || undefined}
               data-cp-diagnostic-id={diagnostic.id}
+              data-diagnostic-color={segment.color}
               x1={a.x}
               y1={a.y}
               x2={b.x}

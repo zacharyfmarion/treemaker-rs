@@ -817,6 +817,16 @@
   background: color-mix(in srgb, var(--status-danger) 11%, transparent);
 }
 
+.diagnostic-list__item[data-severity='warning']:hover,
+.diagnostic-list__item[data-severity='warning'][data-active='true'] {
+  background: color-mix(in srgb, var(--status-warning) 12%, transparent);
+}
+
+.diagnostic-list__item[data-severity='info']:hover,
+.diagnostic-list__item[data-severity='info'][data-active='true'] {
+  background: color-mix(in srgb, var(--status-success) 12%, transparent);
+}
+
 .diagnostic-list__item + .diagnostic-list__item {
   border-top: 1px solid var(--border-subtle);
 }
@@ -824,6 +834,14 @@
 .diagnostic-list__item span:first-child {
   color: var(--status-danger);
   font-weight: 750;
+}
+
+.diagnostic-list__item[data-severity='warning'] span:first-child {
+  color: var(--status-warning);
+}
+
+.diagnostic-list__item[data-severity='info'] span:first-child {
+  color: var(--status-success);
 }
 
 .tooltip-content {
@@ -1935,6 +1953,18 @@
 .cp-diagnostic-segment--active {
   stroke-width: 5.2;
   opacity: 0.95;
+}
+
+.cp-diagnostic-segment[data-diagnostic-color='Cyan3'] {
+  stroke: var(--status-success);
+}
+
+.cp-diagnostic-segment[data-diagnostic-color='Magenta5'] {
+  stroke: var(--status-danger);
+}
+
+.cp-diagnostic-segment[data-diagnostic-color='Yellow7'] {
+  stroke: var(--status-warning);
 }
 
 .cp-diagnostic-point {

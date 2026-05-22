@@ -40,6 +40,13 @@ export function DiagnosticsPanel() {
     const diagnostics = importedCreasePattern?.diagnostics;
     const cpDiagnosticEntries = oristudioCpDocument?.lastCommandResult?.diagnostic_entries ?? [];
     const cpDiagnosticSummary = oristudioCpDocument?.lastCommandResult?.diagnostics[0] ?? null;
+    const cpDiagnosticTone = cpDiagnosticEntries.some((entry) => entry.severity === 'error')
+      ? 'bad'
+      : cpDiagnosticEntries.some((entry) => entry.severity === 'warning')
+        ? 'warn'
+        : cpDiagnosticSummary
+          ? 'good'
+          : 'warn';
     const hasErrors = Boolean(diagnostics?.errors.length);
     const hasWarnings = Boolean(diagnostics?.warnings.length);
     return (
@@ -70,9 +77,13 @@ export function DiagnosticsPanel() {
           </div>
           <div
             className="status-row"
-            data-tone={cpDiagnosticEntries.length > 0 ? 'bad' : cpDiagnosticSummary ? 'good' : 'warn'}
+            data-tone={cpDiagnosticTone}
           >
-            {cpDiagnosticEntries.length > 0 ? <AlertTriangle size={15} /> : <CheckCircle2 size={15} />}
+            {cpDiagnosticTone === 'bad' || cpDiagnosticTone === 'warn' ? (
+              <AlertTriangle size={15} />
+            ) : (
+              <CheckCircle2 size={15} />
+            )}
             <span>{cpDiagnosticSummary ?? 'No Oriedita check has been run'}</span>
           </div>
           {cpDiagnosticEntries.length > 0 && (
@@ -82,6 +93,7 @@ export function DiagnosticsPanel() {
                   type="button"
                   className="diagnostic-list__item"
                   data-active={entry.id === oristudioCpActiveDiagnosticId || undefined}
+                  data-severity={entry.severity}
                   key={entry.id}
                   onClick={() => {
                     setOristudioCpActiveDiagnostic(entry.id);

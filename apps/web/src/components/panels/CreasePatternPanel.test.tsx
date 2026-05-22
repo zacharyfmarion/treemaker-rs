@@ -853,6 +853,80 @@ describe('CreasePatternPanel', () => {
     expect(points[1].y).toBeCloseTo(0);
   });
 
+  it('runs flat-foldable boundary checks from a closed drag path', async () => {
+    const executeOristudioCpCommand = vi.fn(
+      async (_operationId: string, _payload?: OristudioCpCommandPayload) => true
+    );
+    const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
+      documentMode: 'crease-pattern',
+      importedCreasePattern: importedCpDocument(),
+      oristudioCpDocument: editableCpState(),
+      oristudioCpViewport: {
+        gridVisible: true,
+        snapToGrid: false,
+        snapToVertices: false,
+        snapToLines: false,
+      },
+      executeOristudioCpCommand,
+    });
+    const canvas = setCanvasClientRect(container);
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>('button[aria-label="Flat-foldable boundary check"]')
+        ?.click();
+      await Promise.resolve();
+    });
+    expect(container.textContent).toContain(
+      'Flat-foldable boundary check: Draw a closed boundary loop'
+    );
+
+    act(() => {
+      canvas.dispatchEvent(
+        new MouseEvent('pointerdown', {
+          bubbles: true,
+          button: 0,
+          clientX: 300,
+          clientY: 300,
+        })
+      );
+      canvas.dispatchEvent(
+        new MouseEvent('pointermove', {
+          bubbles: true,
+          button: 0,
+          clientX: 420,
+          clientY: 300,
+        })
+      );
+      canvas.dispatchEvent(
+        new MouseEvent('pointermove', {
+          bubbles: true,
+          button: 0,
+          clientX: 360,
+          clientY: 420,
+        })
+      );
+    });
+
+    await act(async () => {
+      canvas.dispatchEvent(
+        new MouseEvent('pointerup', {
+          bubbles: true,
+          button: 0,
+          clientX: 300,
+          clientY: 300,
+        })
+      );
+      await Promise.resolve();
+    });
+
+    expect(executeOristudioCpCommand).toHaveBeenCalledOnce();
+    const [operation, payload] = executeOristudioCpCommand.mock.calls[0] ?? [];
+    expect(operation).toBe('FlatFoldableCheck');
+    expect(payload?.points?.length).toBeGreaterThanOrEqual(3);
+    expect(payload?.selection_distance).toEqual(expect.any(Number));
+  });
+
   it('shows contextual line-type controls before applying selected-type commands', async () => {
     const executeOristudioCpCommand = vi.fn(async () => true);
     const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {

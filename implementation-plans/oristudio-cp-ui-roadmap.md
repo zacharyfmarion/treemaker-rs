@@ -894,6 +894,10 @@ Done when:
       Diagnostics panel and CP canvas, including viewport centering.
 - [x] Stage 9 slice: Validate active diagnostic reset/focus behavior with
       non-browser store and React tests.
+- [x] Stage 9 slice: Enable FlatFoldableCheck as a non-mutating drag-path
+      boundary workflow using Oriedita result colors.
+- [x] Stage 9 slice: Validate FlatFoldableCheck dispatch, undo neutrality,
+      generated wasm, and web interaction tests without browser smoke tests.
 - [ ] Stage 9: Enable checks, diagnostics, issue navigation, and repair
       commands.
 - [ ] Stage 9: Validate diagnostic overlays and repair results against the

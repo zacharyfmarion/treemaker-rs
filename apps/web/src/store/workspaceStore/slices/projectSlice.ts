@@ -100,6 +100,7 @@ const NON_MUTATING_CP_OPERATIONS = new Set<OristudioCpOperationId>([
   'Check3',
   'Check4',
   'CheckCamv',
+  'FlatFoldableCheck',
 ]);
 
 function oristudioCpSelectionAfterCommand(

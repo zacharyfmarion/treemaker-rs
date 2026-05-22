@@ -36,6 +36,11 @@ The first complete product target is:
 - Treat the Oriedita source map as the completeness checklist. A UI command is
   not complete until it is mapped to an upstream behavior, a Rust command, a
   web command ID, and validation coverage.
+- Model the visible editing UX after Oriedita actions, not raw kernel mouse
+  handlers. The UI can call lower-level Rust operations internally, but the
+  rail, shortcuts, prompts, inspector controls, and command palette should be
+  organized around user actions such as "Draw crease", "Set line type to
+  mountain", "Select lasso", or "Angle restricted" variants.
 - Use explicit capability states: `Ready`, `Porting`, `Not implemented`,
   `Unavailable for current selection`, and `Unavailable for current document`.
 - Keep generated TreeMaker CPs and editable Oristudio CP documents distinct.
@@ -48,6 +53,10 @@ The first complete product target is:
   history entries.
 - Prefer a shared web command dispatcher from the start so browser controls,
   keyboard shortcuts, and later Tauri native menus call the same actions.
+- Keep active tool state separate from active tool options. Oriedita's line
+  color/type selector, auxiliary input mode, angle system, division ratio, and
+  snap/input resolver are tool options that feed actions; they should not be
+  exposed as duplicate operation buttons.
 
 ### UI Shape
 
@@ -378,7 +387,74 @@ Done when:
 - The CP pane can perform Oriedita's main crease construction workflows with
   the same generated geometry.
 
-### Stage 7: Circles, Text, Generators, And Measurement
+### Stage 7: Action-Based Editing UX Alignment
+
+Intent:
+
+- Correct the CP editor's mental model before adding more command families.
+  Stage 6 made many kernel-backed operations callable, but the visible web
+  surface should be organized like Oriedita actions and tool options rather
+  than one button per Rust operation.
+
+UX work:
+
+- Replace the operation-centric left rail with an action-centric rail:
+  - line type selector: M, V, E, A,
+  - draw actions,
+  - construction action groups and dropdown variants,
+  - selection add/remove/set actions,
+  - transform actions,
+  - edit/repair actions,
+  - overflow/search for rare commands.
+- Keep the rail two buttons wide on desktop and compact two-wide on narrow
+  panes.
+- Add active tool options for line type, auxiliary input mode, angle system,
+  division count/ratio, parallel width, and candidate choice.
+- Make `Draw crease` behave like Oriedita's visible action: click-drag-release,
+  using the current line type and input mode.
+- Distinguish free draw, restricted draw, and auxiliary-line draw as action
+  variants instead of treating color and insertion mode as hardcoded payloads.
+- Keep unsupported action variants visible but disabled with explicit
+  implementation status.
+
+Technical work:
+
+- Add an action-layer registry over the kernel operation registry. Each visible
+  action should map to:
+  - upstream `ActionType` where one exists,
+  - upstream `MouseMode` or service/task behavior,
+  - Rust operation ID or operation sequence,
+  - tool option requirements,
+  - validation status.
+- Keep kernel operation IDs out of primary UI grouping. They remain dispatch
+  targets and oracle identifiers, not the main user-facing taxonomy.
+- Add CP tool preferences for current fold-line color, auxiliary line color,
+  fold-line additional input mode, angle settings, and division parameters.
+- Add an input resolver that can choose Oriedita-compatible snap behavior per
+  action step: object coordinate, existing point, line segment, box, lasso path,
+  polygon point, or construction candidate.
+- Make preview and commit use the same resolved inputs so a visual snap cannot
+  commit a near-miss point.
+- Preserve undo/redo semantics: changing active options does not create history;
+  committed actions do.
+
+Validation:
+
+- Unit-test the action registry so every visible command maps to upstream
+  action/source data or an explicit unsupported reason.
+- Unit-test input resolver modes and preview/commit input agreement.
+- Browser-test draw crease drag, endpoint snapping, M/V/E/A color selection,
+  restricted draw rejection, and two-column rail layout.
+- Add oracle fixtures for pointer-sequence-sensitive actions where resolved
+  kernel inputs are not enough to prove parity.
+
+Done when:
+
+- The CP editor feels action-based: users choose an action and options, then act
+  on the canvas. Kernel operation names are still traceable in code and tests
+  but no longer define the visible editing UX.
+
+### Stage 8: Circles, Text, Generators, And Measurement
 
 Intent:
 
@@ -413,7 +489,7 @@ Done when:
 - Circle-heavy and annotation-bearing Oriedita documents can be edited without
   data loss.
 
-### Stage 8: Diagnostics, Checks, And Repairs
+### Stage 9: Diagnostics, Checks, And Repairs
 
 Intent:
 
@@ -444,7 +520,7 @@ Done when:
 
 - Users can locate and repair the same classes of CP problems Oriedita reports.
 
-### Stage 9: Folding Estimate And Folded Figure UX
+### Stage 10: Folding Estimate And Folded Figure UX
 
 Intent:
 
@@ -499,7 +575,7 @@ Done when:
 - A user can run and inspect Oriedita-equivalent folding estimates from the CP
   window without losing the editable CP document state.
 
-### Stage 10: Menus, Shortcuts, Desktop Parity, And Polish
+### Stage 11: Menus, Shortcuts, Desktop Parity, And Polish
 
 Intent:
 
@@ -537,7 +613,7 @@ Done when:
 - CP editing works through the left rail, menu, keyboard, and desktop shell
   paths with one shared command implementation.
 
-### Stage 11: Visual And Oracle Validation Harness
+### Stage 12: Visual And Oracle Validation Harness
 
 Intent:
 
@@ -590,6 +666,10 @@ Done when:
   explicit. Avoid silently converting generated CPs into editable CP files.
 - Left-rail density: expose all commands, but use groups, overflow, command
   search, and disabled explanations so the pane remains usable.
+- Action taxonomy: visible CP editing should be action-first. Kernel operations
+  remain necessary for parity and tests, but the user should not need to
+  understand Oriedita mouse-handler names or Rust operation IDs to operate the
+  editor.
 - Folding UI ownership: CP pane owns fold-estimate commands; Folded Base pane
   should own folded preview inspection when a folded result exists.
 
@@ -604,6 +684,7 @@ Done when:
 - `apps/web/src/store/workspaceStore/*`
 - `apps/web/src/store/layoutStore.ts`
 - `apps/web/src/commands/menuActions.ts`
+- `apps/web/src/lib/oristudioCpActions.ts` or equivalent action-layer registry
 - `apps/web/src/lib/creasePatternImport.ts`
 - `apps/web/src/lib/creaseExport.ts`
 - `apps/web/src/lib/selection.ts`
@@ -659,22 +740,30 @@ Done when:
       core edit command.
 - [x] Stage 6: Enable drawing and geometric construction tools with previews.
 - [x] Stage 6: Validate candidate previews and final mutations separately.
-- [ ] Stage 7: Enable circles, text, generators, and measurement tools.
-- [ ] Stage 7: Validate annotation preservation and non-mutating measurement
+- [ ] Stage 7: Replace operation-centric CP editing with an action-based rail,
+      command palette, and inspector option model.
+- [ ] Stage 7: Add M/V/E/A line type state, Oriedita-style input modes, and
+      per-action snap/input resolvers.
+- [ ] Stage 7: Convert draw crease free/restricted to Oriedita-style
+      click-drag-release preview and commit semantics.
+- [ ] Stage 7: Validate action registry coverage, preview/commit input
+      agreement, and pointer-sequence-sensitive draw behavior.
+- [ ] Stage 8: Enable circles, text, generators, and measurement tools.
+- [ ] Stage 8: Validate annotation preservation and non-mutating measurement
       behavior.
-- [ ] Stage 8: Enable checks, diagnostics, issue navigation, and repair
+- [ ] Stage 9: Enable checks, diagnostics, issue navigation, and repair
       commands.
-- [ ] Stage 8: Validate diagnostic overlays and repair results against the
+- [ ] Stage 9: Validate diagnostic overlays and repair results against the
       Oriedita oracle.
-- [ ] Stage 9: Enable folding estimate sessions, folded-figure preview, another
+- [ ] Stage 10: Enable folding estimate sessions, folded-figure preview, another
       solution, duplicate, two-color CP, and batch export as kernel support
       becomes ready.
-- [ ] Stage 9: Validate folded-session command sequences and visual previews.
-- [ ] Stage 10: Add menus, shortcuts, desktop parity, accessibility, responsive
+- [ ] Stage 10: Validate folded-session command sequences and visual previews.
+- [ ] Stage 11: Add menus, shortcuts, desktop parity, accessibility, responsive
       behavior, and performance polish.
-- [ ] Stage 10: Validate shared command dispatch across left rail, keyboard,
+- [ ] Stage 11: Validate shared command dispatch across left rail, keyboard,
       web menus, and Tauri menus.
-- [ ] Stage 11: Add the fixture gallery or developer validation route.
-- [ ] Stage 11: Add scripted visual checks for canonical CP workflows.
-- [ ] Stage 11: Keep semantic oracle validation as the gate for marking any
+- [ ] Stage 12: Add the fixture gallery or developer validation route.
+- [ ] Stage 12: Add scripted visual checks for canonical CP workflows.
+- [ ] Stage 12: Keep semantic oracle validation as the gate for marking any
       command complete.

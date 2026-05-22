@@ -52,8 +52,8 @@ pane-based design.
   how a user can see a near-vertex guide but commit a slightly different point.
 - The left rail groups are operation-centric. They should become action-centric,
   with active line type and active command as separate state.
-- The rail is currently one button wide. The next UI change should make it two
-  buttons wide as requested, while preserving compact pane ergonomics.
+- The rail has been widened to two columns, but its grouping still needs the
+  action-based rebuild described in Stage 7 of the main CP UI roadmap.
 
 ## Approach
 
@@ -95,6 +95,9 @@ pane-based design.
   and Oriedita auxiliary-line insertion.
 
 ### Stage 4: Rebuild The Visible Tool Model Around Actions
+
+This stage is now promoted into the main roadmap as
+`Stage 7: Action-Based Editing UX Alignment`.
 
 - Introduce an action-layer registry parallel to the kernel operation registry.
 - Map Oriedita `ActionType` entries to visible Ori Studio commands, including

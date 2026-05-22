@@ -259,6 +259,7 @@ export interface CreasePatternSliceActions {
   setOristudioCpSelection: (selection: OristudioCpSelection) => void;
   clearOristudioCpSelection: () => void;
   toggleOristudioCpLineSelection: (id: number, additive?: boolean) => void;
+  toggleOristudioCpVertexSelection: (id: string, additive?: boolean) => void;
   toggleOristudioCpPointSelection: (id: number, additive?: boolean) => void;
   toggleOristudioCpCircleSelection: (id: number, additive?: boolean) => void;
   toggleOristudioCpTextSelection: (id: number, additive?: boolean) => void;

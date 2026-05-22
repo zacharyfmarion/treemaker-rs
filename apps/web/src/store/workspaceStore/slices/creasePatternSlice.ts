@@ -286,6 +286,16 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
           : { ...emptyOristudioCpSelection(), lines: [id] },
       }),
 
+    toggleOristudioCpVertexSelection: (id, additive = false) =>
+      set({
+        oristudioCpSelection: additive
+          ? {
+              ...get().oristudioCpSelection,
+              vertices: toggleCpSelectionList(get().oristudioCpSelection.vertices ?? [], id),
+            }
+          : { ...emptyOristudioCpSelection(), vertices: [id] },
+      }),
+
     toggleOristudioCpPointSelection: (id, additive = false) =>
       set({
         oristudioCpSelection: additive

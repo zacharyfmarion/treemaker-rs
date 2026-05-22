@@ -33,12 +33,14 @@ import {
   cpSelectionSize,
   cpSvgPointToModel,
   getCpGridLines,
+  getCpVertices,
   getEditableCpModelBounds,
   modelPointToCpSvg,
   nearestCpSnapTarget,
   textCoordinate,
   visibleOrieditaGridMetadata,
   type CpSnapTarget,
+  type CpVertex,
   type OristudioCpSelection,
 } from '../../lib/creasePatternViewport';
 import type { Selection, TreeProject } from '../../lib/sampleProject';
@@ -150,6 +152,9 @@ export function CreasePatternPanel() {
   const toggleOristudioCpLineSelection = useWorkspaceStore(
     (state) => state.toggleOristudioCpLineSelection
   );
+  const toggleOristudioCpVertexSelection = useWorkspaceStore(
+    (state) => state.toggleOristudioCpVertexSelection
+  );
   const toggleOristudioCpPointSelection = useWorkspaceStore(
     (state) => state.toggleOristudioCpPointSelection
   );
@@ -178,6 +183,7 @@ export function CreasePatternPanel() {
     () => (editableCpVisibleGrid ? getCpGridLines(editableCpBounds, editableCpVisibleGrid) : []),
     [editableCpBounds, editableCpVisibleGrid]
   );
+  const editableCpVertices = useMemo(() => getCpVertices(editableCp), [editableCp]);
   const hasEditableCreasePattern =
     !!editableCp &&
     (editableCp.crease_pattern.line_segments.length > 0 ||
@@ -809,6 +815,8 @@ export function CreasePatternPanel() {
                         toggleLine={toggleOristudioCpLineSelection}
                         togglePoint={toggleOristudioCpPointSelection}
                         toggleText={toggleOristudioCpTextSelection}
+                        toggleVertex={toggleOristudioCpVertexSelection}
+                        vertices={editableCpVertices}
                       />
                     ) : (
                       <GeneratedCreasePattern
@@ -914,6 +922,8 @@ interface EditableCreasePatternProps {
   toggleLine: (id: number, additive?: boolean) => void;
   togglePoint: (id: number, additive?: boolean) => void;
   toggleText: (id: number, additive?: boolean) => void;
+  toggleVertex: (id: string, additive?: boolean) => void;
+  vertices: CpVertex[];
 }
 
 function EditableCreasePattern({
@@ -931,6 +941,8 @@ function EditableCreasePattern({
   toggleLine,
   togglePoint,
   toggleText,
+  toggleVertex,
+  vertices,
 }: EditableCreasePatternProps) {
   return (
     <>
@@ -954,24 +966,39 @@ function EditableCreasePattern({
         const a = modelPointToCpSvg(line.a, bounds);
         const b = modelPointToCpSvg(line.b, bounds);
         return (
-          <line
-            key={id}
-            className={[
-              cpLineColorClass(line.color, mode),
-              selection.lines.includes(id) ? 'crease--selected' : '',
-            ].join(' ')}
-            data-cp-line-id={id}
-            x1={a.x}
-            y1={a.y}
-            x2={b.x}
-            y2={b.y}
-            aria-label={`Editable ${cpLineAssignmentLabel(line.color)} line ${id}`}
-            onClick={(event) => {
-              if (spacePressed) return;
-              event.stopPropagation();
-              toggleLine(id, event.shiftKey || event.metaKey || event.ctrlKey);
-            }}
-          />
+          <g key={id}>
+            <line
+              className="cp-line-hit-target"
+              data-cp-line-hit-id={id}
+              x1={a.x}
+              y1={a.y}
+              x2={b.x}
+              y2={b.y}
+              aria-label={`Editable ${cpLineAssignmentLabel(line.color)} line ${id} hit target`}
+              onClick={(event) => {
+                if (spacePressed) return;
+                event.stopPropagation();
+                toggleLine(id, event.shiftKey || event.metaKey || event.ctrlKey);
+              }}
+            />
+            <line
+              className={[
+                cpLineColorClass(line.color, mode),
+                selection.lines.includes(id) ? 'crease--selected' : '',
+              ].join(' ')}
+              data-cp-line-id={id}
+              x1={a.x}
+              y1={a.y}
+              x2={b.x}
+              y2={b.y}
+              aria-label={`Editable ${cpLineAssignmentLabel(line.color)} line ${id}`}
+              onClick={(event) => {
+                if (spacePressed) return;
+                event.stopPropagation();
+                toggleLine(id, event.shiftKey || event.metaKey || event.ctrlKey);
+              }}
+            />
+          </g>
         );
       })}
       {document.crease_pattern.points.map((point, index) => {
@@ -1041,6 +1068,26 @@ function EditableCreasePattern({
           >
             {text.text}
           </text>
+        );
+      })}
+      {vertices.map((vertex) => {
+        const svgPoint = modelPointToCpSvg(vertex.point, bounds);
+        const selected = selection.vertices?.includes(vertex.id) ?? false;
+        return (
+          <circle
+            key={vertex.id}
+            className={['cp-vertex', selected ? 'cp-vertex--selected' : ''].join(' ')}
+            data-cp-vertex-id={vertex.id}
+            cx={svgPoint.x}
+            cy={svgPoint.y}
+            r="4.5"
+            aria-label={`Editable vertex at ${formatNumber(vertex.point.x, 2)}, ${formatNumber(vertex.point.y, 2)}`}
+            onClick={(event) => {
+              if (spacePressed) return;
+              event.stopPropagation();
+              toggleVertex(vertex.id, event.shiftKey || event.metaKey || event.ctrlKey);
+            }}
+          />
         );
       })}
       {document.operation_frame?.active && (

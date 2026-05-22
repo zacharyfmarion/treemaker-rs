@@ -484,6 +484,8 @@ describe('CreasePatternPanel', () => {
 
     expect(container.textContent).toContain('Editable kernel: 2 lines');
     expect(container.querySelectorAll('[data-cp-line-id]')).toHaveLength(2);
+    expect(container.querySelectorAll('[data-cp-line-hit-id]')).toHaveLength(2);
+    expect(container.querySelectorAll('[data-cp-vertex-id]')).toHaveLength(3);
     expect(container.querySelector('.cp-grid-line')).not.toBeNull();
     expect(container.querySelector('.cp-circle')).not.toBeNull();
     expect(container.querySelector('.cp-point')).not.toBeNull();
@@ -559,6 +561,14 @@ describe('CreasePatternPanel', () => {
     expect(useWorkspaceStore.getState().oristudioCpSelection.lines).toEqual([1]);
     expect(container.textContent).toContain('1 selected');
 
+    act(() => {
+      container.querySelector<SVGCircleElement>('[data-cp-vertex-id="0:0"]')?.dispatchEvent(
+        new MouseEvent('click', { bubbles: true, shiftKey: true })
+      );
+    });
+    expect(useWorkspaceStore.getState().oristudioCpSelection.vertices).toEqual(['0:0']);
+    expect(container.textContent).toContain('2 selected');
+
     const body = container.querySelector<HTMLElement>('.cp-panel__body');
     act(() => {
       body?.dispatchEvent(
@@ -598,7 +608,7 @@ describe('CreasePatternPanel', () => {
     });
 
     act(() => {
-      container.querySelector<SVGLineElement>('[data-cp-line-id="1"]')?.dispatchEvent(
+      container.querySelector<SVGLineElement>('[data-cp-line-hit-id="1"]')?.dispatchEvent(
         new MouseEvent('click', { bubbles: true })
       );
     });

@@ -7,6 +7,7 @@ import {
   cpSelectionSize,
   cpSvgPointToModel,
   getCpGridLines,
+  getCpVertices,
   getEditableCpModelBounds,
   getOrieditaGridBasis,
   modelPointToCpSvg,
@@ -179,6 +180,13 @@ describe('crease pattern viewport helpers', () => {
 
   it('finds nearest snap candidates without mutating selection state', () => {
     const bounds = getEditableCpModelBounds(document);
+    const vertices = getCpVertices(document);
+
+    expect(vertices).toEqual([
+      { id: '0:0', point: { x: 0, y: 0 }, lineIds: [1, 2] },
+      { id: '0:10000000000', point: { x: 0, y: 10 }, lineIds: [2] },
+      { id: '10000000000:0', point: { x: 10, y: 0 }, lineIds: [1] },
+    ]);
 
     expect(
       nearestCpSnapTarget(document, { x: 0.03, y: 0.02 }, bounds, {
@@ -191,9 +199,17 @@ describe('crease pattern viewport helpers', () => {
 
     expect(toggleCpSelectionList([2], 1)).toEqual([1, 2]);
     expect(toggleCpSelectionList([1, 2], 1)).toEqual([2]);
+    expect(toggleCpSelectionList(['0:0'], '1:0')).toEqual(['0:0', '1:0']);
     expect(
-      cpSelectionSize({ lines: [1, 2], points: [1], circles: [], texts: [], faces: [] })
-    ).toBe(3);
+      cpSelectionSize({
+        lines: [1, 2],
+        vertices: ['0:0'],
+        points: [1],
+        circles: [],
+        texts: [],
+        faces: [],
+      })
+    ).toBe(4);
   });
 
   it('snaps to the same Oriedita paper grid basis used for rendering', () => {

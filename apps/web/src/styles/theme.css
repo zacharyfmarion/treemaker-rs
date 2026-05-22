@@ -1761,9 +1761,35 @@
 }
 
 .cp-point--selected,
+.cp-vertex--selected,
 .cp-circle--selected,
 .cp-text--selected {
   filter: drop-shadow(0 0 5px color-mix(in srgb, var(--accent-primary) 80%, transparent));
+}
+
+.cp-line-hit-target {
+  stroke: transparent;
+  stroke-width: 13;
+  stroke-linecap: round;
+  cursor: pointer;
+  pointer-events: stroke;
+  vector-effect: non-scaling-stroke;
+}
+
+.cp-vertex {
+  fill: var(--bg-paper);
+  stroke: color-mix(in srgb, var(--text-secondary) 72%, transparent);
+  stroke-width: 1.45;
+  cursor: pointer;
+  opacity: 0.72;
+  vector-effect: non-scaling-stroke;
+}
+
+.cp-vertex:hover,
+.cp-vertex--selected {
+  fill: var(--accent-primary);
+  stroke: var(--bg-primary);
+  opacity: 1;
 }
 
 .cp-circle {

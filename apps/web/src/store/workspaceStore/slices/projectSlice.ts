@@ -7,7 +7,10 @@ import {
   withFlatFoldArtifacts,
   withFlatFoldError,
 } from '../../../lib/creasePatternImport';
-import { emptyOristudioCpSelection } from '../../../lib/creasePatternViewport';
+import {
+  emptyOristudioCpSelection,
+  getCpVertices,
+} from '../../../lib/creasePatternViewport';
 import type { OristudioCpSelection } from '../../../lib/creasePatternViewport';
 import type { OristudioCpOperationId } from '../../../lib/oristudioCpCommands';
 import { createEmptyProject, DEFAULT_CREASE_COLOR_MODE } from '../../../lib/sampleProject';
@@ -108,8 +111,11 @@ function oristudioCpSelectionAfterCommand(
     };
   }
 
+  const vertexIds = new Set(getCpVertices(document).map((vertex) => vertex.id));
+
   return {
     lines: selection.lines.filter((id) => id >= 1 && id <= document.crease_pattern.line_segments.length),
+    vertices: (selection.vertices ?? []).filter((id) => vertexIds.has(id)),
     points: selection.points.filter((id) => id >= 1 && id <= document.crease_pattern.points.length),
     circles: selection.circles.filter((id) => id >= 1 && id <= document.crease_pattern.circles.length),
     texts: selection.texts.filter((id) => id >= 1 && id <= document.crease_pattern.texts.length),

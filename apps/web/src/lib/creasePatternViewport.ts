@@ -28,6 +28,7 @@ const GRID_EPSILON = 1e-9;
 
 export interface OristudioCpSelection {
   lines: number[];
+  vertices?: string[];
   points: number[];
   circles: number[];
   texts: number[];
@@ -45,6 +46,7 @@ export type OristudioCpViewportOptionKey = keyof OristudioCpViewportOptions;
 
 export const EMPTY_ORISTUDIO_CP_SELECTION: OristudioCpSelection = {
   lines: [],
+  vertices: [],
   points: [],
   circles: [],
   texts: [],
@@ -81,6 +83,12 @@ export interface CpSnapTarget {
   distance: number;
 }
 
+export interface CpVertex {
+  id: string;
+  point: Point;
+  lineIds: number[];
+}
+
 export type OrieditaGridBaseState = 'hidden' | 'within-paper' | 'full';
 
 export interface OrieditaGridBasis {
@@ -102,6 +110,7 @@ export function emptyOristudioCpSelection(): OristudioCpSelection {
 export function cpSelectionSize(selection: OristudioCpSelection): number {
   return (
     selection.lines.length +
+    (selection.vertices?.length ?? 0) +
     selection.points.length +
     selection.circles.length +
     selection.texts.length +
@@ -109,10 +118,44 @@ export function cpSelectionSize(selection: OristudioCpSelection): number {
   );
 }
 
-export function toggleCpSelectionList(ids: number[], id: number): number[] {
+export function cpVertexId(point: Point): string {
+  return `${quantizeCoordinate(point.x)}:${quantizeCoordinate(point.y)}`;
+}
+
+export function getCpVertices(
+  document: OristudioCpDocumentSnapshot | null | undefined
+): CpVertex[] {
+  if (!document) return [];
+
+  const vertices = new Map<string, CpVertex>();
+  document.crease_pattern.line_segments.forEach((segment, index) => {
+    const lineId = index + 1;
+    for (const point of [segment.a, segment.b]) {
+      const id = cpVertexId(point);
+      const existing = vertices.get(id);
+      if (existing) {
+        if (!existing.lineIds.includes(lineId)) {
+          existing.lineIds = [...existing.lineIds, lineId].sort((a, b) => a - b);
+        }
+      } else {
+        vertices.set(id, { id, point, lineIds: [lineId] });
+      }
+    }
+  });
+
+  return Array.from(vertices.values()).sort((a, b) =>
+    a.point.x === b.point.x ? a.point.y - b.point.y : a.point.x - b.point.x
+  );
+}
+
+export function toggleCpSelectionList<T extends number | string>(ids: T[], id: T): T[] {
   return ids.includes(id)
     ? ids.filter((selectedId) => selectedId !== id)
-    : Array.from(new Set([...ids, id])).sort((a, b) => a - b);
+    : Array.from(new Set([...ids, id])).sort((a, b) =>
+        typeof a === 'number' && typeof b === 'number'
+          ? a - b
+          : String(a).localeCompare(String(b))
+      );
 }
 
 export function orieditaGridBaseState(state: string): OrieditaGridBaseState {
@@ -571,6 +614,10 @@ function ceilGridIndex(value: number): number {
 function positiveModulo(value: number, modulo: number): number {
   const safeModulo = Math.max(1, Math.trunc(modulo));
   return ((value % safeModulo) + safeModulo) % safeModulo;
+}
+
+function quantizeCoordinate(value: number): string {
+  return String(Math.round(value * 1e9));
 }
 
 function isIntervalLine(index: number, intervalSize: number, position: number): boolean {

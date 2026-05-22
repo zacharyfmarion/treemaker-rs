@@ -19,7 +19,8 @@ use std::collections::BTreeMap;
 
 pub use canonical::CanonicalCreasePattern;
 use geometry::{
-    Circle, Epsilon, LineColor, LineSegment, Point, Polygon, determine_line_segment_distance,
+    Circle, Epsilon, LineColor, LineSegment, Point, Polygon, RgbColor,
+    determine_line_segment_distance,
 };
 pub use model::CreasePatternModel;
 
@@ -94,6 +95,9 @@ pub struct CreasePatternCommandPayload {
     /// One-based Oriedita line IDs resolved by the UI.
     #[serde(default)]
     pub line_ids: Vec<usize>,
+    /// One-based Oriedita circle IDs resolved by the UI.
+    #[serde(default)]
+    pub circle_ids: Vec<usize>,
     /// Resolved model-space points, in the same order as the active tool steps.
     #[serde(default)]
     pub points: Vec<geometry::Point>,
@@ -148,6 +152,9 @@ pub struct CreasePatternCommandPayload {
     /// Optional number of corners for regular polygon generator commands.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub polygon_corners: Option<usize>,
+    /// Optional custom color for circle and auxiliary-line recoloring commands.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub custom_circle_color: Option<geometry::RgbColor>,
 }
 
 /// Result returned by a successfully executed command.
@@ -1372,6 +1379,16 @@ pub fn execute_command(
             let line_indices = required_line_indices(&command)?;
             operations::color::toggle_mountain_valley(&mut document.crease_pattern, &line_indices)
         }
+        OperationId::CircleChangeColor => {
+            let circle_indices = optional_circle_indices(&command)?;
+            let aux_line_indices = optional_line_indices(&command)?;
+            operations::circle::change_color(
+                &mut document.crease_pattern,
+                &circle_indices,
+                &aux_line_indices,
+                custom_circle_color(&command),
+            )
+        }
         OperationId::CreaseAdvanceType => {
             let line_indices = required_line_indices(&command)?;
             line_indices
@@ -2395,6 +2412,38 @@ fn required_line_indices(command: &CreasePatternCommand) -> Result<Vec<usize>> {
         .collect()
 }
 
+fn optional_line_indices(command: &CreasePatternCommand) -> Result<Vec<usize>> {
+    command
+        .payload
+        .line_ids
+        .iter()
+        .map(|line_id| {
+            line_id
+                .checked_sub(1)
+                .ok_or_else(|| CommandError::InvalidInput {
+                    operation: command.operation,
+                    message: "line IDs are one-based".to_string(),
+                })
+        })
+        .collect()
+}
+
+fn optional_circle_indices(command: &CreasePatternCommand) -> Result<Vec<usize>> {
+    command
+        .payload
+        .circle_ids
+        .iter()
+        .map(|circle_id| {
+            circle_id
+                .checked_sub(1)
+                .ok_or_else(|| CommandError::InvalidInput {
+                    operation: command.operation,
+                    message: "circle IDs are one-based".to_string(),
+                })
+        })
+        .collect()
+}
+
 fn required_points(command: &CreasePatternCommand, count: usize) -> Result<Vec<geometry::Point>> {
     if command.payload.points.len() != count {
         return Err(CommandError::InvalidInput {
@@ -2520,6 +2569,13 @@ fn default_molecule_for_operation(
         OperationId::DrawFrogBase => Some(operations::generators::DefaultMolecule::FrogBase),
         _ => None,
     }
+}
+
+fn custom_circle_color(command: &CreasePatternCommand) -> RgbColor {
+    command
+        .payload
+        .custom_circle_color
+        .unwrap_or_else(|| RgbColor::new(100, 200, 200))
 }
 
 fn fix_inaccurate_options(command: &CreasePatternCommand) -> checks::FixInaccurateOptions {
@@ -2725,7 +2781,7 @@ fn delete_lines_along(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::geometry::{LineColor, Point};
+    use crate::geometry::{Circle, LineColor, Point, RgbColor};
     use std::collections::HashSet;
 
     #[test]
@@ -3526,6 +3582,55 @@ mod tests {
                 .iter()
                 .all(|segment| segment.color == LineColor::Red1)
         );
+    }
+
+    #[test]
+    fn command_dispatch_routes_stage_eight_circle_color_changes() {
+        let mut document = CreasePatternDocument::default();
+        document
+            .crease_pattern
+            .add_circle(Circle::new(0.0, 0.0, 2.0, LineColor::Cyan3));
+        document
+            .crease_pattern
+            .add_circle(Circle::new(2.0, 0.0, 1.0, LineColor::Cyan3));
+        document.crease_pattern.add_line(
+            Point::new(0.0, 0.0),
+            Point::new(1.0, 0.0),
+            LineColor::Cyan3,
+        );
+        document.crease_pattern.add_line(
+            Point::new(0.0, 1.0),
+            Point::new(1.0, 1.0),
+            LineColor::Red1,
+        );
+
+        let result = execute_command(
+            &mut document,
+            CreasePatternCommand::new(OperationId::CircleChangeColor).with_payload(
+                CreasePatternCommandPayload {
+                    circle_ids: vec![2],
+                    line_ids: vec![1, 2],
+                    custom_circle_color: Some(RgbColor::new(10, 20, 30)),
+                    ..CreasePatternCommandPayload::default()
+                },
+            ),
+        )
+        .expect("circle color command should execute");
+
+        assert_eq!(result.status, OperationStatus::OracleTested);
+        assert_eq!(result.diagnostics, vec!["Changed 2 line(s)"]);
+        assert_eq!(document.crease_pattern.circles[0].customized, 0);
+        assert_eq!(document.crease_pattern.circles[1].customized, 1);
+        assert_eq!(
+            document.crease_pattern.circles[1].customized_color,
+            RgbColor::new(10, 20, 30)
+        );
+        assert_eq!(document.crease_pattern.line_segments[0].customized, 1);
+        assert_eq!(
+            document.crease_pattern.line_segments[0].customized_color,
+            RgbColor::new(10, 20, 30)
+        );
+        assert_eq!(document.crease_pattern.line_segments[1].customized, 0);
     }
 
     #[test]

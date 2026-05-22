@@ -900,6 +900,58 @@ describe('CreasePatternPanel', () => {
     });
   });
 
+  it('passes contextual circle color options with selected circles only after apply', async () => {
+    const executeOristudioCpCommand = vi.fn(async () => true);
+    const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
+      documentMode: 'crease-pattern',
+      importedCreasePattern: importedCpDocument(),
+      oristudioCpDocument: editableCpState(),
+      executeOristudioCpCommand,
+    });
+
+    act(() => {
+      container.querySelector<SVGCircleElement>('.cp-circle')?.dispatchEvent(
+        new MouseEvent('click', { bubbles: true })
+      );
+    });
+    expect(useWorkspaceStore.getState().oristudioCpSelection.circles).toEqual([1]);
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>('button[aria-label="Change circle color"]')
+        ?.click();
+      await Promise.resolve();
+    });
+
+    expect(executeOristudioCpCommand).not.toHaveBeenCalled();
+    const redInput = container.querySelector<HTMLInputElement>(
+      'input[aria-label="Circle color red"]'
+    );
+    const greenInput = container.querySelector<HTMLInputElement>(
+      'input[aria-label="Circle color green"]'
+    );
+    const blueInput = container.querySelector<HTMLInputElement>(
+      'input[aria-label="Circle color blue"]'
+    );
+    expect(redInput?.value).toBe('100');
+    act(() => {
+      if (redInput) setNumberInputValue(redInput, '10');
+      if (greenInput) setNumberInputValue(greenInput, '20');
+      if (blueInput) setNumberInputValue(blueInput, '30');
+    });
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('button.cp-context-panel__apply')?.click();
+      await Promise.resolve();
+    });
+
+    expect(executeOristudioCpCommand).toHaveBeenCalledWith('CircleChangeColor', {
+      line_ids: [],
+      circle_ids: [1],
+      custom_circle_color: { red: 10, green: 20, blue: 30 },
+    });
+  });
+
   it('shows active tool inputs for line division count and sends the edited count', async () => {
     const executeOristudioCpCommand = vi.fn(
       async (_operationId: string, _payload?: OristudioCpCommandPayload) => true

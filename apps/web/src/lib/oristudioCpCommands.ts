@@ -413,7 +413,10 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
     selectionRequirement: 'selected mountain or valley lines',
     tooltip: 'Toggle selected mountain and valley lines',
   }),
-  notImplemented('CircleChangeColor', 'Change circle color', 'annotations', 'palette', 'MouseHandlerCircleChangeColor'),
+  ready('CircleChangeColor', 'Change circle color', 'annotations', 'palette', 'MouseHandlerCircleChangeColor', {
+    selectionRequirement: 'selected circles or auxiliary lines',
+    tooltip: 'Apply the contextual custom color to selected circles and auxiliary lines',
+  }),
   ready('CreaseMakeAux', 'Make auxiliary', 'color', 'scan-line', 'MouseHandlerCreaseMakeAux', {
     selectionRequirement: 'selected folding lines',
     tooltip: 'Convert selected folding lines to auxiliary lines',

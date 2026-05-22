@@ -198,6 +198,10 @@ function cpCommandPayloadDefaults(
     payload.polygon_corners = toolOptions.polygonCorners;
   }
 
+  if (operationId === 'CircleChangeColor') {
+    payload.custom_circle_color = toolOptions.customCircleColor;
+  }
+
   if (operationId === 'ParallelDrawWidth') {
     payload.width = toolOptions.parallelWidth;
   }
@@ -633,11 +637,15 @@ export function CreasePatternPanel() {
     }
 
     void (async () => {
+      const selectionPayload: OristudioCpCommandPayload = {
+        line_ids: oristudioCpSelection.lines,
+      };
+      if (activeCpCommand.operationId === 'CircleChangeColor') {
+        selectionPayload.circle_ids = oristudioCpSelection.circles;
+      }
       const succeeded = await executeOristudioCpCommand(
         activeCpCommand.operationId,
-        buildCpCommandPayload(activeCpCommand, {
-          line_ids: oristudioCpSelection.lines,
-        })
+        buildCpCommandPayload(activeCpCommand, selectionPayload)
       );
       setCpToolState((state) =>
         state.activeOperationId === activeCpCommand.operationId
@@ -658,6 +666,7 @@ export function CreasePatternPanel() {
     buildCpCommandPayload,
     editableCp,
     executeOristudioCpCommand,
+    oristudioCpSelection.circles,
     oristudioCpSelection.lines,
   ]);
 

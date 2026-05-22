@@ -849,6 +849,10 @@ Done when:
       default base generators with point-sequence previews.
 - [x] Stage 8 slice: Validate enabled shape/generator commands through Rust,
       wasm, and web command tests.
+- [x] Stage 8 slice: Enable custom color changes for selected circles and cyan
+      auxiliary lines through contextual RGB controls.
+- [x] Stage 8 slice: Validate circle color payloads across Rust, wasm, and web
+      command tests.
 - [ ] Stage 8: Enable circles, text, generators, and measurement tools.
 - [ ] Stage 8: Validate annotation preservation and non-mutating measurement
       behavior.

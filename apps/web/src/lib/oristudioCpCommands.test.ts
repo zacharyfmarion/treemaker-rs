@@ -96,6 +96,10 @@ describe('oristudio CP command registry', () => {
       uiStatus: 'ready',
       toolSteps: ['Pick first anchor point', 'Pick second anchor point'],
     });
+    expect(cpCommandByOperation('CircleChangeColor')).toMatchObject({
+      uiStatus: 'ready',
+      selectionRequirement: 'selected circles or auxiliary lines',
+    });
   });
 
   it('keeps the left rail populated by ordered command groups', () => {

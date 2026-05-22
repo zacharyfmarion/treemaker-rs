@@ -115,6 +115,7 @@ export interface OristudioCpCommandPreview {
 
 export interface OristudioCpCommandPayload {
   line_ids?: number[];
+  circle_ids?: number[];
   points?: Point[];
   line_color?: OristudioCpLineColor;
   selection_distance?: number;
@@ -133,6 +134,7 @@ export interface OristudioCpCommandPayload {
   fix_precision_use_bp?: boolean;
   fix_precision_use_22_5?: boolean;
   polygon_corners?: number;
+  custom_circle_color?: OristudioCpRgbColor;
 }
 
 export type OristudioCpLineColor =

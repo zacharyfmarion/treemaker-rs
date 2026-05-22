@@ -376,8 +376,18 @@ pub fn plan_folding_sequence_with_options(
     })
 }
 
-pub fn plan_reference_precreases(_document: &FoldDocument) -> Result<()> {
-    Err(SequenceError::NotImplemented("reference/precrease planner"))
+pub fn plan_reference_precreases(document: &FoldDocument) -> Result<ReferencePlan> {
+    plan_reference_precreases_with_options(document, ReferencePlanOptions::default())
+}
+
+pub fn plan_reference_precreases_with_options(
+    document: &FoldDocument,
+    _options: ReferencePlanOptions,
+) -> Result<ReferencePlan> {
+    validate_basic(document).map_err(|error| SequenceError::InvalidInput(error.to_string()))?;
+    Err(SequenceError::NotImplemented(
+        "V2 ReferenceFinder-style reference/precrease planner",
+    ))
 }
 
 pub fn trace_plan(plan: &SequencePlan) -> PlannerTrace {
@@ -546,6 +556,48 @@ pub enum MlRecommendation {
     KeepSymbolic,
     CollectMoreTraces,
     ConsiderOfflineRanker,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReferencePlanOptions {
+    pub max_axiom_depth: usize,
+}
+
+impl Default for ReferencePlanOptions {
+    fn default() -> Self {
+        Self { max_axiom_depth: 6 }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReferencePlanStatus {
+    Complete,
+    Partial,
+    NotImplemented,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ReferencePlan {
+    pub status: ReferencePlanStatus,
+    pub steps: Vec<ReferenceConstructionStep>,
+    pub diagnostics: Vec<SequenceDiagnostic>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum ReferenceConstructionStep {
+    ReferenceFold {
+        id: String,
+        label: String,
+        axiom: String,
+        target_creases: Vec<usize>,
+    },
+    PrecreaseRegion {
+        id: String,
+        label: String,
+        creases: Vec<usize>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

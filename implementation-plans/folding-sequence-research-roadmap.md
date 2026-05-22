@@ -79,7 +79,7 @@ has a validated implementation.
 - [x] Phase 6: Expose planner artifacts through WASM and add a research UI.
 - [x] Phase 7: Expand fixture/corpus validation and optional Oriedita cross-checks.
 - [x] Phase 8: Decide whether ML/ranking data collection is warranted.
-- [ ] Phase 9: V2 reference/precrease planner integration.
+- [x] Phase 9: V2 reference/precrease planner integration.
 
 ## Phase 0: Fixtures And Contracts
 
@@ -532,6 +532,15 @@ Exit criteria:
 
 - The app can distinguish "we know how to collapse this base" from "we also know
   how a person can precrease the required landmarks."
+
+Phase 9 implementation notes:
+
+- Added typed reference/precrease planner options and artifact shapes.
+- Kept the actual ReferenceFinder-style construction search explicitly
+  `not_implemented` for V2 rather than producing placeholder construction
+  steps.
+- Added `implementation-plans/reference-precrease-v2-boundary.md` to document
+  the GPL-compatible porting boundary and future validation requirements.
 
 ## Validation Command Guide
 

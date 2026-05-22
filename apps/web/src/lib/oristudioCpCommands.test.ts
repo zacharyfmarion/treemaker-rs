@@ -100,6 +100,10 @@ describe('oristudio CP command registry', () => {
       uiStatus: 'ready',
       selectionRequirement: 'selected circles or auxiliary lines',
     });
+    expect(cpCommandByOperation('OrganizeCircles')).toMatchObject({
+      uiStatus: 'ready',
+      tooltip: 'Prune invalid zero-radius circles using Oriedita cleanup rules',
+    });
   });
 
   it('keeps the left rail populated by ordered command groups', () => {

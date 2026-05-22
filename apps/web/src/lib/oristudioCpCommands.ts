@@ -537,7 +537,9 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
   notImplemented('Check4', 'Check 4', 'check-fix', 'badge-alert', 'Check4'),
   notImplemented('Fix1', 'Fix 1', 'check-fix', 'wrench', 'Fix1'),
   notImplemented('Fix2', 'Fix 2', 'check-fix', 'wrench', 'Fix2'),
-  notImplemented('OrganizeCircles', 'Organize circles', 'annotations', 'circle-ellipsis', 'OrganizeCircles'),
+  ready('OrganizeCircles', 'Organize circles', 'annotations', 'circle-ellipsis', 'OrganizeCircles', {
+    tooltip: 'Prune invalid zero-radius circles using Oriedita cleanup rules',
+  }),
 ];
 
 export const ORISTUDIO_CP_SOURCE_MAP_OPERATION_IDS = [

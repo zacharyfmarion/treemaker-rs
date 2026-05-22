@@ -1389,6 +1389,7 @@ pub fn execute_command(
                 custom_circle_color(&command),
             )
         }
+        OperationId::OrganizeCircles => operations::circle::organize(&mut document.crease_pattern),
         OperationId::CreaseAdvanceType => {
             let line_indices = required_line_indices(&command)?;
             line_indices
@@ -3631,6 +3632,31 @@ mod tests {
             RgbColor::new(10, 20, 30)
         );
         assert_eq!(document.crease_pattern.line_segments[1].customized, 0);
+    }
+
+    #[test]
+    fn command_dispatch_routes_stage_eight_circle_organization() {
+        let mut document = CreasePatternDocument::default();
+        document
+            .crease_pattern
+            .add_circle(Circle::new(0.0, 0.0, 2.0, LineColor::Cyan3));
+        document
+            .crease_pattern
+            .add_circle(Circle::new(2.0, 0.0, 0.0, LineColor::Cyan3));
+        document
+            .crease_pattern
+            .add_circle(Circle::new(3.0, 0.0, 0.0, LineColor::Cyan3));
+
+        let result = execute_command(
+            &mut document,
+            CreasePatternCommand::new(OperationId::OrganizeCircles),
+        )
+        .expect("organize circles should execute");
+
+        assert_eq!(result.status, OperationStatus::OracleTested);
+        assert_eq!(result.diagnostics, vec!["Changed 2 line(s)"]);
+        assert_eq!(document.crease_pattern.circles.len(), 1);
+        assert_eq!(document.crease_pattern.circles[0].r, 2.0);
     }
 
     #[test]

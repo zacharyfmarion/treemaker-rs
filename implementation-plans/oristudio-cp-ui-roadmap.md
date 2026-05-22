@@ -853,6 +853,9 @@ Done when:
       auxiliary lines through contextual RGB controls.
 - [x] Stage 8 slice: Validate circle color payloads across Rust, wasm, and web
       command tests.
+- [x] Stage 8 slice: Enable Oriedita circle organization cleanup.
+- [x] Stage 8 slice: Validate circle organization dispatch with Rust, wasm, and
+      web command tests.
 - [ ] Stage 8: Enable circles, text, generators, and measurement tools.
 - [ ] Stage 8: Validate annotation preservation and non-mutating measurement
       behavior.

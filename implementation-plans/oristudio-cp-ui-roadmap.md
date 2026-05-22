@@ -642,7 +642,7 @@ Done when:
 - [x] Stage 3: Add CP tool-state transitions for multi-step commands.
 - [x] Stage 4: Add CP open/import/save/export workflows and dirty-state
       handling.
-- [ ] Stage 4: Validate file workflows with oracle-backed round trips.
+- [x] Stage 4: Validate file workflows with oracle-backed round trips.
 - [ ] Stage 5: Enable core selection, deletion, color, assignment, move, copy,
       lengthen, and operation-frame commands.
 - [ ] Stage 5: Add web command tests and visual workflows for each enabled

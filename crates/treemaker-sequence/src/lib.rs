@@ -262,6 +262,7 @@ pub fn plan_folding_sequence_with_options(
     let mut applied_steps = 0usize;
     let mut branches_pruned = 0usize;
     let mut budget_exhausted = false;
+    let mut transform_diagnostics = Vec::new();
 
     loop {
         if current.active_creases.is_empty() {
@@ -277,18 +278,52 @@ pub fn plan_folding_sequence_with_options(
         }
         let simple_folds = detect_simple_folds(&current)?;
         let pruned = simple_folds.len().saturating_sub(1);
-        let Some(simple_fold) = choose_simple_fold(simple_folds) else {
-            break;
-        };
-        branches_pruned += pruned;
-        let next_state_id = format!("state-{}", reverse_states.len());
-        let next = apply_reverse_simple_fold(&current, &next_state_id, &simple_fold)?;
-        next.validate()?;
-        reverse_steps.push((simple_fold, current.id.clone(), next.id.clone()));
-        reverse_states.push(next.clone());
-        current = next;
-        explored_states += 1;
-        applied_steps += 1;
+        if let Some(simple_fold) = choose_simple_fold(simple_folds) {
+            branches_pruned += pruned;
+            let next_state_id = format!("state-{}", reverse_states.len());
+            let before_reverse = current.id.clone();
+            let next = apply_reverse_simple_fold(&current, &next_state_id, &simple_fold)?;
+            next.validate()?;
+            reverse_steps.push(simple_fold.to_forward_step(
+                applied_steps,
+                next.id.clone(),
+                before_reverse,
+            ));
+            reverse_states.push(next.clone());
+            current = next;
+            explored_states += 1;
+            applied_steps += 1;
+            continue;
+        }
+
+        let complex_candidates = recognize_complex_moves(&current)?;
+        let mut applied_complex = None;
+        let mut unsupported_complex_candidates = 0usize;
+        for candidate in &complex_candidates {
+            let next_state_id = format!("state-{}", reverse_states.len());
+            let result = apply_complex_transform(&current, &next_state_id, candidate)?;
+            if result.status == ComplexTransformStatus::Applied {
+                if let (Some(next), Some(step)) = (result.after_state, result.step) {
+                    applied_complex = Some((next, step, result.diagnostics));
+                    break;
+                }
+            } else {
+                unsupported_complex_candidates += 1;
+            }
+        }
+        if let Some((next, step, diagnostics)) = applied_complex {
+            branches_pruned += unsupported_complex_candidates;
+            transform_diagnostics.extend(diagnostics);
+            next.validate()?;
+            reverse_steps.push(step);
+            reverse_states.push(next.clone());
+            current = next;
+            explored_states += 1;
+            applied_steps += 1;
+            continue;
+        }
+
+        break;
     }
 
     let complex_candidates = recognize_complex_moves(&current)?;
@@ -315,6 +350,7 @@ pub fn plan_folding_sequence_with_options(
     };
 
     let mut diagnostics = target.diagnostics.clone();
+    diagnostics.extend(transform_diagnostics);
     if !unresolved_regions.is_empty() {
         diagnostics.push(SequenceDiagnostic::warning(
             "unsupported_region",
@@ -331,18 +367,9 @@ pub fn plan_folding_sequence_with_options(
         diagnostics.extend(transform.diagnostics.clone());
     }
 
-    let mut steps = reverse_steps
-        .into_iter()
-        .rev()
-        .enumerate()
-        .map(|(index, (simple_fold, before_reverse, after_reverse))| {
-            simple_fold.to_forward_step(index, after_reverse, before_reverse)
-        })
-        .collect::<Vec<_>>();
+    let mut steps = reverse_steps.into_iter().rev().collect::<Vec<_>>();
     for (index, step) in steps.iter_mut().enumerate() {
-        if let InstructionStep::SimpleFold(details) = step {
-            details.id = format!("step-{}", index + 1);
-        }
+        set_step_id(step, format!("step-{}", index + 1));
     }
     if let Some(region) = unresolved_regions.first() {
         let mut step_diagnostics = Vec::new();
@@ -1112,6 +1139,10 @@ pub fn apply_complex_transform(
         });
     }
 
+    if phase12_complex_transform_is_supported(state, candidate) {
+        return apply_reverse_complex_group(state, _next_state_id, candidate, diagnostics);
+    }
+
     diagnostics.push(SequenceDiagnostic::warning(
         "complex_transform_not_implemented",
         format!(
@@ -1133,6 +1164,92 @@ pub fn apply_complex_transform(
         before_state: state.id.clone(),
         after_state: None,
         step: None,
+        diagnostics,
+    })
+}
+
+fn phase12_complex_transform_is_supported(
+    state: &SequenceState,
+    candidate: &ComplexMoveCandidate,
+) -> bool {
+    matches!(
+        candidate.kind,
+        ComplexMoveKind::ReverseFold | ComplexMoveKind::SquashFold
+    ) && active_creases_match_candidate(state, candidate)
+}
+
+fn active_creases_match_candidate(state: &SequenceState, candidate: &ComplexMoveCandidate) -> bool {
+    let mut active = state.active_creases.clone();
+    let mut candidate_creases = candidate.creases.clone();
+    active.sort_unstable();
+    candidate_creases.sort_unstable();
+    active == candidate_creases
+}
+
+fn apply_reverse_complex_group(
+    state: &SequenceState,
+    next_state_id: &str,
+    candidate: &ComplexMoveCandidate,
+    mut diagnostics: Vec<SequenceDiagnostic>,
+) -> Result<ComplexTransformResult> {
+    let mut document = state.document.clone();
+    for crease in &candidate.creases {
+        if let Some(assignment) = document.edges_assignment.get_mut(*crease) {
+            *assignment = Assignment::Flat;
+        }
+        if let Some(angle) = document.edges_fold_angle.get_mut(*crease) {
+            *angle = Some(0.0);
+        }
+    }
+
+    let target = match resolve_target_state(&document, TargetStateOptions::default()) {
+        Ok(target) => target,
+        Err(error) => {
+            diagnostics.push(SequenceDiagnostic::warning(
+                "complex_transform_target_solve_failed",
+                format!(
+                    "{:?} candidate could not be accepted because the reverse state failed target resolution: {error}",
+                    candidate.kind
+                ),
+            ));
+            return Ok(ComplexTransformResult {
+                status: ComplexTransformStatus::Unsupported,
+                candidate: candidate.clone(),
+                before_state: state.id.clone(),
+                after_state: None,
+                step: None,
+                diagnostics,
+            });
+        }
+    };
+
+    let mut next = SequenceState::from_target(next_state_id.to_string(), &target);
+    next.provenance = StateProvenance::rewrite(
+        &state.id,
+        format!(
+            "reverse-complex-{}",
+            complex_kind_label(&candidate.kind).replace(' ', "-")
+        ),
+    );
+    next.active_creases
+        .retain(|crease| !candidate.creases.contains(crease));
+    next.validate()?;
+
+    diagnostics.push(SequenceDiagnostic::info(
+        "complex_transform_applied",
+        format!(
+            "{:?} transform accepted as an isolated local complex collapse over creases {:?}",
+            candidate.kind, candidate.creases
+        ),
+    ));
+    let step = complex_candidate_to_forward_step(candidate, next.id.clone(), state.id.clone());
+
+    Ok(ComplexTransformResult {
+        status: ComplexTransformStatus::Applied,
+        candidate: candidate.clone(),
+        before_state: state.id.clone(),
+        after_state: Some(next),
+        step: Some(step),
         diagnostics,
     })
 }
@@ -1355,6 +1472,70 @@ impl SimpleFoldRule {
             notes: Vec::new(),
         };
         InstructionStep::SimpleFold(details)
+    }
+}
+
+fn complex_candidate_to_forward_step(
+    candidate: &ComplexMoveCandidate,
+    before_state: String,
+    after_state: String,
+) -> InstructionStep {
+    let mut details = StepDetails::new(
+        "complex-step",
+        complex_step_label(candidate),
+        before_state,
+        after_state,
+    );
+    details.affected_creases = candidate.creases.clone();
+    details.affected_faces = candidate.faces.clone();
+    details.metadata = candidate.metadata.clone();
+    details.metadata.confidence = details.metadata.confidence.max(0.7);
+    details.metadata.notes.push(
+        "accepted as an isolated local complex move; lower-level sub-folds are not decomposed"
+            .to_string(),
+    );
+    match candidate.kind {
+        ComplexMoveKind::ReverseFold => InstructionStep::ReverseFold(details),
+        ComplexMoveKind::SquashFold => InstructionStep::SquashFold(details),
+        ComplexMoveKind::RabbitEar => InstructionStep::RabbitEar(details),
+        ComplexMoveKind::MoleculeCollapse => InstructionStep::MoleculeCollapse(details),
+        ComplexMoveKind::SimultaneousCollapse => InstructionStep::SimultaneousCollapse(details),
+    }
+}
+
+fn complex_step_label(candidate: &ComplexMoveCandidate) -> String {
+    let center = candidate
+        .center_vertex
+        .map(|vertex| format!(" at vertex {vertex}"))
+        .unwrap_or_default();
+    format!(
+        "Perform a {}{}",
+        complex_kind_label(&candidate.kind),
+        center
+    )
+}
+
+fn complex_kind_label(kind: &ComplexMoveKind) -> &'static str {
+    match kind {
+        ComplexMoveKind::ReverseFold => "reverse fold",
+        ComplexMoveKind::SquashFold => "squash fold",
+        ComplexMoveKind::RabbitEar => "rabbit ear",
+        ComplexMoveKind::MoleculeCollapse => "molecule collapse",
+        ComplexMoveKind::SimultaneousCollapse => "simultaneous collapse",
+    }
+}
+
+fn set_step_id(step: &mut InstructionStep, id: String) {
+    match step {
+        InstructionStep::PrecreaseRegion(details)
+        | InstructionStep::SimpleFold(details)
+        | InstructionStep::ReverseFold(details)
+        | InstructionStep::SquashFold(details)
+        | InstructionStep::RabbitEar(details)
+        | InstructionStep::MoleculeCollapse(details)
+        | InstructionStep::SimultaneousCollapse(details) => details.id = id,
+        InstructionStep::ManualChoice(step) => step.id = id,
+        InstructionStep::UnsupportedRegion(step) => step.id = id,
     }
 }
 
@@ -1742,6 +1923,69 @@ mod tests {
         document
     }
 
+    fn squash_local() -> FoldDocument {
+        let mut document = FoldDocument::new(
+            vec![
+                vec![0.0, 0.0],
+                vec![1.0, 0.0],
+                vec![1.0, 1.0],
+                vec![0.0, 1.0],
+                vec![0.5, 0.0],
+                vec![1.0, 0.5],
+                vec![0.5, 1.0],
+                vec![0.0, 0.5],
+                vec![0.5, 0.5],
+            ],
+            vec![
+                [0, 4],
+                [4, 1],
+                [1, 5],
+                [5, 2],
+                [2, 6],
+                [6, 3],
+                [3, 7],
+                [7, 0],
+                [4, 8],
+                [1, 8],
+                [5, 8],
+                [2, 8],
+                [6, 8],
+                [3, 8],
+                [7, 8],
+                [0, 8],
+            ],
+        );
+        document.edges_assignment = vec![
+            Assignment::Boundary,
+            Assignment::Boundary,
+            Assignment::Boundary,
+            Assignment::Boundary,
+            Assignment::Boundary,
+            Assignment::Boundary,
+            Assignment::Boundary,
+            Assignment::Boundary,
+            Assignment::Mountain,
+            Assignment::Valley,
+            Assignment::Mountain,
+            Assignment::Mountain,
+            Assignment::Valley,
+            Assignment::Mountain,
+            Assignment::Mountain,
+            Assignment::Valley,
+        ];
+        document.faces_vertices = vec![
+            vec![0, 4, 8],
+            vec![4, 1, 8],
+            vec![1, 5, 8],
+            vec![5, 2, 8],
+            vec![2, 6, 8],
+            vec![6, 3, 8],
+            vec![3, 7, 8],
+            vec![7, 0, 8],
+        ];
+        document
+    }
+
     #[test]
     fn target_state_wraps_flatfold_result() {
         let target = resolve_target_state(&two_face_valley(), TargetStateOptions::default())
@@ -1837,6 +2081,35 @@ mod tests {
                 .diagnostics
                 .iter()
                 .any(|diagnostic| diagnostic.code == "rabbit_ear_not_implemented")
+        );
+    }
+
+    #[test]
+    fn isolated_squash_transform_completes_as_complex_step() {
+        let target =
+            resolve_target_state(&squash_local(), TargetStateOptions::default()).expect("target");
+        let plan = plan_folding_sequence(&target).expect("squash plan");
+
+        assert_eq!(plan.status, PlanStatus::Complete);
+        assert!(plan.unresolved_regions.is_empty());
+        assert_eq!(plan.search.best_unresolved_creases, 0);
+        assert!(
+            plan.diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.code == "complex_transform_applied")
+        );
+        match &plan.steps[0] {
+            InstructionStep::SquashFold(details) => {
+                assert_eq!(details.affected_creases.len(), 8);
+                assert_eq!(details.before_state, "state-1");
+                assert_eq!(details.after_state, "target");
+            }
+            other => panic!("expected squash fold step, got {other:?}"),
+        }
+        assert!(
+            plan.states
+                .first()
+                .is_some_and(|state| state.active_creases.is_empty())
         );
     }
 

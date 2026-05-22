@@ -47,7 +47,7 @@
       "file": "fold/squash-local.fold",
       "expected_artifact": "expected/squash-local.sequence.json",
       "category": "complex_local_move",
-      "expected_v1_status": "partial",
+      "expected_v1_status": "complete",
       "target_state": "flat_foldable",
       "visual_checks": [
         "eight crease rays meet at the center point",

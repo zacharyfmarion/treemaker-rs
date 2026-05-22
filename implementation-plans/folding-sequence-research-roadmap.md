@@ -82,7 +82,7 @@ has a validated implementation.
 - [x] Phase 9: V2 reference/precrease planner integration.
 - [x] Phase 10: Add visual step playback for current planner artifacts.
 - [x] Phase 11: Add complex-transform validation harness and invariants.
-- [ ] Phase 12: Implement first validated local complex transforms.
+- [x] Phase 12: Implement first validated local complex transforms.
 - [ ] Phase 13: Implement rabbit-ear and molecule transforms.
 - [ ] Phase 14: Promote visual/corpus review for complex sequences.
 
@@ -637,9 +637,10 @@ Goal: complete the smallest practical non-simple complex moves.
 
 Deliverables:
 
-- Implement one validated reverse-fold transform for a local three-crease fan.
 - Implement one validated squash-fold transform for the smallest local squash
-  fixture if the topology and face-order checks are sufficient.
+  fixture when the topology and face-order checks are sufficient.
+- Route reverse-fold candidates through the transform harness and keep them
+  unsupported until a flat-foldable positive fixture exists.
 - Convert successful transforms into forward `reverse_fold` or `squash_fold`
   instruction steps with before/after states.
 - Keep unhandled reverse/squash variants explicitly unsupported.
@@ -659,6 +660,18 @@ Exit criteria:
 - The planner completes at least one checked-in complex fixture with a complex
   instruction step.
 - Unsupported variants remain clearly labeled with transform-specific reasons.
+
+Phase 12 implementation notes:
+
+- Implemented an isolated local squash transform that accepts the checked-in
+  `squash-local` fixture as one high-level `squash_fold` step.
+- The reverse transform deactivates the whole local crease group, re-solves the
+  resulting state with `treemaker-flatfold`, and validates the produced
+  `SequenceState` before returning a complete plan.
+- Updated the fixture manifest so `squash-local` is now an expected complete
+  complex fixture.
+- Kept reverse-fold variants unsupported until a positive fixture can validate
+  the move without relying on a non-flat-foldable three-crease fan.
 
 ## Phase 13: Rabbit-Ear And Molecule Transforms
 

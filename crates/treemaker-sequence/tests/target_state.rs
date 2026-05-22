@@ -93,7 +93,7 @@ fn phase0_complex_fixtures_are_recognized_but_not_faked() {
         (
             "squash-local.fold",
             ComplexMoveKind::SquashFold,
-            PlanStatus::Partial,
+            PlanStatus::Complete,
         ),
         (
             "treemaker-triad-base.fold",
@@ -122,17 +122,30 @@ fn phase0_complex_fixtures_are_recognized_but_not_faked() {
             "{fixture}: {candidates:?}"
         );
         assert_eq!(plan.status, expected_status, "{fixture}");
-        assert!(
-            plan.steps.iter().any(|step| matches!(
-                step,
-                treemaker_sequence::InstructionStep::UnsupportedRegion(_)
-            )),
-            "{fixture}"
-        );
-        assert!(
-            !plan.unresolved_regions.is_empty(),
-            "{fixture}: complex moves must not be silently dropped"
-        );
+        if expected_status == PlanStatus::Complete {
+            assert!(
+                plan.steps
+                    .iter()
+                    .any(|step| matches!(step, treemaker_sequence::InstructionStep::SquashFold(_))),
+                "{fixture}: completed complex fixture should use a complex step"
+            );
+            assert!(
+                plan.unresolved_regions.is_empty(),
+                "{fixture}: completed complex fixture should not leave unresolved regions"
+            );
+        } else {
+            assert!(
+                plan.steps.iter().any(|step| matches!(
+                    step,
+                    treemaker_sequence::InstructionStep::UnsupportedRegion(_)
+                )),
+                "{fixture}"
+            );
+            assert!(
+                !plan.unresolved_regions.is_empty(),
+                "{fixture}: complex moves must not be silently dropped"
+            );
+        }
     }
 }
 

@@ -316,7 +316,9 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
   ready('LineSegmentRatioSet', 'Divide line by ratio', 'draw', 'divide', 'MouseHandlerLineSegmentRatioSet', {
     toolSteps: ['Pick line segment'],
   }),
-  notImplemented('PolygonSetNoCorners', 'Regular polygon', 'generators', 'hexagon', 'MouseHandlerPolygonSetNoCorners'),
+  ready('PolygonSetNoCorners', 'Regular polygon', 'generators', 'hexagon', 'MouseHandlerPolygonSetNoCorners', {
+    toolSteps: ['Pick first corner', 'Pick second corner'],
+  }),
   ready('CreaseAdvanceType', 'Advance crease type', 'color', 'list-restart', 'MouseHandlerCreaseAdvanceType', {
     selectionRequirement: 'selected folding lines',
     tooltip: 'Advance selected folding lines through edge, mountain, and valley',
@@ -369,12 +371,20 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
     toolSteps: ['Pick vertex'],
     tooltip: 'Merge adjacent creases at a vertex with Oriedita color-change rules',
   }),
-  notImplemented('CircleDraw', 'Draw circle', 'annotations', 'circle', 'MouseHandlerCircleDraw'),
-  notImplemented('CircleDrawThreePoint', 'Circle through three points', 'annotations', 'circle-dot', 'MouseHandlerCircleDrawThreePoint'),
-  notImplemented('CircleDrawSeparate', 'Separate circle', 'annotations', 'circle-dashed', 'MouseHandlerCircleDrawSeparate'),
+  ready('CircleDraw', 'Draw circle', 'annotations', 'circle', 'MouseHandlerCircleDraw', {
+    toolSteps: ['Pick center point', 'Pick radius point'],
+  }),
+  ready('CircleDrawThreePoint', 'Circle through three points', 'annotations', 'circle-dot', 'MouseHandlerCircleDrawThreePoint', {
+    toolSteps: ['Pick first point', 'Pick second point', 'Pick third point'],
+  }),
+  ready('CircleDrawSeparate', 'Separate circle', 'annotations', 'circle-dashed', 'MouseHandlerCircleDrawSeparate', {
+    toolSteps: ['Pick center point', 'Pick radius start', 'Pick radius end'],
+  }),
   notImplemented('CircleDrawTangentLine', 'Circle tangent line', 'annotations', 'circle-slash', 'MouseHandlerCircleDrawTangentLine'),
   notImplemented('CircleDrawInverted', 'Inverted circle', 'annotations', 'refresh-cw', 'MouseHandlerCircleDrawInverted'),
-  notImplemented('CircleDrawFree', 'Free circle', 'annotations', 'circle-plus', 'MouseHandlerCircleDrawFree'),
+  ready('CircleDrawFree', 'Free circle', 'annotations', 'circle-plus', 'MouseHandlerCircleDrawFree', {
+    toolSteps: ['Pick center point', 'Pick radius point'],
+  }),
   notImplemented('CircleDrawConcentric', 'Concentric circle', 'annotations', 'circle-dot-dashed', 'MouseHandlerCircleDrawConcentric'),
   notImplemented('CircleDrawConcentricSelect', 'Concentric from selection', 'annotations', 'circle-dot', 'MouseHandlerCircleDrawConcentricSelect'),
   notImplemented('CircleDrawConcentricTwoCircleSelect', 'Concentric from two circles', 'annotations', 'venetian-mask', 'MouseHandlerCircleDrawConcentricTwoCircleSelect'),
@@ -467,11 +477,21 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
     tooltip: 'Unselect creases touched by a freehand lasso path',
   }),
   notImplemented('Text', 'Text annotation', 'annotations', 'text-cursor-input', 'MouseHandlerText'),
-  notImplemented('DrawBlintz', 'Blintz base', 'generators', 'sparkles', 'MouseHandlerDrawBlintz'),
-  notImplemented('DrawFishBase', 'Fish base', 'generators', 'sparkles', 'MouseHandlerDrawFishBase'),
-  notImplemented('DrawDoveBase', 'Dove base', 'generators', 'sparkles', 'MouseHandlerDrawDoveBase'),
-  notImplemented('DrawBirdBase', 'Bird base', 'generators', 'sparkles', 'MouseHandlerDrawBirdBase'),
-  notImplemented('DrawFrogBase', 'Frog base', 'generators', 'sparkles', 'MouseHandlerDrawFrogBase'),
+  ready('DrawBlintz', 'Blintz base', 'generators', 'sparkles', 'MouseHandlerDrawBlintz', {
+    toolSteps: ['Pick first anchor point', 'Pick second anchor point'],
+  }),
+  ready('DrawFishBase', 'Fish base', 'generators', 'sparkles', 'MouseHandlerDrawFishBase', {
+    toolSteps: ['Pick first anchor point', 'Pick second anchor point'],
+  }),
+  ready('DrawDoveBase', 'Dove base', 'generators', 'sparkles', 'MouseHandlerDrawDoveBase', {
+    toolSteps: ['Pick first anchor point', 'Pick second anchor point'],
+  }),
+  ready('DrawBirdBase', 'Bird base', 'generators', 'sparkles', 'MouseHandlerDrawBirdBase', {
+    toolSteps: ['Pick first anchor point', 'Pick second anchor point'],
+  }),
+  ready('DrawFrogBase', 'Frog base', 'generators', 'sparkles', 'MouseHandlerDrawFrogBase', {
+    toolSteps: ['Pick first anchor point', 'Pick second anchor point'],
+  }),
   notImplemented('ModifyCalculatedShape', 'Modify calculated shape', 'folding', 'pen-tool', 'MouseHandlerModifyCalculatedShape'),
   notImplemented('MoveCalculatedShape', 'Move calculated shape', 'folding', 'move', 'MouseHandlerMoveCalculatedShape'),
   notImplemented('ChangeStandardFace', 'Change standard face', 'folding', 'layers', 'MouseHandlerChangeStandardFace'),

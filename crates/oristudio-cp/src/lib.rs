@@ -18,7 +18,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 pub use canonical::CanonicalCreasePattern;
-use geometry::{Epsilon, LineColor, LineSegment, Point, Polygon, determine_line_segment_distance};
+use geometry::{
+    Circle, Epsilon, LineColor, LineSegment, Point, Polygon, determine_line_segment_distance,
+};
 pub use model::CreasePatternModel;
 
 const DEFAULT_SELECTION_DISTANCE: f64 = 1.0;
@@ -27,6 +29,7 @@ const DEFAULT_ANGLE_SYSTEM_DIVIDER: i32 = 4;
 const DEFAULT_ANGLE_SYSTEM_ANGLES: [f64; 6] = [40.0, 60.0, 80.0, 30.0, 50.0, 100.0];
 const DEFAULT_LINE_DIVISION_COUNT: usize = 2;
 const DEFAULT_LINE_RATIO: f64 = 1.0;
+const DEFAULT_POLYGON_CORNERS: usize = 5;
 
 /// Crate-local result type.
 pub type Result<T> = std::result::Result<T, CommandError>;
@@ -142,6 +145,9 @@ pub struct CreasePatternCommandPayload {
     /// Optional toggle for 22.5-degree fix-inaccurate targets.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fix_precision_use_22_5: Option<bool>,
+    /// Optional number of corners for regular polygon generator commands.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub polygon_corners: Option<usize>,
 }
 
 /// Result returned by a successfully executed command.
@@ -160,6 +166,8 @@ pub struct CommandResult {
 pub struct CommandPreview {
     /// Candidate, guide, or would-be committed line segments.
     pub segments: Vec<geometry::LineSegment>,
+    /// Candidate, guide, or would-be committed circles.
+    pub circles: Vec<geometry::Circle>,
     /// Candidate commit points, such as angle-restricted convergence points.
     pub points: Vec<geometry::Point>,
     /// Human-readable diagnostics emitted by the preview query.
@@ -1432,6 +1440,74 @@ pub fn execute_command(
                 ratio_t(&command),
             )
         }
+        OperationId::PolygonSetNoCorners => {
+            let points = required_points(&command, 2)?;
+            operations::generators::regular_polygon_no_corners(
+                &mut document.crease_pattern,
+                points[0],
+                points[1],
+                polygon_corners(&command),
+                active_line_color(&command),
+            )
+        }
+        OperationId::DrawBlintz
+        | OperationId::DrawFishBase
+        | OperationId::DrawDoveBase
+        | OperationId::DrawBirdBase
+        | OperationId::DrawFrogBase => {
+            let points = required_points(&command, 2)?;
+            let molecule = default_molecule_for_operation(command.operation).ok_or_else(|| {
+                CommandError::InvalidInput {
+                    operation: command.operation,
+                    message: "operation is not a default molecule generator".to_string(),
+                }
+            })?;
+            operations::generators::default_molecule(
+                &mut document.crease_pattern,
+                molecule,
+                points[0],
+                points[1],
+                active_line_color(&command),
+            )
+            .map_err(|error| CommandError::InvalidInput {
+                operation: command.operation,
+                message: error.to_string(),
+            })?
+        }
+        OperationId::CircleDraw => {
+            let points = required_points(&command, 2)?;
+            usize::from(operations::circle::draw(
+                &mut document.crease_pattern,
+                points[0],
+                points[1],
+            ))
+        }
+        OperationId::CircleDrawFree => {
+            let points = required_points(&command, 2)?;
+            usize::from(operations::circle::free(
+                &mut document.crease_pattern,
+                points[0],
+                points[1],
+            ))
+        }
+        OperationId::CircleDrawSeparate => {
+            let points = required_points(&command, 3)?;
+            usize::from(operations::circle::separate(
+                &mut document.crease_pattern,
+                points[0],
+                points[1],
+                points[2],
+            ))
+        }
+        OperationId::CircleDrawThreePoint => {
+            let points = required_points(&command, 3)?;
+            usize::from(operations::circle::through_three_points(
+                &mut document.crease_pattern,
+                points[0],
+                points[1],
+                points[2],
+            ))
+        }
         OperationId::SquareBisector => {
             if command.payload.line_ids.len() >= 3 {
                 let line_indices = required_line_indices(&command)?;
@@ -2054,6 +2130,58 @@ pub fn preview_command(
                 active_line_color(&command),
             ));
         }
+        OperationId::PolygonSetNoCorners if points.len() >= 2 => {
+            let mut model = CreasePatternModel::default();
+            operations::generators::regular_polygon_no_corners(
+                &mut model,
+                points[0],
+                points[1],
+                polygon_corners(&command),
+                active_line_color(&command),
+            );
+            preview.segments = model.line_segments;
+        }
+        OperationId::DrawBlintz
+        | OperationId::DrawFishBase
+        | OperationId::DrawDoveBase
+        | OperationId::DrawBirdBase
+        | OperationId::DrawFrogBase
+            if points.len() >= 2 =>
+        {
+            if let Some(molecule) = default_molecule_for_operation(command.operation) {
+                let mut model = CreasePatternModel::default();
+                if operations::generators::default_molecule(
+                    &mut model,
+                    molecule,
+                    points[0],
+                    points[1],
+                    active_line_color(&command),
+                )
+                .is_ok()
+                {
+                    preview.segments = model.line_segments;
+                }
+            }
+        }
+        OperationId::CircleDraw | OperationId::CircleDrawFree if points.len() >= 2 => {
+            preview.circles.push(Circle::from_center(
+                points[0],
+                points[0].distance(points[1]),
+                LineColor::Cyan3,
+            ));
+        }
+        OperationId::CircleDrawSeparate if points.len() >= 3 => {
+            preview.circles.push(Circle::from_center(
+                points[0],
+                points[1].distance(points[2]),
+                LineColor::Cyan3,
+            ));
+        }
+        OperationId::CircleDrawThreePoint if points.len() >= 3 => {
+            let mut model = CreasePatternModel::default();
+            operations::circle::through_three_points(&mut model, points[0], points[1], points[2]);
+            preview.circles = model.circles;
+        }
         OperationId::Inward if points.len() >= 3 => {
             let center = geometry::center(points[0], points[1], points[2]);
             preview.segments.extend(
@@ -2371,6 +2499,27 @@ fn ratio_t(command: &CreasePatternCommand) -> f64 {
         .ratio_t
         .filter(|ratio| ratio.is_finite() && *ratio >= 0.0)
         .unwrap_or(DEFAULT_LINE_RATIO)
+}
+
+fn polygon_corners(command: &CreasePatternCommand) -> usize {
+    command
+        .payload
+        .polygon_corners
+        .filter(|corners| *corners >= 3)
+        .unwrap_or(DEFAULT_POLYGON_CORNERS)
+}
+
+fn default_molecule_for_operation(
+    operation: OperationId,
+) -> Option<operations::generators::DefaultMolecule> {
+    match operation {
+        OperationId::DrawBlintz => Some(operations::generators::DefaultMolecule::Blintz),
+        OperationId::DrawFishBase => Some(operations::generators::DefaultMolecule::FishBase),
+        OperationId::DrawDoveBase => Some(operations::generators::DefaultMolecule::DoveBase),
+        OperationId::DrawBirdBase => Some(operations::generators::DefaultMolecule::BirdBase),
+        OperationId::DrawFrogBase => Some(operations::generators::DefaultMolecule::FrogBase),
+        _ => None,
+    }
 }
 
 fn fix_inaccurate_options(command: &CreasePatternCommand) -> checks::FixInaccurateOptions {
@@ -3263,6 +3412,156 @@ mod tests {
                 .any(|segment| segment.a == Point::new(1.0, 0.0)
                     || segment.b == Point::new(1.0, 0.0))
         );
+    }
+
+    #[test]
+    fn command_dispatch_routes_stage_eight_circle_creation_commands() {
+        let mut document = CreasePatternDocument::default();
+
+        execute_command(
+            &mut document,
+            CreasePatternCommand::new(OperationId::CircleDraw).with_payload(
+                CreasePatternCommandPayload {
+                    points: vec![Point::new(1.0, 2.0), Point::new(4.0, 6.0)],
+                    ..CreasePatternCommandPayload::default()
+                },
+            ),
+        )
+        .expect("restricted circle draw should execute");
+        execute_command(
+            &mut document,
+            CreasePatternCommand::new(OperationId::CircleDrawFree).with_payload(
+                CreasePatternCommandPayload {
+                    points: vec![Point::new(0.0, 0.0), Point::new(0.0, 2.0)],
+                    ..CreasePatternCommandPayload::default()
+                },
+            ),
+        )
+        .expect("free circle draw should execute");
+        execute_command(
+            &mut document,
+            CreasePatternCommand::new(OperationId::CircleDrawSeparate).with_payload(
+                CreasePatternCommandPayload {
+                    points: vec![
+                        Point::new(10.0, 10.0),
+                        Point::new(1.0, 1.0),
+                        Point::new(4.0, 5.0),
+                    ],
+                    ..CreasePatternCommandPayload::default()
+                },
+            ),
+        )
+        .expect("separate circle draw should execute");
+        execute_command(
+            &mut document,
+            CreasePatternCommand::new(OperationId::CircleDrawThreePoint).with_payload(
+                CreasePatternCommandPayload {
+                    points: vec![
+                        Point::new(1.0, 0.0),
+                        Point::new(0.0, 1.0),
+                        Point::new(-1.0, 0.0),
+                    ],
+                    ..CreasePatternCommandPayload::default()
+                },
+            ),
+        )
+        .expect("three-point circle draw should execute");
+
+        assert_eq!(document.crease_pattern.circles.len(), 4);
+        assert_eq!(document.crease_pattern.circles[0].r, 5.0);
+        assert_eq!(document.crease_pattern.circles[1].r, 2.0);
+        assert_eq!(document.crease_pattern.circles[2].r, 5.0);
+        assert!(
+            document
+                .crease_pattern
+                .circles
+                .iter()
+                .all(|circle| circle.color == LineColor::Cyan3)
+        );
+    }
+
+    #[test]
+    fn command_dispatch_routes_stage_eight_shape_generators() {
+        let mut document = CreasePatternDocument::default();
+
+        let polygon_result = execute_command(
+            &mut document,
+            CreasePatternCommand::new(OperationId::PolygonSetNoCorners).with_payload(
+                CreasePatternCommandPayload {
+                    points: vec![Point::new(0.0, 0.0), Point::new(1.0, 0.0)],
+                    line_color: Some(LineColor::Blue2),
+                    polygon_corners: Some(4),
+                    ..CreasePatternCommandPayload::default()
+                },
+            ),
+        )
+        .expect("regular polygon should execute");
+
+        assert_eq!(polygon_result.status, OperationStatus::OracleTested);
+        assert_eq!(document.crease_pattern.line_segments.len(), 4);
+        assert!(
+            document
+                .crease_pattern
+                .line_segments
+                .iter()
+                .all(|segment| segment.color == LineColor::Blue2)
+        );
+
+        let molecule_result = execute_command(
+            &mut document,
+            CreasePatternCommand::new(OperationId::DrawBlintz).with_payload(
+                CreasePatternCommandPayload {
+                    points: vec![Point::new(-200.0, -200.0), Point::new(200.0, 200.0)],
+                    line_color: Some(LineColor::Red1),
+                    ..CreasePatternCommandPayload::default()
+                },
+            ),
+        )
+        .expect("default molecule should execute");
+
+        assert_eq!(molecule_result.status, OperationStatus::OracleTested);
+        assert_eq!(document.crease_pattern.line_segments.len(), 8);
+        assert!(
+            document.crease_pattern.line_segments[4..]
+                .iter()
+                .all(|segment| segment.color == LineColor::Red1)
+        );
+    }
+
+    #[test]
+    fn command_preview_returns_stage_eight_shape_candidates_without_mutating_document() {
+        let document = CreasePatternDocument::default();
+
+        let circle_preview = preview_command(
+            &document,
+            CreasePatternCommand::new(OperationId::CircleDraw).with_payload(
+                CreasePatternCommandPayload {
+                    points: vec![Point::new(1.0, 2.0), Point::new(4.0, 6.0)],
+                    ..CreasePatternCommandPayload::default()
+                },
+            ),
+        )
+        .expect("circle draw should expose a circle preview");
+
+        assert!(circle_preview.segments.is_empty());
+        assert_eq!(circle_preview.circles.len(), 1);
+        assert_eq!(circle_preview.circles[0].r, 5.0);
+
+        let polygon_preview = preview_command(
+            &document,
+            CreasePatternCommand::new(OperationId::PolygonSetNoCorners).with_payload(
+                CreasePatternCommandPayload {
+                    points: vec![Point::new(0.0, 0.0), Point::new(1.0, 0.0)],
+                    polygon_corners: Some(3),
+                    ..CreasePatternCommandPayload::default()
+                },
+            ),
+        )
+        .expect("regular polygon should expose line previews");
+
+        assert_eq!(polygon_preview.segments.len(), 3);
+        assert!(document.crease_pattern.line_segments.is_empty());
+        assert!(document.crease_pattern.circles.is_empty());
     }
 
     #[test]

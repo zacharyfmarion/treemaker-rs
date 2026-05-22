@@ -37,15 +37,15 @@ describe('oristudio CP tool state', () => {
   it('selects unavailable commands as blocked but keeps the active command visible', () => {
     const state = transitionOristudioCpToolState(IDLE_ORISTUDIO_CP_TOOL_STATE, {
       type: 'selectAction',
-      action: action('cp.action.circle-draw'),
+      action: action('cp.action.circle-draw-tangent-line'),
       editable: true,
     });
 
     expect(state).toMatchObject({
-      activeActionId: 'cp.action.circle-draw',
-      activeOperationId: 'CircleDraw',
+      activeActionId: 'cp.action.circle-draw-tangent-line',
+      activeOperationId: 'CircleDrawTangentLine',
       phase: 'blocked',
-      prompt: 'Draw circle: Not implemented',
+      prompt: 'Circle tangent line: Not implemented',
       status: 'not-implemented',
       stepIndex: 0,
     });

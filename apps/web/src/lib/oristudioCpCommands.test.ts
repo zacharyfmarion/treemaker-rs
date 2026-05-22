@@ -84,6 +84,18 @@ describe('oristudio CP command registry', () => {
       uiStatus: 'ready',
       toolSteps: ['Pick first point', 'Pick vertex point', 'Pick second point'],
     });
+    expect(cpCommandByOperation('CircleDraw')).toMatchObject({
+      uiStatus: 'ready',
+      toolSteps: ['Pick center point', 'Pick radius point'],
+    });
+    expect(cpCommandByOperation('PolygonSetNoCorners')).toMatchObject({
+      uiStatus: 'ready',
+      toolSteps: ['Pick first corner', 'Pick second corner'],
+    });
+    expect(cpCommandByOperation('DrawBlintz')).toMatchObject({
+      uiStatus: 'ready',
+      toolSteps: ['Pick first anchor point', 'Pick second anchor point'],
+    });
   });
 
   it('keeps the left rail populated by ordered command groups', () => {

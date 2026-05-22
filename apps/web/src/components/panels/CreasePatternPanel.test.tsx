@@ -78,6 +78,7 @@ function renderPanel(
   const optimizeScale = vi.fn(async () => undefined);
   const previewOristudioCpCommand = vi.fn(async () => ({
     segments: [],
+    circles: [],
     points: [],
     diagnostics: [],
   }));
@@ -1138,6 +1139,205 @@ describe('CreasePatternPanel', () => {
     expect(useWorkspaceStore.getState().historyPast).toHaveLength(0);
   });
 
+  it('runs ready circle commands with circle previews and resolved model points', async () => {
+    const executeOristudioCpCommand = vi.fn(
+      async (_operationId: string, _payload?: OristudioCpCommandPayload) => true
+    );
+    const previewOristudioCpCommand = vi.fn(async () => ({
+      segments: [],
+      circles: [
+        {
+          x: 0,
+          y: 0,
+          r: 80,
+          color: 'Cyan3',
+          customized: 0,
+          customized_color: { red: 100, green: 200, blue: 200 },
+        },
+      ],
+      points: [],
+      diagnostics: [],
+    }));
+    const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
+      documentMode: 'crease-pattern',
+      importedCreasePattern: importedCpDocument(),
+      oristudioCpDocument: editableCpState(),
+      oristudioCpViewport: {
+        gridVisible: true,
+        snapToGrid: false,
+        snapToVertices: false,
+        snapToLines: false,
+      },
+      executeOristudioCpCommand,
+      previewOristudioCpCommand,
+    });
+    const canvas = setCanvasClientRect(container);
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('button[aria-label="Draw circle"]')?.click();
+      await Promise.resolve();
+    });
+
+    act(() => {
+      canvas.dispatchEvent(
+        new MouseEvent('pointerdown', {
+          bubbles: true,
+          button: 0,
+          clientX: 360,
+          clientY: 348,
+        })
+      );
+    });
+
+    await act(async () => {
+      canvas.dispatchEvent(
+        new MouseEvent('pointermove', {
+          bubbles: true,
+          button: 0,
+          clientX: 477.6,
+          clientY: 348,
+        })
+      );
+      await Promise.resolve();
+    });
+
+    expect(previewOristudioCpCommand).toHaveBeenCalledWith(
+      'CircleDraw',
+      expect.objectContaining({
+        points: [
+          { x: 0, y: 0 },
+          expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }),
+        ],
+      })
+    );
+    expect(container.querySelector('circle.cp-command-preview')).not.toBeNull();
+
+    await act(async () => {
+      canvas.dispatchEvent(
+        new MouseEvent('pointerdown', {
+          bubbles: true,
+          button: 0,
+          clientX: 477.6,
+          clientY: 348,
+        })
+      );
+      await Promise.resolve();
+    });
+
+    expect(executeOristudioCpCommand).toHaveBeenCalledOnce();
+    const [operation, payload] = executeOristudioCpCommand.mock.calls[0] ?? [];
+    expect(operation).toBe('CircleDraw');
+    expect(payload?.points?.[0]).toEqual({ x: 0, y: 0 });
+    expect(payload?.points?.[1].x).toBeCloseTo(80);
+    expect(payload?.points?.[1].y).toBeCloseTo(0);
+  });
+
+  it('runs regular polygon with contextual corner count and active line color', async () => {
+    const executeOristudioCpCommand = vi.fn(
+      async (_operationId: string, _payload?: OristudioCpCommandPayload) => true
+    );
+    const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
+      documentMode: 'crease-pattern',
+      importedCreasePattern: importedCpDocument(),
+      oristudioCpDocument: editableCpState(),
+      oristudioCpViewport: {
+        gridVisible: true,
+        snapToGrid: false,
+        snapToVertices: false,
+        snapToLines: false,
+      },
+      executeOristudioCpCommand,
+    });
+    const canvas = setCanvasClientRect(container);
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('button[aria-label="Valley"]')?.click();
+      container.querySelector<HTMLButtonElement>('button[aria-label="Regular polygon"]')?.click();
+      await Promise.resolve();
+    });
+
+    const cornersInput = container.querySelector<HTMLInputElement>(
+      'input[aria-label="Polygon corners"]'
+    );
+    expect(cornersInput?.value).toBe('5');
+    act(() => {
+      if (cornersInput) setNumberInputValue(cornersInput, '4');
+    });
+
+    for (const [clientX, clientY] of [
+      [360, 348],
+      [477.6, 348],
+    ]) {
+      await act(async () => {
+        canvas.dispatchEvent(
+          new MouseEvent('pointerdown', {
+            bubbles: true,
+            button: 0,
+            clientX,
+            clientY,
+          })
+        );
+        await Promise.resolve();
+      });
+    }
+
+    expect(executeOristudioCpCommand).toHaveBeenCalledOnce();
+    const [operation, payload] = executeOristudioCpCommand.mock.calls[0] ?? [];
+    expect(operation).toBe('PolygonSetNoCorners');
+    expect(payload?.polygon_corners).toBe(4);
+    expect(payload?.line_color).toBe('Blue2');
+    expect(payload?.points).toHaveLength(2);
+  });
+
+  it('runs default base generators with the active line color', async () => {
+    const executeOristudioCpCommand = vi.fn(
+      async (_operationId: string, _payload?: OristudioCpCommandPayload) => true
+    );
+    const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
+      documentMode: 'crease-pattern',
+      importedCreasePattern: importedCpDocument(),
+      oristudioCpDocument: editableCpState(),
+      oristudioCpViewport: {
+        gridVisible: true,
+        snapToGrid: false,
+        snapToVertices: false,
+        snapToLines: false,
+      },
+      executeOristudioCpCommand,
+    });
+    const canvas = setCanvasClientRect(container);
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('button[aria-label="Valley"]')?.click();
+      container.querySelector<HTMLButtonElement>('button[aria-label="Blintz base"]')?.click();
+      await Promise.resolve();
+    });
+
+    for (const [clientX, clientY] of [
+      [66, 54],
+      [654, 642],
+    ]) {
+      await act(async () => {
+        canvas.dispatchEvent(
+          new MouseEvent('pointerdown', {
+            bubbles: true,
+            button: 0,
+            clientX,
+            clientY,
+          })
+        );
+        await Promise.resolve();
+      });
+    }
+
+    expect(executeOristudioCpCommand).toHaveBeenCalledOnce();
+    const [operation, payload] = executeOristudioCpCommand.mock.calls[0] ?? [];
+    expect(operation).toBe('DrawBlintz');
+    expect(payload?.line_color).toBe('Blue2');
+    expect(payload?.points?.[0]).toEqual({ x: -200, y: 200 });
+    expect(payload?.points?.[1]).toEqual({ x: 200, y: -200 });
+  });
+
   it('runs ready lengthen CP commands with three resolved model points and current color', async () => {
     const executeOristudioCpCommand = vi.fn(
       async (_operationId: string, _payload?: OristudioCpCommandPayload) => true
@@ -1203,6 +1403,7 @@ describe('CreasePatternPanel', () => {
           customized_color: { red: 0, green: 0, blue: 0 },
         },
       ],
+      circles: [],
       points: [{ x: 40, y: 0 }],
       diagnostics: [],
     }));

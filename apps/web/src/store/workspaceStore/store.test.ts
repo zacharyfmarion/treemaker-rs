@@ -964,7 +964,7 @@ function resetStores(snapshot = makeSnapshot()) {
   });
   oristudioCpMocks.previewOristudioCpCommand
     .mockReset()
-    .mockResolvedValue({ segments: [], points: [], diagnostics: [] });
+    .mockResolvedValue({ segments: [], circles: [], points: [], diagnostics: [] });
   return api;
 }
 

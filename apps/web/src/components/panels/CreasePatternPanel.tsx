@@ -13,6 +13,7 @@ import { ChevronDown, ChevronRight, GitBranch, Grid2X2, Magnet, ScanLine } from 
 import type {
   OristudioCpCommandPayload,
   OristudioCpCommandPreview,
+  OristudioCpCircle,
   OristudioCpCustomLineType,
   OristudioCpDocumentSnapshot,
   OristudioCpLineColor,
@@ -153,7 +154,13 @@ function cpCommandPayloadDefaults(
     operationId === 'ContinuousSymmetricDraw' ||
     operationId === 'FoldableLineDraw' ||
     operationId === 'Axiom5' ||
-    operationId === 'Axiom7'
+    operationId === 'Axiom7' ||
+    operationId === 'PolygonSetNoCorners' ||
+    operationId === 'DrawBlintz' ||
+    operationId === 'DrawFishBase' ||
+    operationId === 'DrawDoveBase' ||
+    operationId === 'DrawBirdBase' ||
+    operationId === 'DrawFrogBase'
   ) {
     payload.line_color = lineColor;
   }
@@ -185,6 +192,10 @@ function cpCommandPayloadDefaults(
     const ratio = evaluateOrieditaRatioExpression(toolOptions.divisionRatio);
     payload.ratio_s = ratio.ratioS;
     payload.ratio_t = ratio.ratioT;
+  }
+
+  if (operationId === 'PolygonSetNoCorners') {
+    payload.polygon_corners = toolOptions.polygonCorners;
   }
 
   if (operationId === 'ParallelDrawWidth') {
@@ -498,6 +509,7 @@ export function CreasePatternPanel() {
     localDragLinePreviewSegments.length > 0
       ? localDragLinePreviewSegments
       : (cpCommandPreview?.segments ?? []);
+  const renderedCommandPreviewCircles = cpCommandPreview?.circles ?? [];
   const buildCpCommandPayload = useCallback(
     (
       command: OristudioCpCommandDefinition,
@@ -1425,6 +1437,7 @@ export function CreasePatternPanel() {
                         gridVisible={oristudioCpViewport.gridVisible}
                         mode={mode}
                         commandCandidatePoints={cpCommandPreview?.points ?? []}
+                        commandPreviewCircles={renderedCommandPreviewCircles}
                         commandPreviewPoints={renderedCommandPreviewPoints}
                         commandPreviewSegments={renderedCommandPreviewSegments}
                         selection={oristudioCpSelection}
@@ -1549,6 +1562,7 @@ interface EditableCreasePatternProps {
   gridVisible: boolean;
   mode: 'mvf' | 'agrh';
   commandCandidatePoints: Point[];
+  commandPreviewCircles: OristudioCpCircle[];
   commandPreviewPoints: Point[];
   commandPreviewSegments: OristudioCpLineSegment[];
   selection: OristudioCpSelection;
@@ -1570,6 +1584,7 @@ function EditableCreasePattern({
   gridVisible,
   mode,
   commandCandidatePoints,
+  commandPreviewCircles,
   commandPreviewPoints,
   commandPreviewSegments,
   selection,
@@ -1681,6 +1696,21 @@ function EditableCreasePattern({
               event.stopPropagation();
               toggleCircle(id, event.shiftKey || event.metaKey || event.ctrlKey);
             }}
+          />
+        );
+      })}
+      {commandPreviewCircles.map((circle, index) => {
+        const center = modelPointToCpSvg({ x: circle.x, y: circle.y }, bounds);
+        const radius =
+          (circle.r / Math.max(bounds.spanX, bounds.spanY)) *
+          Math.min(CP_PAPER_RECT.width, CP_PAPER_RECT.height);
+        return (
+          <circle
+            key={`${index}-${circle.x}-${circle.y}-${circle.r}`}
+            className="cp-command-preview"
+            cx={center.x}
+            cy={center.y}
+            r={Math.max(1, radius)}
           />
         );
       })}

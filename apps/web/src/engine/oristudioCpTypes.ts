@@ -108,6 +108,7 @@ export interface OristudioCpCommandResult {
 
 export interface OristudioCpCommandPreview {
   segments: OristudioCpLineSegment[];
+  circles: OristudioCpCircle[];
   points: Point[];
   diagnostics: string[];
 }
@@ -131,6 +132,7 @@ export interface OristudioCpCommandPayload {
   fix_precision?: number;
   fix_precision_use_bp?: boolean;
   fix_precision_use_22_5?: boolean;
+  polygon_corners?: number;
 }
 
 export type OristudioCpLineColor =

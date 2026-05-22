@@ -845,6 +845,10 @@ Done when:
       contextual readouts.
 - [x] Stage 8 slice: Validate measurement probes as non-mutating UI state with
       no CP undo/redo history entries.
+- [x] Stage 8 slice: Enable simple circle creation, regular polygon, and
+      default base generators with point-sequence previews.
+- [x] Stage 8 slice: Validate enabled shape/generator commands through Rust,
+      wasm, and web command tests.
 - [ ] Stage 8: Enable circles, text, generators, and measurement tools.
 - [ ] Stage 8: Validate annotation preservation and non-mutating measurement
       behavior.

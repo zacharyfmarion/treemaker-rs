@@ -155,6 +155,12 @@ const LINE_COLOR_OPERATION_IDS = new Set<OristudioCpOperationId>([
   'FoldableLineDraw',
   'Axiom5',
   'Axiom7',
+  'PolygonSetNoCorners',
+  'DrawBlintz',
+  'DrawFishBase',
+  'DrawDoveBase',
+  'DrawBirdBase',
+  'DrawFrogBase',
 ]);
 
 const TOOL_SETTING_GROUPS_BY_OPERATION: Partial<

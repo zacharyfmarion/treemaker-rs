@@ -13,6 +13,8 @@ function capabilities({
   engineReady = true,
   hasEditableCreasePattern = false,
   hasImportedCreasePattern = false,
+  historyPastCount = 0,
+  historyFutureCount = 0,
   selection = treeSelection,
 }: {
   documentMode?: DocumentMode;
@@ -23,6 +25,8 @@ function capabilities({
   engineReady?: boolean;
   hasEditableCreasePattern?: boolean;
   hasImportedCreasePattern?: boolean;
+  historyPastCount?: number;
+  historyFutureCount?: number;
   selection?: Selection;
 } = {}) {
   return getWorkspaceCapabilities({
@@ -35,8 +39,8 @@ function capabilities({
     hasEditableCreasePattern,
     hasImportedCreasePattern,
     hasSimulationModel: false,
-    historyPastCount: 0,
-    historyFutureCount: 0,
+    historyPastCount,
+    historyFutureCount,
     clipboard: null,
     selection,
   });
@@ -151,6 +155,26 @@ describe('workspace capabilities', () => {
     expect(state['file.exportCp']).toMatchObject({
       enabled: true,
       reason: 'Export editable crease pattern as CP',
+    });
+  });
+
+  it('enables undo and redo for editable CP history', () => {
+    const state = capabilities({
+      documentMode: 'crease-pattern',
+      status: 'crease_pattern_ready',
+      hasEditableCreasePattern: true,
+      hasImportedCreasePattern: true,
+      historyPastCount: 1,
+      historyFutureCount: 1,
+    });
+
+    expect(state['edit.undo']).toMatchObject({
+      enabled: true,
+      reason: 'Undo the last crease-pattern edit',
+    });
+    expect(state['edit.redo']).toMatchObject({
+      enabled: true,
+      reason: 'Redo the next crease-pattern edit',
     });
   });
 

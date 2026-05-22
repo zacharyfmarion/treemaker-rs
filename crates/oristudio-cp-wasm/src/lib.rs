@@ -72,6 +72,7 @@ pub fn load_cp(text: &str, title: &str) -> Result<u32, JsValue> {
     store_document(CreasePatternDocument {
         title: title_from_js(title),
         crease_pattern: model,
+        operation_frame: Default::default(),
         metadata: Default::default(),
     })
 }
@@ -82,6 +83,7 @@ pub fn load_fold(text: &str, title: &str) -> Result<u32, JsValue> {
     store_document(CreasePatternDocument {
         title: title_from_js(title),
         crease_pattern: model,
+        operation_frame: Default::default(),
         metadata: Default::default(),
     })
 }

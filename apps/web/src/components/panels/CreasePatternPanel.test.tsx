@@ -513,6 +513,12 @@ describe('CreasePatternPanel', () => {
     const fixInaccurateButton = container.querySelector<HTMLButtonElement>(
       'button[aria-label="Fix inaccurate creases"]'
     );
+    const operationFrameButton = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Operation frame"]'
+    );
+    const selectLassoButton = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Select lasso"]'
+    );
     expect(drawCreaseButton?.getAttribute('aria-disabled')).toBe('true');
     expect(drawCreaseButton?.getAttribute('data-ui-status')).toBe('not-implemented');
     expect(makeMountainButton?.getAttribute('aria-disabled')).toBe('false');
@@ -525,6 +531,10 @@ describe('CreasePatternPanel', () => {
     expect(selectIntersectingButton?.getAttribute('data-ui-status')).toBe('ready');
     expect(fixInaccurateButton?.getAttribute('aria-disabled')).toBe('false');
     expect(fixInaccurateButton?.getAttribute('data-ui-status')).toBe('ready');
+    expect(operationFrameButton?.getAttribute('aria-disabled')).toBe('false');
+    expect(operationFrameButton?.getAttribute('data-ui-status')).toBe('ready');
+    expect(selectLassoButton?.getAttribute('aria-disabled')).toBe('false');
+    expect(selectLassoButton?.getAttribute('data-ui-status')).toBe('ready');
     expect(foldEstimateButton?.getAttribute('aria-disabled')).toBe('true');
     expect(foldEstimateButton?.getAttribute('data-ui-status')).toBe('porting');
 
@@ -730,5 +740,153 @@ describe('CreasePatternPanel', () => {
     expect(points[0].y).toBeCloseTo(0);
     expect(points[1].x).toBeCloseTo(80);
     expect(points[1].y).toBeCloseTo(0);
+  });
+
+  it('passes Oriedita line-type defaults for ready selected-type commands', async () => {
+    const executeOristudioCpCommand = vi.fn(async () => true);
+    const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
+      documentMode: 'crease-pattern',
+      importedCreasePattern: importedCpDocument(),
+      oristudioCpDocument: editableCpState(),
+      executeOristudioCpCommand,
+    });
+
+    act(() => {
+      container.querySelector<SVGLineElement>('[data-cp-line-id="1"]')?.dispatchEvent(
+        new MouseEvent('click', { bubbles: true })
+      );
+    });
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>('button[aria-label="Replace selected line type"]')
+        ?.click();
+      await Promise.resolve();
+    });
+
+    expect(executeOristudioCpCommand).toHaveBeenCalledWith('ReplaceLineTypeSelect', {
+      line_ids: [1],
+      custom_from_line_type: 'Any',
+      custom_to_line_type: 'Edge',
+    });
+  });
+
+  it('runs ready lengthen CP commands with three resolved model points and current color', async () => {
+    const executeOristudioCpCommand = vi.fn(
+      async (_operationId: string, _payload?: OristudioCpCommandPayload) => true
+    );
+    const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
+      documentMode: 'crease-pattern',
+      importedCreasePattern: importedCpDocument(),
+      oristudioCpDocument: editableCpState(),
+      oristudioCpViewport: {
+        gridVisible: true,
+        snapToGrid: false,
+        snapToVertices: false,
+        snapToLines: false,
+      },
+      executeOristudioCpCommand,
+    });
+    const canvas = setCanvasClientRect(container);
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('button[aria-label="Lengthen crease"]')?.click();
+      await Promise.resolve();
+    });
+
+    for (const [clientX, clientY] of [
+      [360, 348],
+      [477.6, 348],
+      [477.6, 230.4],
+    ]) {
+      await act(async () => {
+        canvas.dispatchEvent(
+          new MouseEvent('pointerdown', {
+            bubbles: true,
+            button: 0,
+            clientX,
+            clientY,
+          })
+        );
+        await Promise.resolve();
+      });
+    }
+
+    expect(executeOristudioCpCommand).toHaveBeenCalledOnce();
+    const [operation, payload] = executeOristudioCpCommand.mock.calls[0] ?? [];
+    expect(operation).toBe('LengthenCrease');
+    expect(payload?.points).toHaveLength(3);
+    expect(payload?.line_color).toBe('Red1');
+    expect(payload?.selection_distance).toBeGreaterThan(0);
+  });
+
+  it('runs ready lasso commands from a freehand drag path', async () => {
+    const executeOristudioCpCommand = vi.fn(
+      async (_operationId: string, _payload?: OristudioCpCommandPayload) => true
+    );
+    const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
+      documentMode: 'crease-pattern',
+      importedCreasePattern: importedCpDocument(),
+      oristudioCpDocument: editableCpState(),
+      oristudioCpViewport: {
+        gridVisible: true,
+        snapToGrid: false,
+        snapToVertices: false,
+        snapToLines: false,
+      },
+      executeOristudioCpCommand,
+    });
+    const canvas = setCanvasClientRect(container);
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('button[aria-label="Select lasso"]')?.click();
+      await Promise.resolve();
+    });
+
+    act(() => {
+      canvas.dispatchEvent(
+        new MouseEvent('pointerdown', {
+          bubbles: true,
+          button: 0,
+          clientX: 360,
+          clientY: 348,
+        })
+      );
+      canvas.dispatchEvent(
+        new MouseEvent('pointermove', {
+          bubbles: true,
+          button: 0,
+          clientX: 477.6,
+          clientY: 348,
+        })
+      );
+      canvas.dispatchEvent(
+        new MouseEvent('pointermove', {
+          bubbles: true,
+          button: 0,
+          clientX: 477.6,
+          clientY: 230.4,
+        })
+      );
+    });
+    expect(container.querySelector('.cp-command-preview')).not.toBeNull();
+
+    await act(async () => {
+      canvas.dispatchEvent(
+        new MouseEvent('pointerup', {
+          bubbles: true,
+          button: 0,
+          clientX: 360,
+          clientY: 230.4,
+        })
+      );
+      await Promise.resolve();
+    });
+
+    expect(executeOristudioCpCommand).toHaveBeenCalledOnce();
+    const [operation, payload] = executeOristudioCpCommand.mock.calls[0] ?? [];
+    expect(operation).toBe('SelectLasso');
+    expect(payload?.points?.length).toBeGreaterThanOrEqual(3);
+    expect(payload?.selection_distance).toBeGreaterThan(0);
   });
 });

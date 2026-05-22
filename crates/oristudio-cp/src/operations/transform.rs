@@ -13,6 +13,7 @@ use crate::operations::arrangement::{
     add_line_segment_like_worker, divide_line_segment_with_new_lines,
 };
 use crate::operations::selection::{delete_selected_lines, unselect_all};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LengthenColorMode {
@@ -20,7 +21,7 @@ pub enum LengthenColorMode {
     SameAsOriginal,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum OperationFrameMode {
     None0,
     Create1,
@@ -41,13 +42,13 @@ impl OperationFrameMode {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct OperationFrameDragState {
     pub mode: OperationFrameMode,
     pub last_mouse_pos: Point,
 }
 
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct OperationFrame {
     pub active: bool,
     pub points: [Point; 4],

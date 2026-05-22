@@ -18,7 +18,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 pub use canonical::CanonicalCreasePattern;
+use geometry::{Epsilon, LineColor, LineSegment, Polygon};
 pub use model::CreasePatternModel;
+
+const DEFAULT_SELECTION_DISTANCE: f64 = 1.0;
 
 /// Crate-local result type.
 pub type Result<T> = std::result::Result<T, CommandError>;
@@ -36,6 +39,9 @@ pub struct CreasePatternDocument {
     /// Editable Oriedita-compatible crease-pattern model state.
     #[serde(default)]
     pub crease_pattern: CreasePatternModel,
+    /// Transient Oriedita operation-frame state used by frame selection tools.
+    #[serde(default)]
+    pub operation_frame: operations::transform::OperationFrame,
     /// Namespaced metadata preserved before full model support lands.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub metadata: BTreeMap<String, serde_json::Value>,
@@ -83,6 +89,21 @@ pub struct CreasePatternCommandPayload {
     /// Resolved model-space points, in the same order as the active tool steps.
     #[serde(default)]
     pub points: Vec<geometry::Point>,
+    /// Optional active Oriedita line color for commands that use the current color.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub line_color: Option<geometry::LineColor>,
+    /// Optional model-space hit tolerance for point/line tools.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selection_distance: Option<f64>,
+    /// Optional source custom line type for replace-type commands.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub custom_from_line_type: Option<model::CustomLineType>,
+    /// Optional destination custom line type for replace-type commands.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub custom_to_line_type: Option<model::CustomLineType>,
+    /// Optional custom line type for delete-type commands.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub custom_line_type: Option<model::CustomLineType>,
 }
 
 /// Result returned by a successfully executed command.
@@ -1214,6 +1235,44 @@ pub fn execute_command(
                 &line_indices,
             )
         }
+        OperationId::ChangeCreaseType => {
+            let line_indices = required_line_indices(&command)?;
+            line_indices
+                .iter()
+                .filter(|index| {
+                    operations::color::change_crease_type(&mut document.crease_pattern, **index)
+                })
+                .count()
+        }
+        OperationId::DeletePoint => {
+            let points = required_points(&command, 1)?;
+            let before = document.crease_pattern.line_segments.len();
+            operations::arrangement::del_v_at_point(
+                &mut document.crease_pattern,
+                points[0],
+                selection_distance(&command),
+                Epsilon::UNKNOWN_1EN6,
+            );
+            before.abs_diff(document.crease_pattern.line_segments.len())
+        }
+        OperationId::CreaseSelect => {
+            if command.payload.line_ids.is_empty() {
+                let polygon = required_selection_polygon(&command)?;
+                operations::selection::select_box(&mut document.crease_pattern, &polygon)
+            } else {
+                let line_indices = required_line_indices(&command)?;
+                operations::selection::select_indices(&mut document.crease_pattern, &line_indices)
+            }
+        }
+        OperationId::CreaseUnselect => {
+            if command.payload.line_ids.is_empty() {
+                let polygon = required_selection_polygon(&command)?;
+                operations::selection::unselect_box(&mut document.crease_pattern, &polygon)
+            } else {
+                let line_indices = required_line_indices(&command)?;
+                operations::selection::unselect_indices(&mut document.crease_pattern, &line_indices)
+            }
+        }
         OperationId::CreaseMakeMountain => {
             let line_indices = required_line_indices(&command)?;
             operations::color::make_mountain(&mut document.crease_pattern, &line_indices)
@@ -1233,6 +1292,15 @@ pub fn execute_command(
         OperationId::CreaseToggleMv => {
             let line_indices = required_line_indices(&command)?;
             operations::color::toggle_mountain_valley(&mut document.crease_pattern, &line_indices)
+        }
+        OperationId::CreaseAdvanceType => {
+            let line_indices = required_line_indices(&command)?;
+            line_indices
+                .iter()
+                .filter(|index| {
+                    operations::color::advance_line_type(&mut document.crease_pattern, **index)
+                })
+                .count()
         }
         OperationId::CreaseMove => {
             let line_indices = required_line_indices(&command)?;
@@ -1276,6 +1344,66 @@ pub fn execute_command(
                 points[3],
             )
         }
+        OperationId::CreaseMakeMv => {
+            let points = required_points(&command, 2)?;
+            let guide = LineSegment::with_color(points[0], points[1], active_line_color(&command));
+            operations::color::alternate_mountain_valley_along(
+                &mut document.crease_pattern,
+                &guide,
+                active_line_color(&command),
+            )
+        }
+        OperationId::CreasesAlternateMv => {
+            let points = required_points(&command, 2)?;
+            let guide = LineSegment::with_color(points[0], points[1], active_line_color(&command));
+            operations::color::alternate_mountain_valley_crossing(
+                &mut document.crease_pattern,
+                &guide,
+                active_line_color(&command),
+            )
+        }
+        OperationId::VertexDeleteOnCrease => {
+            let points = required_points(&command, 1)?;
+            let before = document.crease_pattern.line_segments.len();
+            operations::arrangement::del_v_at_point_color_change(
+                &mut document.crease_pattern,
+                points[0],
+                selection_distance(&command),
+                Epsilon::UNKNOWN_1EN6,
+            );
+            before.abs_diff(document.crease_pattern.line_segments.len())
+        }
+        OperationId::OperationFrameCreate => {
+            let points = required_points_at_least(&command, 2)?;
+            let mut state = operations::transform::operation_frame_press(
+                &document.crease_pattern,
+                &mut document.operation_frame,
+                points[0],
+                selection_distance(&command),
+            );
+            for point in points
+                .iter()
+                .copied()
+                .skip(1)
+                .take(points.len().saturating_sub(2))
+            {
+                operations::transform::operation_frame_drag(
+                    &document.crease_pattern,
+                    &mut document.operation_frame,
+                    &mut state,
+                    point,
+                    selection_distance(&command),
+                );
+            }
+            operations::transform::operation_frame_release(
+                &document.crease_pattern,
+                &mut document.operation_frame,
+                &state,
+                points[points.len() - 1],
+                selection_distance(&command),
+            );
+            usize::from(document.operation_frame.active)
+        }
         OperationId::CreaseDeleteOverlapping => {
             let points = required_points(&command, 2)?;
             delete_lines_along(document, &points, false)
@@ -1291,6 +1419,14 @@ pub fn execute_command(
                 &mut document.crease_pattern,
                 &selection,
             )
+        }
+        OperationId::SelectPolygon => {
+            let polygon = required_selection_polygon(&command)?;
+            operations::selection::select_polygon(&mut document.crease_pattern, &polygon)
+        }
+        OperationId::UnselectPolygon => {
+            let polygon = required_selection_polygon(&command)?;
+            operations::selection::unselect_polygon(&mut document.crease_pattern, &polygon)
         }
         OperationId::UnselectLineIntersecting => {
             let points = required_points(&command, 2)?;
@@ -1308,6 +1444,60 @@ pub fn execute_command(
                 checks::FixInaccurateOptions::default(),
             )
             .num_fixed_lines
+        }
+        OperationId::LengthenCrease => {
+            let points = required_points(&command, 3)?;
+            operations::transform::lengthen_crease(
+                &mut document.crease_pattern,
+                LineSegment::with_color(points[0], points[1], LineColor::Magenta5),
+                points[2],
+                selection_distance(&command),
+                operations::transform::LengthenColorMode::Current(active_line_color(&command)),
+            )
+        }
+        OperationId::LengthenCreaseSameColor => {
+            let points = required_points(&command, 3)?;
+            operations::transform::lengthen_crease(
+                &mut document.crease_pattern,
+                LineSegment::with_color(points[0], points[1], LineColor::Magenta5),
+                points[2],
+                selection_distance(&command),
+                operations::transform::LengthenColorMode::SameAsOriginal,
+            )
+        }
+        OperationId::ReplaceLineTypeSelect => {
+            let line_indices = required_line_indices(&command)?;
+            operations::color::replace_line_type_for_indices(
+                &mut document.crease_pattern,
+                &line_indices,
+                command
+                    .payload
+                    .custom_from_line_type
+                    .unwrap_or(model::CustomLineType::Any),
+                command
+                    .payload
+                    .custom_to_line_type
+                    .unwrap_or(model::CustomLineType::Edge),
+            )
+        }
+        OperationId::DeleteLineTypeSelect => {
+            let line_indices = required_line_indices(&command)?;
+            operations::color::delete_line_type_for_indices(
+                &mut document.crease_pattern,
+                &line_indices,
+                command
+                    .payload
+                    .custom_line_type
+                    .unwrap_or(model::CustomLineType::Any),
+            )
+        }
+        OperationId::SelectLasso => {
+            let polygon = required_selection_polygon(&command)?;
+            operations::selection::select_lasso(&mut document.crease_pattern, &polygon)
+        }
+        OperationId::UnselectLasso => {
+            let polygon = required_selection_polygon(&command)?;
+            operations::selection::unselect_lasso(&mut document.crease_pattern, &polygon)
         }
         _ => {
             return Err(CommandError::NotImplemented {
@@ -1354,6 +1544,52 @@ fn required_points(command: &CreasePatternCommand, count: usize) -> Result<Vec<g
         });
     }
     Ok(command.payload.points.clone())
+}
+
+fn required_points_at_least(
+    command: &CreasePatternCommand,
+    count: usize,
+) -> Result<Vec<geometry::Point>> {
+    if command.payload.points.len() < count {
+        return Err(CommandError::InvalidInput {
+            operation: command.operation,
+            message: format!("expected at least {count} resolved point(s)"),
+        });
+    }
+    Ok(command.payload.points.clone())
+}
+
+fn required_selection_polygon(command: &CreasePatternCommand) -> Result<Polygon> {
+    let points = required_points_at_least(command, 2)?;
+    if points.len() == 2 {
+        return Ok(rectangle_polygon(points[0], points[1]));
+    }
+    Ok(Polygon::new(points))
+}
+
+fn rectangle_polygon(a: geometry::Point, b: geometry::Point) -> Polygon {
+    let min_x = a.x.min(b.x);
+    let max_x = a.x.max(b.x);
+    let min_y = a.y.min(b.y);
+    let max_y = a.y.max(b.y);
+    Polygon::new(vec![
+        geometry::Point::new(min_x, min_y),
+        geometry::Point::new(max_x, min_y),
+        geometry::Point::new(max_x, max_y),
+        geometry::Point::new(min_x, max_y),
+    ])
+}
+
+fn active_line_color(command: &CreasePatternCommand) -> LineColor {
+    command.payload.line_color.unwrap_or(LineColor::Red1)
+}
+
+fn selection_distance(command: &CreasePatternCommand) -> f64 {
+    command
+        .payload
+        .selection_distance
+        .filter(|distance| distance.is_finite() && *distance > 0.0)
+        .unwrap_or(DEFAULT_SELECTION_DISTANCE)
 }
 
 fn set_selected_line_flags(model: &mut CreasePatternModel, line_indices: &[usize]) {
@@ -1551,6 +1787,7 @@ mod tests {
                 CreasePatternCommandPayload {
                     line_ids: vec![1],
                     points: vec![Point::new(0.0, 0.0), Point::new(2.0, 3.0)],
+                    ..CreasePatternCommandPayload::default()
                 },
             ),
         )
@@ -1588,6 +1825,7 @@ mod tests {
                 CreasePatternCommandPayload {
                     line_ids: vec![1],
                     points: vec![Point::new(0.0, 0.0), Point::new(0.0, 2.0)],
+                    ..CreasePatternCommandPayload::default()
                 },
             ),
         )
@@ -1629,6 +1867,7 @@ mod tests {
                         Point::new(0.0, 0.0),
                         Point::new(0.0, 2.0),
                     ],
+                    ..CreasePatternCommandPayload::default()
                 },
             ),
         )
@@ -1778,6 +2017,142 @@ mod tests {
     }
 
     #[test]
+    fn command_dispatch_routes_stage_five_selection_polygons() {
+        let mut document = CreasePatternDocument::default();
+        document.crease_pattern.add_line(
+            Point::new(0.0, 0.0),
+            Point::new(1.0, 0.0),
+            LineColor::Red1,
+        );
+        document.crease_pattern.add_line(
+            Point::new(10.0, 10.0),
+            Point::new(11.0, 10.0),
+            LineColor::Blue2,
+        );
+
+        let result = execute_command(
+            &mut document,
+            CreasePatternCommand::new(OperationId::SelectPolygon).with_payload(
+                CreasePatternCommandPayload {
+                    points: vec![Point::new(-1.0, -1.0), Point::new(2.0, 1.0)],
+                    ..CreasePatternCommandPayload::default()
+                },
+            ),
+        )
+        .expect("polygon selection should execute");
+
+        assert_eq!(result.status, OperationStatus::OracleTested);
+        assert_eq!(result.diagnostics, vec!["Changed 1 line(s)"]);
+        assert_eq!(
+            document
+                .crease_pattern
+                .line_segments
+                .iter()
+                .map(|line| line.selected)
+                .collect::<Vec<_>>(),
+            vec![2, 0]
+        );
+
+        execute_command(
+            &mut document,
+            CreasePatternCommand::new(OperationId::UnselectLasso).with_payload(
+                CreasePatternCommandPayload {
+                    points: vec![
+                        Point::new(-1.0, -1.0),
+                        Point::new(2.0, -1.0),
+                        Point::new(2.0, 1.0),
+                        Point::new(-1.0, 1.0),
+                    ],
+                    ..CreasePatternCommandPayload::default()
+                },
+            ),
+        )
+        .expect("lasso unselection should execute");
+        assert_eq!(document.crease_pattern.line_segments[0].selected, 0);
+    }
+
+    #[test]
+    fn command_dispatch_routes_stage_five_type_and_vertex_commands() {
+        let mut document = CreasePatternDocument::default();
+        document.crease_pattern.add_line(
+            Point::new(0.0, 0.0),
+            Point::new(1.0, 0.0),
+            LineColor::Red1,
+        );
+        document.crease_pattern.add_line(
+            Point::new(1.0, 0.0),
+            Point::new(2.0, 0.0),
+            LineColor::Red1,
+        );
+        document.crease_pattern.add_line(
+            Point::new(0.0, 1.0),
+            Point::new(1.0, 1.0),
+            LineColor::Blue2,
+        );
+
+        execute_command(
+            &mut document,
+            CreasePatternCommand::new(OperationId::ReplaceLineTypeSelect).with_payload(
+                CreasePatternCommandPayload {
+                    line_ids: vec![1, 3],
+                    custom_from_line_type: Some(model::CustomLineType::Valley),
+                    custom_to_line_type: Some(model::CustomLineType::Edge),
+                    ..CreasePatternCommandPayload::default()
+                },
+            ),
+        )
+        .expect("replace line type should execute");
+        assert_eq!(
+            document.crease_pattern.line_segments[2].color,
+            LineColor::Black0
+        );
+
+        execute_command(
+            &mut document,
+            CreasePatternCommand::new(OperationId::DeletePoint).with_payload(
+                CreasePatternCommandPayload {
+                    points: vec![Point::new(1.0, 0.0)],
+                    selection_distance: Some(1.0),
+                    ..CreasePatternCommandPayload::default()
+                },
+            ),
+        )
+        .expect("delete point should execute");
+        assert_eq!(document.crease_pattern.line_segments.len(), 2);
+        assert_eq!(
+            document.crease_pattern.line_segments[1].a,
+            Point::new(0.0, 0.0)
+        );
+        assert_eq!(
+            document.crease_pattern.line_segments[1].b,
+            Point::new(2.0, 0.0)
+        );
+    }
+
+    #[test]
+    fn command_dispatch_routes_operation_frame_create() {
+        let mut document = CreasePatternDocument::default();
+
+        let result = execute_command(
+            &mut document,
+            CreasePatternCommand::new(OperationId::OperationFrameCreate).with_payload(
+                CreasePatternCommandPayload {
+                    points: vec![Point::new(0.0, 0.0), Point::new(4.0, 3.0)],
+                    selection_distance: Some(0.5),
+                    ..CreasePatternCommandPayload::default()
+                },
+            ),
+        )
+        .expect("operation frame create should execute");
+
+        assert_eq!(result.status, OperationStatus::OracleTested);
+        assert_eq!(result.diagnostics, vec!["Changed 1 line(s)"]);
+        assert!(document.operation_frame.active);
+        assert_eq!(document.operation_frame.p1(), Point::new(0.0, 0.0));
+        assert_eq!(document.operation_frame.p3(), Point::new(4.0, 3.0));
+    }
+
+    #[test]
     fn command_dispatch_requires_resolved_line_targets() {
         let mut document = CreasePatternDocument::default();
 
@@ -1811,6 +2186,7 @@ mod tests {
                 CreasePatternCommandPayload {
                     line_ids: vec![1],
                     points: vec![Point::new(0.0, 0.0)],
+                    ..CreasePatternCommandPayload::default()
                 },
             ),
         )

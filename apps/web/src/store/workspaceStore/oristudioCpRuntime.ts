@@ -119,6 +119,25 @@ export async function refreshOristudioCpDocument(
   };
 }
 
+export async function restoreOristudioCpDocument(
+  document: OristudioCpDocumentSnapshot,
+  source: OristudioCpDocumentState['source'],
+  lastCommandResult: OristudioCpCommandResult | null = null
+): Promise<OristudioCpDocumentState> {
+  const api = await getOristudioCpClient();
+  const nextHandle = await api.loadDocument(document);
+
+  try {
+    const nextState = await buildDocumentState(api, nextHandle, source, lastCommandResult);
+    await replaceHandle(api, nextHandle);
+    currentSource = nextState.source;
+    return nextState;
+  } catch (error) {
+    await api.freeDocument(nextHandle).catch(() => undefined);
+    throw error;
+  }
+}
+
 export async function executeOristudioCpCommand(
   operationId: OristudioCpOperationId,
   payload: OristudioCpCommandPayload = {}

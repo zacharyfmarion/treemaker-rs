@@ -44,6 +44,7 @@ pub fn import_ori_json_with_unknown_version(
         title: string_field(object, "title")?.map(ToOwned::to_owned),
         crease_pattern: CreasePatternModel::default(),
         metadata: Default::default(),
+        ..CreasePatternDocument::default()
     };
 
     document.crease_pattern.line_segments = line_segment_array(object, "lineSegments")?;

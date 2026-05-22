@@ -29,6 +29,7 @@ pub fn import_orh_str(input: &str) -> Result<CreasePatternDocument> {
         title: Some("_".to_string()),
         crease_pattern: CreasePatternModel::default(),
         metadata: Default::default(),
+        ..CreasePatternDocument::default()
     };
 
     let num_lines = count_orh_lines(&lines)?;

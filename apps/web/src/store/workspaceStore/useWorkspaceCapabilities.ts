@@ -12,10 +12,16 @@ export function useWorkspaceCapabilities() {
   const hasEditableCreasePattern = useWorkspaceStore((state) => state.oristudioCpDocument !== null);
   const hasImportedCreasePattern = useWorkspaceStore((state) => state.importedCreasePattern !== null);
   const hasSimulationModel = useWorkspaceStore((state) => state.foldArtifacts?.simulation_model != null);
-  const historyPastCount = useWorkspaceStore((state) => state.historyPast.length);
-  const historyFutureCount = useWorkspaceStore((state) => state.historyFuture.length);
+  const treeHistoryPastCount = useWorkspaceStore((state) => state.historyPast.length);
+  const treeHistoryFutureCount = useWorkspaceStore((state) => state.historyFuture.length);
+  const cpHistoryPastCount = useWorkspaceStore((state) => state.oristudioCpHistoryPast.length);
+  const cpHistoryFutureCount = useWorkspaceStore((state) => state.oristudioCpHistoryFuture.length);
   const clipboard = useWorkspaceStore((state) => state.clipboard);
   const selection = useWorkspaceStore((state) => state.selection);
+  const historyPastCount =
+    documentMode === 'crease-pattern' ? cpHistoryPastCount : treeHistoryPastCount;
+  const historyFutureCount =
+    documentMode === 'crease-pattern' ? cpHistoryFutureCount : treeHistoryFutureCount;
 
   return useMemo(
     () =>

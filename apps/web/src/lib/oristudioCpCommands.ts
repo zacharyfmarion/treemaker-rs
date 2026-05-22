@@ -104,7 +104,16 @@ export interface OristudioCpCommandDefinition {
   selectionRequirement?: string;
   shortcut?: string;
   toolSteps?: readonly string[];
+  inputMode?: 'point-sequence' | 'drag-path';
 }
+
+type CommandOptionKeys =
+  | 'placement'
+  | 'selectionRequirement'
+  | 'shortcut'
+  | 'toolSteps'
+  | 'tooltip'
+  | 'inputMode';
 
 function notImplemented(
   operationId: OristudioCpOperationId,
@@ -113,10 +122,7 @@ function notImplemented(
   icon: string,
   upstream: string,
   options: Partial<
-    Pick<
-      OristudioCpCommandDefinition,
-      'placement' | 'selectionRequirement' | 'shortcut' | 'toolSteps' | 'tooltip'
-    >
+    Pick<OristudioCpCommandDefinition, CommandOptionKeys>
   > = {}
 ): OristudioCpCommandDefinition {
   return {
@@ -133,6 +139,7 @@ function notImplemented(
     selectionRequirement: options.selectionRequirement,
     shortcut: options.shortcut,
     toolSteps: options.toolSteps,
+    inputMode: options.inputMode,
   };
 }
 
@@ -143,10 +150,7 @@ function porting(
   icon: string,
   upstream: string,
   options: Partial<
-    Pick<
-      OristudioCpCommandDefinition,
-      'placement' | 'selectionRequirement' | 'shortcut' | 'toolSteps' | 'tooltip'
-    >
+    Pick<OristudioCpCommandDefinition, CommandOptionKeys>
   > = {}
 ): OristudioCpCommandDefinition {
   return {
@@ -163,10 +167,7 @@ function ready(
   icon: string,
   upstream: string,
   options: Partial<
-    Pick<
-      OristudioCpCommandDefinition,
-      'placement' | 'selectionRequirement' | 'shortcut' | 'toolSteps' | 'tooltip'
-    >
+    Pick<OristudioCpCommandDefinition, CommandOptionKeys>
   > = {}
 ): OristudioCpCommandDefinition {
   return {
@@ -226,8 +227,14 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
       tooltip: 'Delete selected line segments',
     }
   ),
-  notImplemented('ChangeCreaseType', 'Change crease type', 'color', 'paintbrush', 'MouseHandlerChangeCreaseType'),
-  notImplemented('LengthenCrease', 'Lengthen crease', 'transform', 'stretch-horizontal', 'MouseHandlerLengthenCrease'),
+  ready('ChangeCreaseType', 'Change crease type', 'color', 'paintbrush', 'MouseHandlerChangeCreaseType', {
+    selectionRequirement: 'selected folding lines',
+    tooltip: 'Advance selected folding lines through edge, mountain, and valley',
+  }),
+  ready('LengthenCrease', 'Lengthen crease', 'transform', 'stretch-horizontal', 'MouseHandlerLengthenCrease', {
+    toolSteps: ['Pick crossing start point', 'Pick crossing end point', 'Pick extension target'],
+    tooltip: 'Extend creases crossed by the guide line to the target crease',
+  }),
   notImplemented('SquareBisector', 'Square bisector', 'construct', 'square-dashed', 'MouseHandlerSquareBisector'),
   notImplemented('Inward', 'Inward fold line', 'construct', 'corner-down-left', 'MouseHandlerInward'),
   notImplemented('PerpendicularDraw', 'Perpendicular draw', 'construct', 'ruler', 'MouseHandlerPerpendicularDraw'),
@@ -238,13 +245,21 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
   notImplemented('DrawPoint', 'Draw point', 'draw', 'circle-dot', 'MouseHandlerDrawPoint', {
     toolSteps: ['Pick point'],
   }),
-  notImplemented('DeletePoint', 'Delete point', 'select-edit', 'circle-x', 'MouseHandlerDeletePoint'),
+  ready('DeletePoint', 'Delete point', 'select-edit', 'circle-x', 'MouseHandlerDeletePoint', {
+    toolSteps: ['Pick vertex'],
+    tooltip: 'Merge same-color creases meeting at the picked vertex',
+  }),
   notImplemented('AngleSystem', 'Angle system', 'construct', 'chart-no-axes-combined', 'MouseHandlerAngleSystem'),
   notImplemented('DrawCreaseAngleRestricted3', 'Angle restricted 3 crease', 'construct', 'between-horizontal-start', 'MouseHandlerDrawCreaseAngleRestricted3_2'),
-  notImplemented('CreaseSelect', 'Select crease', 'select-edit', 'mouse-pointer-2', 'MouseHandlerCreaseSelect', {
+  ready('CreaseSelect', 'Select crease', 'select-edit', 'mouse-pointer-2', 'MouseHandlerCreaseSelect', {
     shortcut: 'V',
+    toolSteps: ['Pick box start point', 'Pick box end point'],
+    tooltip: 'Select creases inside a dragged box',
   }),
-  notImplemented('CreaseUnselect', 'Unselect crease', 'select-edit', 'mouse-pointer-click', 'MouseHandlerCreaseUnselect'),
+  ready('CreaseUnselect', 'Unselect crease', 'select-edit', 'mouse-pointer-click', 'MouseHandlerCreaseUnselect', {
+    toolSteps: ['Pick box start point', 'Pick box end point'],
+    tooltip: 'Unselect creases inside a dragged box',
+  }),
   ready('CreaseMove', 'Move selected creases', 'transform', 'move', 'MouseHandlerCreaseMove', {
     selectionRequirement: 'selected creases',
     toolSteps: ['Pick source point', 'Pick destination point'],
@@ -276,7 +291,10 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
   notImplemented('LineSegmentDivision', 'Divide line by count', 'draw', 'split', 'MouseHandlerLineSegmentDivision'),
   notImplemented('LineSegmentRatioSet', 'Divide line by ratio', 'draw', 'divide', 'MouseHandlerLineSegmentRatioSet'),
   notImplemented('PolygonSetNoCorners', 'Regular polygon', 'generators', 'hexagon', 'MouseHandlerPolygonSetNoCorners'),
-  notImplemented('CreaseAdvanceType', 'Advance crease type', 'color', 'list-restart', 'MouseHandlerCreaseAdvanceType'),
+  ready('CreaseAdvanceType', 'Advance crease type', 'color', 'list-restart', 'MouseHandlerCreaseAdvanceType', {
+    selectionRequirement: 'selected folding lines',
+    tooltip: 'Advance selected folding lines through edge, mountain, and valley',
+  }),
   ready('CreaseMove4p', 'Move by four points', 'transform', 'scan-line', 'MouseHandlerCreaseMove4p', {
     selectionRequirement: 'selected creases',
     toolSteps: [
@@ -296,14 +314,23 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
     ],
   }),
   notImplemented('FishBoneDraw', 'Fishbone draw', 'construct', 'git-branch', 'MouseHandlerFishBoneDraw'),
-  notImplemented('CreaseMakeMv', 'Make alternating M/V', 'color', 'git-branch', 'MouseHandlerCreaseMakeMV'),
+  ready('CreaseMakeMv', 'Make alternating M/V', 'color', 'git-branch', 'MouseHandlerCreaseMakeMV', {
+    toolSteps: ['Pick guide start point', 'Pick guide end point'],
+    tooltip: 'Assign alternating mountain and valley folds along a guide line',
+  }),
   notImplemented('DoubleSymmetricDraw', 'Double symmetric draw', 'construct', 'fold-horizontal', 'MouseHandlerDoubleSymmetricDraw'),
-  notImplemented('CreasesAlternateMv', 'Alternate crossing M/V', 'color', 'shuffle', 'MouseHandlerCreasesAlternateMV'),
+  ready('CreasesAlternateMv', 'Alternate crossing M/V', 'color', 'shuffle', 'MouseHandlerCreasesAlternateMV', {
+    toolSteps: ['Pick guide start point', 'Pick guide end point'],
+    tooltip: 'Assign alternating mountain and valley folds to crossings along a guide line',
+  }),
   notImplemented('DrawCreaseAngleRestricted5', 'Angle restricted 5 crease', 'construct', 'chart-pie', 'MouseHandlerDrawCreaseAngleRestricted5'),
   notImplemented('VertexMakeAngularlyFlatFoldable', 'Make vertex flat-foldable', 'construct', 'badge-check', 'MouseHandlerVertexMakeAngularlyFlatFoldable'),
   notImplemented('FoldableLineInput', 'Foldable line input', 'construct', 'list-plus', 'MouseHandlerFoldableLineInput'),
   notImplemented('ParallelDraw', 'Parallel draw', 'construct', 'align-justify', 'MouseHandlerParallelDraw'),
-  notImplemented('VertexDeleteOnCrease', 'Delete vertex on crease', 'select-edit', 'scan-x', 'MouseHandlerVertexDeleteOnCrease'),
+  ready('VertexDeleteOnCrease', 'Delete vertex on crease', 'select-edit', 'scan-x', 'MouseHandlerVertexDeleteOnCrease', {
+    toolSteps: ['Pick vertex'],
+    tooltip: 'Merge adjacent creases at a vertex with Oriedita color-change rules',
+  }),
   notImplemented('CircleDraw', 'Draw circle', 'annotations', 'circle', 'MouseHandlerCircleDraw'),
   notImplemented('CircleDrawThreePoint', 'Circle through three points', 'annotations', 'circle-dot', 'MouseHandlerCircleDrawThreePoint'),
   notImplemented('CircleDrawSeparate', 'Separate circle', 'annotations', 'circle-dashed', 'MouseHandlerCircleDrawSeparate'),
@@ -339,8 +366,10 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
     selectionRequirement: 'selected folding lines',
     tooltip: 'Convert selected folding lines to auxiliary lines',
   }),
-  notImplemented('OperationFrameCreate', 'Operation frame', 'transform', 'frame', 'MouseHandlerOperationFrameCreate', {
+  ready('OperationFrameCreate', 'Operation frame', 'transform', 'frame', 'MouseHandlerOperationFrameCreate', {
     toolSteps: ['Drag operation frame'],
+    inputMode: 'drag-path',
+    tooltip: 'Create or adjust an Oriedita operation frame by dragging on the CP',
   }),
   notImplemented('VoronoiCreate', 'Voronoi', 'generators', 'network', 'MouseHandlerVoronoiCreate'),
   notImplemented('FlatFoldableCheck', 'Flat-foldable boundary check', 'check-fix', 'shield-check', 'MouseHandlerFlatFoldableCheck'),
@@ -352,8 +381,16 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
     toolSteps: ['Pick drag start point', 'Pick drag end point'],
     tooltip: 'Delete crease segments intersecting or overlapping a dragged line',
   }),
-  notImplemented('SelectPolygon', 'Select polygon', 'select-edit', 'lasso-select', 'MouseHandlerSelectPolygon'),
-  notImplemented('UnselectPolygon', 'Unselect polygon', 'select-edit', 'lasso', 'MouseHandlerUnselectPolygon'),
+  ready('SelectPolygon', 'Select polygon', 'select-edit', 'lasso-select', 'MouseHandlerSelectPolygon', {
+    toolSteps: ['Drag polygon path'],
+    inputMode: 'drag-path',
+    tooltip: 'Select creases contained by a freehand polygon',
+  }),
+  ready('UnselectPolygon', 'Unselect polygon', 'select-edit', 'lasso', 'MouseHandlerUnselectPolygon', {
+    toolSteps: ['Drag polygon path'],
+    inputMode: 'drag-path',
+    tooltip: 'Unselect creases contained by a freehand polygon',
+  }),
   ready('SelectLineIntersecting', 'Select intersecting line', 'select-edit', 'scan-search', 'MouseHandlerSelectLineIntersecting', {
     toolSteps: ['Pick drag start point', 'Pick drag end point'],
     tooltip: 'Select crease segments intersecting or overlapping a dragged line',
@@ -362,12 +399,29 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
     toolSteps: ['Pick drag start point', 'Pick drag end point'],
     tooltip: 'Unselect crease segments intersecting or overlapping a dragged line',
   }),
-  notImplemented('LengthenCreaseSameColor', 'Lengthen same color', 'transform', 'stretch-horizontal', 'MouseHandlerLengthenCreaseSameColor'),
+  ready('LengthenCreaseSameColor', 'Lengthen same color', 'transform', 'stretch-horizontal', 'MouseHandlerLengthenCreaseSameColor', {
+    toolSteps: ['Pick crossing start point', 'Pick crossing end point', 'Pick extension target'],
+    tooltip: 'Extend creases crossed by the guide line while preserving original colors',
+  }),
   notImplemented('FoldableLineDraw', 'Foldable line draw', 'construct', 'pen-line', 'MouseHandlerFoldableLineDraw'),
-  notImplemented('ReplaceLineTypeSelect', 'Replace selected line type', 'color', 'replace', 'MouseHandlerReplaceTypeSelect'),
-  notImplemented('DeleteLineTypeSelect', 'Delete selected line type', 'color', 'trash-2', 'MouseHandlerDeleteTypeSelect'),
-  notImplemented('SelectLasso', 'Select lasso', 'select-edit', 'lasso-select', 'MouseHandlerSelectLasso'),
-  notImplemented('UnselectLasso', 'Unselect lasso', 'select-edit', 'lasso', 'MouseHandlerUnselectLasso'),
+  ready('ReplaceLineTypeSelect', 'Replace selected line type', 'color', 'replace', 'MouseHandlerReplaceTypeSelect', {
+    selectionRequirement: 'selected lines',
+    tooltip: 'Replace selected lines matching the active source line type',
+  }),
+  ready('DeleteLineTypeSelect', 'Delete selected line type', 'color', 'trash-2', 'MouseHandlerDeleteTypeSelect', {
+    selectionRequirement: 'selected lines',
+    tooltip: 'Delete selected lines matching the active line type filter',
+  }),
+  ready('SelectLasso', 'Select lasso', 'select-edit', 'lasso-select', 'MouseHandlerSelectLasso', {
+    toolSteps: ['Drag lasso path'],
+    inputMode: 'drag-path',
+    tooltip: 'Select creases touched by a freehand lasso path',
+  }),
+  ready('UnselectLasso', 'Unselect lasso', 'select-edit', 'lasso', 'MouseHandlerUnselectLasso', {
+    toolSteps: ['Drag lasso path'],
+    inputMode: 'drag-path',
+    tooltip: 'Unselect creases touched by a freehand lasso path',
+  }),
   notImplemented('Text', 'Text annotation', 'annotations', 'text-cursor-input', 'MouseHandlerText'),
   notImplemented('DrawBlintz', 'Blintz base', 'generators', 'sparkles', 'MouseHandlerDrawBlintz'),
   notImplemented('DrawFishBase', 'Fish base', 'generators', 'sparkles', 'MouseHandlerDrawFishBase'),

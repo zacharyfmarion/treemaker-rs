@@ -75,6 +75,7 @@ fn command_dispatch_accepts_resolved_point_payloads() {
                 oristudio_cp::geometry::Point::new(0.0, 0.0),
                 oristudio_cp::geometry::Point::new(0.0, 2.0),
             ],
+            ..oristudio_cp::CreasePatternCommandPayload::default()
         })
         .expect("payload should serialize"),
     )

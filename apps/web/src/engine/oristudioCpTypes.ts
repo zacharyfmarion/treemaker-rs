@@ -77,9 +77,15 @@ export interface OristudioCpModel {
   grid: OristudioCpGridMetadata;
 }
 
+export interface OristudioCpOperationFrame {
+  active: boolean;
+  points: [Point, Point, Point, Point];
+}
+
 export interface OristudioCpDocumentSnapshot {
   title?: string | null;
   crease_pattern: OristudioCpModel;
+  operation_frame?: OristudioCpOperationFrame;
   metadata: Record<string, unknown>;
 }
 
@@ -103,7 +109,35 @@ export interface OristudioCpCommandResult {
 export interface OristudioCpCommandPayload {
   line_ids?: number[];
   points?: Point[];
+  line_color?: OristudioCpLineColor;
+  selection_distance?: number;
+  custom_from_line_type?: OristudioCpCustomLineType;
+  custom_to_line_type?: OristudioCpCustomLineType;
+  custom_line_type?: OristudioCpCustomLineType;
 }
+
+export type OristudioCpLineColor =
+  | 'Angle'
+  | 'None'
+  | 'Black0'
+  | 'Red1'
+  | 'Blue2'
+  | 'Cyan3'
+  | 'Orange4'
+  | 'Magenta5'
+  | 'Green6'
+  | 'Yellow7'
+  | 'Purple8'
+  | 'Other9'
+  | 'Grey10';
+
+export type OristudioCpCustomLineType =
+  | 'Any'
+  | 'Edge'
+  | 'MountainAndValley'
+  | 'Mountain'
+  | 'Valley'
+  | 'Aux';
 
 export interface OristudioCpDocumentState {
   handle: number;

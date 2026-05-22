@@ -52,10 +52,12 @@ function nowIso(): string {
 
 function cpHistoryEntry(
   document: Awaited<ReturnType<typeof loadOristudioCpDocumentFromText>>['document'],
-  label: string
+  label: string,
+  selection: OristudioCpSelection
 ) {
   return {
     document,
+    selection,
     label,
     timestamp: nowIso(),
   };
@@ -70,12 +72,22 @@ const CLEAR_CP_SELECTION_AFTER_OPERATIONS = new Set<OristudioCpOperationId>([
   'CreaseCopy4p',
   'CreaseDeleteOverlapping',
   'CreaseDeleteIntersecting',
+  'DeletePoint',
   'FixInaccurate',
+  'ReplaceLineTypeSelect',
+  'DeleteLineTypeSelect',
+  'VertexDeleteOnCrease',
 ]);
 
 const SYNC_CP_LINE_SELECTION_AFTER_OPERATIONS = new Set<OristudioCpOperationId>([
+  'CreaseSelect',
+  'CreaseUnselect',
+  'SelectPolygon',
+  'UnselectPolygon',
   'SelectLineIntersecting',
   'UnselectLineIntersecting',
+  'SelectLasso',
+  'UnselectLasso',
 ]);
 
 function oristudioCpSelectionAfterCommand(
@@ -168,8 +180,14 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
       hasEditableCreasePattern: get().oristudioCpDocument !== null,
       hasImportedCreasePattern: get().importedCreasePattern !== null,
       hasSimulationModel: get().foldArtifacts?.simulation_model != null,
-      historyPastCount: get().historyPast.length,
-      historyFutureCount: get().historyFuture.length,
+      historyPastCount:
+        get().documentMode === 'crease-pattern'
+          ? get().oristudioCpHistoryPast.length
+          : get().historyPast.length,
+      historyFutureCount:
+        get().documentMode === 'crease-pattern'
+          ? get().oristudioCpHistoryFuture.length
+          : get().historyFuture.length,
       clipboard: get().clipboard,
       selection: get().selection,
     });
@@ -583,7 +601,10 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
             nextDocument.document
           ),
           oristudioCpHistoryPast: previousDocument
-            ? [...get().oristudioCpHistoryPast, cpHistoryEntry(previousDocument, String(operationId))]
+            ? [
+                ...get().oristudioCpHistoryPast,
+                cpHistoryEntry(previousDocument, String(operationId), previousSelection),
+              ]
             : get().oristudioCpHistoryPast,
           oristudioCpHistoryFuture: [],
           error: null,

@@ -44,6 +44,7 @@ export interface RecentProject {
 
 export interface OristudioCpHistoryEntry {
   document: OristudioCpDocumentSnapshot;
+  selection: OristudioCpSelection;
   label: string;
   timestamp: string;
 }

@@ -156,14 +156,26 @@ export function getWorkspaceCapabilities(input: WorkspaceCapabilityInput): Works
       hasCreasePattern ? busyOr('Export crease pattern PNG', input.status) : 'No crease pattern to export'
     ),
     'edit.undo': capability(
-      treeMode && input.historyPastCount > 0 && !isBusy,
+      ((treeMode && input.historyPastCount > 0) ||
+        (creasePatternMode && input.hasEditableCreasePattern && input.historyPastCount > 0)) &&
+        !isBusy,
       'Undo',
-      treeMode ? 'Undo the last tree edit' : 'Imported crease patterns are read-only'
+      treeMode
+        ? 'Undo the last tree edit'
+        : creasePatternMode && input.hasEditableCreasePattern
+          ? 'Undo the last crease-pattern edit'
+          : 'Imported crease patterns are read-only'
     ),
     'edit.redo': capability(
-      treeMode && input.historyFutureCount > 0 && !isBusy,
+      ((treeMode && input.historyFutureCount > 0) ||
+        (creasePatternMode && input.hasEditableCreasePattern && input.historyFutureCount > 0)) &&
+        !isBusy,
       'Redo',
-      treeMode ? 'Redo the next tree edit' : 'Imported crease patterns are read-only'
+      treeMode
+        ? 'Redo the next tree edit'
+        : creasePatternMode && input.hasEditableCreasePattern
+          ? 'Redo the next crease-pattern edit'
+          : 'Imported crease patterns are read-only'
     ),
     'edit.cut': capability(
       treeMode && hasSelection && !isBusy,

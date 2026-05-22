@@ -1792,6 +1792,25 @@
   vector-effect: non-scaling-stroke;
 }
 
+.cp-command-preview,
+.cp-operation-frame {
+  fill: none;
+  stroke: var(--accent-primary);
+  stroke-width: 1.5;
+  stroke-dasharray: 6 4;
+  pointer-events: none;
+  vector-effect: non-scaling-stroke;
+}
+
+.cp-command-preview {
+  opacity: 0.82;
+}
+
+.cp-operation-frame {
+  stroke: var(--accent-secondary);
+  opacity: 0.92;
+}
+
 .design-empty-state {
   overflow: visible;
   pointer-events: none;

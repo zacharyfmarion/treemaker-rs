@@ -8,7 +8,10 @@ import {
 } from 'react';
 import { TransformComponent, TransformWrapper, type ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
 import { GitBranch, Grid2X2, Magnet, ScanLine } from 'lucide-react';
-import type { OristudioCpDocumentSnapshot } from '../../engine/oristudioCpTypes';
+import type {
+  OristudioCpCommandPayload,
+  OristudioCpDocumentSnapshot,
+} from '../../engine/oristudioCpTypes';
 import { formatNumber, paperToSvg, type Point } from '../../lib/geometry';
 import { getViewportFitScale, type ViewportSize } from '../../lib/designViewport';
 import {
@@ -66,6 +69,50 @@ function formatZoom(scale: number): string {
   return `${Math.round(scale * 100)}%`;
 }
 
+function modelSelectionDistance(bounds: ReturnType<typeof getEditableCpModelBounds>): number {
+  return Math.max(
+    1e-6,
+    (Math.max(bounds.spanX, bounds.spanY) / CP_PAPER_RECT.width) * 8
+  );
+}
+
+function cpCommandPayloadDefaults(
+  command: OristudioCpCommandDefinition,
+  bounds: ReturnType<typeof getEditableCpModelBounds>
+): OristudioCpCommandPayload {
+  const payload: OristudioCpCommandPayload = {};
+  const operationId = command.operationId;
+
+  if ((command.toolSteps?.length ?? 0) > 0 || command.inputMode === 'drag-path') {
+    payload.selection_distance = modelSelectionDistance(bounds);
+  }
+
+  if (
+    operationId === 'CreaseMakeMv' ||
+    operationId === 'CreasesAlternateMv' ||
+    operationId === 'LengthenCrease'
+  ) {
+    payload.line_color = 'Red1';
+  }
+
+  if (operationId === 'ReplaceLineTypeSelect') {
+    payload.custom_from_line_type = 'Any';
+    payload.custom_to_line_type = 'Edge';
+  }
+
+  if (operationId === 'DeleteLineTypeSelect') {
+    payload.custom_line_type = 'Any';
+  }
+
+  return payload;
+}
+
+function pointDistanceSquared(a: Point, b: Point): number {
+  const dx = a.x - b.x;
+  const dy = a.y - b.y;
+  return dx * dx + dy * dy;
+}
+
 export function CreasePatternPanel() {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -76,6 +123,12 @@ export function CreasePatternPanel() {
   const [snapTarget, setSnapTarget] = useState<CpSnapTarget | null>(null);
   const [cpToolState, setCpToolState] = useState(IDLE_ORISTUDIO_CP_TOOL_STATE);
   const [cpToolPoints, setCpToolPoints] = useState<Point[]>([]);
+  const [cpToolPath, setCpToolPath] = useState<Point[]>([]);
+  const cpToolDragRef = useRef<{
+    operationId: OristudioCpCommandDefinition['operationId'];
+    pointerId: number;
+    points: Point[];
+  } | null>(null);
 
   const project = useWorkspaceStore((state) => state.project);
   const status = useWorkspaceStore((state) => state.status);
@@ -141,10 +194,22 @@ export function CreasePatternPanel() {
         : undefined,
     [cpToolState.activeOperationId]
   );
+  const buildCpCommandPayload = useCallback(
+    (
+      command: OristudioCpCommandDefinition,
+      payload: OristudioCpCommandPayload = {}
+    ): OristudioCpCommandPayload => ({
+      ...cpCommandPayloadDefaults(command, editableCpBounds),
+      ...payload,
+    }),
+    [editableCpBounds]
+  );
 
   const handleCpToolCommand = useCallback(
     (command: OristudioCpCommandDefinition) => {
       setCpToolPoints([]);
+      setCpToolPath([]);
+      cpToolDragRef.current = null;
       setCpToolState((state) =>
         transitionOristudioCpToolState(state, {
           type: 'selectCommand',
@@ -158,9 +223,12 @@ export function CreasePatternPanel() {
       }
 
       void (async () => {
-        const succeeded = await executeOristudioCpCommand(command.operationId, {
-          line_ids: oristudioCpSelection.lines,
-        });
+        const succeeded = await executeOristudioCpCommand(
+          command.operationId,
+          buildCpCommandPayload(command, {
+            line_ids: oristudioCpSelection.lines,
+          })
+        );
         setCpToolPoints([]);
         setCpToolState((state) =>
           state.activeOperationId === command.operationId
@@ -177,7 +245,7 @@ export function CreasePatternPanel() {
         );
       })();
     },
-    [editableCp, executeOristudioCpCommand, oristudioCpSelection.lines]
+    [buildCpCommandPayload, editableCp, executeOristudioCpCommand, oristudioCpSelection.lines]
   );
 
   const eventToEditableModelPoint = useCallback(
@@ -211,6 +279,20 @@ export function CreasePatternPanel() {
     [editableCp, editableCpBounds, eventToEditableModelPoint, oristudioCpViewport]
   );
 
+  const updateEditablePointerStatus = useCallback(
+    (event: PointerEvent<SVGElement>) => {
+      if (!editableCp) return;
+      const modelPoint = eventToEditableModelPoint(event);
+      setCursorModelPoint(modelPoint);
+      setSnapTarget(
+        modelPoint
+          ? nearestCpSnapTarget(editableCp, modelPoint, editableCpBounds, oristudioCpViewport)
+          : null
+      );
+    },
+    [editableCp, editableCpBounds, eventToEditableModelPoint, oristudioCpViewport]
+  );
+
   const handleEditableToolPointerDown = useCallback(
     (event: PointerEvent<SVGElement>) => {
       if (
@@ -225,6 +307,23 @@ export function CreasePatternPanel() {
       }
       const stepCount = activeCpCommand.toolSteps?.length ?? 0;
       if (stepCount === 0) return;
+
+      if (activeCpCommand.inputMode === 'drag-path') {
+        const point = eventToEditableModelPoint(event);
+        if (!point) return;
+        event.preventDefault();
+        event.stopPropagation();
+        cpToolDragRef.current = {
+          operationId: activeCpCommand.operationId,
+          pointerId: event.pointerId,
+          points: [point],
+        };
+        if (typeof event.pointerId === 'number') {
+          event.currentTarget.setPointerCapture?.(event.pointerId);
+        }
+        setCpToolPath([point]);
+        return;
+      }
 
       const point = resolveEditableToolPoint(event);
       if (!point) return;
@@ -245,10 +344,13 @@ export function CreasePatternPanel() {
 
       setCpToolPoints([]);
       void (async () => {
-        const succeeded = await executeOristudioCpCommand(activeCpCommand.operationId, {
-          line_ids: oristudioCpSelection.lines,
-          points: nextPoints,
-        });
+        const succeeded = await executeOristudioCpCommand(
+          activeCpCommand.operationId,
+          buildCpCommandPayload(activeCpCommand, {
+            line_ids: oristudioCpSelection.lines,
+            points: nextPoints,
+          })
+        );
         setCpToolState((state) =>
           state.activeOperationId === activeCpCommand.operationId
             ? transitionOristudioCpToolState(
@@ -266,15 +368,103 @@ export function CreasePatternPanel() {
     },
     [
       activeCpCommand,
+      buildCpCommandPayload,
       cpToolPoints,
       cpToolState.phase,
       editableCp,
+      eventToEditableModelPoint,
       executeOristudioCpCommand,
       oristudioCpSelection.lines,
       resolveEditableToolPoint,
       spacePressed,
     ]
   );
+
+  const handleEditablePointerMove = useCallback(
+    (event: PointerEvent<SVGElement>) => {
+      updateEditablePointerStatus(event);
+      const drag = cpToolDragRef.current;
+      if (!drag || drag.pointerId !== event.pointerId) return;
+      const point = eventToEditableModelPoint(event);
+      if (!point) return;
+      const last = drag.points.at(-1);
+      if (last && pointDistanceSquared(last, point) < modelSelectionDistance(editableCpBounds) ** 2 / 16) {
+        return;
+      }
+      drag.points = [...drag.points, point];
+      setCpToolPath(drag.points);
+    },
+    [editableCpBounds, eventToEditableModelPoint, updateEditablePointerStatus]
+  );
+
+  const finishEditableDragPath = useCallback(
+    (event: PointerEvent<SVGElement>) => {
+      const drag = cpToolDragRef.current;
+      if (!drag || drag.pointerId !== event.pointerId) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const command = cpCommandByOperation(drag.operationId);
+      if (!command) {
+        cpToolDragRef.current = null;
+        setCpToolPath([]);
+        return;
+      }
+      const finalPoint = eventToEditableModelPoint(event);
+      const points =
+        finalPoint && !drag.points.some((point) => pointDistanceSquared(point, finalPoint) < 1e-12)
+          ? [...drag.points, finalPoint]
+          : drag.points;
+      cpToolDragRef.current = null;
+      if (typeof event.pointerId === 'number') {
+        event.currentTarget.releasePointerCapture?.(event.pointerId);
+      }
+      setCpToolPath([]);
+      if (points.length < 2) {
+        setCpToolState((state) =>
+          state.activeOperationId === command.operationId
+            ? transitionOristudioCpToolState(state, { type: 'cancel' })
+            : state
+        );
+        return;
+      }
+
+      void (async () => {
+        const succeeded = await executeOristudioCpCommand(
+          command.operationId,
+          buildCpCommandPayload(command, {
+            line_ids: oristudioCpSelection.lines,
+            points,
+          })
+        );
+        setCpToolState((state) =>
+          state.activeOperationId === command.operationId
+            ? transitionOristudioCpToolState(
+                state,
+                succeeded
+                  ? { type: 'commit' }
+                  : {
+                      type: 'commandError',
+                      message: useWorkspaceStore.getState().oristudioCpError ?? 'Command failed',
+                    }
+              )
+            : state
+        );
+      })();
+    },
+    [
+      buildCpCommandPayload,
+      eventToEditableModelPoint,
+      executeOristudioCpCommand,
+      oristudioCpSelection.lines,
+    ]
+  );
+
+  const cancelEditableDragPath = useCallback((event: PointerEvent<SVGElement>) => {
+    const drag = cpToolDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    cpToolDragRef.current = null;
+    setCpToolPath([]);
+  }, []);
 
   const clearSelectionOnBackgroundPointerDown = (event: PointerEvent<SVGElement>) => {
     if (event.button !== 0 || spacePressed) return;
@@ -337,20 +527,6 @@ export function CreasePatternPanel() {
   const setZoomLevel = useCallback((scale: number) => {
     transformRef.current?.centerView(scale, 160);
   }, []);
-
-  const updateEditablePointerStatus = useCallback(
-    (event: PointerEvent<SVGElement>) => {
-      if (!editableCp) return;
-      const modelPoint = eventToEditableModelPoint(event);
-      setCursorModelPoint(modelPoint);
-      setSnapTarget(
-        modelPoint
-          ? nearestCpSnapTarget(editableCp, modelPoint, editableCpBounds, oristudioCpViewport)
-          : null
-      );
-    },
-    [editableCp, editableCpBounds, eventToEditableModelPoint, oristudioCpViewport]
-  );
 
   const clearEditablePointerStatus = useCallback(() => {
     setCursorModelPoint(null);
@@ -425,6 +601,8 @@ export function CreasePatternPanel() {
         if (cancellation.handled) {
           event.preventDefault();
           setCpToolPoints([]);
+          setCpToolPath([]);
+          cpToolDragRef.current = null;
           setCpToolState(cancellation.state);
           return;
         }
@@ -493,6 +671,8 @@ export function CreasePatternPanel() {
   useEffect(() => {
     if (!editableCp) {
       setCpToolPoints([]);
+      setCpToolPath([]);
+      cpToolDragRef.current = null;
       setCpToolState(IDLE_ORISTUDIO_CP_TOOL_STATE);
     }
   }, [editableCp]);
@@ -588,7 +768,9 @@ export function CreasePatternPanel() {
                     style={{ width: CP_VIEWBOX_SIZE, height: CP_VIEWBOX_SIZE }}
                     role="img"
                     aria-label="Crease pattern"
-                    onPointerMove={updateEditablePointerStatus}
+                    onPointerMove={handleEditablePointerMove}
+                    onPointerUp={finishEditableDragPath}
+                    onPointerCancel={cancelEditableDragPath}
                     onPointerLeave={clearEditablePointerStatus}
                     onPointerDownCapture={handleEditableToolPointerDown}
                     onPointerDown={(event) => {
@@ -619,6 +801,7 @@ export function CreasePatternPanel() {
                         gridLines={editableCpGridLines}
                         gridVisible={oristudioCpViewport.gridVisible}
                         mode={mode}
+                        commandPreviewPoints={cpToolPath.length > 0 ? cpToolPath : cpToolPoints}
                         selection={oristudioCpSelection}
                         snapTarget={snapTarget}
                         spacePressed={spacePressed}
@@ -723,6 +906,7 @@ interface EditableCreasePatternProps {
   gridLines: ReturnType<typeof getCpGridLines>;
   gridVisible: boolean;
   mode: 'mvf' | 'agrh';
+  commandPreviewPoints: Point[];
   selection: OristudioCpSelection;
   snapTarget: CpSnapTarget | null;
   spacePressed: boolean;
@@ -739,6 +923,7 @@ function EditableCreasePattern({
   gridLines,
   gridVisible,
   mode,
+  commandPreviewPoints,
   selection,
   snapTarget,
   spacePressed,
@@ -858,6 +1043,24 @@ function EditableCreasePattern({
           </text>
         );
       })}
+      {document.operation_frame?.active && (
+        <polygon
+          className="cp-operation-frame"
+          points={document.operation_frame.points
+            .map((point) => modelPointToCpSvg(point, bounds))
+            .map((point) => `${point.x},${point.y}`)
+            .join(' ')}
+        />
+      )}
+      {commandPreviewPoints.length > 1 && (
+        <polyline
+          className="cp-command-preview"
+          points={commandPreviewPoints
+            .map((point) => modelPointToCpSvg(point, bounds))
+            .map((point) => `${point.x},${point.y}`)
+            .join(' ')}
+        />
+      )}
       {snapTarget && (
         <circle
           className="cp-snap-target"

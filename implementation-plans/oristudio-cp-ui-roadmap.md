@@ -639,7 +639,7 @@ Done when:
 - [x] Stage 2: Validate viewport behavior with unit and visual tests.
 - [x] Stage 3: Add the left-side tool rail, command groups, active-tool
       prompts, and Not-implemented presentation.
-- [ ] Stage 3: Add CP tool-state transitions for multi-step commands.
+- [x] Stage 3: Add CP tool-state transitions for multi-step commands.
 - [ ] Stage 4: Add CP open/import/save/export workflows and dirty-state
       handling.
 - [ ] Stage 4: Validate file workflows with oracle-backed round trips.

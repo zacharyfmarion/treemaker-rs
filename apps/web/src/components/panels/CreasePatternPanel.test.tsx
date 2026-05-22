@@ -500,6 +500,22 @@ describe('CreasePatternPanel', () => {
     expect(useWorkspaceStore.getState().oristudioCpSelection.lines).toEqual([1]);
     expect(container.textContent).toContain('1 selected');
 
+    const body = container.querySelector<HTMLElement>('.cp-panel__body');
+    act(() => {
+      body?.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+      );
+    });
+    expect(container.textContent).toContain('Tool Select');
+    expect(useWorkspaceStore.getState().oristudioCpSelection.lines).toEqual([1]);
+
+    act(() => {
+      body?.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+      );
+    });
+    expect(useWorkspaceStore.getState().oristudioCpSelection.lines).toEqual([]);
+
     act(() => {
       container.querySelector<HTMLButtonElement>('button[aria-label="Grid"]')?.click();
     });

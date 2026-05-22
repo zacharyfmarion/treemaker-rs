@@ -11,10 +11,12 @@ import { GitBranch, Grid2X2, Magnet, ScanLine } from 'lucide-react';
 import type { OristudioCpDocumentSnapshot } from '../../engine/oristudioCpTypes';
 import { formatNumber, paperToSvg, type Point } from '../../lib/geometry';
 import { getViewportFitScale, type ViewportSize } from '../../lib/designViewport';
-import type {
-  OristudioCpCommandDefinition,
-  OristudioCpOperationId,
-} from '../../lib/oristudioCpCommands';
+import type { OristudioCpCommandDefinition } from '../../lib/oristudioCpCommands';
+import {
+  cancelOristudioCpToolState,
+  IDLE_ORISTUDIO_CP_TOOL_STATE,
+  transitionOristudioCpToolState,
+} from '../../lib/oristudioCpToolState';
 import {
   CP_PAPER_RECT,
   CP_PAPER_SHADOW_RECT,
@@ -69,9 +71,7 @@ export function CreasePatternPanel() {
   const [spacePressed, setSpacePressed] = useState(false);
   const [cursorModelPoint, setCursorModelPoint] = useState<Point | null>(null);
   const [snapTarget, setSnapTarget] = useState<CpSnapTarget | null>(null);
-  const [activeCpOperationId, setActiveCpOperationId] =
-    useState<OristudioCpOperationId | null>(null);
-  const [cpToolPrompt, setCpToolPrompt] = useState('Tool Select');
+  const [cpToolState, setCpToolState] = useState(IDLE_ORISTUDIO_CP_TOOL_STATE);
 
   const project = useWorkspaceStore((state) => state.project);
   const status = useWorkspaceStore((state) => state.status);
@@ -128,16 +128,18 @@ export function CreasePatternPanel() {
     hasEditableCreasePattern || project.creases.length > 0 || project.facets.length > 0;
   const editableSelectionSize = cpSelectionSize(oristudioCpSelection);
 
-  const handleCpToolCommand = useCallback((command: OristudioCpCommandDefinition) => {
-    setActiveCpOperationId(command.operationId);
-    if (command.uiStatus === 'ready') {
-      setCpToolPrompt(`Tool ${command.label}`);
-      return;
-    }
-    setCpToolPrompt(
-      `${command.label}: ${command.uiStatus === 'porting' ? 'Porting' : 'Not implemented'}`
-    );
-  }, []);
+  const handleCpToolCommand = useCallback(
+    (command: OristudioCpCommandDefinition) => {
+      setCpToolState((state) =>
+        transitionOristudioCpToolState(state, {
+          type: 'selectCommand',
+          command,
+          editable: !!editableCp,
+        })
+      );
+    },
+    [editableCp]
+  );
 
   const clearSelectionOnBackgroundPointerDown = (event: PointerEvent<SVGElement>) => {
     if (event.button !== 0 || spacePressed) return;
@@ -298,6 +300,20 @@ export function CreasePatternPanel() {
 
     const onKeyDown = (event: KeyboardEvent) => {
       const interactive = isViewportInteractiveTarget(event.target);
+      if (event.key === 'Escape' && editableCp) {
+        const cancellation = cancelOristudioCpToolState(cpToolState);
+        if (cancellation.handled) {
+          event.preventDefault();
+          setCpToolState(cancellation.state);
+          return;
+        }
+        if (editableSelectionSize > 0) {
+          event.preventDefault();
+          clearOristudioCpSelection();
+          return;
+        }
+      }
+
       if (event.key === ' ' && !interactive) {
         event.preventDefault();
         setSpacePressed(true);
@@ -343,12 +359,19 @@ export function CreasePatternPanel() {
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', clearSpace);
     };
-  }, [fitToView, hasCreasePattern, setActualSize]);
+  }, [
+    clearOristudioCpSelection,
+    cpToolState,
+    editableCp,
+    editableSelectionSize,
+    fitToView,
+    hasCreasePattern,
+    setActualSize,
+  ]);
 
   useEffect(() => {
     if (!editableCp) {
-      setActiveCpOperationId(null);
-      setCpToolPrompt('Tool Select');
+      setCpToolState(IDLE_ORISTUDIO_CP_TOOL_STATE);
     }
   }, [editableCp]);
 
@@ -402,7 +425,7 @@ export function CreasePatternPanel() {
           <>
             {editableCp && (
               <CpToolRail
-                activeOperationId={activeCpOperationId}
+                activeOperationId={cpToolState.activeOperationId}
                 editable={!!editableCp}
                 onSelectCommand={handleCpToolCommand}
               />
@@ -543,7 +566,7 @@ export function CreasePatternPanel() {
               </ViewportToolbar>
               <div className="viewport-status-readout">
                 <span>{formatZoom(zoomPercent / 100)}</span>
-                {editableCp && <span>{cpToolPrompt}</span>}
+                {editableCp && <span>{cpToolState.prompt}</span>}
                 {editableCp && editableCpSummary && (
                   <span>{editableCpSummary.line_segments} lines</span>
                 )}

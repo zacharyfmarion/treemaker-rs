@@ -103,6 +103,7 @@ export interface OristudioCpCommandDefinition {
   disabledReason: string;
   selectionRequirement?: string;
   shortcut?: string;
+  toolSteps?: readonly string[];
 }
 
 function notImplemented(
@@ -114,7 +115,7 @@ function notImplemented(
   options: Partial<
     Pick<
       OristudioCpCommandDefinition,
-      'placement' | 'selectionRequirement' | 'shortcut' | 'tooltip'
+      'placement' | 'selectionRequirement' | 'shortcut' | 'toolSteps' | 'tooltip'
     >
   > = {}
 ): OristudioCpCommandDefinition {
@@ -131,6 +132,7 @@ function notImplemented(
     disabledReason: 'Not implemented in the CP editor yet',
     selectionRequirement: options.selectionRequirement,
     shortcut: options.shortcut,
+    toolSteps: options.toolSteps,
   };
 }
 
@@ -143,7 +145,7 @@ function porting(
   options: Partial<
     Pick<
       OristudioCpCommandDefinition,
-      'placement' | 'selectionRequirement' | 'shortcut' | 'tooltip'
+      'placement' | 'selectionRequirement' | 'shortcut' | 'toolSteps' | 'tooltip'
     >
   > = {}
 ): OristudioCpCommandDefinition {
@@ -183,6 +185,7 @@ function commandId(operationId: string): `cp.${string}` {
 export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
   notImplemented('DrawCreaseFree', 'Draw crease', 'draw', 'pen-line', 'MouseHandlerDrawCreaseFree', {
     shortcut: 'L',
+    toolSteps: ['Pick start point', 'Pick end point'],
   }),
   outOfScopeUi(
     'MoveCreasePattern',
@@ -209,7 +212,9 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
   notImplemented('DrawCreaseRestricted', 'Draw restricted crease', 'draw', 'pen-tool', 'MouseHandlerDrawCreaseRestricted'),
   notImplemented('DrawCreaseSymmetric', 'Mirror selected creases', 'construct', 'copy-plus', 'MouseHandlerDrawCreaseSymmetric'),
   notImplemented('DrawCreaseAngleRestricted', 'Angle restricted crease', 'construct', 'drafting-compass', 'MouseHandlerDrawCreaseAngleRestricted'),
-  notImplemented('DrawPoint', 'Draw point', 'draw', 'circle-dot', 'MouseHandlerDrawPoint'),
+  notImplemented('DrawPoint', 'Draw point', 'draw', 'circle-dot', 'MouseHandlerDrawPoint', {
+    toolSteps: ['Pick point'],
+  }),
   notImplemented('DeletePoint', 'Delete point', 'select-edit', 'circle-x', 'MouseHandlerDeletePoint'),
   notImplemented('AngleSystem', 'Angle system', 'construct', 'chart-no-axes-combined', 'MouseHandlerAngleSystem'),
   notImplemented('DrawCreaseAngleRestricted3', 'Angle restricted 3 crease', 'construct', 'between-horizontal-start', 'MouseHandlerDrawCreaseAngleRestricted3_2'),
@@ -219,9 +224,11 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
   notImplemented('CreaseUnselect', 'Unselect crease', 'select-edit', 'mouse-pointer-click', 'MouseHandlerCreaseUnselect'),
   notImplemented('CreaseMove', 'Move selected creases', 'transform', 'move', 'MouseHandlerCreaseMove', {
     selectionRequirement: 'selected creases',
+    toolSteps: ['Pick source point', 'Pick destination point'],
   }),
   notImplemented('CreaseCopy', 'Copy selected creases', 'transform', 'copy', 'MouseHandlerCreaseCopy', {
     selectionRequirement: 'selected creases',
+    toolSteps: ['Pick source point', 'Pick destination point'],
   }),
   notImplemented('CreaseMakeMountain', 'Make mountain', 'color', 'mountain', 'MouseHandlerCreaseMakeMountain'),
   notImplemented('CreaseMakeValley', 'Make valley', 'color', 'waves', 'MouseHandlerCreaseMakeValley'),
@@ -260,15 +267,27 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
   notImplemented('CircleDrawConcentricTwoCircleSelect', 'Concentric from two circles', 'annotations', 'venetian-mask', 'MouseHandlerCircleDrawConcentricTwoCircleSelect'),
   notImplemented('ParallelDrawWidth', 'Parallel draw by width', 'construct', 'between-horizontal-end', 'MouseHandlerParallelDrawWidth'),
   notImplemented('ContinuousSymmetricDraw', 'Continuous symmetric draw', 'construct', 'repeat', 'MouseHandlerContinuousSymmetricDraw'),
-  notImplemented('DisplayLengthBetweenPoints1', 'Measure length 1', 'measure', 'ruler', 'MouseHandlerDisplayLengthBetweenPoints'),
-  notImplemented('DisplayLengthBetweenPoints2', 'Measure length 2', 'measure', 'ruler-dimension-line', 'MouseHandlerDisplayLengthBetweenPoints'),
-  notImplemented('DisplayAngleBetweenThreePoints1', 'Measure angle 1', 'measure', 'angle', 'MouseHandlerDisplayAngleBetweenThreePoints'),
-  notImplemented('DisplayAngleBetweenThreePoints2', 'Measure angle 2', 'measure', 'angle', 'MouseHandlerDisplayAngleBetweenThreePoints'),
-  notImplemented('DisplayAngleBetweenThreePoints3', 'Measure angle 3', 'measure', 'angle', 'MouseHandlerDisplayAngleBetweenThreePoints'),
+  notImplemented('DisplayLengthBetweenPoints1', 'Measure length 1', 'measure', 'ruler', 'MouseHandlerDisplayLengthBetweenPoints', {
+    toolSteps: ['Pick first point', 'Pick second point'],
+  }),
+  notImplemented('DisplayLengthBetweenPoints2', 'Measure length 2', 'measure', 'ruler-dimension-line', 'MouseHandlerDisplayLengthBetweenPoints', {
+    toolSteps: ['Pick first point', 'Pick second point'],
+  }),
+  notImplemented('DisplayAngleBetweenThreePoints1', 'Measure angle 1', 'measure', 'angle', 'MouseHandlerDisplayAngleBetweenThreePoints', {
+    toolSteps: ['Pick first point', 'Pick vertex point', 'Pick second point'],
+  }),
+  notImplemented('DisplayAngleBetweenThreePoints2', 'Measure angle 2', 'measure', 'angle', 'MouseHandlerDisplayAngleBetweenThreePoints', {
+    toolSteps: ['Pick first point', 'Pick vertex point', 'Pick second point'],
+  }),
+  notImplemented('DisplayAngleBetweenThreePoints3', 'Measure angle 3', 'measure', 'angle', 'MouseHandlerDisplayAngleBetweenThreePoints', {
+    toolSteps: ['Pick first point', 'Pick vertex point', 'Pick second point'],
+  }),
   notImplemented('CreaseToggleMv', 'Toggle mountain/valley', 'color', 'repeat-2', 'MouseHandlerCreaseToggleMV'),
   notImplemented('CircleChangeColor', 'Change circle color', 'annotations', 'palette', 'MouseHandlerCircleChangeColor'),
   notImplemented('CreaseMakeAux', 'Make auxiliary', 'color', 'scan-line', 'MouseHandlerCreaseMakeAux'),
-  notImplemented('OperationFrameCreate', 'Operation frame', 'transform', 'frame', 'MouseHandlerOperationFrameCreate'),
+  notImplemented('OperationFrameCreate', 'Operation frame', 'transform', 'frame', 'MouseHandlerOperationFrameCreate', {
+    toolSteps: ['Drag operation frame'],
+  }),
   notImplemented('VoronoiCreate', 'Voronoi', 'generators', 'network', 'MouseHandlerVoronoiCreate'),
   notImplemented('FlatFoldableCheck', 'Flat-foldable boundary check', 'check-fix', 'shield-check', 'MouseHandlerFlatFoldableCheck'),
   notImplemented('CreaseDeleteOverlapping', 'Delete overlapping creases', 'select-edit', 'combine', 'MouseHandlerCreaseDeleteOverlapping'),

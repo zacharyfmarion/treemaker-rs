@@ -10,7 +10,6 @@ import type {
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { useLayoutStore } from '../../store/layoutStore';
 import { Button } from '../ui/Button';
-import { IconButton } from '../ui/IconButton';
 
 const PREVIEW_VIEWBOX = 320;
 const PREVIEW_PADDING = 24;
@@ -163,21 +162,20 @@ function SequenceDiagramList({ plan }: { plan: SequencePlan }) {
                 <strong>{formatKind(step.kind)}</strong>
               </div>
               <div className="sequence-diagram-step__header-actions">
-                <span>
-                  {stepCreaseCount(step)} crease{stepCreaseCount(step) === 1 ? '' : 's'}
-                </span>
-                <IconButton
+                <Button
                   size="sm"
-                  variant="toolbar"
+                  variant="secondary"
+                  className="sequence-diagram-step__simulate"
                   title="Simulate step"
-                  tooltipSide="left"
+                  aria-label="Simulate step"
                   onClick={() => {
                     setSequenceSimulationFocus({ kind: 'sequence_step', stepId: step.id });
                     activatePanel('simulator');
                   }}
                 >
                   <Waves size={13} />
-                </IconButton>
+                  Simulate
+                </Button>
               </div>
             </div>
             <div className="sequence-diagram-step__visuals">
@@ -313,12 +311,6 @@ function formatStatus(status: string): string {
 
 function formatKind(kind: string): string {
   return kind.replaceAll('_', ' ');
-}
-
-function stepCreaseCount(step: SequenceInstructionStep): number {
-  const region = (step as { region?: { creases: number[] } }).region;
-  if (step.kind === 'unsupported_region' && region) return region.creases.length;
-  return step.affected_creases?.length ?? 0;
 }
 
 interface SequenceHighlights {

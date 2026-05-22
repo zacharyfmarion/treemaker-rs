@@ -72,9 +72,9 @@ describe('SimulatorPanel', () => {
     expect(rendered.textContent).toContain('Step 1: manual collapse');
     expect(rendered.textContent).toContain('Manual preview');
     expect(rendered.querySelector('[aria-label="Step simulation accuracy"]')?.textContent).toContain(
-      'Accurate'
+      'Fast'
     );
-    expect(activeAccuracyButton(rendered)?.textContent).toBe('Accurate');
+    expect(activeAccuracyButton(rendered)?.textContent).toBe('Fast');
   });
 
   it('lets step simulation switch between accurate and fast solver work', () => {
@@ -85,15 +85,15 @@ describe('SimulatorPanel', () => {
       sequenceSimulationFocus: { kind: 'sequence_step', stepId: 'manual' },
     });
     const accuracyControl = rendered.querySelector('[aria-label="Step simulation accuracy"]');
-    const fastButton = Array.from(accuracyControl?.querySelectorAll('button') ?? []).find(
-      (button) => button.textContent === 'Fast'
+    const accurateButton = Array.from(accuracyControl?.querySelectorAll('button') ?? []).find(
+      (button) => button.textContent === 'Accurate'
     );
 
-    expect(activeAccuracyButton(rendered)?.textContent).toBe('Accurate');
-    act(() => {
-      fastButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
     expect(activeAccuracyButton(rendered)?.textContent).toBe('Fast');
+    act(() => {
+      accurateButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(activeAccuracyButton(rendered)?.textContent).toBe('Accurate');
   });
 });
 

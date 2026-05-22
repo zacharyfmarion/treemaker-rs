@@ -130,7 +130,7 @@ export function SimulatorPanel() {
   const [strain, setStrain] = useState(0);
   const [modelStats, setModelStats] = useState({ vertices: 0, triangles: 0 });
   const [viewSettings, setViewSettings] = useState<SimulatorViewSettings>(DEFAULT_VIEW_SETTINGS);
-  const [stepAccuracy, setStepAccuracy] = useState<StepSimulationAccuracy>('accurate');
+  const [stepAccuracy, setStepAccuracy] = useState<StepSimulationAccuracy>('fast');
   const refreshCapability = capabilities['simulator.refresh'];
   const stepSimulationResult = useMemo(
     () =>

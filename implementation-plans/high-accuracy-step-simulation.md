@@ -6,7 +6,7 @@ Add an optional high-accuracy mode for sequence step simulation that uses smalle
 
 ## Approach
 
-Keep whole-model simulation behavior unchanged. Add a scale-aware solver timestep multiplier to `@treemaker/origami-simulator`, then route the web Simulator pane through explicit run presets. Step mode defaults to `Accurate`, with a compact `Fast` / `Accurate` control for quick comparison. Accurate mode uses the same fold profile but advances the physics solver with a smaller adaptive timestep, smaller percent jumps, slower playback, and longer settle loops.
+Keep whole-model simulation behavior unchanged. Add a scale-aware solver timestep multiplier to `@treemaker/origami-simulator`, then route the web Simulator pane through explicit run presets. Step mode defaults to `Fast`, with a compact `Fast` / `Accurate` control for quick comparison. Accurate mode uses the same fold profile but advances the physics solver with a smaller adaptive timestep, smaller percent jumps, slower playback, and longer settle loops.
 
 ## Affected Areas
 

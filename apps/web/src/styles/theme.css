@@ -674,10 +674,11 @@
   min-width: 0;
 }
 
-.sequence-diagram-step__header-actions > span {
-  flex: 0 0 auto;
-  color: var(--text-tertiary);
-  font-variant-numeric: tabular-nums;
+.sequence-diagram-step__simulate {
+  height: 28px;
+  padding: 0 9px;
+  font-size: 0.68rem;
+  text-transform: none;
 }
 
 .sequence-diagram-step__label {

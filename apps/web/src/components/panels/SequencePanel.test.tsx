@@ -36,6 +36,8 @@ describe('SequencePanel', () => {
     expect(rendered.querySelectorAll('.sequence-preview-crease--highlight')).toHaveLength(2);
     expect(rendered.querySelector<HTMLDetailsElement>('.sequence-panel__details')?.open).toBe(false);
     expect(rendered.querySelector('.sequence-diagram-step__header')?.textContent).toContain('Step 1');
+    expect(rendered.querySelector('.sequence-diagram-step__header')?.textContent).toContain('Simulate');
+    expect(rendered.querySelector('.sequence-diagram-step__header')?.textContent).not.toContain('1 crease');
     expect(rendered.querySelector('.sequence-diagram-step__label')?.textContent).toContain(
       'Make a valley fold on crease 6'
     );

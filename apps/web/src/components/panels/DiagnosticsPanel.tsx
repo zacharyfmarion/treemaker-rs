@@ -7,6 +7,7 @@ export function DiagnosticsPanel() {
   const documentMode = useWorkspaceStore((state) => state.documentMode);
   const importedCreasePattern = useWorkspaceStore((state) => state.importedCreasePattern);
   const oristudioCpDocument = useWorkspaceStore((state) => state.oristudioCpDocument);
+  const oristudioCpCamvResult = useWorkspaceStore((state) => state.oristudioCpCamvResult);
   const oristudioCpActiveDiagnosticId = useWorkspaceStore(
     (state) => state.oristudioCpActiveDiagnosticId
   );
@@ -38,8 +39,19 @@ export function DiagnosticsPanel() {
 
   if (documentMode === 'crease-pattern') {
     const diagnostics = importedCreasePattern?.diagnostics;
-    const cpDiagnosticEntries = oristudioCpDocument?.lastCommandResult?.diagnostic_entries ?? [];
-    const cpDiagnosticSummary = oristudioCpDocument?.lastCommandResult?.diagnostics[0] ?? null;
+    const lastCommandResult = oristudioCpDocument?.lastCommandResult ?? null;
+    const camvDiagnosticEntries = oristudioCpCamvResult?.diagnostic_entries ?? [];
+    const commandDiagnosticEntries =
+      lastCommandResult?.operation === 'CheckCamv'
+        ? []
+        : (lastCommandResult?.diagnostic_entries ?? []);
+    const cpDiagnosticEntries = [...camvDiagnosticEntries, ...commandDiagnosticEntries];
+    const cpDiagnosticSummary =
+      (camvDiagnosticEntries.length > 0 ? oristudioCpCamvResult?.diagnostics[0] : null) ??
+      (commandDiagnosticEntries.length > 0 ? lastCommandResult?.diagnostics[0] : null) ??
+      oristudioCpCamvResult?.diagnostics[0] ??
+      lastCommandResult?.diagnostics[0] ??
+      null;
     const cpDiagnosticTone = cpDiagnosticEntries.some((entry) => entry.severity === 'error')
       ? 'bad'
       : cpDiagnosticEntries.some((entry) => entry.severity === 'warning')

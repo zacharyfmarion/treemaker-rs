@@ -44,7 +44,11 @@ import {
   setOristudioCpDocumentSource,
 } from '../oristudioCpRuntime';
 import type { ProjectSlice, RecentProject, WorkspaceSliceCreator } from '../types';
-import type { OristudioCpDocumentSnapshot } from '../../../engine/oristudioCpTypes';
+import type {
+  OristudioCpCommandResult,
+  OristudioCpDocumentSnapshot,
+  OristudioCpDocumentState,
+} from '../../../engine/oristudioCpTypes';
 
 const RECENTS_STORAGE_KEY = 'treemaker.recentProjects.v1';
 const AUTOSAVE_STORAGE_KEY = 'treemaker.autosave.v1';
@@ -65,6 +69,29 @@ function cpHistoryEntry(
     label,
     timestamp: nowIso(),
   };
+}
+
+async function refreshAlwaysOnCamvDiagnostics(
+  documentState: OristudioCpDocumentState
+): Promise<{
+  documentState: OristudioCpDocumentState;
+  camvResult: OristudioCpCommandResult | null;
+}> {
+  try {
+    const checkedDocument = await executeRuntimeOristudioCpCommand('CheckCamv');
+    return {
+      documentState: {
+        ...checkedDocument,
+        lastCommandResult: documentState.lastCommandResult,
+      },
+      camvResult:
+        checkedDocument.lastCommandResult?.operation === 'CheckCamv'
+          ? checkedDocument.lastCommandResult
+          : null,
+    };
+  } catch {
+    return { documentState, camvResult: null };
+  }
 }
 
 const CLEAR_CP_SELECTION_AFTER_OPERATIONS = new Set<OristudioCpOperationId>([
@@ -234,6 +261,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
       importedCreasePattern: null,
       oristudioCpDocument: null,
       oristudioCpError: null,
+      oristudioCpCamvResult: null,
       oristudioCpHistoryPast: [],
       oristudioCpHistoryFuture: [],
       projectLoadId: get().projectLoadId + 1,
@@ -269,7 +297,12 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
     text: string,
     source: { filename: string; path?: string | null }
   ) => {
-    set({ status: 'loading_engine', error: null, projectMessage: null });
+    set({
+      status: 'loading_engine',
+      error: null,
+      projectMessage: null,
+      oristudioCpCamvResult: null,
+    });
     const filename = source.filename;
     const format = importedCreasePatternFormat(filename);
     const parsed = parseImportedCreasePattern(text, {
@@ -281,6 +314,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
     let oristudioCpDocument: Awaited<
       ReturnType<typeof loadOristudioCpDocumentFromText>
     > | null = null;
+    let oristudioCpCamvResult: OristudioCpCommandResult | null = null;
     let oristudioCpRuntimeError: string | null = null;
     try {
       oristudioCpDocument = await loadOristudioCpDocumentFromText(text, {
@@ -289,6 +323,9 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
         path: source.path ?? null,
         title: parsed.document.title,
       });
+      const checked = await refreshAlwaysOnCamvDiagnostics(oristudioCpDocument);
+      oristudioCpDocument = checked.documentState;
+      oristudioCpCamvResult = checked.camvResult;
     } catch (error) {
       oristudioCpRuntimeError = oristudioCpError(error).message;
     }
@@ -308,6 +345,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
       documentMode: 'crease-pattern',
       importedCreasePattern: result.document,
       oristudioCpDocument,
+      oristudioCpCamvResult,
       oristudioCpOperationDescriptors: oristudioCpDocument
         ? oristudioCpDocument.operationDescriptors
         : get().oristudioCpOperationDescriptors,
@@ -451,6 +489,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
     oristudioCpDocument: null,
     oristudioCpOperationDescriptors: [],
     oristudioCpError: null,
+    oristudioCpCamvResult: null,
     oristudioCpHistoryPast: [],
     oristudioCpHistoryFuture: [],
     projectLoadId: 0,
@@ -483,6 +522,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
           oristudioCpDocument: null,
           oristudioCpOperationDescriptors: operationDescriptors,
           oristudioCpError: null,
+          oristudioCpCamvResult: null,
           oristudioCpHistoryPast: [],
           oristudioCpHistoryFuture: [],
           projectLoadId: get().projectLoadId + 1,
@@ -516,6 +556,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
           importedCreasePattern: null,
           oristudioCpDocument: null,
           oristudioCpError: null,
+          oristudioCpCamvResult: null,
           oristudioCpHistoryPast: [],
           oristudioCpHistoryFuture: [],
           projectLoadId: get().projectLoadId + 1,
@@ -555,6 +596,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
           importedCreasePattern: null,
           oristudioCpDocument: null,
           oristudioCpError: null,
+          oristudioCpCamvResult: null,
           oristudioCpHistoryPast: [],
           oristudioCpHistoryFuture: [],
           projectLoadId: get().projectLoadId + 1,
@@ -611,11 +653,24 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
       try {
         const previousDocument = get().oristudioCpDocument?.document ?? null;
         const previousSelection = get().oristudioCpSelection;
-        const nextDocument = await executeRuntimeOristudioCpCommand(operationId, payload);
+        const commandDocument = await executeRuntimeOristudioCpCommand(operationId, payload);
         const mutatesDocument = !NON_MUTATING_CP_OPERATIONS.has(operationId);
+        const checked =
+          mutatesDocument
+            ? await refreshAlwaysOnCamvDiagnostics(commandDocument)
+            : {
+                documentState: commandDocument,
+                camvResult:
+                  operationId === 'CheckCamv' &&
+                  commandDocument.lastCommandResult?.operation === 'CheckCamv'
+                    ? commandDocument.lastCommandResult
+                    : get().oristudioCpCamvResult,
+              };
+        const nextDocument = checked.documentState;
         const diagnosticEntries = nextDocument.lastCommandResult?.diagnostic_entries ?? [];
         set({
           oristudioCpDocument: nextDocument,
+          oristudioCpCamvResult: checked.camvResult,
           oristudioCpOperationDescriptors: nextDocument.operationDescriptors,
           oristudioCpError: null,
           oristudioCpActiveDiagnosticId: mutatesDocument
@@ -670,6 +725,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
         oristudioCpHistoryPast: [],
         oristudioCpHistoryFuture: [],
         oristudioCpActiveDiagnosticId: null,
+        oristudioCpCamvResult: null,
       });
     },
 

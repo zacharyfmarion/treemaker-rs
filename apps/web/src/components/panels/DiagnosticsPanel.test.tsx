@@ -1,7 +1,10 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';
-import type { OristudioCpDocumentState } from '../../engine/oristudioCpTypes';
+import type {
+  OristudioCpCommandResult,
+  OristudioCpDocumentState,
+} from '../../engine/oristudioCpTypes';
 import { createSampleProject } from '../../lib/sampleProject';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { DiagnosticsPanel } from './DiagnosticsPanel';
@@ -116,6 +119,24 @@ function cpDocumentWithDiagnostics(): OristudioCpDocumentState {
   };
 }
 
+function camvDiagnosticResult(): OristudioCpCommandResult {
+  return {
+    operation: 'CheckCamv',
+    status: 'OracleTested',
+    diagnostics: ['Check CAMV found 1 issue(s)'],
+    diagnostic_entries: [
+      {
+        id: 'CheckCamv-1',
+        kind: 'CheckCamv',
+        severity: 'error',
+        message: 'Flat-foldability violation: Maekawa',
+        point: { x: 0, y: 0 },
+        rule: 'Maekawa',
+      },
+    ],
+  };
+}
+
 describe('DiagnosticsPanel', () => {
   it('summarizes latest Oriedita CP diagnostics', () => {
     const view = renderDiagnosticsPanel({
@@ -124,6 +145,18 @@ describe('DiagnosticsPanel', () => {
     });
 
     expect(view.textContent).toContain('Check1 found 1 issue(s)');
+    expect(view.textContent).toContain('Overlapping or contained non-auxiliary creases');
+  });
+
+  it('includes always-on CAMV diagnostics', () => {
+    const view = renderDiagnosticsPanel({
+      documentMode: 'crease-pattern',
+      oristudioCpDocument: cpDocumentWithDiagnostics(),
+      oristudioCpCamvResult: camvDiagnosticResult(),
+    });
+
+    expect(view.textContent).toContain('Check CAMV found 1 issue(s)');
+    expect(view.textContent).toContain('Flat-foldability violation: Maekawa');
     expect(view.textContent).toContain('Overlapping or contained non-auxiliary creases');
   });
 

@@ -6,7 +6,11 @@ import {
   projectStateFromSnapshot,
   statusFromSnapshot,
 } from '../engineRuntime';
-import { oristudioCpError, restoreOristudioCpDocument } from '../oristudioCpRuntime';
+import {
+  executeOristudioCpCommand as executeRuntimeOristudioCpCommand,
+  oristudioCpError,
+  restoreOristudioCpDocument,
+} from '../oristudioCpRuntime';
 import type {
   HistoryEntry,
   HistorySlice,
@@ -14,6 +18,7 @@ import type {
   WorkspaceSliceCreator,
 } from '../types';
 import type {
+  OristudioCpCommandResult,
   OristudioCpDocumentSnapshot,
   OristudioCpDocumentState,
 } from '../../../engine/oristudioCpTypes';
@@ -44,18 +49,43 @@ function cpHistoryEntry(
 
 function setRestoredCreasePatternState(
   restored: OristudioCpDocumentState,
-  selection: OristudioCpSelection
+  selection: OristudioCpSelection,
+  camvResult: OristudioCpCommandResult | null
 ) {
   return {
     oristudioCpDocument: restored,
     oristudioCpOperationDescriptors: restored.operationDescriptors,
     oristudioCpSelection: selection,
     oristudioCpActiveDiagnosticId: null,
+    oristudioCpCamvResult: camvResult,
     oristudioCpError: null,
     error: null,
     dirty: true,
     status: 'crease_pattern_ready' as const,
   };
+}
+
+async function refreshAlwaysOnCamvDiagnostics(
+  restored: OristudioCpDocumentState
+): Promise<{
+  restored: OristudioCpDocumentState;
+  camvResult: OristudioCpCommandResult | null;
+}> {
+  try {
+    const checkedDocument = await executeRuntimeOristudioCpCommand('CheckCamv');
+    return {
+      restored: {
+        ...checkedDocument,
+        lastCommandResult: restored.lastCommandResult,
+      },
+      camvResult:
+        checkedDocument.lastCommandResult?.operation === 'CheckCamv'
+          ? checkedDocument.lastCommandResult
+          : null,
+    };
+  } catch {
+    return { restored, camvResult: null };
+  }
 }
 
 export const createHistorySlice: WorkspaceSliceCreator<HistorySlice> = (set, get) => ({
@@ -93,6 +123,7 @@ export const createHistorySlice: WorkspaceSliceCreator<HistorySlice> = (set, get
       oristudioCpHistoryPast: [],
       oristudioCpHistoryFuture: [],
       oristudioCpActiveDiagnosticId: null,
+      oristudioCpCamvResult: null,
     }),
 
   undo: async () => {
@@ -105,8 +136,13 @@ export const createHistorySlice: WorkspaceSliceCreator<HistorySlice> = (set, get
       set({ historyBusy: true, error: null, oristudioCpError: null });
       try {
         const restored = await restoreOristudioCpDocument(previous.document, current.source, null);
+        const checked = await refreshAlwaysOnCamvDiagnostics(restored);
         set({
-          ...setRestoredCreasePatternState(restored, previous.selection),
+          ...setRestoredCreasePatternState(
+            checked.restored,
+            previous.selection,
+            checked.camvResult
+          ),
           oristudioCpHistoryPast: past.slice(0, -1),
           oristudioCpHistoryFuture: [
             cpHistoryEntry(current.document, currentSelection, previous.label),
@@ -168,8 +204,9 @@ export const createHistorySlice: WorkspaceSliceCreator<HistorySlice> = (set, get
       set({ historyBusy: true, error: null, oristudioCpError: null });
       try {
         const restored = await restoreOristudioCpDocument(next.document, current.source, null);
+        const checked = await refreshAlwaysOnCamvDiagnostics(restored);
         set({
-          ...setRestoredCreasePatternState(restored, next.selection),
+          ...setRestoredCreasePatternState(checked.restored, next.selection, checked.camvResult),
           oristudioCpHistoryPast: [
             ...get().oristudioCpHistoryPast,
             cpHistoryEntry(current.document, currentSelection, next.label),

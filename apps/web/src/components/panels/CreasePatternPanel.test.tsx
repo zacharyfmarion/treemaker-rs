@@ -10,6 +10,7 @@ import {
 import type { ImportedCreasePatternDocument } from '../../lib/creasePatternImport';
 import type {
   OristudioCpCommandPayload,
+  OristudioCpCommandResult,
   OristudioCpDocumentState,
 } from '../../engine/oristudioCpTypes';
 import { useWorkspaceStore } from '../../store/workspaceStore';
@@ -220,6 +221,24 @@ function editableCpState(): OristudioCpDocumentState {
         },
       },
     },
+  };
+}
+
+function camvDiagnosticResult(): OristudioCpCommandResult {
+  return {
+    operation: 'CheckCamv',
+    status: 'OracleTested',
+    diagnostics: ['Check CAMV found 1 issue(s)'],
+    diagnostic_entries: [
+      {
+        id: 'CheckCamv-1',
+        kind: 'CheckCamv',
+        severity: 'error',
+        message: 'Flat-foldability violation: Maekawa',
+        point: { x: 0, y: 0 },
+        rule: 'Maekawa',
+      },
+    ],
   };
 }
 
@@ -1072,25 +1091,17 @@ describe('CreasePatternPanel', () => {
   it('renders point-only CAMV diagnostics without segment arrays', () => {
     const state = editableCpState();
     state.lastCommandResult = {
-      operation: 'CheckCamv',
+      operation: 'DrawCreaseRestricted',
       status: 'OracleTested',
-      diagnostics: ['Check CAMV found 1 issue(s)'],
-      diagnostic_entries: [
-        {
-          id: 'CheckCamv-1',
-          kind: 'CheckCamv',
-          severity: 'error',
-          message: 'Flat-foldability violation: Maekawa',
-          point: { x: 0, y: 0 },
-          rule: 'Maekawa',
-        },
-      ],
+      diagnostics: ['Changed 1 line(s)'],
     };
+    const camvResult = camvDiagnosticResult();
 
     const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
       documentMode: 'crease-pattern',
       importedCreasePattern: importedCpDocument(),
       oristudioCpDocument: state,
+      oristudioCpCamvResult: camvResult,
     });
 
     expect(container.querySelectorAll('.cp-diagnostic-segment')).toHaveLength(0);
@@ -1117,6 +1128,22 @@ describe('CreasePatternPanel', () => {
       documentMode: 'crease-pattern',
       importedCreasePattern: importedCpDocument(),
       oristudioCpDocument: state,
+    });
+
+    expect(container.querySelector('.cp-diagnostic-hud')).toBeNull();
+  });
+
+  it('does not show an always-on CAMV OK result as a floating HUD', () => {
+    const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
+      documentMode: 'crease-pattern',
+      importedCreasePattern: importedCpDocument(),
+      oristudioCpDocument: editableCpState(),
+      oristudioCpCamvResult: {
+        operation: 'CheckCamv',
+        status: 'OracleTested',
+        diagnostics: ['Check CAMV passed'],
+        diagnostic_entries: [],
+      },
     });
 
     expect(container.querySelector('.cp-diagnostic-hud')).toBeNull();

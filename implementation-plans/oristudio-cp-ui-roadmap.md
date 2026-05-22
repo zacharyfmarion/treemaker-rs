@@ -586,6 +586,8 @@ UX work:
   treats it as an interactive temporary boundary, not a document-wide button.
 - Add a diagnostics layer with clickable issue markers.
 - Add a diagnostics panel list that filters, focuses, and explains issues.
+- Keep CAMV/Maekawa violations visible as an always-on issue layer after load,
+  edits, undo, and redo. Do not show automatic "OK" HUDs on the canvas.
 - Keep repair commands explicit. Do not auto-fix without a user command.
 
 Technical work:
@@ -902,6 +904,9 @@ Done when:
       point-only diagnostic entries such as CAMV vertex errors.
 - [x] Stage 9 slice: Restrict the diagnostic HUD to check results and render
       CAMV/Maekawa point violations above normal vertex markers.
+- [x] Stage 9 slice: Keep CAMV diagnostics visible after loads, mutating
+      commands, undo, and redo without adding history entries, dirtying the
+      document, or showing automatic OK HUDs.
 - [ ] Stage 9: Enable checks, diagnostics, issue navigation, and repair
       commands.
 - [ ] Stage 9: Validate diagnostic overlays and repair results against the

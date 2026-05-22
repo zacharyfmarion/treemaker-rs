@@ -29,6 +29,7 @@ import type { ImportedCreasePatternDocument } from '../../lib/creasePatternImpor
 import type {
   OristudioCpCommandPayload,
   OristudioCpCommandPreview,
+  OristudioCpCommandResult,
   OristudioCpDocumentSnapshot,
   OristudioCpDocumentState,
   OristudioCpOperationDescriptor,
@@ -57,6 +58,7 @@ export interface ProjectSliceState {
   oristudioCpDocument: OristudioCpDocumentState | null;
   oristudioCpOperationDescriptors: OristudioCpOperationDescriptor[];
   oristudioCpError: string | null;
+  oristudioCpCamvResult: OristudioCpCommandResult | null;
   oristudioCpHistoryPast: OristudioCpHistoryEntry[];
   oristudioCpHistoryFuture: OristudioCpHistoryEntry[];
   projectLoadId: number;

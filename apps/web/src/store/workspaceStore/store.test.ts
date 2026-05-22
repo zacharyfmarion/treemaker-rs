@@ -15,6 +15,7 @@ import type {
   TreeSummary,
 } from '../../engine/types';
 import type {
+  OristudioCpCommandResult,
   OristudioCpDocumentSnapshot,
   OristudioCpDocumentState,
   OristudioCpOperationDescriptor,
@@ -829,6 +830,7 @@ function loadSnapshotIntoStore(snapshot: TreeSnapshot, title = 'Seed project') {
     oristudioCpDocument: null,
     oristudioCpOperationDescriptors: [],
     oristudioCpError: null,
+    oristudioCpCamvResult: null,
     oristudioCpHistoryPast: [],
     oristudioCpHistoryFuture: [],
     projectLoadId: useWorkspaceStore.getState().projectLoadId + 1,
@@ -968,6 +970,24 @@ function resetStores(snapshot = makeSnapshot()) {
   return api;
 }
 
+function camvErrorResult(id = 'CheckCamv-1'): OristudioCpCommandResult {
+  return {
+    operation: 'CheckCamv',
+    status: 'OracleTested',
+    diagnostics: ['Check CAMV found 1 issue(s)'],
+    diagnostic_entries: [
+      {
+        id,
+        kind: 'CheckCamv',
+        severity: 'error',
+        message: 'Maekawa violation',
+        point: { x: 0, y: 0 },
+        rule: 'Maekawa',
+      },
+    ],
+  };
+}
+
 function createFileService(
   file: { text: string; name: string; path: string | null } | null = null
 ): FileService & {
@@ -1014,6 +1034,7 @@ describe('workspace store slices', () => {
     expect(state.oristudioCpDocument).toBeNull();
     expect(state.oristudioCpOperationDescriptors).toEqual([]);
     expect(state.oristudioCpError).toBeNull();
+    expect(state.oristudioCpCamvResult).toBeNull();
     expect(state.oristudioCpHistoryPast).toEqual([]);
     expect(state.oristudioCpHistoryFuture).toEqual([]);
     expect(state.status).toBe('loading_engine');
@@ -1329,6 +1350,51 @@ describe('workspace store slices', () => {
     expect(useWorkspaceStore.getState().dirty).toBe(true);
   });
 
+  it('refreshes always-on CAMV diagnostics after editable CP mutations', async () => {
+    resetStores(seedSnapshot());
+    await useWorkspaceStore.getState().loadCreasePatternText('1 0 0 1 0\n2 0 0 0 1', {
+      filename: 'lines.cp',
+      path: '/tmp/lines.cp',
+    });
+    useWorkspaceStore.setState({ dirty: false });
+    const currentDocument = useWorkspaceStore.getState().oristudioCpDocument;
+    if (!currentDocument) throw new Error('expected editable CP document');
+    const commandResult: OristudioCpCommandResult = {
+      operation: 'CreaseMakeMountain',
+      status: 'OracleTested',
+      diagnostics: ['Changed 2 line(s)'],
+    };
+    const camvResult = camvErrorResult();
+    oristudioCpMocks.executeOristudioCpCommand
+      .mockResolvedValueOnce({
+        ...currentDocument,
+        lastCommandResult: commandResult,
+      })
+      .mockResolvedValueOnce({
+        ...currentDocument,
+        lastCommandResult: camvResult,
+      });
+
+    await expect(
+      useWorkspaceStore.getState().executeOristudioCpCommand('CreaseMakeMountain', {
+        line_ids: [1, 2],
+      })
+    ).resolves.toBe(true);
+
+    expect(oristudioCpMocks.executeOristudioCpCommand).toHaveBeenCalledWith(
+      'CreaseMakeMountain',
+      { line_ids: [1, 2] }
+    );
+    expect(oristudioCpMocks.executeOristudioCpCommand).toHaveBeenCalledWith('CheckCamv');
+    expect(useWorkspaceStore.getState().oristudioCpDocument?.lastCommandResult).toEqual(
+      commandResult
+    );
+    expect(useWorkspaceStore.getState().oristudioCpCamvResult).toEqual(camvResult);
+    expect(useWorkspaceStore.getState().oristudioCpActiveDiagnosticId).toBeNull();
+    expect(useWorkspaceStore.getState().oristudioCpHistoryPast).toHaveLength(1);
+    expect(useWorkspaceStore.getState().dirty).toBe(true);
+  });
+
   it('keeps editable CP diagnostic checks out of undo history', async () => {
     resetStores(seedSnapshot());
     await useWorkspaceStore.getState().loadCreasePatternText('1 0 0 1 0\n2 0 0 0 1', {
@@ -1579,6 +1645,11 @@ describe('workspace store slices', () => {
       label: 'CreaseMakeMountain',
     });
 
+    const undoCamvResult = camvErrorResult('CheckCamv-undo');
+    oristudioCpMocks.executeOristudioCpCommand.mockResolvedValueOnce({
+      ...loadedDocument,
+      lastCommandResult: undoCamvResult,
+    });
     await useWorkspaceStore.getState().undo();
     expect(oristudioCpMocks.restoreOristudioCpDocument).toHaveBeenLastCalledWith(
       loadedDocument.document,
@@ -1589,9 +1660,16 @@ describe('workspace store slices', () => {
       loadedDocument.document
     );
     expect(useWorkspaceStore.getState().oristudioCpSelection.lines).toEqual([1]);
+    expect(useWorkspaceStore.getState().oristudioCpCamvResult).toEqual(undoCamvResult);
     expect(useWorkspaceStore.getState().oristudioCpHistoryFuture).toHaveLength(1);
     expect(useWorkspaceStore.getState().projectMessage).toBe('Undid CreaseMakeMountain');
 
+    const redoCamvResult = camvErrorResult('CheckCamv-redo');
+    oristudioCpMocks.executeOristudioCpCommand.mockResolvedValueOnce({
+      ...loadedDocument,
+      document: changedDocument,
+      lastCommandResult: redoCamvResult,
+    });
     await useWorkspaceStore.getState().redo();
     expect(oristudioCpMocks.restoreOristudioCpDocument).toHaveBeenLastCalledWith(
       changedDocument,
@@ -1600,6 +1678,7 @@ describe('workspace store slices', () => {
     );
     expect(useWorkspaceStore.getState().oristudioCpDocument?.document).toEqual(changedDocument);
     expect(useWorkspaceStore.getState().oristudioCpSelection.lines).toEqual([1]);
+    expect(useWorkspaceStore.getState().oristudioCpCamvResult).toEqual(redoCamvResult);
     expect(useWorkspaceStore.getState().oristudioCpHistoryPast).toHaveLength(1);
     expect(useWorkspaceStore.getState().projectMessage).toBe('Redid CreaseMakeMountain');
   });

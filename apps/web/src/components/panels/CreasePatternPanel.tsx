@@ -152,7 +152,8 @@ function pluralizeCount(count: number, singular: string): string {
 }
 
 function diagnosticHudStatus(
-  result: OristudioCpCommandResult | null | undefined
+  result: OristudioCpCommandResult | null | undefined,
+  options: { issueOnly?: boolean } = {}
 ): CpDiagnosticHudStatus | null {
   if (!result || !isDiagnosticResultOperation(result.operation)) return null;
   if (!result?.diagnostics.length) return null;
@@ -178,6 +179,8 @@ function diagnosticHudStatus(
       tone: 'warn',
     };
   }
+
+  if (options.issueOnly) return null;
 
   return {
     label: `${label} OK`,
@@ -590,6 +593,7 @@ export function CreasePatternPanel() {
   const documentMode = useWorkspaceStore((state) => state.documentMode);
   const importedCreasePattern = useWorkspaceStore((state) => state.importedCreasePattern);
   const oristudioCpDocument = useWorkspaceStore((state) => state.oristudioCpDocument);
+  const oristudioCpCamvResult = useWorkspaceStore((state) => state.oristudioCpCamvResult);
   const oristudioCpError = useWorkspaceStore((state) => state.oristudioCpError);
   const oristudioCpSelection = useWorkspaceStore((state) => state.oristudioCpSelection);
   const oristudioCpActiveDiagnosticId = useWorkspaceStore(
@@ -717,11 +721,24 @@ export function CreasePatternPanel() {
       ? localDragLinePreviewSegments
       : (cpCommandPreview?.segments ?? []);
   const renderedCommandPreviewCircles = cpCommandPreview?.circles ?? [];
-  const latestDiagnosticEntries =
-    oristudioCpDocument?.lastCommandResult?.diagnostic_entries ?? EMPTY_DIAGNOSTIC_ENTRIES;
+  const lastCommandResult = oristudioCpDocument?.lastCommandResult ?? null;
+  const camvDiagnosticEntries =
+    oristudioCpCamvResult?.diagnostic_entries ?? EMPTY_DIAGNOSTIC_ENTRIES;
+  const latestCommandDiagnosticEntries =
+    lastCommandResult && isDiagnosticResultOperation(lastCommandResult.operation)
+      ? (lastCommandResult.diagnostic_entries ?? EMPTY_DIAGNOSTIC_ENTRIES)
+      : EMPTY_DIAGNOSTIC_ENTRIES;
+  const latestDiagnosticEntries = useMemo(() => {
+    if (lastCommandResult?.operation === 'CheckCamv') return latestCommandDiagnosticEntries;
+    if (camvDiagnosticEntries.length === 0) return latestCommandDiagnosticEntries;
+    if (latestCommandDiagnosticEntries.length === 0) return camvDiagnosticEntries;
+    return [...camvDiagnosticEntries, ...latestCommandDiagnosticEntries];
+  }, [camvDiagnosticEntries, latestCommandDiagnosticEntries, lastCommandResult?.operation]);
   const diagnosticStatus = useMemo(
-    () => diagnosticHudStatus(oristudioCpDocument?.lastCommandResult),
-    [oristudioCpDocument?.lastCommandResult]
+    () =>
+      diagnosticHudStatus(oristudioCpCamvResult, { issueOnly: true }) ??
+      diagnosticHudStatus(lastCommandResult),
+    [lastCommandResult, oristudioCpCamvResult]
   );
   const activeDiagnosticEntry = useMemo(
     () =>

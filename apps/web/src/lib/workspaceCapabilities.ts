@@ -380,33 +380,37 @@ export function getWorkspaceCapabilities(input: WorkspaceCapabilityInput): Works
     ),
     'cp.check1': capability(
       canEditCp,
-      'Check 1',
+      'Check Overlaps',
       canEditCp ? 'Check overlapping or contained non-auxiliary creases' : 'Open an editable crease pattern first'
     ),
     'cp.check2': capability(
       canEditCp,
-      'Check 2',
+      'Check T-junctions',
       canEditCp ? 'Check near T-intersections between creases' : 'Open an editable crease pattern first'
     ),
     'cp.check3': capability(
       canEditCp,
-      'Check 3',
+      'Check Vertex Foldability',
       canEditCp ? 'Check vertex flat-foldability markers' : 'Open an editable crease pattern first'
     ),
     'cp.check4': capability(
       canEditCp,
-      'Check 4',
+      'Check Maekawa/LBL',
       canEditCp ? 'Check Maekawa, angle, and little-big-little violations' : 'Open an editable crease pattern first'
     ),
     'cp.fix1': capability(
       canEditCp,
-      'Fix 1',
-      canEditCp ? 'Run Oriedita Fix1 repair' : 'Open an editable crease pattern first'
+      'Repair Overlaps',
+      canEditCp
+        ? 'Merge exact duplicates and select remaining overlapping creases'
+        : 'Open an editable crease pattern first'
     ),
     'cp.fix2': capability(
       canEditCp,
-      'Fix 2',
-      canEditCp ? 'Run Oriedita Fix2 repair' : 'Open an editable crease pattern first'
+      'Split T-junctions',
+      canEditCp
+        ? 'Split near T-intersections using Oriedita tolerances'
+        : 'Open an editable crease pattern first'
     ),
     'cp.fixInaccurate': capability(
       canEditCp && hasSelectedCpLines,

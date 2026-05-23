@@ -104,7 +104,7 @@ export interface OristudioCpCommandDefinition {
   selectionRequirement?: string;
   shortcut?: string;
   toolSteps?: readonly string[];
-  inputMode?: 'point-sequence' | 'drag-path' | 'drag-line';
+  inputMode?: 'point-sequence' | 'drag-path' | 'drag-line' | 'drag-box';
 }
 
 type CommandOptionKeys =
@@ -275,11 +275,13 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
   }),
   ready('CreaseSelect', 'Select crease', 'select-edit', 'mouse-pointer-2', 'MouseHandlerCreaseSelect', {
     shortcut: 'V',
-    toolSteps: ['Pick box start point', 'Pick box end point'],
+    toolSteps: ['Drag selection box'],
+    inputMode: 'drag-box',
     tooltip: 'Select creases inside a dragged box',
   }),
   ready('CreaseUnselect', 'Unselect crease', 'select-edit', 'mouse-pointer-click', 'MouseHandlerCreaseUnselect', {
-    toolSteps: ['Pick box start point', 'Pick box end point'],
+    toolSteps: ['Drag selection box'],
+    inputMode: 'drag-box',
     tooltip: 'Unselect creases inside a dragged box',
   }),
   ready('CreaseMove', 'Move selected creases', 'transform', 'move', 'MouseHandlerCreaseMove', {
@@ -565,23 +567,23 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
   notImplemented('Fold', 'Fold', 'folding', 'origami', 'FoldingServiceImpl.fold'),
   porting('FoldAnother', 'Another solution', 'folding', 'skip-forward', 'FoldingServiceImpl.foldAnother'),
   porting('DuplicateFoldedModel', 'Duplicate folded model', 'folding', 'copy', 'FoldingServiceImpl.duplicate'),
-  ready('Check1', 'Check 1', 'check-fix', 'badge-alert', 'Check1', {
+  ready('Check1', 'Check overlaps', 'check-fix', 'badge-alert', 'Check1', {
     tooltip: 'Find overlapping or contained non-auxiliary crease pairs',
   }),
-  ready('Check2', 'Check 2', 'check-fix', 'badge-alert', 'Check2', {
+  ready('Check2', 'Check T-junctions', 'check-fix', 'badge-alert', 'Check2', {
     tooltip: 'Find near T-intersections between non-auxiliary crease pairs',
   }),
-  ready('Check3', 'Check 3', 'check-fix', 'badge-alert', 'Check3', {
+  ready('Check3', 'Check vertex foldability', 'check-fix', 'badge-alert', 'Check3', {
     tooltip: 'Find Oriedita vertex flat-foldability markers',
   }),
-  ready('Check4', 'Check 4', 'check-fix', 'badge-alert', 'Check4', {
+  ready('Check4', 'Check Maekawa/LBL', 'check-fix', 'badge-alert', 'Check4', {
     tooltip: 'Find Maekawa, angle, and little-big-little violations',
   }),
-  ready('Fix1', 'Fix 1', 'check-fix', 'wrench', 'Fix1', {
-    tooltip: 'Run Oriedita Fix1 overlap repair or selection pass',
+  ready('Fix1', 'Repair overlaps', 'check-fix', 'wrench', 'Fix1', {
+    tooltip: 'Merge exact duplicates and select remaining overlapping creases',
   }),
-  ready('Fix2', 'Fix 2', 'check-fix', 'wrench', 'Fix2', {
-    tooltip: 'Run Oriedita Fix2 near-T-intersection split pass',
+  ready('Fix2', 'Split T-junctions', 'check-fix', 'wrench', 'Fix2', {
+    tooltip: 'Split near T-intersections using Oriedita tolerances',
   }),
   ready('OrganizeCircles', 'Organize circles', 'annotations', 'circle-ellipsis', 'OrganizeCircles', {
     tooltip: 'Prune invalid zero-radius circles using Oriedita cleanup rules',

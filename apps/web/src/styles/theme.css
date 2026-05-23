@@ -1718,7 +1718,7 @@
 .cp-tool-rail {
   z-index: 15;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
   border-right: 1px solid var(--border-subtle);
@@ -1923,6 +1923,13 @@
   vector-effect: non-scaling-stroke;
 }
 
+.cp-vertex-hit-target {
+  fill: transparent;
+  stroke: transparent;
+  cursor: pointer;
+  pointer-events: all;
+}
+
 .cp-vertex:hover,
 .cp-vertex--selected {
   fill: var(--accent-primary);
@@ -1957,6 +1964,7 @@
 }
 
 .cp-command-preview,
+.cp-command-box-preview,
 .cp-operation-frame {
   fill: none;
   stroke: var(--accent-primary);
@@ -1968,6 +1976,11 @@
 
 .cp-command-preview {
   opacity: 0.82;
+}
+
+.cp-command-box-preview {
+  fill: color-mix(in srgb, var(--accent-primary) 12%, transparent);
+  opacity: 0.9;
 }
 
 .cp-command-candidate {

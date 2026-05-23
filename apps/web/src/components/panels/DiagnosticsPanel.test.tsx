@@ -144,7 +144,8 @@ describe('DiagnosticsPanel', () => {
       oristudioCpDocument: cpDocumentWithDiagnostics(),
     });
 
-    expect(view.textContent).toContain('Check1 found 1 issue(s)');
+    expect(view.textContent).toContain('Overlap check found 1 issue(s)');
+    expect(view.textContent).toContain('Overlap check');
     expect(view.textContent).toContain('Overlapping or contained non-auxiliary creases');
   });
 

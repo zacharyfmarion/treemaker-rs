@@ -216,12 +216,13 @@ pub fn setup_menu(app: &App) -> Result<(), Box<dyn std::error::Error>> {
     let cp_check_camv = MenuItemBuilder::with_id("cp.checkCamv", "Check CAMV")
         .accelerator("CmdOrCtrl+Shift+M")
         .build(app)?;
-    let cp_check1 = MenuItemBuilder::with_id("cp.check1", "Check 1").build(app)?;
-    let cp_check2 = MenuItemBuilder::with_id("cp.check2", "Check 2").build(app)?;
-    let cp_check3 = MenuItemBuilder::with_id("cp.check3", "Check 3").build(app)?;
-    let cp_check4 = MenuItemBuilder::with_id("cp.check4", "Check 4").build(app)?;
-    let cp_fix1 = MenuItemBuilder::with_id("cp.fix1", "Fix 1").build(app)?;
-    let cp_fix2 = MenuItemBuilder::with_id("cp.fix2", "Fix 2").build(app)?;
+    let cp_check1 = MenuItemBuilder::with_id("cp.check1", "Check Overlaps").build(app)?;
+    let cp_check2 = MenuItemBuilder::with_id("cp.check2", "Check T-junctions").build(app)?;
+    let cp_check3 =
+        MenuItemBuilder::with_id("cp.check3", "Check Vertex Foldability").build(app)?;
+    let cp_check4 = MenuItemBuilder::with_id("cp.check4", "Check Maekawa/LBL").build(app)?;
+    let cp_fix1 = MenuItemBuilder::with_id("cp.fix1", "Repair Overlaps").build(app)?;
+    let cp_fix2 = MenuItemBuilder::with_id("cp.fix2", "Split T-junctions").build(app)?;
     let cp_fix_inaccurate =
         MenuItemBuilder::with_id("cp.fixInaccurate", "Fix Inaccurate Creases").build(app)?;
     let cp_diagnostics_menu = SubmenuBuilder::new(app, "Diagnostics")

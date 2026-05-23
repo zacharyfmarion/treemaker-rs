@@ -57,6 +57,11 @@ The first complete product target is:
   color/type selector, auxiliary input mode, angle system, division ratio, and
   snap/input resolver are tool options that feed actions; they should not be
   exposed as duplicate operation buttons.
+- Separate CP controls by behavior: persistent pointer modes change what the
+  canvas does next, selection-scoped actions execute against the current
+  selection, and passive options feed either one. They can share the rail, but
+  active styling, disabled copy, prompts, and undo behavior should make the
+  difference explicit.
 
 ### UI Shape
 
@@ -578,10 +583,12 @@ Intent:
 
 UX work:
 
-- Enable Check1, Check2, Check3, Check4, CAMV, flat-foldable boundary checks,
-  little-big-little diagnostics, Fix1, Fix2, and fix inaccurate.
-- Current slice: Check1, Check2, Check3, Check4, CAMV, Fix1, and Fix2 are
-  wired through the shared command path with renderable diagnostic markers.
+- Enable overlap checks, T-junction checks, vertex foldability checks,
+  Maekawa/little-big-little diagnostics, CAMV, flat-foldable boundary checks,
+  overlap repair, T-junction splitting, and fix inaccurate.
+- Current slice: the former Oriedita Check1, Check2, Check3, Check4, CAMV,
+  Fix1, and Fix2 operations are wired through the shared command path with
+  semantic UI names and renderable diagnostic markers.
 - Keep FlatFoldableCheck as a later boundary-drawing workflow because Oriedita
   treats it as an interactive temporary boundary, not a document-wide button.
 - Add a diagnostics layer with clickable issue markers.
@@ -904,10 +911,10 @@ Done when:
 - [x] Stage 8: Enable circles, text, generators, and measurement tools.
 - [x] Stage 8: Validate annotation preservation and non-mutating measurement
       behavior.
-- [x] Stage 9 slice: Enable Check1, Check2, Check3, Check4, and CAMV as
-      non-mutating structured diagnostic checks.
-- [x] Stage 9 slice: Enable Fix1 and Fix2 repair commands through undo-aware
-      CP command dispatch.
+- [x] Stage 9 slice: Enable overlap, T-junction, vertex foldability,
+      Maekawa/LBL, and CAMV checks as non-mutating structured diagnostic checks.
+- [x] Stage 9 slice: Enable overlap repair and T-junction splitting through
+      undo-aware CP command dispatch.
 - [x] Stage 9 slice: Render latest diagnostic line/point markers in the CP pane
       and summarize them in the Diagnostics panel.
 - [x] Stage 9 slice: Validate diagnostic command results, repair dispatch,

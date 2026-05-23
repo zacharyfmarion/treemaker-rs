@@ -72,12 +72,18 @@ describe('oristudio CP command registry', () => {
       uiStatus: 'ready',
       toolSteps: ['Pick drag start point', 'Pick drag end point'],
     });
+    expect(cpCommandByOperation('CreaseSelect')).toMatchObject({
+      uiStatus: 'ready',
+      inputMode: 'drag-box',
+      toolSteps: ['Drag selection box'],
+    });
     expect(cpCommandByOperation('FixInaccurate')).toMatchObject({
       uiStatus: 'ready',
       selectionRequirement: 'selected folding lines',
     });
     expect(cpCommandByOperation('Check1')).toMatchObject({
       uiStatus: 'ready',
+      label: 'Check overlaps',
       tooltip: 'Find overlapping or contained non-auxiliary crease pairs',
     });
     expect(cpCommandByOperation('CheckCamv')).toMatchObject({
@@ -90,9 +96,11 @@ describe('oristudio CP command registry', () => {
     });
     expect(cpCommandByOperation('Fix1')).toMatchObject({
       uiStatus: 'ready',
+      label: 'Repair overlaps',
     });
     expect(cpCommandByOperation('Fix2')).toMatchObject({
       uiStatus: 'ready',
+      label: 'Split T-junctions',
     });
     expect(cpCommandByOperation('DisplayLengthBetweenPoints1')).toMatchObject({
       uiStatus: 'ready',

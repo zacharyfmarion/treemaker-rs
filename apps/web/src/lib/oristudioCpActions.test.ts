@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  DEFAULT_ORISTUDIO_CP_ACTION_ID,
   ORISTUDIO_CP_ACTION_GROUPS,
   ORISTUDIO_CP_LINE_TYPE_ACTIONS,
   cpActionById,
@@ -43,6 +44,13 @@ describe('oristudio CP action registry', () => {
   });
 
   it('models draw crease as a repeatable drag-line action', () => {
+    expect(cpActionById(DEFAULT_ORISTUDIO_CP_ACTION_ID)).toMatchObject({
+      kind: 'command',
+      operationId: 'CreaseSelect',
+      inputMode: 'drag-box',
+      repeatable: true,
+    });
+
     expect(cpActionById('cp.action.draw-crease')).toMatchObject({
       kind: 'command',
       operationId: 'DrawCreaseFree',

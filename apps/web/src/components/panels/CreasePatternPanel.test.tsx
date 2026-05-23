@@ -509,19 +509,19 @@ describe('CreasePatternPanel', () => {
     const rolesButton = buttons.find((button) => button.textContent?.includes('Crease roles'));
     const mvButton = buttons.find((button) => button.textContent?.includes('M/V assignment'));
 
-    expect(rolesButton?.getAttribute('aria-pressed')).toBe('true');
-    expect(mvButton?.getAttribute('aria-pressed')).toBe('false');
-    expect(container.querySelector('.crease--kind-hinge')).not.toBeNull();
-    expect(container.querySelector('.crease--fold-valley')).toBeNull();
-
-    act(() => {
-      mvButton?.click();
-    });
-
-    expect(useWorkspaceStore.getState().creaseColorMode).toBe('mvf');
+    expect(mvButton?.getAttribute('aria-pressed')).toBe('true');
+    expect(rolesButton?.getAttribute('aria-pressed')).toBe('false');
     expect(container.querySelector('.crease--fold-mountain')).not.toBeNull();
     expect(container.querySelector('.crease--fold-valley')).not.toBeNull();
     expect(container.querySelector('.crease--kind-hinge')).toBeNull();
+
+    act(() => {
+      rolesButton?.click();
+    });
+
+    expect(useWorkspaceStore.getState().creaseColorMode).toBe('agrh');
+    expect(container.querySelector('.crease--kind-hinge')).not.toBeNull();
+    expect(container.querySelector('.crease--fold-valley')).toBeNull();
   });
 
   it('clears crease-pattern selection when the user clicks the canvas background', () => {
@@ -575,7 +575,7 @@ describe('CreasePatternPanel', () => {
     expect(container.querySelector('.cp-point')).not.toBeNull();
     expect(container.querySelector('.cp-text')?.textContent).toBe('note');
     expect(container.querySelector('.cp-tool-rail')).not.toBeNull();
-    expect(container.textContent).toContain('Tool Select');
+    expect(container.textContent).toContain('Select crease: Drag selection box');
     expect(container.textContent).toContain('Line M');
     expect(container.textContent).toContain('2 lines');
     expect(container.querySelector('button[aria-label="Mountain"]')?.textContent).toContain('M');
@@ -628,6 +628,9 @@ describe('CreasePatternPanel', () => {
     expect(selectLassoButton?.getAttribute('data-ui-status')).toBe('ready');
     expect(foldEstimateButton?.getAttribute('aria-disabled')).toBe('true');
     expect(foldEstimateButton?.getAttribute('data-ui-status')).toBe('porting');
+    expect(container.querySelector('button[aria-label="Select crease"]')?.hasAttribute('data-active')).toBe(
+      true
+    );
 
     act(() => {
       drawCreaseButton?.click();
@@ -697,9 +700,10 @@ describe('CreasePatternPanel', () => {
     });
 
     act(() => {
-      container.querySelector<SVGLineElement>('[data-cp-line-hit-id="1"]')?.dispatchEvent(
-        new MouseEvent('click', { bubbles: true })
-      );
+      useWorkspaceStore.getState().setOristudioCpSelection({
+        ...useWorkspaceStore.getState().oristudioCpSelection,
+        lines: [1],
+      });
     });
 
     await act(async () => {
@@ -743,6 +747,62 @@ describe('CreasePatternPanel', () => {
     expect(useWorkspaceStore.getState().oristudioCpSelection.lines).toEqual([]);
   });
 
+  it('defaults editable CP interaction to repeatable drag-box crease selection', async () => {
+    const executeOristudioCpCommand = vi.fn(
+      async (_operationId: string, _payload?: OristudioCpCommandPayload) => true
+    );
+    const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
+      documentMode: 'crease-pattern',
+      importedCreasePattern: importedCpDocument(),
+      oristudioCpDocument: editableCpState(),
+      executeOristudioCpCommand,
+    });
+    const canvas = setCanvasClientRect(container);
+    const selectButton = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Select crease"]'
+    );
+
+    expect(selectButton?.hasAttribute('data-active')).toBe(true);
+
+    act(() => {
+      canvas.dispatchEvent(
+        new MouseEvent('pointerdown', {
+          bubbles: true,
+          button: 0,
+          clientX: 300,
+          clientY: 300,
+        })
+      );
+      canvas.dispatchEvent(
+        new MouseEvent('pointermove', {
+          bubbles: true,
+          button: 0,
+          clientX: 420,
+          clientY: 420,
+        })
+      );
+    });
+    expect(container.querySelector('.cp-command-box-preview')).not.toBeNull();
+
+    await act(async () => {
+      canvas.dispatchEvent(
+        new MouseEvent('pointerup', {
+          bubbles: true,
+          button: 0,
+          clientX: 420,
+          clientY: 420,
+        })
+      );
+      await Promise.resolve();
+    });
+
+    expect(executeOristudioCpCommand).toHaveBeenCalledOnce();
+    const [operation, payload] = executeOristudioCpCommand.mock.calls[0] ?? [];
+    expect(operation).toBe('CreaseSelect');
+    expect(payload?.points).toHaveLength(2);
+    expect(selectButton?.hasAttribute('data-active')).toBe(true);
+  });
+
   it('runs ready multi-step CP transform commands with resolved model points', async () => {
     const executeOristudioCpCommand = vi.fn(
       async (_operationId: string, _payload?: OristudioCpCommandPayload) => true
@@ -762,9 +822,10 @@ describe('CreasePatternPanel', () => {
     const canvas = setCanvasClientRect(container);
 
     act(() => {
-      container.querySelector<SVGLineElement>('[data-cp-line-id="1"]')?.dispatchEvent(
-        new MouseEvent('click', { bubbles: true })
-      );
+      useWorkspaceStore.getState().setOristudioCpSelection({
+        ...useWorkspaceStore.getState().oristudioCpSelection,
+        lines: [1],
+      });
     });
 
     await act(async () => {
@@ -956,9 +1017,10 @@ describe('CreasePatternPanel', () => {
     });
 
     act(() => {
-      container.querySelector<SVGLineElement>('[data-cp-line-id="1"]')?.dispatchEvent(
-        new MouseEvent('click', { bubbles: true })
-      );
+      useWorkspaceStore.getState().setOristudioCpSelection({
+        ...useWorkspaceStore.getState().oristudioCpSelection,
+        lines: [1],
+      });
     });
 
     await act(async () => {
@@ -1004,9 +1066,10 @@ describe('CreasePatternPanel', () => {
     });
 
     act(() => {
-      container.querySelector<SVGLineElement>('[data-cp-line-id="1"]')?.dispatchEvent(
-        new MouseEvent('click', { bubbles: true })
-      );
+      useWorkspaceStore.getState().setOristudioCpSelection({
+        ...useWorkspaceStore.getState().oristudioCpSelection,
+        lines: [1],
+      });
     });
 
     await act(async () => {
@@ -1079,7 +1142,7 @@ describe('CreasePatternPanel', () => {
     expect(transformMocks.setTransform).toHaveBeenCalled();
 
     await act(async () => {
-      container.querySelector<HTMLButtonElement>('button[aria-label="Check 1"]')?.click();
+      container.querySelector<HTMLButtonElement>('button[aria-label="Check overlaps"]')?.click();
       await Promise.resolve();
     });
 

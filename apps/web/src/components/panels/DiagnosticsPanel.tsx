@@ -46,12 +46,13 @@ export function DiagnosticsPanel() {
         ? []
         : (lastCommandResult?.diagnostic_entries ?? []);
     const cpDiagnosticEntries = [...camvDiagnosticEntries, ...commandDiagnosticEntries];
-    const cpDiagnosticSummary =
+    const cpDiagnosticSummary = semanticCpDiagnosticSummary(
       (camvDiagnosticEntries.length > 0 ? oristudioCpCamvResult?.diagnostics[0] : null) ??
       (commandDiagnosticEntries.length > 0 ? lastCommandResult?.diagnostics[0] : null) ??
       oristudioCpCamvResult?.diagnostics[0] ??
       lastCommandResult?.diagnostics[0] ??
-      null;
+      null
+    );
     const cpDiagnosticTone = cpDiagnosticEntries.some((entry) => entry.severity === 'error')
       ? 'bad'
       : cpDiagnosticEntries.some((entry) => entry.severity === 'warning')
@@ -112,7 +113,7 @@ export function DiagnosticsPanel() {
                     useLayoutStore.getState().activatePanel('crease-pattern');
                   }}
                 >
-                  <span>{entry.kind}</span>
+                  <span>{semanticCpDiagnosticKind(entry.kind)}</span>
                   <span>{entry.message}</span>
                 </button>
               ))}
@@ -229,4 +230,30 @@ function Metric({ label, value }: { label: string; value: number | string }) {
       <div className="metric__value">{value}</div>
     </div>
   );
+}
+
+function semanticCpDiagnosticKind(kind: string): string {
+  switch (kind) {
+    case 'Check1':
+      return 'Overlap check';
+    case 'Check2':
+      return 'T-junction check';
+    case 'Check3':
+      return 'Vertex foldability';
+    case 'Check4':
+    case 'CheckCamv':
+      return 'Maekawa/LBL';
+    default:
+      return kind;
+  }
+}
+
+function semanticCpDiagnosticSummary(summary: string | null): string | null {
+  if (!summary) return null;
+  return summary
+    .replace(/^Check1\b/u, 'Overlap check')
+    .replace(/^Check2\b/u, 'T-junction check')
+    .replace(/^Check3\b/u, 'Vertex foldability check')
+    .replace(/^Check4\b/u, 'Maekawa/LBL check')
+    .replace(/^CheckCamv\b/u, 'CAMV check');
 }

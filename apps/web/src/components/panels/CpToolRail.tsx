@@ -194,7 +194,6 @@ export function CpToolRail({
 }: CpToolRailProps) {
   return (
     <aside className="cp-tool-rail" aria-label="Crease pattern tools">
-      <div className="cp-tool-rail__header">Tools</div>
       <div className="cp-tool-rail__groups">
         {ORISTUDIO_CP_ACTION_GROUPS.map((group) => {
           const actions = cpActionsForGroup(group.id).filter(

@@ -14,7 +14,9 @@ export type OristudioCpActionKind = 'line-type' | 'command';
 export type OristudioCpActionId = `cp.action.${string}`;
 export type OristudioCpActionGroupId = 'line-type' | OristudioCpCommandGroupId;
 export type OristudioCpLineInputMode = 'fold-line' | 'aux-line';
-export type OristudioCpActionInputMode = 'point-sequence' | 'drag-path' | 'drag-line';
+export type OristudioCpActionInputMode = 'point-sequence' | 'drag-path' | 'drag-line' | 'drag-box';
+export const DEFAULT_ORISTUDIO_CP_ACTION_ID =
+  'cp.action.crease-select' as const satisfies OristudioCpActionId;
 
 export interface OristudioCpActionGroupDefinition {
   id: OristudioCpActionGroupId;
@@ -160,7 +162,15 @@ function commandAction(
     lineInputMode: 'fold-line',
     repeatable:
       command.operationId === 'DrawCreaseFree' ||
-      command.operationId === 'DrawCreaseRestricted',
+      command.operationId === 'DrawCreaseRestricted' ||
+      command.operationId === 'CreaseSelect' ||
+      command.operationId === 'CreaseUnselect' ||
+      command.operationId === 'SelectPolygon' ||
+      command.operationId === 'UnselectPolygon' ||
+      command.operationId === 'SelectLineIntersecting' ||
+      command.operationId === 'UnselectLineIntersecting' ||
+      command.operationId === 'SelectLasso' ||
+      command.operationId === 'UnselectLasso',
     ...overrides,
   };
 }

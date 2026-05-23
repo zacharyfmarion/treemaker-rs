@@ -7,6 +7,13 @@ import { useWorkspaceStore } from '../store/workspaceStore';
 import { selectWorkspaceCapabilities } from '../store/workspaceStore/capabilities';
 import type { WorkspaceCapabilities, WorkspaceCapabilityId } from '../lib/workspaceCapabilities';
 import { requestPositiveNumber, type NumberDialogOptions } from '../store/commandDialogStore';
+import type {
+  OristudioCpCommandPayload,
+  OristudioCpDocumentState,
+} from '../engine/oristudioCpTypes';
+import type { OristudioCpSelection } from '../lib/creasePatternViewport';
+import type { OristudioCpOperationId } from '../lib/oristudioCpCommands';
+import type { DocumentMode } from '../lib/sampleProject';
 
 export const MENU_ACTION_IDS = [
   'app.about',
@@ -17,6 +24,7 @@ export const MENU_ACTION_IDS = [
   'file.saveAs',
   'file.settings',
   'file.exportV4',
+  'file.exportCp',
   'file.exportFold',
   'file.exportSvg',
   'file.exportPng',
@@ -59,6 +67,27 @@ export const MENU_ACTION_IDS = [
   'optimize.edges',
   'optimize.strain',
   'cp.build',
+  'cp.foldedPreview',
+  'cp.deleteSelectedLines',
+  'cp.changeCreaseType',
+  'cp.advanceCreaseType',
+  'cp.makeMountain',
+  'cp.makeValley',
+  'cp.makeEdge',
+  'cp.makeAuxiliary',
+  'cp.toggleMountainValley',
+  'cp.replaceLineType',
+  'cp.deleteLineType',
+  'cp.checkCamv',
+  'cp.check1',
+  'cp.check2',
+  'cp.check3',
+  'cp.check4',
+  'cp.fix1',
+  'cp.fix2',
+  'cp.fixInaccurate',
+  'cp.changeCircleColor',
+  'cp.organizeCircles',
   'help.documentation',
   'help.about',
 ] as const;
@@ -71,6 +100,7 @@ export interface WorkspaceCommands {
   saveProject(fileService?: FileService): Promise<boolean>;
   saveProjectAs(fileService?: FileService): Promise<boolean>;
   exportV4(fileService?: FileService): Promise<boolean>;
+  exportCp(fileService?: FileService): Promise<boolean>;
   exportFold(fileService?: FileService): Promise<boolean>;
   exportSvg(fileService?: FileService): Promise<boolean>;
   exportPng(fileService?: FileService): Promise<boolean>;
@@ -107,6 +137,16 @@ export interface WorkspaceCommands {
   addLargestStubForSelectedNodes(): Promise<void>;
   addLargestStubForSelectedPoly(): Promise<void>;
   triangulateTree(): Promise<void>;
+  documentMode: DocumentMode;
+  oristudioCpDocument: OristudioCpDocumentState | null;
+  oristudioCpSelection: OristudioCpSelection;
+  setOristudioCpSelection(selection: OristudioCpSelection): void;
+  clearOristudioCpSelection(): void;
+  requestOristudioCpAction(operationId: OristudioCpOperationId): void;
+  executeOristudioCpCommand(
+    operationId: OristudioCpOperationId,
+    payload?: OristudioCpCommandPayload
+  ): Promise<boolean>;
 }
 
 export interface LayoutCommands {
@@ -132,9 +172,37 @@ const FILE_ACTIONS: Partial<Record<MenuActionId, FileCommand>> = {
   'file.save': 'saveProject',
   'file.saveAs': 'saveProjectAs',
   'file.exportV4': 'exportV4',
+  'file.exportCp': 'exportCp',
   'file.exportFold': 'exportFold',
   'file.exportSvg': 'exportSvg',
   'file.exportPng': 'exportPng',
+};
+
+const CP_OPERATION_ACTIONS: Partial<Record<MenuActionId, OristudioCpOperationId>> = {
+  'cp.checkCamv': 'CheckCamv',
+  'cp.check1': 'Check1',
+  'cp.check2': 'Check2',
+  'cp.check3': 'Check3',
+  'cp.check4': 'Check4',
+  'cp.fix1': 'Fix1',
+  'cp.fix2': 'Fix2',
+};
+
+const CP_SELECTED_LINE_ACTIONS: Partial<Record<MenuActionId, OristudioCpOperationId>> = {
+  'cp.changeCreaseType': 'ChangeCreaseType',
+  'cp.advanceCreaseType': 'CreaseAdvanceType',
+  'cp.makeMountain': 'CreaseMakeMountain',
+  'cp.makeValley': 'CreaseMakeValley',
+  'cp.makeEdge': 'CreaseMakeEdge',
+  'cp.makeAuxiliary': 'CreaseMakeAux',
+  'cp.toggleMountainValley': 'CreaseToggleMv',
+};
+
+const CP_CONTEXT_ACTIONS: Partial<Record<MenuActionId, OristudioCpOperationId>> = {
+  'cp.replaceLineType': 'ReplaceLineTypeSelect',
+  'cp.deleteLineType': 'DeleteLineTypeSelect',
+  'cp.fixInaccurate': 'FixInaccurate',
+  'cp.changeCircleColor': 'CircleChangeColor',
 };
 
 export function isMenuActionId(id: string): id is MenuActionId {
@@ -165,6 +233,8 @@ export function createMenuActionHandler(deps: MenuActionDependencies) {
           return deps.workspace.saveProjectAs(deps.fileService);
         case 'exportV4':
           return deps.workspace.exportV4(deps.fileService);
+        case 'exportCp':
+          return deps.workspace.exportCp(deps.fileService);
         case 'exportFold':
           return deps.workspace.exportFold(deps.fileService);
         case 'exportSvg':
@@ -172,6 +242,42 @@ export function createMenuActionHandler(deps: MenuActionDependencies) {
         case 'exportPng':
           return deps.workspace.exportPng(deps.fileService);
       }
+    }
+
+    const cpOperation = CP_OPERATION_ACTIONS[id];
+    if (cpOperation) {
+      return deps.workspace.executeOristudioCpCommand(cpOperation);
+    }
+
+    const cpSelectedLineOperation = CP_SELECTED_LINE_ACTIONS[id];
+    if (cpSelectedLineOperation) {
+      const lineIds = deps.workspace.oristudioCpSelection.lines;
+      if (lineIds.length === 0) return false;
+      return deps.workspace.executeOristudioCpCommand(cpSelectedLineOperation, {
+        line_ids: lineIds,
+      });
+    }
+
+    const cpContextOperation = CP_CONTEXT_ACTIONS[id];
+    if (cpContextOperation) {
+      const selection = deps.workspace.oristudioCpSelection;
+      if (
+        (cpContextOperation === 'ReplaceLineTypeSelect' ||
+          cpContextOperation === 'DeleteLineTypeSelect' ||
+          cpContextOperation === 'FixInaccurate') &&
+        selection.lines.length === 0
+      ) {
+        return false;
+      }
+      if (
+        cpContextOperation === 'CircleChangeColor' &&
+        selection.lines.length === 0 &&
+        selection.circles.length === 0
+      ) {
+        return false;
+      }
+      deps.workspace.requestOristudioCpAction(cpContextOperation);
+      return true;
     }
 
     switch (id) {
@@ -203,13 +309,38 @@ export function createMenuActionHandler(deps: MenuActionDependencies) {
         await deps.workspace.pasteClipboard();
         return true;
       case 'edit.delete':
-        await deps.workspace.deleteSelection();
-        return true;
+        if (deps.workspace.documentMode === 'crease-pattern') {
+          const lineIds = deps.workspace.oristudioCpSelection.lines;
+          if (lineIds.length === 0) return false;
+          return deps.workspace.executeOristudioCpCommand('LineSegmentDelete', {
+            line_ids: lineIds,
+          });
+        } else {
+          await deps.workspace.deleteSelection();
+          return true;
+        }
       case 'edit.selectAll':
-        deps.workspace.selectAll();
+        if (deps.workspace.documentMode === 'crease-pattern') {
+          const lineCount =
+            deps.workspace.oristudioCpDocument?.document.crease_pattern.line_segments.length ?? 0;
+          deps.workspace.setOristudioCpSelection({
+            lines: Array.from({ length: lineCount }, (_value, index) => index + 1),
+            vertices: [],
+            points: [],
+            circles: [],
+            texts: [],
+            faces: [],
+          });
+        } else {
+          deps.workspace.selectAll();
+        }
         return true;
       case 'edit.deselectAll':
-        deps.workspace.selectNone();
+        if (deps.workspace.documentMode === 'crease-pattern') {
+          deps.workspace.clearOristudioCpSelection();
+        } else {
+          deps.workspace.selectNone();
+        }
         return true;
       case 'edit.selectByIndex':
         deps.selectByIndex?.();
@@ -334,6 +465,18 @@ export function createMenuActionHandler(deps: MenuActionDependencies) {
       case 'cp.build':
         await deps.workspace.buildCreasePattern();
         return true;
+      case 'cp.foldedPreview':
+        deps.layout.activatePanel('folded-base');
+        return true;
+      case 'cp.deleteSelectedLines': {
+        const lineIds = deps.workspace.oristudioCpSelection.lines;
+        if (lineIds.length === 0) return false;
+        return deps.workspace.executeOristudioCpCommand('LineSegmentDelete', {
+          line_ids: lineIds,
+        });
+      }
+      case 'cp.organizeCircles':
+        return deps.workspace.executeOristudioCpCommand('OrganizeCircles');
       case 'help.documentation':
         deps.help?.();
         return true;

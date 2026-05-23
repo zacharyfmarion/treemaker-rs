@@ -6,7 +6,23 @@ import {
   projectStateFromSnapshot,
   statusFromSnapshot,
 } from '../engineRuntime';
-import type { HistoryEntry, HistorySlice, WorkspaceSliceCreator } from '../types';
+import {
+  executeOristudioCpCommand as executeRuntimeOristudioCpCommand,
+  oristudioCpError,
+  restoreOristudioCpDocument,
+} from '../oristudioCpRuntime';
+import type {
+  HistoryEntry,
+  HistorySlice,
+  OristudioCpHistoryEntry,
+  WorkspaceSliceCreator,
+} from '../types';
+import type {
+  OristudioCpCommandResult,
+  OristudioCpDocumentSnapshot,
+  OristudioCpDocumentState,
+} from '../../../engine/oristudioCpTypes';
+import type { OristudioCpSelection } from '../../../lib/creasePatternViewport';
 
 const MAX_HISTORY = 100;
 
@@ -16,6 +32,60 @@ function historyEntry(text: string, label = 'Edit'): HistoryEntry {
     label,
     timestamp: new Date().toISOString(),
   };
+}
+
+function cpHistoryEntry(
+  document: OristudioCpDocumentSnapshot,
+  selection: OristudioCpSelection,
+  label = 'Edit'
+): OristudioCpHistoryEntry {
+  return {
+    document,
+    selection,
+    label,
+    timestamp: new Date().toISOString(),
+  };
+}
+
+function setRestoredCreasePatternState(
+  restored: OristudioCpDocumentState,
+  selection: OristudioCpSelection,
+  camvResult: OristudioCpCommandResult | null
+) {
+  return {
+    oristudioCpDocument: restored,
+    oristudioCpOperationDescriptors: restored.operationDescriptors,
+    oristudioCpSelection: selection,
+    oristudioCpActiveDiagnosticId: null,
+    oristudioCpCamvResult: camvResult,
+    oristudioCpError: null,
+    error: null,
+    dirty: true,
+    status: 'crease_pattern_ready' as const,
+  };
+}
+
+async function refreshAlwaysOnCamvDiagnostics(
+  restored: OristudioCpDocumentState
+): Promise<{
+  restored: OristudioCpDocumentState;
+  camvResult: OristudioCpCommandResult | null;
+}> {
+  try {
+    const checkedDocument = await executeRuntimeOristudioCpCommand('CheckCamv');
+    return {
+      restored: {
+        ...checkedDocument,
+        lastCommandResult: restored.lastCommandResult,
+      },
+      camvResult:
+        checkedDocument.lastCommandResult?.operation === 'CheckCamv'
+          ? checkedDocument.lastCommandResult
+          : null,
+    };
+  } catch {
+    return { restored, camvResult: null };
+  }
 }
 
 export const createHistorySlice: WorkspaceSliceCreator<HistorySlice> = (set, get) => ({
@@ -46,9 +116,53 @@ export const createHistorySlice: WorkspaceSliceCreator<HistorySlice> = (set, get
     });
   },
 
-  clearHistory: () => set({ historyPast: [], historyFuture: [] }),
+  clearHistory: () =>
+    set({
+      historyPast: [],
+      historyFuture: [],
+      oristudioCpHistoryPast: [],
+      oristudioCpHistoryFuture: [],
+      oristudioCpActiveDiagnosticId: null,
+      oristudioCpCamvResult: null,
+    }),
 
   undo: async () => {
+    if (get().documentMode === 'crease-pattern') {
+      const past = get().oristudioCpHistoryPast;
+      const previous = past.at(-1);
+      const current = get().oristudioCpDocument;
+      if (!previous || !current || get().historyBusy) return;
+      const currentSelection = get().oristudioCpSelection;
+      set({ historyBusy: true, error: null, oristudioCpError: null });
+      try {
+        const restored = await restoreOristudioCpDocument(previous.document, current.source, null);
+        const checked = await refreshAlwaysOnCamvDiagnostics(restored);
+        set({
+          ...setRestoredCreasePatternState(
+            checked.restored,
+            previous.selection,
+            checked.camvResult
+          ),
+          oristudioCpHistoryPast: past.slice(0, -1),
+          oristudioCpHistoryFuture: [
+            cpHistoryEntry(current.document, currentSelection, previous.label),
+            ...get().oristudioCpHistoryFuture,
+          ].slice(0, MAX_HISTORY),
+          historyBusy: false,
+          projectMessage: `Undid ${previous.label}`,
+        });
+      } catch (error) {
+        const normalized = oristudioCpError(error);
+        set({
+          status: 'error',
+          error: normalized,
+          oristudioCpError: normalized.message,
+          historyBusy: false,
+        });
+      }
+      return;
+    }
+
     if (get().documentMode !== 'tree') return;
     const past = get().historyPast;
     const previous = past.at(-1);
@@ -81,6 +195,38 @@ export const createHistorySlice: WorkspaceSliceCreator<HistorySlice> = (set, get
   },
 
   redo: async () => {
+    if (get().documentMode === 'crease-pattern') {
+      const future = get().oristudioCpHistoryFuture;
+      const next = future[0];
+      const current = get().oristudioCpDocument;
+      if (!next || !current || get().historyBusy) return;
+      const currentSelection = get().oristudioCpSelection;
+      set({ historyBusy: true, error: null, oristudioCpError: null });
+      try {
+        const restored = await restoreOristudioCpDocument(next.document, current.source, null);
+        const checked = await refreshAlwaysOnCamvDiagnostics(restored);
+        set({
+          ...setRestoredCreasePatternState(checked.restored, next.selection, checked.camvResult),
+          oristudioCpHistoryPast: [
+            ...get().oristudioCpHistoryPast,
+            cpHistoryEntry(current.document, currentSelection, next.label),
+          ].slice(-MAX_HISTORY),
+          oristudioCpHistoryFuture: future.slice(1),
+          historyBusy: false,
+          projectMessage: `Redid ${next.label}`,
+        });
+      } catch (error) {
+        const normalized = oristudioCpError(error);
+        set({
+          status: 'error',
+          error: normalized,
+          oristudioCpError: normalized.message,
+          historyBusy: false,
+        });
+      }
+      return;
+    }
+
     if (get().documentMode !== 'tree') return;
     const future = get().historyFuture;
     const next = future[0];

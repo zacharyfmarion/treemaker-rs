@@ -1,0 +1,468 @@
+use oristudio_cp::CreasePatternDocument;
+use oristudio_cp::geometry::{Circle, LineColor, LineSegment, Point, RgbColor};
+use oristudio_cp::io::{cp, dxf, fold, obj, orh, ori};
+use oristudio_cp::model::{CreasePatternModel, GridState, TextElement};
+
+#[test]
+fn cp_import_and_export_preserve_oriedita_assignment_numbers() {
+    let input = "\
+1 200.0 200.0 200.0 -200.0
+3 200.0 200.0 0.0 0.0
+2 0.0 0.0 -200.0 -200.0
+4 1.5 2.25 3.5 4.75
+";
+
+    let model = cp::import_cp_str(input).expect("valid cp");
+    assert_eq!(model.line_segments.len(), 4);
+    assert_eq!(model.line_segments[0].color, LineColor::Black0);
+    assert_eq!(model.line_segments[1].color, LineColor::Red1);
+    assert_eq!(model.line_segments[2].color, LineColor::Blue2);
+    assert_eq!(model.line_segments[3].color, LineColor::Cyan3);
+
+    assert_eq!(cp::export_cp_string(&model), input);
+}
+
+#[test]
+fn fold_import_reads_edges_and_oriedita_extensions() {
+    let input = r##"{
+      "file_spec": 1.1,
+      "vertices_coords": [[0, 0], [10, 0], [10, 10]],
+      "edges_vertices": [[0, 1], [1, 2]],
+      "edges_assignment": ["B", "M"],
+      "oriedita:edges_colors": ["", "ffff33"],
+      "oriedita:circles_coords": [[5, 5]],
+      "oriedita:circles_radii": [2],
+      "oriedita:circles_colors": ["3"],
+      "oriedita:circles_custom_colors": ["64c8c8"],
+      "oriedita:texts_coords": [[1, 2]],
+      "oriedita:texts_text": ["note"],
+      "oriedita:grid_size": 16,
+      "oriedita:grid_style": 2
+    }"##;
+
+    let model = fold::import_fold_json(input).expect("valid fold");
+    assert_eq!(model.line_segments.len(), 2);
+    assert_eq!(model.line_segments[0].color, LineColor::Black0);
+    assert_eq!(model.line_segments[1].color, LineColor::Red1);
+    assert_eq!(model.line_segments[0].a, Point::new(-200.0, -200.0));
+    assert_eq!(model.line_segments[0].b, Point::new(200.0, -200.0));
+    assert_eq!(model.line_segments[1].a, Point::new(200.0, -200.0));
+    assert_eq!(model.line_segments[1].b, Point::new(200.0, 200.0));
+    assert_eq!(model.line_segments[1].customized, 1);
+    assert_eq!(
+        model.line_segments[1].customized_color,
+        RgbColor::new(255, 255, 51)
+    );
+    assert_eq!(model.circles.len(), 1);
+    assert_eq!(model.circles[0].color, LineColor::Cyan3);
+    assert_eq!(
+        model.circles[0].customized_color,
+        RgbColor::new(100, 200, 200)
+    );
+    assert_eq!(model.circles[0].determine_center(), Point::new(5.0, 5.0));
+    assert_eq!(model.texts[0].position(), Point::new(1.0, 2.0));
+    assert_eq!(model.texts[0].text, "note");
+    assert_eq!(model.grid.grid_size, 16);
+    assert_eq!(model.grid.base_state, GridState::Full);
+}
+
+#[test]
+fn fold_import_defaults_missing_oriedita_grid_style_to_hidden_like_oriedita() {
+    let input = r#"{
+      "file_spec": 1.1,
+      "vertices_coords": [[0, 0], [10, 0]],
+      "edges_vertices": [[0, 1]],
+      "edges_assignment": ["B"]
+    }"#;
+
+    let model = fold::import_fold_json(input).expect("valid fold");
+
+    assert_eq!(model.grid.grid_size, 8);
+    assert_eq!(model.grid.base_state, GridState::Hidden);
+}
+
+#[test]
+fn fold_export_round_trips_canonical_model_data() {
+    let mut model = CreasePatternModel::default();
+    model.add_line_segment(
+        LineSegment::from_coordinates(-200.0, -200.0, 200.0, -200.0)
+            .with_line_color(LineColor::Blue2)
+            .with_customized_color(RgbColor::new(1, 2, 3)),
+    );
+    model.add_line(
+        Point::new(-200.0, -200.0),
+        Point::new(-200.0, 200.0),
+        LineColor::Cyan3,
+    );
+    model.add_circle(
+        Circle::new(5.0, 5.0, 2.0, LineColor::Magenta5)
+            .with_customized_color(RgbColor::new(100, 200, 200)),
+    );
+    model.add_text(TextElement::new(3.0, 4.0, "hello"));
+    model.grid.set_grid_size(12);
+    model.grid.base_state = GridState::Hidden;
+
+    let json = fold::export_fold_json(&model, Some("fold".to_string())).expect("serializes");
+    let imported = fold::import_fold_json(&json).expect("imports exported fold");
+
+    assert_eq!(model.canonical(1.0e-9), imported.canonical(1.0e-9));
+}
+
+#[test]
+fn fold_export_reconstructs_oriedita_face_topology() {
+    let mut model = CreasePatternModel::default();
+    for (a, b) in [
+        (Point::new(0.0, -200.0), Point::new(-200.0, 0.0)),
+        (Point::new(-200.0, 0.0), Point::new(0.0, 200.0)),
+        (Point::new(0.0, 200.0), Point::new(200.0, 0.0)),
+        (Point::new(200.0, 0.0), Point::new(0.0, -200.0)),
+    ] {
+        model.add_line(a, b, LineColor::Red1);
+    }
+
+    let document = fold::export_fold_document(&model, None);
+
+    assert_eq!(document.file_spec, Some(1.1));
+    assert_eq!(document.file_creator.as_deref(), Some("oriedita"));
+    assert_eq!(
+        document.vertices_coords,
+        vec![
+            vec![0.0, -200.0],
+            vec![-200.0, 0.0],
+            vec![0.0, 200.0],
+            vec![200.0, 0.0],
+        ]
+    );
+    assert_eq!(
+        document.edges_vertices,
+        vec![[0, 1], [1, 2], [2, 3], [3, 0]]
+    );
+    assert_eq!(document.faces_vertices, vec![vec![0, 1, 2, 3]]);
+    assert_eq!(document.faces_edges, vec![vec![3, 0, 1, 2]]);
+    assert_eq!(document.extra["oriedita:version"], "dev");
+    assert!(!document.extra.contains_key("oriedita:circles_coords"));
+    assert!(!document.extra.contains_key("oriedita:texts_coords"));
+}
+
+#[test]
+fn fold_export_suppresses_faces_when_oriedita_euler_check_fails() {
+    let mut model = CreasePatternModel::default();
+    for (a, b) in [
+        (
+            Point::new(-200.0, -200.0),
+            Point::new(-117.15728752538098, 0.0),
+        ),
+        (Point::new(0.0, 0.0), Point::new(-117.15728752538098, 0.0)),
+        (
+            Point::new(-200.0, 200.0),
+            Point::new(-117.15728752538098, 0.0),
+        ),
+        (
+            Point::new(-200.0, -200.0),
+            Point::new(0.0, -117.15728752538098),
+        ),
+        (Point::new(0.0, 0.0), Point::new(0.0, -117.15728752538098)),
+        (
+            Point::new(200.0, -200.0),
+            Point::new(0.0, -117.15728752538098),
+        ),
+    ] {
+        model.add_line(a, b, LineColor::Blue2);
+    }
+
+    let document = fold::export_fold_document(&model, None);
+
+    assert!(document.faces_vertices.is_empty());
+    assert!(document.faces_edges.is_empty());
+}
+
+#[test]
+fn dxf_export_uses_oriedita_layers_and_coordinate_transform() {
+    let mut model = CreasePatternModel::default();
+    model.add_line(Point::new(0.0, 0.0), Point::new(10.0, 0.0), LineColor::Red1);
+
+    let output = dxf::export_dxf_string(&model);
+    assert!(output.contains("MountainLine"));
+    assert!(output.contains("\n  62\n1\n"));
+    assert!(output.contains("\n  10\n604.0\n"));
+    assert!(output.contains("\n  20\n604.0\n"));
+}
+
+#[test]
+fn obj_import_matches_oriedita_face_edge_and_dummy_line_behavior() {
+    let input = "\
+v 0 0 0
+v 10 0 0
+v 0 10 0
+f 1 2 3
+";
+
+    let model = obj::import_obj_str(input).expect("valid obj");
+    assert_eq!(model.line_segments.len(), 4);
+    assert_eq!(model.line_segments[0].color, LineColor::None);
+    assert_eq!(model.line_segments[1].a, Point::new(0.0, 10.0));
+    assert_eq!(model.line_segments[1].b, Point::new(0.0, 0.0));
+}
+
+#[test]
+fn ori_import_reads_oriedita_save_json() {
+    let input = r##"{
+      "@version": "v1.1",
+      "lineSegments": [{
+        "a": "-200.0,-200.0",
+        "b": "200.0,-200.0",
+        "active": "ACTIVE_A_1",
+        "color": "RED_1",
+        "customized": 1,
+        "customizedColor": "ff010203",
+        "selected": 2
+      }],
+      "circles": [{
+        "x": 25.0,
+        "y": -50.0,
+        "r": 12.5,
+        "color": "CYAN_3",
+        "customized": 1,
+        "customizedColor": "ff64c8c8"
+      }],
+      "texts": [{"x": 1.0, "y": 2.0, "text": "note"}],
+      "title": "_",
+      "points": ["3.0,4.0"],
+      "auxLineSegments": [{
+        "a": "0.0,0.0",
+        "b": "1.0,1.0",
+        "active": "ACTIVE_BOTH_3",
+        "color": "YELLOW_7",
+        "customized": 0,
+        "customizedColor": "ff64c8c8",
+        "selected": 0
+      }],
+      "gridModel": {
+        "intervalGridSize": 5,
+        "gridSize": 16,
+        "gridXA": 2.0,
+        "gridXB": 1.0,
+        "gridXC": 4.0,
+        "gridYA": 1.0,
+        "gridYB": 0.0,
+        "gridYC": 1.0,
+        "gridAngle": 45.0,
+        "baseState": "FULL",
+        "verticalScalePosition": 3,
+        "horizontalScalePosition": 2,
+        "drawDiagonalGridlines": true
+      },
+      "canvasModel": {"mouseMode": "DRAW_CREASE_FREE_1"}
+    }"##;
+
+    let document = ori::import_ori_json(input).expect("valid ori");
+    let model = &document.crease_pattern;
+
+    assert_eq!(document.title.as_deref(), Some("_"));
+    assert_eq!(model.line_segments.len(), 1);
+    assert_eq!(model.line_segments[0].color, LineColor::Red1);
+    assert_eq!(
+        model.line_segments[0].active,
+        oristudio_cp::geometry::ActiveState::ActiveA1
+    );
+    assert_eq!(model.line_segments[0].selected, 2);
+    assert_eq!(
+        model.line_segments[0].customized_color,
+        RgbColor::new(1, 2, 3)
+    );
+    assert_eq!(model.circles[0].color, LineColor::Cyan3);
+    assert_eq!(model.texts[0].text, "note");
+    assert_eq!(model.points[0], Point::new(3.0, 4.0));
+    assert_eq!(model.aux_line_segments[0].color, LineColor::Yellow7);
+    assert_eq!(model.grid.interval_grid_size, 5);
+    assert_eq!(model.grid.grid_size, 16);
+    assert_eq!(model.grid.grid_angle, 45.0);
+    assert_eq!(model.grid.base_state, GridState::Full);
+    assert_eq!(
+        document.metadata.get("oriedita:ori:canvasModel"),
+        Some(&serde_json::json!({"mouseMode": "DRAW_CREASE_FREE_1"}))
+    );
+}
+
+#[test]
+fn ori_export_round_trips_canonical_model_data_and_metadata() {
+    let mut document = CreasePatternDocument {
+        title: Some("model".to_string()),
+        ..CreasePatternDocument::default()
+    };
+    document.crease_pattern.add_line_segment(
+        LineSegment::from_coordinates(0.0, 0.0, 10.0, 0.0)
+            .with_line_color(LineColor::Blue2)
+            .with_customized_color(RgbColor::new(10, 20, 30)),
+    );
+    document
+        .crease_pattern
+        .add_aux_line_segment(LineSegment::with_color(
+            Point::new(1.0, 1.0),
+            Point::new(2.0, 2.0),
+            LineColor::Orange4,
+        ));
+    document
+        .crease_pattern
+        .add_circle(Circle::new(5.0, 5.0, 2.0, LineColor::Magenta5));
+    document
+        .crease_pattern
+        .add_text(TextElement::new(3.0, 4.0, "hello"));
+    document.crease_pattern.add_point(Point::new(-1.0, -2.0));
+    document.crease_pattern.grid.base_state = GridState::Hidden;
+    document.metadata.insert(
+        "oriedita:ori:applicationModel".to_string(),
+        serde_json::Value::Null,
+    );
+
+    let json = ori::export_ori_json(&document).expect("serializes ori");
+    let exported: serde_json::Value = serde_json::from_str(&json).expect("json");
+
+    assert_eq!(exported["@version"], "v1.1");
+    assert_eq!(exported["lineSegments"][0]["color"], "BLUE_2");
+    assert_eq!(exported["lineSegments"][0]["customizedColor"], "ff0a141e");
+    assert!(exported.get("applicationModel").is_some());
+
+    let imported = ori::import_ori_json(&json).expect("imports exported ori");
+    assert_eq!(document.canonical(1.0e-9), imported.canonical(1.0e-9));
+    assert_eq!(
+        imported.metadata.get("oriedita:ori:applicationModel"),
+        Some(&serde_json::Value::Null)
+    );
+}
+
+#[test]
+fn ori_import_has_explicit_unknown_version_policy() {
+    let input = r#"{"@version":"v99","lineSegments":[]}"#;
+
+    assert!(ori::import_ori_json(input).is_err());
+    assert!(ori::import_ori_json_with_unknown_version(input, true).is_ok());
+}
+
+#[test]
+fn orh_import_matches_oriedita_legacy_quirks() {
+    let input = "\
+<タイトル>
+タイトル,orh model
+<線分集合>
+番号,1
+色,1
+<tpp>0</tpp>
+<tpp_color_R>10</tpp_color_R>
+<tpp_color_G>20</tpp_color_G>
+<tpp_color_B>30</tpp_color_B>
+iactive,ACTIVE_BOTH_3
+選択,2
+座標,0.0,0.0,10.0,0.0
+<円集合>
+番号,1
+中心と半径と色,5.0,5.0,2.0,3
+<tpp>1</tpp>
+<tpp_color_R>40</tpp_color_R>
+<tpp_color_G>50</tpp_color_G>
+<tpp_color_B>60</tpp_color_B>
+<補助線分集合>
+補助番号,1
+補助色,4
+補助座標,1.0,1.0,2.0,2.0
+<Kousi>
+<i_kitei_jyoutai>2</i_kitei_jyoutai>
+<nyuuryoku_kitei>12.6</nyuuryoku_kitei>
+<memori_kankaku>6</memori_kankaku>
+<a_to_heikouna_memori_iti>4</a_to_heikouna_memori_iti>
+<b_to_heikouna_memori_iti>5</b_to_heikouna_memori_iti>
+<d_kousi_x_a>2</d_kousi_x_a>
+<d_kousi_x_b>1.5</d_kousi_x_b>
+<d_kousi_x_c>4</d_kousi_x_c>
+<d_kousi_y_a>1</d_kousi_y_a>
+<d_kousi_y_b>0</d_kousi_y_b>
+<d_kousi_y_c>1</d_kousi_y_c>
+<d_kousi_kakudo>45</d_kousi_kakudo>
+</Kousi>
+";
+
+    let document = orh::import_orh_str(input).expect("valid orh");
+    let model = &document.crease_pattern;
+
+    assert_eq!(document.title.as_deref(), Some("orh model"));
+    assert_eq!(model.line_segments.len(), 2);
+    assert_eq!(model.line_segments[0].color, LineColor::Red1);
+    assert_eq!(
+        model.line_segments[0].active,
+        oristudio_cp::geometry::ActiveState::ActiveBoth3
+    );
+    assert_eq!(model.line_segments[0].selected, 2);
+    assert_eq!(model.line_segments[0].customized, 1);
+    assert_eq!(
+        model.line_segments[0].customized_color,
+        RgbColor::new(10, 20, 30)
+    );
+    assert_eq!(model.line_segments[1], LineSegment::default());
+    assert_eq!(model.circles.len(), 2);
+    assert_eq!(model.circles[0].color, LineColor::Cyan3);
+    assert_eq!(model.circles[0].customized, 1);
+    assert_eq!(model.circles[0].customized_color, RgbColor::new(40, 50, 60));
+    assert_eq!(model.circles[1], Circle::default());
+    assert!(model.aux_line_segments.is_empty());
+    assert_eq!(model.grid.base_state, GridState::WithinPaper);
+    assert_eq!(model.grid.grid_size, 8);
+    assert_eq!(model.grid.interval_grid_size, 4);
+    assert_eq!(model.grid.determine_grid_x_length(), 1.0);
+    assert_eq!(model.grid.grid_angle, 90.0);
+
+    assert!(orh::import_orh_bytes(input.as_bytes()).is_ok());
+}
+
+#[test]
+fn orh_export_writes_oriedita_sections_and_imports_back_with_quirks() {
+    let mut document = CreasePatternDocument {
+        title: Some("exported".to_string()),
+        ..CreasePatternDocument::default()
+    };
+    document.crease_pattern.add_line_segment(
+        LineSegment::with_color(
+            Point::new(0.0, 0.0),
+            Point::new(10.0, 0.0),
+            LineColor::Blue2,
+        )
+        .with_customized_color(RgbColor::new(1, 2, 3)),
+    );
+    document
+        .crease_pattern
+        .add_circle(Circle::new(5.0, 5.0, 2.0, LineColor::Magenta5));
+    document
+        .crease_pattern
+        .add_aux_line_segment(LineSegment::with_color(
+            Point::new(1.0, 1.0),
+            Point::new(2.0, 2.0),
+            LineColor::Orange4,
+        ));
+    document.crease_pattern.grid.base_state = GridState::Hidden;
+    document.crease_pattern.grid.set_grid_size(24);
+
+    let output = orh::export_orh_string(&document);
+
+    assert!(output.contains("<タイトル>"));
+    assert!(output.contains("タイトル,exported"));
+    assert!(output.contains("色,2"));
+    assert!(output.contains("<tpp_color_R>1</tpp_color_R>"));
+    assert!(output.contains("<補助線分集合>"));
+    assert!(output.contains("補助色,4"));
+    assert!(output.contains("<i_kitei_jyoutai>0</i_kitei_jyoutai>"));
+    assert!(output.contains("<nyuuryoku_kitei>24</nyuuryoku_kitei>"));
+
+    let imported = orh::import_orh_str(&output).expect("imports exported orh");
+    assert_eq!(imported.title.as_deref(), Some("exported"));
+    assert_eq!(imported.crease_pattern.line_segments.len(), 2);
+    assert_eq!(
+        imported.crease_pattern.line_segments[0].a,
+        Point::new(0.0, 0.0)
+    );
+    assert_eq!(
+        imported.crease_pattern.line_segments[0].color,
+        LineColor::Blue2
+    );
+    assert_eq!(imported.crease_pattern.line_segments[0].customized, 1);
+    assert_eq!(imported.crease_pattern.circles.len(), 2);
+    assert!(imported.crease_pattern.aux_line_segments.is_empty());
+}

@@ -11,7 +11,12 @@ function capabilities({
   creaseCount = 0,
   facetCount = 0,
   engineReady = true,
+  hasEditableCreasePattern = false,
   hasImportedCreasePattern = false,
+  oristudioCpSelectedLineCount = 0,
+  oristudioCpSelectedCircleCount = 0,
+  historyPastCount = 0,
+  historyFutureCount = 0,
   selection = treeSelection,
 }: {
   documentMode?: DocumentMode;
@@ -20,7 +25,12 @@ function capabilities({
   creaseCount?: number;
   facetCount?: number;
   engineReady?: boolean;
+  hasEditableCreasePattern?: boolean;
   hasImportedCreasePattern?: boolean;
+  oristudioCpSelectedLineCount?: number;
+  oristudioCpSelectedCircleCount?: number;
+  historyPastCount?: number;
+  historyFutureCount?: number;
   selection?: Selection;
 } = {}) {
   return getWorkspaceCapabilities({
@@ -30,10 +40,13 @@ function capabilities({
     edgeCount,
     creaseCount,
     facetCount,
+    hasEditableCreasePattern,
     hasImportedCreasePattern,
     hasSimulationModel: false,
-    historyPastCount: 0,
-    historyFutureCount: 0,
+    oristudioCpSelectedLineCount,
+    oristudioCpSelectedCircleCount,
+    historyPastCount,
+    historyFutureCount,
     clipboard: null,
     selection,
   });
@@ -119,11 +132,116 @@ describe('workspace capabilities', () => {
     expect(state['cp.build'].enabled).toBe(false);
     expect(state['cp.build'].reason).toBe('Build CP requires an editable tree document');
     expect(state['file.save'].enabled).toBe(false);
+    expect(state['file.exportCp'].enabled).toBe(false);
     expect(state['file.exportFold'].enabled).toBe(true);
     expect(state['file.exportSvg'].enabled).toBe(true);
     expect(state['view.foldedBase'].enabled).toBe(true);
+    expect(state['cp.foldedPreview'].enabled).toBe(true);
     expect(state['foldedBase.refresh'].enabled).toBe(false);
     expect(getNextDocumentAction(state)).toBe(null);
+  });
+
+  it('enables CP save actions when an editable CP kernel is available', () => {
+    const state = capabilities({
+      documentMode: 'crease-pattern',
+      status: 'crease_pattern_ready',
+      creaseCount: 5,
+      facetCount: 1,
+      hasEditableCreasePattern: true,
+      hasImportedCreasePattern: true,
+    });
+
+    expect(state['file.save']).toMatchObject({
+      enabled: true,
+      reason: 'Save editable crease pattern as CP',
+    });
+    expect(state['file.saveAs']).toMatchObject({
+      enabled: true,
+      reason: 'Save editable crease pattern as a new CP file',
+    });
+    expect(state['file.exportCp']).toMatchObject({
+      enabled: true,
+      reason: 'Export editable crease pattern as CP',
+    });
+    expect(state['cp.checkCamv'].enabled).toBe(true);
+    expect(state['cp.deleteSelectedLines'].enabled).toBe(false);
+    expect(state['cp.fixInaccurate'].enabled).toBe(false);
+    expect(state['cp.makeMountain'].enabled).toBe(false);
+    expect(state['cp.changeCircleColor'].enabled).toBe(false);
+    expect(state['cp.organizeCircles'].enabled).toBe(true);
+  });
+
+  it('enables selected-line CP commands only when editable CP lines are selected', () => {
+    const state = capabilities({
+      documentMode: 'crease-pattern',
+      status: 'crease_pattern_ready',
+      hasEditableCreasePattern: true,
+      hasImportedCreasePattern: true,
+      oristudioCpSelectedLineCount: 2,
+    });
+
+    expect(state['cp.deleteSelectedLines']).toMatchObject({
+      enabled: true,
+      reason: 'Delete selected crease-pattern lines',
+    });
+    expect(state['edit.delete']).toMatchObject({
+      enabled: true,
+      reason: 'Delete selected crease-pattern lines',
+    });
+    expect(state['cp.fixInaccurate']).toMatchObject({
+      enabled: true,
+      reason: 'Open inaccurate-crease repair settings for selected lines',
+    });
+    expect(state['cp.makeMountain']).toMatchObject({
+      enabled: true,
+      reason: 'Make selected lines mountain folds',
+    });
+    expect(state['cp.replaceLineType']).toMatchObject({
+      enabled: true,
+      reason: 'Open line-type replacement settings for selected lines',
+    });
+  });
+
+  it('enables selected-circle CP actions only when circle or auxiliary selections exist', () => {
+    const noSelection = capabilities({
+      documentMode: 'crease-pattern',
+      status: 'crease_pattern_ready',
+      hasEditableCreasePattern: true,
+      hasImportedCreasePattern: true,
+    });
+    const circleSelection = capabilities({
+      documentMode: 'crease-pattern',
+      status: 'crease_pattern_ready',
+      hasEditableCreasePattern: true,
+      hasImportedCreasePattern: true,
+      oristudioCpSelectedCircleCount: 1,
+    });
+
+    expect(noSelection['cp.changeCircleColor'].enabled).toBe(false);
+    expect(circleSelection['cp.changeCircleColor']).toMatchObject({
+      enabled: true,
+      reason: 'Open color settings for selected circles or auxiliary lines',
+    });
+  });
+
+  it('enables undo and redo for editable CP history', () => {
+    const state = capabilities({
+      documentMode: 'crease-pattern',
+      status: 'crease_pattern_ready',
+      hasEditableCreasePattern: true,
+      hasImportedCreasePattern: true,
+      historyPastCount: 1,
+      historyFutureCount: 1,
+    });
+
+    expect(state['edit.undo']).toMatchObject({
+      enabled: true,
+      reason: 'Undo the last crease-pattern edit',
+    });
+    expect(state['edit.redo']).toMatchObject({
+      enabled: true,
+      reason: 'Redo the next crease-pattern edit',
+    });
   });
 
   it('disables workflow actions while the engine is busy or unavailable', () => {

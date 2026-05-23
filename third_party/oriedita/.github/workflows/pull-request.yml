@@ -1,0 +1,49 @@
+name: Create artifact
+
+on:
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        version: [17, 21]
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up JDK ${{ matrix.version }}
+        uses: actions/setup-java@v3
+        with:
+          java-version: ${{ matrix.version }}
+          distribution: 'adopt'
+          cache: maven
+
+      - name: Cache Maven packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-java${{ matrix.version }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-java${{ matrix.version }}-m2
+
+      - name: Set version for Jar
+        run: mvn -B versions:set -DnewVersion="pr-${{ github.event.number }}-${{ github.sha }}" --file pom.xml
+
+      - name: Build with Maven
+        run: mvn -B package --file pom.xml
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ matrix.version == '21' }}
+        with:
+          name: oriedita-jar
+          path: oriedita/target/oriedita-*.jar
+
+      - name: Test Report
+        uses: actions/upload-artifact@v4
+        if: (success() || failure()) && matrix.version == '21'    # run this step even if previous step failed
+        with:
+          name: test-results
+          path: "*/target/surefire-reports/TEST*.xml"    # Path to test results

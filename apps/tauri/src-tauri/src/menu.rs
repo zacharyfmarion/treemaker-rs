@@ -26,6 +26,7 @@ pub fn setup_menu(app: &App) -> Result<(), Box<dyn std::error::Error>> {
         .build(app)?;
     let file_export_v4 =
         MenuItemBuilder::with_id("file.exportV4", "Export TreeMaker 4...").build(app)?;
+    let file_export_cp = MenuItemBuilder::with_id("file.exportCp", "Export CP...").build(app)?;
     let file_export_fold =
         MenuItemBuilder::with_id("file.exportFold", "Export FOLD...").build(app)?;
     let file_export_svg = MenuItemBuilder::with_id("file.exportSvg", "Export SVG...").build(app)?;
@@ -42,6 +43,7 @@ pub fn setup_menu(app: &App) -> Result<(), Box<dyn std::error::Error>> {
         .item(&file_save_as)
         .separator()
         .item(&file_export_v4)
+        .item(&file_export_cp)
         .item(&file_export_fold)
         .item(&file_export_svg)
         .item(&file_export_png)
@@ -206,6 +208,84 @@ pub fn setup_menu(app: &App) -> Result<(), Box<dyn std::error::Error>> {
         .item(&build_cp)
         .build()?;
 
+    let cp_folded_preview = MenuItemBuilder::with_id("cp.foldedPreview", "Show Folded Preview")
+        .accelerator("CmdOrCtrl+Shift+F")
+        .build(app)?;
+    let cp_delete_selected =
+        MenuItemBuilder::with_id("cp.deleteSelectedLines", "Delete Selected CP Lines")
+            .build(app)?;
+    let cp_change_crease_type =
+        MenuItemBuilder::with_id("cp.changeCreaseType", "Change Crease Type").build(app)?;
+    let cp_advance_crease_type =
+        MenuItemBuilder::with_id("cp.advanceCreaseType", "Advance Crease Type").build(app)?;
+    let cp_make_mountain =
+        MenuItemBuilder::with_id("cp.makeMountain", "Make Mountain").build(app)?;
+    let cp_make_valley = MenuItemBuilder::with_id("cp.makeValley", "Make Valley").build(app)?;
+    let cp_make_edge = MenuItemBuilder::with_id("cp.makeEdge", "Make Edge").build(app)?;
+    let cp_make_auxiliary =
+        MenuItemBuilder::with_id("cp.makeAuxiliary", "Make Auxiliary").build(app)?;
+    let cp_toggle_mv =
+        MenuItemBuilder::with_id("cp.toggleMountainValley", "Toggle Mountain/Valley").build(app)?;
+    let cp_replace_line_type =
+        MenuItemBuilder::with_id("cp.replaceLineType", "Replace Selected Line Type...")
+            .build(app)?;
+    let cp_delete_line_type =
+        MenuItemBuilder::with_id("cp.deleteLineType", "Delete Selected Line Type...").build(app)?;
+    let cp_check_camv = MenuItemBuilder::with_id("cp.checkCamv", "Check CAMV")
+        .accelerator("CmdOrCtrl+Shift+M")
+        .build(app)?;
+    let cp_check1 = MenuItemBuilder::with_id("cp.check1", "Check Overlaps").build(app)?;
+    let cp_check2 = MenuItemBuilder::with_id("cp.check2", "Check T-junctions").build(app)?;
+    let cp_check3 = MenuItemBuilder::with_id("cp.check3", "Check Vertex Foldability").build(app)?;
+    let cp_check4 = MenuItemBuilder::with_id("cp.check4", "Check Maekawa/LBL").build(app)?;
+    let cp_fix1 = MenuItemBuilder::with_id("cp.fix1", "Repair Overlaps").build(app)?;
+    let cp_fix2 = MenuItemBuilder::with_id("cp.fix2", "Split T-junctions").build(app)?;
+    let cp_fix_inaccurate =
+        MenuItemBuilder::with_id("cp.fixInaccurate", "Fix Inaccurate Creases...").build(app)?;
+    let cp_change_circle_color =
+        MenuItemBuilder::with_id("cp.changeCircleColor", "Change Circle Color...").build(app)?;
+    let cp_organize_circles =
+        MenuItemBuilder::with_id("cp.organizeCircles", "Organize Circles").build(app)?;
+    let cp_selected_lines_menu = SubmenuBuilder::new(app, "Selected Lines")
+        .item(&cp_delete_selected)
+        .separator()
+        .item(&cp_change_crease_type)
+        .item(&cp_advance_crease_type)
+        .item(&cp_toggle_mv)
+        .separator()
+        .item(&cp_make_mountain)
+        .item(&cp_make_valley)
+        .item(&cp_make_edge)
+        .item(&cp_make_auxiliary)
+        .separator()
+        .item(&cp_replace_line_type)
+        .item(&cp_delete_line_type)
+        .build()?;
+    let cp_diagnostics_menu = SubmenuBuilder::new(app, "Diagnostics")
+        .item(&cp_check_camv)
+        .item(&cp_check1)
+        .item(&cp_check2)
+        .item(&cp_check3)
+        .item(&cp_check4)
+        .build()?;
+    let cp_repair_menu = SubmenuBuilder::new(app, "Repair")
+        .item(&cp_fix1)
+        .item(&cp_fix2)
+        .item(&cp_fix_inaccurate)
+        .build()?;
+    let cp_annotations_menu = SubmenuBuilder::new(app, "Annotations")
+        .item(&cp_change_circle_color)
+        .item(&cp_organize_circles)
+        .build()?;
+    let cp_menu = SubmenuBuilder::new(app, "Crease Pattern")
+        .item(&cp_folded_preview)
+        .separator()
+        .item(&cp_selected_lines_menu)
+        .item(&cp_diagnostics_menu)
+        .item(&cp_repair_menu)
+        .item(&cp_annotations_menu)
+        .build()?;
+
     let help_docs = MenuItemBuilder::with_id("help.documentation", "Ori Studio Help")
         .accelerator("F1")
         .build(app)?;
@@ -222,6 +302,7 @@ pub fn setup_menu(app: &App) -> Result<(), Box<dyn std::error::Error>> {
         .item(&edit_menu)
         .item(&view_menu)
         .item(&design_menu)
+        .item(&cp_menu)
         .item(&help_menu)
         .build()?;
 

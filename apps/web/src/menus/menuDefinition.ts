@@ -44,6 +44,7 @@ export function getMenuBarDef(): MenuDef[] {
         { type: 'action', id: 'file.saveAs', label: 'Save As...', shortcut: `${mod}+Shift+S` },
         { type: 'separator' },
         { type: 'action', id: 'file.exportV4', label: 'Export TreeMaker 4...' },
+        { type: 'action', id: 'file.exportCp', label: 'Export CP...' },
         { type: 'action', id: 'file.exportFold', label: 'Export FOLD...' },
         { type: 'action', id: 'file.exportSvg', label: 'Export SVG...' },
         { type: 'action', id: 'file.exportPng', label: 'Export PNG...' },
@@ -142,6 +143,60 @@ export function getMenuBarDef(): MenuDef[] {
         { type: 'action', id: 'optimize.strain', label: 'Optimize Strain' },
         { type: 'separator' },
         { type: 'action', id: 'cp.build', label: 'Build Crease Pattern', shortcut: `${mod}+B` },
+      ],
+    },
+    {
+      label: 'Crease Pattern',
+      items: [
+        { type: 'action', id: 'cp.foldedPreview', label: 'Show Folded Preview', shortcut: `${mod}+Shift+F` },
+        { type: 'separator' },
+        {
+          type: 'submenu',
+          label: 'Selected Lines',
+          items: [
+            { type: 'action', id: 'cp.deleteSelectedLines', label: 'Delete Selected Lines', shortcut: 'Delete' },
+            { type: 'separator' },
+            { type: 'action', id: 'cp.changeCreaseType', label: 'Change Crease Type' },
+            { type: 'action', id: 'cp.advanceCreaseType', label: 'Advance Crease Type' },
+            { type: 'action', id: 'cp.toggleMountainValley', label: 'Toggle Mountain/Valley' },
+            { type: 'separator' },
+            { type: 'action', id: 'cp.makeMountain', label: 'Make Mountain' },
+            { type: 'action', id: 'cp.makeValley', label: 'Make Valley' },
+            { type: 'action', id: 'cp.makeEdge', label: 'Make Edge' },
+            { type: 'action', id: 'cp.makeAuxiliary', label: 'Make Auxiliary' },
+            { type: 'separator' },
+            { type: 'action', id: 'cp.replaceLineType', label: 'Replace Selected Line Type...' },
+            { type: 'action', id: 'cp.deleteLineType', label: 'Delete Selected Line Type...' },
+          ],
+        },
+        {
+          type: 'submenu',
+          label: 'Diagnostics',
+          items: [
+            { type: 'action', id: 'cp.checkCamv', label: 'Check CAMV', shortcut: `${mod}+Shift+M` },
+            { type: 'action', id: 'cp.check1', label: 'Check Overlaps' },
+            { type: 'action', id: 'cp.check2', label: 'Check T-junctions' },
+            { type: 'action', id: 'cp.check3', label: 'Check Vertex Foldability' },
+            { type: 'action', id: 'cp.check4', label: 'Check Maekawa/LBL' },
+          ],
+        },
+        {
+          type: 'submenu',
+          label: 'Repair',
+          items: [
+            { type: 'action', id: 'cp.fix1', label: 'Repair Overlaps' },
+            { type: 'action', id: 'cp.fix2', label: 'Split T-junctions' },
+            { type: 'action', id: 'cp.fixInaccurate', label: 'Fix Inaccurate Creases...' },
+          ],
+        },
+        {
+          type: 'submenu',
+          label: 'Annotations',
+          items: [
+            { type: 'action', id: 'cp.changeCircleColor', label: 'Change Circle Color...' },
+            { type: 'action', id: 'cp.organizeCircles', label: 'Organize Circles' },
+          ],
+        },
       ],
     },
     {

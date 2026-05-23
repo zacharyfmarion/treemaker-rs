@@ -40,4 +40,33 @@ describe('web menu definition', () => {
 
     expect(actionIds).toEqual(['help.documentation', 'help.about']);
   });
+
+  it('exposes CP diagnostics, repair, and folded preview commands', () => {
+    const cpMenu = getMenuBarDef().find((menu) => menu.label === 'Crease Pattern');
+    const actionIds = cpMenu ? actionIdsFor(cpMenu.items) : undefined;
+
+    expect(actionIds).toEqual([
+      'cp.foldedPreview',
+      'cp.deleteSelectedLines',
+      'cp.changeCreaseType',
+      'cp.advanceCreaseType',
+      'cp.toggleMountainValley',
+      'cp.makeMountain',
+      'cp.makeValley',
+      'cp.makeEdge',
+      'cp.makeAuxiliary',
+      'cp.replaceLineType',
+      'cp.deleteLineType',
+      'cp.checkCamv',
+      'cp.check1',
+      'cp.check2',
+      'cp.check3',
+      'cp.check4',
+      'cp.fix1',
+      'cp.fix2',
+      'cp.fixInaccurate',
+      'cp.changeCircleColor',
+      'cp.organizeCircles',
+    ]);
+  });
 });

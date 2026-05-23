@@ -1,0 +1,77 @@
+name: Comment on pull request
+on:
+  workflow_run:
+    workflows: [ Create artifact ]
+    types: [ completed ]
+jobs:
+  test_results:
+    if: github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: dorny/test-reporter@v1
+        with:
+          artifact: test-results
+          name: JUnit Test Report
+          path: "*/target/surefire-reports/TEST*.xml"    # Path to test results
+          reporter: java-junit
+
+  pr_comment:
+    if: github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v6
+        with:
+          # This snippet is public-domain, taken from
+          # https://github.com/oprypin/nightly.link/blob/master/.github/workflows/pr-comment.yml
+          script: |
+            async function upsertComment(owner, repo, issue_number, purpose, body) {
+              const {data: comments} = await github.rest.issues.listComments(
+                {owner, repo, issue_number});
+              const marker = `<!-- bot: ${purpose} -->`;
+              body = marker + "\n" + body;
+              const existing = comments.filter((c) => c.body.includes(marker));
+              if (existing.length > 0) {
+                const last = existing[existing.length - 1];
+                core.info(`Updating comment ${last.id}`);
+                await github.rest.issues.updateComment({
+                  owner, repo,
+                  body,
+                  comment_id: last.id,
+                });
+              } else {
+                core.info(`Creating a comment in issue / PR #${issue_number}`);
+                await github.rest.issues.createComment({issue_number, body, owner, repo});
+              }
+            }
+            const {owner, repo} = context.repo;
+            const pull_head_sha = '${{github.event.workflow_run.head_sha}}';
+            const pull_user_id = ${{github.event.sender.id}};
+            const run_id = ${{github.event.workflow_run.id}};
+            const pull_requests = ${{ toJSON(github.event.workflow_run.pull_requests) }};
+            const pr_number = await (async () => {
+              const pulls = await github.rest.pulls.list({owner, repo});
+              for await (const {data} of github.paginate.iterator(pulls)) {
+                for (const pull of data) {
+                  if (pull.head.sha === pull_head_sha && pull.user.id === pull_user_id) {
+                    return pull.number;
+                  }
+                }
+              }
+            })();
+            if (!pr_number) {
+              return core.error("This workflow doesn't match any pull requests!");
+            }
+
+            const artifacts = await github.paginate(
+              github.rest.actions.listWorkflowRunArtifacts, {owner, repo, run_id});
+            if (!artifacts.length) {
+              return core.error(`No artifacts found`);
+            }
+            let body = `Download the artifacts for this pull request:\n`;
+            for (const art of artifacts) {
+              if (art.name == "oriedita-jar") {
+                body += `\n* [${art.name}.zip](https://nightly.link/${owner}/${repo}/actions/artifacts/${art.id}.zip)`;
+              }
+            }
+            core.info("Review thread message body:", body);
+            await upsertComment(owner, repo, pr_number, "nightly-link", body);

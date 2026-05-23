@@ -14,9 +14,19 @@ import type {
   TreeSnapshot,
   TreeSummary,
 } from '../../engine/types';
+import type {
+  OristudioCpCommandResult,
+  OristudioCpDocumentSnapshot,
+  OristudioCpDocumentState,
+  OristudioCpOperationDescriptor,
+} from '../../engine/oristudioCpTypes';
 import { projectFromSnapshot } from '../../engine/snapshotMapper';
 import type { FileService, SaveBinaryFileOptions, SaveTextFileOptions } from '../../platform/fileService';
 import { DEFAULT_CREASE_COLOR_MODE } from '../../lib/sampleProject';
+import {
+  DEFAULT_ORISTUDIO_CP_VIEWPORT_OPTIONS,
+  emptyOristudioCpSelection,
+} from '../../lib/creasePatternViewport';
 import { useLayoutStore } from '../layoutStore';
 
 const engineMocks = vi.hoisted(() => ({
@@ -26,6 +36,18 @@ const engineMocks = vi.hoisted(() => ({
   getEngine: vi.fn(),
   initializeBlankTree: vi.fn(),
   loadTreeFromText: vi.fn(),
+}));
+
+const oristudioCpMocks = vi.hoisted(() => ({
+  executeOristudioCpCommand: vi.fn(),
+  exportOristudioCpDocumentAsCp: vi.fn(),
+  exportOristudioCpDocumentAsFold: vi.fn(),
+  getOristudioCpOperationDescriptors: vi.fn(),
+  loadOristudioCpDocumentFromText: vi.fn(),
+  previewOristudioCpCommand: vi.fn(),
+  releaseOristudioCpDocument: vi.fn(),
+  restoreOristudioCpDocument: vi.fn(),
+  setOristudioCpDocumentSource: vi.fn(),
 }));
 
 const exportMocks = vi.hoisted(() => ({
@@ -48,6 +70,22 @@ vi.mock('./engineRuntime', async (importOriginal) => {
   };
 });
 
+vi.mock('./oristudioCpRuntime', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./oristudioCpRuntime')>();
+  return {
+    ...actual,
+    executeOristudioCpCommand: oristudioCpMocks.executeOristudioCpCommand,
+    exportOristudioCpDocumentAsCp: oristudioCpMocks.exportOristudioCpDocumentAsCp,
+    exportOristudioCpDocumentAsFold: oristudioCpMocks.exportOristudioCpDocumentAsFold,
+    getOristudioCpOperationDescriptors: oristudioCpMocks.getOristudioCpOperationDescriptors,
+    loadOristudioCpDocumentFromText: oristudioCpMocks.loadOristudioCpDocumentFromText,
+    previewOristudioCpCommand: oristudioCpMocks.previewOristudioCpCommand,
+    releaseOristudioCpDocument: oristudioCpMocks.releaseOristudioCpDocument,
+    restoreOristudioCpDocument: oristudioCpMocks.restoreOristudioCpDocument,
+    setOristudioCpDocumentSource: oristudioCpMocks.setOristudioCpDocumentSource,
+  };
+});
+
 import type { EngineClient } from './engineRuntime';
 import { useWorkspaceStore } from './store';
 
@@ -65,6 +103,16 @@ const savedSnapshots = new Map<string, TreeSnapshot>();
 
 const initialWorkspaceState = useWorkspaceStore.getInitialState();
 const initialLayoutState = useLayoutStore.getInitialState();
+const cpOperationDescriptors = [
+  {
+    id: 'DrawCreaseFree',
+    upstream: 'MouseHandlerDrawCreaseFree',
+    target: 'operations::construction::draw_crease_segment',
+    category: 'Kernel',
+    stage: 7,
+    status: 'OracleTested',
+  },
+] satisfies OristudioCpOperationDescriptor[];
 
 function cloneSnapshot(snapshot: TreeSnapshot): TreeSnapshot {
   return JSON.parse(JSON.stringify(snapshot)) as TreeSnapshot;
@@ -779,6 +827,12 @@ function loadSnapshotIntoStore(snapshot: TreeSnapshot, title = 'Seed project') {
     project: projectFromSnapshot(snapshot, title),
     documentMode: 'tree',
     importedCreasePattern: null,
+    oristudioCpDocument: null,
+    oristudioCpOperationDescriptors: [],
+    oristudioCpError: null,
+    oristudioCpCamvResult: null,
+    oristudioCpHistoryPast: [],
+    oristudioCpHistoryFuture: [],
     projectLoadId: useWorkspaceStore.getState().projectLoadId + 1,
     currentFileName: 'seed.tmd5',
     currentFilePath: null,
@@ -798,6 +852,8 @@ function loadSnapshotIntoStore(snapshot: TreeSnapshot, title = 'Seed project') {
     clipboard: null,
     clipboardPasteCount: 0,
     creaseColorMode: DEFAULT_CREASE_COLOR_MODE,
+    oristudioCpSelection: emptyOristudioCpSelection(),
+    oristudioCpViewport: DEFAULT_ORISTUDIO_CP_VIEWPORT_OPTIONS,
     foldArtifacts: null,
     foldArtifactError: null,
     sequenceTarget: null,
@@ -815,7 +871,121 @@ function resetStores(snapshot = makeSnapshot()) {
   useLayoutStore.setState(initialLayoutState, true);
   const api = createMockEngineApi(snapshot);
   configureEngine(api);
+  oristudioCpMocks.getOristudioCpOperationDescriptors
+    .mockReset()
+    .mockResolvedValue(cpOperationDescriptors);
+  oristudioCpMocks.releaseOristudioCpDocument.mockReset().mockResolvedValue(undefined);
+  oristudioCpMocks.exportOristudioCpDocumentAsCp
+    .mockReset()
+    .mockResolvedValue('1 0 0 1 0\n');
+  oristudioCpMocks.exportOristudioCpDocumentAsFold
+    .mockReset()
+    .mockResolvedValue('{"file_spec":1.1}');
+  oristudioCpMocks.setOristudioCpDocumentSource.mockReset();
+  oristudioCpMocks.loadOristudioCpDocumentFromText
+    .mockReset()
+    .mockImplementation(async (_text: string, source: { format: 'cp' | 'fold'; filename: string; path?: string | null; title?: string }) => ({
+      handle: 2,
+      document: {
+        title: source.title ?? 'square',
+        crease_pattern: {
+          line_segments: [],
+          circles: [],
+          points: [],
+          aux_line_segments: [],
+          texts: [],
+          grid: {
+            interval_grid_size: 4,
+            grid_size: 8,
+            grid_xa: 1,
+            grid_xb: 0,
+            grid_xc: 1,
+            grid_ya: 1,
+            grid_yb: 0,
+            grid_yc: 1,
+            grid_angle: 90,
+            base_state: 'WithinPaper',
+            vertical_scale_position: 0,
+            horizontal_scale_position: 0,
+            draw_diagonal_gridlines: false,
+          },
+        },
+        metadata: {},
+      },
+      summary: {
+        title: source.title ?? 'square',
+        line_segments: 5,
+        circles: 0,
+        points: 0,
+        aux_line_segments: 0,
+        texts: 0,
+        can_save_as_cp: true,
+        is_empty: false,
+      },
+      source: {
+        format: source.format,
+        filename: source.filename,
+        path: source.path ?? null,
+      },
+      operationDescriptors: cpOperationDescriptors,
+      lastCommandResult: null,
+    }));
+  oristudioCpMocks.restoreOristudioCpDocument
+    .mockReset()
+    .mockImplementation(
+      async (
+        document: OristudioCpDocumentSnapshot,
+        source: OristudioCpDocumentState['source']
+      ) => ({
+      handle: 3,
+      document,
+      summary: {
+        title: document.title ?? 'square',
+        line_segments: document.crease_pattern.line_segments.length,
+        circles: document.crease_pattern.circles.length,
+        points: document.crease_pattern.points.length,
+        aux_line_segments: document.crease_pattern.aux_line_segments.length,
+        texts: document.crease_pattern.texts.length,
+        can_save_as_cp: true,
+        is_empty:
+          document.crease_pattern.line_segments.length +
+            document.crease_pattern.circles.length +
+            document.crease_pattern.points.length +
+            document.crease_pattern.aux_line_segments.length +
+            document.crease_pattern.texts.length ===
+          0,
+      },
+      source,
+      operationDescriptors: cpOperationDescriptors,
+      lastCommandResult: null,
+    })
+    );
+  oristudioCpMocks.executeOristudioCpCommand.mockReset().mockRejectedValue({
+    code: 'not_implemented',
+    message: 'Oriedita operation DrawCreaseFree is not implemented yet',
+  });
+  oristudioCpMocks.previewOristudioCpCommand
+    .mockReset()
+    .mockResolvedValue({ segments: [], circles: [], points: [], diagnostics: [] });
   return api;
+}
+
+function camvErrorResult(id = 'CheckCamv-1'): OristudioCpCommandResult {
+  return {
+    operation: 'CheckCamv',
+    status: 'OracleTested',
+    diagnostics: ['Check CAMV found 1 issue(s)'],
+    diagnostic_entries: [
+      {
+        id,
+        kind: 'CheckCamv',
+        severity: 'error',
+        message: 'Maekawa violation',
+        point: { x: 0, y: 0 },
+        rule: 'Maekawa',
+      },
+    ],
+  };
 }
 
 function createFileService(
@@ -861,11 +1031,19 @@ describe('workspace store slices', () => {
     expect(state.project.nodes).toEqual([]);
     expect(state.documentMode).toBe('tree');
     expect(state.importedCreasePattern).toBeNull();
+    expect(state.oristudioCpDocument).toBeNull();
+    expect(state.oristudioCpOperationDescriptors).toEqual([]);
+    expect(state.oristudioCpError).toBeNull();
+    expect(state.oristudioCpCamvResult).toBeNull();
+    expect(state.oristudioCpHistoryPast).toEqual([]);
+    expect(state.oristudioCpHistoryFuture).toEqual([]);
     expect(state.status).toBe('loading_engine');
     expect(state.selection).toEqual({ kind: 'tree' });
     expect(state.toolMode).toBe('select');
     expect(state.symmetryAuthoringPairs).toEqual([]);
     expect(state.creaseColorMode).toBe(DEFAULT_CREASE_COLOR_MODE);
+    expect(state.oristudioCpSelection).toEqual(emptyOristudioCpSelection());
+    expect(state.oristudioCpViewport).toEqual(DEFAULT_ORISTUDIO_CP_VIEWPORT_OPTIONS);
     expect(state.foldArtifacts).toBeNull();
     expect(state.designViewportFitRequestId).toBe(0);
     expect(state.historyPast).toEqual([]);
@@ -875,7 +1053,9 @@ describe('workspace store slices', () => {
     expect(state.createNewProject).toBeTypeOf('function');
     expect(state.openProject).toBeTypeOf('function');
     expect(state.loadCreasePatternText).toBeTypeOf('function');
+    expect(state.executeOristudioCpCommand).toBeTypeOf('function');
     expect(state.saveProject).toBeTypeOf('function');
+    expect(state.exportCp).toBeTypeOf('function');
     expect(state.exportFold).toBeTypeOf('function');
     expect(state.undo).toBeTypeOf('function');
     expect(state.copySelection).toBeTypeOf('function');
@@ -885,6 +1065,7 @@ describe('workspace store slices', () => {
     expect(state.addNodeWithSymmetry).toBeTypeOf('function');
     expect(state.optimizeEdges).toBeTypeOf('function');
     expect(state.buildCreasePattern).toBeTypeOf('function');
+    expect(state.toggleOristudioCpLineSelection).toBeTypeOf('function');
   });
 
   it('initializes projects, loads text, saves, exports, and maintains recents', async () => {
@@ -984,14 +1165,15 @@ describe('workspace store slices', () => {
     loadSnapshotIntoStore(seedSnapshot());
     const activatePanel = vi.fn();
     useLayoutStore.setState({ activatePanel });
+    const cpText = [
+      '1 0 0 1 0',
+      '1 1 0 1 1',
+      '1 1 1 0 1',
+      '1 0 1 0 0',
+      '2 0 0 1 1',
+    ].join('\n');
     const fileService = createFileService({
-      text: [
-        '1 0 0 1 0',
-        '1 1 0 1 1',
-        '1 1 1 0 1',
-        '1 0 1 0 0',
-        '2 0 0 1 1',
-      ].join('\n'),
+      text: cpText,
       name: 'square.cp',
       path: '/tmp/square.cp',
     });
@@ -1006,6 +1188,29 @@ describe('workspace store slices', () => {
       status: 'crease_pattern_ready',
     });
     expect(useWorkspaceStore.getState().importedCreasePattern?.source.format).toBe('cp');
+    expect(oristudioCpMocks.loadOristudioCpDocumentFromText).toHaveBeenCalledWith(
+      cpText,
+      expect.objectContaining({
+        format: 'cp',
+        filename: 'square.cp',
+        path: '/tmp/square.cp',
+        title: 'square',
+      })
+    );
+    expect(useWorkspaceStore.getState().oristudioCpDocument).toMatchObject({
+      handle: 2,
+      summary: {
+        line_segments: 5,
+        can_save_as_cp: true,
+      },
+      source: {
+        format: 'cp',
+        filename: 'square.cp',
+      },
+    });
+    expect(useWorkspaceStore.getState().oristudioCpOperationDescriptors).toEqual(
+      cpOperationDescriptors
+    );
     expect(useWorkspaceStore.getState().project.creases.length).toBeGreaterThan(0);
     expect(useWorkspaceStore.getState().project.facets.length).toBeGreaterThan(0);
     expect(useWorkspaceStore.getState().foldArtifacts?.folded_base?.facets.length).toBeGreaterThan(
@@ -1014,14 +1219,539 @@ describe('workspace store slices', () => {
     expect(api.flatFoldArtifacts).toHaveBeenCalledOnce();
     expect(activatePanel).toHaveBeenCalledWith('crease-pattern');
 
-    await expect(useWorkspaceStore.getState().saveProject(fileService)).resolves.toBe(false);
-    expect(useWorkspaceStore.getState().error?.message).toBe(
-      'Imported crease patterns are exported, not saved as Ori Studio projects'
+    useWorkspaceStore.setState({ dirty: true });
+    await expect(useWorkspaceStore.getState().saveProject(fileService)).resolves.toBe(true);
+    expect(oristudioCpMocks.exportOristudioCpDocumentAsCp).toHaveBeenCalledOnce();
+    expect(fileService.saveTextFile).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        title: 'Save Crease Pattern',
+        contents: '1 0 0 1 0\n',
+        suggestedName: 'square.cp',
+        path: '/tmp/square.cp',
+        extensions: ['cp'],
+      })
+    );
+    expect(oristudioCpMocks.setOristudioCpDocumentSource).toHaveBeenCalledWith({
+      format: 'cp',
+      filename: 'square.cp',
+      path: '/tmp/square.cp',
+    });
+    expect(useWorkspaceStore.getState()).toMatchObject({
+      currentFileName: 'square.cp',
+      currentFilePath: '/tmp/square.cp',
+      dirty: false,
+    });
+
+    await expect(useWorkspaceStore.getState().exportCp(fileService)).resolves.toBe(true);
+    expect(oristudioCpMocks.exportOristudioCpDocumentAsCp).toHaveBeenCalledTimes(2);
+    expect(fileService.saveTextFile).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        title: 'Export CP Document',
+        contents: '1 0 0 1 0\n',
+        suggestedName: 'square.cp',
+        path: null,
+        extensions: ['cp'],
+      })
     );
 
     await expect(useWorkspaceStore.getState().exportFold(fileService)).resolves.toBe(true);
+    expect(oristudioCpMocks.exportOristudioCpDocumentAsFold).toHaveBeenCalledOnce();
     expect(fileService.saveTextFile).toHaveBeenLastCalledWith(
-      expect.objectContaining({ title: 'Export FOLD Document', extensions: ['fold'] })
+      expect.objectContaining({
+        title: 'Export FOLD Document',
+        contents: '{"file_spec":1.1}',
+        extensions: ['fold'],
+      })
+    );
+  });
+
+  it('surfaces typed Oristudio CP command errors without mutating the imported document', async () => {
+    resetStores(seedSnapshot());
+    await useWorkspaceStore.getState().loadCreasePatternText('1 0 0 1 0', {
+      filename: 'line.cp',
+      path: '/tmp/line.cp',
+    });
+
+    await expect(useWorkspaceStore.getState().executeOristudioCpCommand('DrawCreaseFree')).resolves.toBe(
+      false
+    );
+
+    expect(oristudioCpMocks.executeOristudioCpCommand).toHaveBeenCalledWith('DrawCreaseFree', {});
+    expect(useWorkspaceStore.getState().oristudioCpDocument?.source.filename).toBe('line.cp');
+    expect(useWorkspaceStore.getState().oristudioCpError).toContain('DrawCreaseFree');
+    expect(useWorkspaceStore.getState().error).toMatchObject({
+      code: 'not_implemented',
+    });
+  });
+
+  it('passes selected editable CP line IDs into kernel commands and keeps stable color selections', async () => {
+    resetStores(seedSnapshot());
+    await useWorkspaceStore.getState().loadCreasePatternText('1 0 0 1 0\n2 0 0 0 1', {
+      filename: 'lines.cp',
+      path: '/tmp/lines.cp',
+    });
+    useWorkspaceStore.setState({
+      oristudioCpSelection: {
+        lines: [1, 2],
+        points: [],
+        circles: [],
+        texts: [],
+        faces: [],
+      },
+    });
+    const currentDocument = useWorkspaceStore.getState().oristudioCpDocument;
+    if (!currentDocument) throw new Error('expected editable CP document');
+    oristudioCpMocks.executeOristudioCpCommand.mockResolvedValueOnce({
+      ...currentDocument,
+      document: {
+        ...currentDocument.document,
+        crease_pattern: {
+          ...currentDocument.document.crease_pattern,
+          line_segments: [
+            {
+              a: { x: 0, y: 0 },
+              b: { x: 1, y: 0 },
+              active: 'Inactive0',
+              color: 'Red1',
+              selected: 0,
+              customized: 0,
+              customized_color: { red: 100, green: 200, blue: 200 },
+            },
+            {
+              a: { x: 0, y: 0 },
+              b: { x: 0, y: 1 },
+              active: 'Inactive0',
+              color: 'Red1',
+              selected: 0,
+              customized: 0,
+              customized_color: { red: 100, green: 200, blue: 200 },
+            },
+          ],
+        },
+      },
+      lastCommandResult: {
+        operation: 'CreaseMakeMountain',
+        status: 'OracleTested',
+        diagnostics: ['Changed 2 line(s)'],
+      },
+    });
+
+    await expect(
+      useWorkspaceStore.getState().executeOristudioCpCommand('CreaseMakeMountain', {
+        line_ids: [1, 2],
+      })
+    ).resolves.toBe(true);
+
+    expect(oristudioCpMocks.executeOristudioCpCommand).toHaveBeenCalledWith(
+      'CreaseMakeMountain',
+      { line_ids: [1, 2] }
+    );
+    expect(useWorkspaceStore.getState().oristudioCpSelection.lines).toEqual([1, 2]);
+    expect(useWorkspaceStore.getState().dirty).toBe(true);
+  });
+
+  it('refreshes always-on CAMV diagnostics after editable CP mutations', async () => {
+    resetStores(seedSnapshot());
+    await useWorkspaceStore.getState().loadCreasePatternText('1 0 0 1 0\n2 0 0 0 1', {
+      filename: 'lines.cp',
+      path: '/tmp/lines.cp',
+    });
+    useWorkspaceStore.setState({ dirty: false });
+    const currentDocument = useWorkspaceStore.getState().oristudioCpDocument;
+    if (!currentDocument) throw new Error('expected editable CP document');
+    const commandResult: OristudioCpCommandResult = {
+      operation: 'CreaseMakeMountain',
+      status: 'OracleTested',
+      diagnostics: ['Changed 2 line(s)'],
+    };
+    const camvResult = camvErrorResult();
+    oristudioCpMocks.executeOristudioCpCommand
+      .mockResolvedValueOnce({
+        ...currentDocument,
+        lastCommandResult: commandResult,
+      })
+      .mockResolvedValueOnce({
+        ...currentDocument,
+        lastCommandResult: camvResult,
+      });
+
+    await expect(
+      useWorkspaceStore.getState().executeOristudioCpCommand('CreaseMakeMountain', {
+        line_ids: [1, 2],
+      })
+    ).resolves.toBe(true);
+
+    expect(oristudioCpMocks.executeOristudioCpCommand).toHaveBeenCalledWith(
+      'CreaseMakeMountain',
+      { line_ids: [1, 2] }
+    );
+    expect(oristudioCpMocks.executeOristudioCpCommand).toHaveBeenCalledWith('CheckCamv');
+    expect(useWorkspaceStore.getState().oristudioCpDocument?.lastCommandResult).toEqual(
+      commandResult
+    );
+    expect(useWorkspaceStore.getState().oristudioCpCamvResult).toEqual(camvResult);
+    expect(useWorkspaceStore.getState().oristudioCpActiveDiagnosticId).toBeNull();
+    expect(useWorkspaceStore.getState().oristudioCpHistoryPast).toHaveLength(1);
+    expect(useWorkspaceStore.getState().dirty).toBe(true);
+  });
+
+  it('keeps editable CP diagnostic checks out of undo history', async () => {
+    resetStores(seedSnapshot());
+    await useWorkspaceStore.getState().loadCreasePatternText('1 0 0 1 0\n2 0 0 0 1', {
+      filename: 'lines.cp',
+      path: '/tmp/lines.cp',
+    });
+    useWorkspaceStore.setState({ dirty: false });
+    const currentDocument = useWorkspaceStore.getState().oristudioCpDocument;
+    if (!currentDocument) throw new Error('expected editable CP document');
+    oristudioCpMocks.executeOristudioCpCommand.mockResolvedValueOnce({
+      ...currentDocument,
+      lastCommandResult: {
+        operation: 'Check1',
+        status: 'OracleTested',
+        diagnostics: ['Check1 found 1 issue(s)'],
+        diagnostic_entries: [
+          {
+            id: 'Check1-1',
+            kind: 'Check1',
+            severity: 'error',
+            message: 'Overlapping or contained non-auxiliary creases',
+            segments: currentDocument.document.crease_pattern.line_segments,
+            rule: 'Check1',
+          },
+        ],
+      },
+    });
+
+    await expect(useWorkspaceStore.getState().executeOristudioCpCommand('Check1')).resolves.toBe(
+      true
+    );
+
+    expect(useWorkspaceStore.getState().oristudioCpHistoryPast).toHaveLength(0);
+    expect(useWorkspaceStore.getState().oristudioCpHistoryFuture).toHaveLength(0);
+    expect(useWorkspaceStore.getState().dirty).toBe(false);
+    expect(useWorkspaceStore.getState().oristudioCpActiveDiagnosticId).toBe('Check1-1');
+    expect(
+      useWorkspaceStore.getState().oristudioCpDocument?.lastCommandResult?.diagnostic_entries
+    ).toHaveLength(1);
+
+    const checkedDocument = useWorkspaceStore.getState().oristudioCpDocument;
+    if (!checkedDocument) throw new Error('expected checked CP document');
+    oristudioCpMocks.executeOristudioCpCommand.mockResolvedValueOnce({
+      ...checkedDocument,
+      lastCommandResult: {
+        operation: 'FlatFoldableCheck',
+        status: 'OracleTested',
+        diagnostics: ['Flat-foldable boundary check passed'],
+        diagnostic_entries: [
+          {
+            id: 'FlatFoldableCheck-1',
+            kind: 'FlatFoldableCheck',
+            severity: 'info',
+            message: 'Boundary crossing order is flat-foldable',
+            segments: [],
+            rule: 'FlatFoldableBoundary',
+          },
+        ],
+      },
+    });
+
+    await expect(
+      useWorkspaceStore.getState().executeOristudioCpCommand('FlatFoldableCheck')
+    ).resolves.toBe(true);
+
+    expect(useWorkspaceStore.getState().oristudioCpHistoryPast).toHaveLength(0);
+    expect(useWorkspaceStore.getState().dirty).toBe(false);
+    expect(useWorkspaceStore.getState().oristudioCpActiveDiagnosticId).toBe(
+      'FlatFoldableCheck-1'
+    );
+
+    const flatCheckedDocument = useWorkspaceStore.getState().oristudioCpDocument;
+    if (!flatCheckedDocument) throw new Error('expected flat-checked CP document');
+    oristudioCpMocks.executeOristudioCpCommand.mockResolvedValueOnce({
+      ...flatCheckedDocument,
+      lastCommandResult: {
+        operation: 'Fix1',
+        status: 'OracleTested',
+        diagnostics: ['Changed 0 line(s)'],
+      },
+    });
+
+    await expect(useWorkspaceStore.getState().executeOristudioCpCommand('Fix1')).resolves.toBe(
+      true
+    );
+
+    expect(useWorkspaceStore.getState().oristudioCpActiveDiagnosticId).toBeNull();
+  });
+
+  it('clears editable CP selection after destructive kernel commands', async () => {
+    resetStores(seedSnapshot());
+    await useWorkspaceStore.getState().loadCreasePatternText('1 0 0 1 0\n2 0 0 0 1', {
+      filename: 'lines.cp',
+      path: '/tmp/lines.cp',
+    });
+    useWorkspaceStore.setState({
+      oristudioCpSelection: {
+        lines: [1],
+        points: [],
+        circles: [],
+        texts: [],
+        faces: [],
+      },
+    });
+    const currentDocument = useWorkspaceStore.getState().oristudioCpDocument;
+    if (!currentDocument) throw new Error('expected editable CP document');
+    oristudioCpMocks.executeOristudioCpCommand.mockResolvedValueOnce({
+      ...currentDocument,
+      document: {
+        ...currentDocument.document,
+        crease_pattern: {
+          ...currentDocument.document.crease_pattern,
+          line_segments: currentDocument.document.crease_pattern.line_segments.slice(1),
+        },
+      },
+      summary: {
+        ...currentDocument.summary,
+        line_segments: Math.max(0, currentDocument.summary.line_segments - 1),
+      },
+    });
+
+    await expect(
+      useWorkspaceStore.getState().executeOristudioCpCommand('LineSegmentDelete', {
+        line_ids: [1],
+      })
+    ).resolves.toBe(true);
+
+    expect(useWorkspaceStore.getState().oristudioCpSelection).toEqual(
+      emptyOristudioCpSelection()
+    );
+  });
+
+  it('syncs editable CP selection from kernel line selection commands', async () => {
+    resetStores(seedSnapshot());
+    await useWorkspaceStore.getState().loadCreasePatternText('1 0 0 1 0\n2 0 0 0 1', {
+      filename: 'lines.cp',
+      path: '/tmp/lines.cp',
+    });
+    const currentDocument = useWorkspaceStore.getState().oristudioCpDocument;
+    if (!currentDocument) throw new Error('expected editable CP document');
+    oristudioCpMocks.executeOristudioCpCommand.mockResolvedValueOnce({
+      ...currentDocument,
+      document: {
+        ...currentDocument.document,
+        crease_pattern: {
+          ...currentDocument.document.crease_pattern,
+          line_segments: [
+            {
+              a: { x: 0, y: 0 },
+              b: { x: 1, y: 0 },
+              active: 'Inactive0',
+              color: 'Red1',
+              selected: 2,
+              customized: 0,
+              customized_color: { red: 100, green: 200, blue: 200 },
+            },
+            {
+              a: { x: 0, y: 0 },
+              b: { x: 0, y: 1 },
+              active: 'Inactive0',
+              color: 'Blue2',
+              selected: 2,
+              customized: 0,
+              customized_color: { red: 100, green: 200, blue: 200 },
+            },
+            {
+              a: { x: 1, y: 0 },
+              b: { x: 1, y: 1 },
+              active: 'Inactive0',
+              color: 'Black0',
+              selected: 0,
+              customized: 0,
+              customized_color: { red: 100, green: 200, blue: 200 },
+            },
+          ],
+        },
+      },
+      summary: {
+        ...currentDocument.summary,
+        line_segments: 3,
+      },
+    });
+
+    await expect(
+      useWorkspaceStore.getState().executeOristudioCpCommand('SelectLineIntersecting', {
+        points: [
+          { x: 0, y: 0 },
+          { x: 1, y: 0 },
+        ],
+      })
+    ).resolves.toBe(true);
+
+    expect(useWorkspaceStore.getState().oristudioCpSelection).toEqual({
+      ...emptyOristudioCpSelection(),
+      lines: [1, 2],
+    });
+  });
+
+  it('restores editable CP snapshots and selections through undo and redo', async () => {
+    resetStores(seedSnapshot());
+    await useWorkspaceStore.getState().loadCreasePatternText('1 0 0 1 0', {
+      filename: 'line.cp',
+      path: '/tmp/line.cp',
+    });
+    useWorkspaceStore.setState({
+      oristudioCpSelection: {
+        ...emptyOristudioCpSelection(),
+        lines: [1],
+      },
+    });
+    const loadedDocument = useWorkspaceStore.getState().oristudioCpDocument;
+    if (!loadedDocument) throw new Error('expected editable CP document');
+    const changedDocument = {
+      ...loadedDocument.document,
+      crease_pattern: {
+        ...loadedDocument.document.crease_pattern,
+        line_segments: [
+          {
+            a: { x: 0, y: 0 },
+            b: { x: 1, y: 0 },
+            active: 'Inactive0',
+            color: 'Red1',
+            selected: 0,
+            customized: 0,
+            customized_color: { red: 100, green: 200, blue: 200 },
+          },
+        ],
+      },
+    };
+    oristudioCpMocks.executeOristudioCpCommand.mockResolvedValueOnce({
+      ...loadedDocument,
+      document: changedDocument,
+      summary: {
+        ...loadedDocument.summary,
+        line_segments: 1,
+      },
+    });
+
+    await expect(
+      useWorkspaceStore.getState().executeOristudioCpCommand('CreaseMakeMountain', {
+        line_ids: [1],
+      })
+    ).resolves.toBe(true);
+
+    expect(useWorkspaceStore.getState().oristudioCpHistoryPast[0]).toMatchObject({
+      document: loadedDocument.document,
+      selection: { lines: [1] },
+      label: 'CreaseMakeMountain',
+    });
+
+    const undoCamvResult = camvErrorResult('CheckCamv-undo');
+    oristudioCpMocks.executeOristudioCpCommand.mockResolvedValueOnce({
+      ...loadedDocument,
+      lastCommandResult: undoCamvResult,
+    });
+    await useWorkspaceStore.getState().undo();
+    expect(oristudioCpMocks.restoreOristudioCpDocument).toHaveBeenLastCalledWith(
+      loadedDocument.document,
+      loadedDocument.source,
+      null
+    );
+    expect(useWorkspaceStore.getState().oristudioCpDocument?.document).toEqual(
+      loadedDocument.document
+    );
+    expect(useWorkspaceStore.getState().oristudioCpSelection.lines).toEqual([1]);
+    expect(useWorkspaceStore.getState().oristudioCpCamvResult).toEqual(undoCamvResult);
+    expect(useWorkspaceStore.getState().oristudioCpHistoryFuture).toHaveLength(1);
+    expect(useWorkspaceStore.getState().projectMessage).toBe('Undid CreaseMakeMountain');
+
+    const redoCamvResult = camvErrorResult('CheckCamv-redo');
+    oristudioCpMocks.executeOristudioCpCommand.mockResolvedValueOnce({
+      ...loadedDocument,
+      document: changedDocument,
+      lastCommandResult: redoCamvResult,
+    });
+    await useWorkspaceStore.getState().redo();
+    expect(oristudioCpMocks.restoreOristudioCpDocument).toHaveBeenLastCalledWith(
+      changedDocument,
+      loadedDocument.source,
+      null
+    );
+    expect(useWorkspaceStore.getState().oristudioCpDocument?.document).toEqual(changedDocument);
+    expect(useWorkspaceStore.getState().oristudioCpSelection.lines).toEqual([1]);
+    expect(useWorkspaceStore.getState().oristudioCpCamvResult).toEqual(redoCamvResult);
+    expect(useWorkspaceStore.getState().oristudioCpHistoryPast).toHaveLength(1);
+    expect(useWorkspaceStore.getState().projectMessage).toBe('Redid CreaseMakeMountain');
+  });
+
+  it('saves imported FOLD documents as CP without overwriting the source FOLD path', async () => {
+    resetStores(seedSnapshot());
+    await useWorkspaceStore.getState().loadCreasePatternText(
+      JSON.stringify({
+        file_spec: 1.1,
+        vertices_coords: [
+          [0, 0],
+          [1, 0],
+        ],
+        edges_vertices: [[0, 1]],
+        edges_assignment: ['B'],
+      }),
+      {
+        filename: 'line.fold',
+        path: '/tmp/line.fold',
+      }
+    );
+    const fileService = createFileService();
+
+    await expect(useWorkspaceStore.getState().saveProject(fileService)).resolves.toBe(true);
+
+    expect(fileService.saveTextFile).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        title: 'Save Crease Pattern',
+        suggestedName: 'line.cp',
+        path: null,
+        extensions: ['cp'],
+      })
+    );
+    expect(useWorkspaceStore.getState()).toMatchObject({
+      currentFileName: 'line.cp',
+      currentFilePath: '/tmp/line.cp',
+    });
+    expect(useWorkspaceStore.getState().oristudioCpDocument?.source).toEqual({
+      format: 'cp',
+      filename: 'line.cp',
+      path: '/tmp/line.cp',
+    });
+  });
+
+  it('tracks editable CP viewport options and selection independently from tree selection', () => {
+    resetStores(seedSnapshot());
+
+    useWorkspaceStore.getState().toggleOristudioCpLineSelection(2);
+    expect(useWorkspaceStore.getState().oristudioCpSelection).toMatchObject({ lines: [2] });
+    expect(useWorkspaceStore.getState().selection).toEqual({ kind: 'tree' });
+
+    useWorkspaceStore.getState().toggleOristudioCpPointSelection(1, true);
+    expect(useWorkspaceStore.getState().oristudioCpSelection).toMatchObject({
+      lines: [2],
+      points: [1],
+    });
+
+    useWorkspaceStore.getState().toggleOristudioCpVertexSelection('0:0', true);
+    expect(useWorkspaceStore.getState().oristudioCpSelection).toMatchObject({
+      lines: [2],
+      vertices: ['0:0'],
+      points: [1],
+    });
+
+    useWorkspaceStore.getState().setOristudioCpViewportOption('snapToGrid', false);
+    expect(useWorkspaceStore.getState().oristudioCpViewport).toMatchObject({
+      snapToGrid: false,
+      snapToVertices: true,
+    });
+
+    useWorkspaceStore.getState().clearOristudioCpSelection();
+    expect(useWorkspaceStore.getState().oristudioCpSelection).toEqual(
+      emptyOristudioCpSelection()
     );
   });
 

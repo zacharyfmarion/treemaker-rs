@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+set -euo pipefail
+java -cp "/Users/zacharymarion/Documents/code/tree-maker-rust/tools/oriedita-oracle/build/classes" OrieditaGeometryOracle "$@"

@@ -1,8 +1,9 @@
 import { selectionSize } from './selection';
-import type { Selection } from './sampleProject';
+import type { DocumentMode, Selection } from './sampleProject';
 
 interface AppKeyboardActions {
-  deleteSelection: () => unknown;
+  getDocumentMode: () => DocumentMode;
+  getCpSelectionSize: () => number;
   getSelection: () => Selection;
   handleMenuAction: (id: string) => unknown;
   selectNone: () => void;
@@ -20,6 +21,12 @@ export function handleAppKeyDown(event: KeyboardEvent, actions: AppKeyboardActio
   if (event.defaultPrevented || isEditingTarget(event.target)) return false;
 
   if (event.key === 'Escape') {
+    if (actions.getDocumentMode() === 'crease-pattern') {
+      if (actions.getCpSelectionSize() === 0) return false;
+      event.preventDefault();
+      void actions.handleMenuAction('edit.deselectAll');
+      return true;
+    }
     if (selectionSize(actions.getSelection()) === 0) return false;
     event.preventDefault();
     actions.selectNone();
@@ -28,6 +35,21 @@ export function handleAppKeyDown(event: KeyboardEvent, actions: AppKeyboardActio
 
   const modifier = event.metaKey || event.ctrlKey;
   const key = event.key.toLowerCase();
+  if (modifier && key === 'n') {
+    event.preventDefault();
+    void actions.handleMenuAction('file.new');
+    return true;
+  }
+  if (modifier && key === 'o') {
+    event.preventDefault();
+    void actions.handleMenuAction('file.open');
+    return true;
+  }
+  if (modifier && key === 's') {
+    event.preventDefault();
+    void actions.handleMenuAction(event.shiftKey ? 'file.saveAs' : 'file.save');
+    return true;
+  }
   if (modifier && key === 'z') {
     event.preventDefault();
     void actions.handleMenuAction(event.shiftKey ? 'edit.redo' : 'edit.undo');
@@ -58,6 +80,26 @@ export function handleAppKeyDown(event: KeyboardEvent, actions: AppKeyboardActio
     void actions.handleMenuAction('file.settings');
     return true;
   }
+  if (modifier && key === 'b') {
+    event.preventDefault();
+    void actions.handleMenuAction('cp.build');
+    return true;
+  }
+  if (modifier && key === 'r') {
+    event.preventDefault();
+    void actions.handleMenuAction('optimize.scale');
+    return true;
+  }
+  if (modifier && event.shiftKey && key === 'f') {
+    event.preventDefault();
+    void actions.handleMenuAction('cp.foldedPreview');
+    return true;
+  }
+  if (modifier && event.shiftKey && key === 'm') {
+    event.preventDefault();
+    void actions.handleMenuAction('cp.checkCamv');
+    return true;
+  }
   if (event.key === 'F1') {
     event.preventDefault();
     void actions.handleMenuAction('help.documentation');
@@ -65,6 +107,6 @@ export function handleAppKeyDown(event: KeyboardEvent, actions: AppKeyboardActio
   }
   if (event.key !== 'Delete' && event.key !== 'Backspace') return false;
   event.preventDefault();
-  void actions.deleteSelection();
+  void actions.handleMenuAction('edit.delete');
   return true;
 }

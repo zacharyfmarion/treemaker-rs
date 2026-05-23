@@ -10,6 +10,14 @@ export function InspectorPanel() {
   const project = useWorkspaceStore((state) => state.project);
   const documentMode = useWorkspaceStore((state) => state.documentMode);
   const importedCreasePattern = useWorkspaceStore((state) => state.importedCreasePattern);
+  const oristudioCpDocument = useWorkspaceStore((state) => state.oristudioCpDocument);
+  const oristudioCpSelection = useWorkspaceStore((state) => state.oristudioCpSelection);
+  const oristudioCpActiveDiagnosticId = useWorkspaceStore(
+    (state) => state.oristudioCpActiveDiagnosticId
+  );
+  const setOristudioCpActiveDiagnostic = useWorkspaceStore(
+    (state) => state.setOristudioCpActiveDiagnostic
+  );
   const selection = useWorkspaceStore((state) => state.selection);
   const moveNode = useWorkspaceStore((state) => state.moveNode);
   const updateNodeLabel = useWorkspaceStore((state) => state.updateNodeLabel);
@@ -33,6 +41,13 @@ export function InspectorPanel() {
   const selectedPath =
     selection.kind === 'path' ? project.paths.find((path) => path.id === selection.id) : null;
   const selectedNodes = selectedNodeIds(selection);
+  const editableCpSelectionSize =
+    oristudioCpSelection.lines.length +
+    (oristudioCpSelection.vertices?.length ?? 0) +
+    oristudioCpSelection.points.length +
+    oristudioCpSelection.circles.length +
+    oristudioCpSelection.texts.length +
+    oristudioCpSelection.faces.length;
 
   return (
     <section className="panel-shell inspector-panel">
@@ -154,7 +169,53 @@ export function InspectorPanel() {
             <ActionRow label="Perturb nodes" onClick={() => void handleMenuAction('edit.perturbNodes')} />
           </>
         )}
-        {selection.kind === 'tree' && documentMode === 'crease-pattern' && (
+        {selection.kind === 'tree' &&
+          documentMode === 'crease-pattern' &&
+          oristudioCpDocument &&
+          editableCpSelectionSize > 0 && (
+          <>
+            <div className="inspector-heading"><MousePointer2 size={15} /> CP Selection</div>
+            <Row label="Lines" value={String(oristudioCpSelection.lines.length)} />
+            <Row label="Vertices" value={String(oristudioCpSelection.vertices?.length ?? 0)} />
+            <Row label="Points" value={String(oristudioCpSelection.points.length)} />
+            <Row label="Circles" value={String(oristudioCpSelection.circles.length)} />
+            <Row label="Text" value={String(oristudioCpSelection.texts.length)} />
+            {oristudioCpSelection.lines.length > 0 && (
+              <>
+                <ActionRow
+                  label="Delete selected lines"
+                  onClick={() => void handleMenuAction('cp.deleteSelectedLines')}
+                />
+                <ActionRow
+                  label="Fix inaccurate creases"
+                  onClick={() => void handleMenuAction('cp.fixInaccurate')}
+                />
+              </>
+            )}
+            <ActionRow label="Check CAMV" onClick={() => void handleMenuAction('cp.checkCamv')} />
+            <ActionRow label="Folded preview" onClick={() => void handleMenuAction('cp.foldedPreview')} />
+          </>
+        )}
+        {selection.kind === 'tree' &&
+          documentMode === 'crease-pattern' &&
+          oristudioCpActiveDiagnosticId && (
+          <>
+            <div className="inspector-heading"><Activity size={15} /> Diagnostic</div>
+            <Row label="Issue" value={oristudioCpActiveDiagnosticId} />
+            <ActionRow label="Check CAMV" onClick={() => void handleMenuAction('cp.checkCamv')} />
+            <button
+              className="control-row control-row--button"
+              type="button"
+              onClick={() => setOristudioCpActiveDiagnostic(null)}
+            >
+              <span className="control-row__label">Action</span>
+              <span className="control-row__value">Clear diagnostic focus</span>
+            </button>
+          </>
+        )}
+        {selection.kind === 'tree' &&
+          documentMode === 'crease-pattern' &&
+          editableCpSelectionSize === 0 && (
           <>
             <div className="inspector-heading"><Square size={15} /> Imported CP</div>
             <Row label="Title" value={project.title} />
@@ -167,6 +228,8 @@ export function InspectorPanel() {
               label="Simulation"
               value={importedCreasePattern?.simulationModelError ? 'Unavailable' : 'Ready'}
             />
+            <ActionRow label="Folded preview" onClick={() => void handleMenuAction('cp.foldedPreview')} />
+            <ActionRow label="Check CAMV" onClick={() => void handleMenuAction('cp.checkCamv')} />
           </>
         )}
         {selection.kind === 'tree' && documentMode === 'tree' && (

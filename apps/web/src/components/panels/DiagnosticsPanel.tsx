@@ -1,10 +1,19 @@
 import { AlertTriangle, CheckCircle2, CircleDashed } from 'lucide-react';
+import { useLayoutStore } from '../../store/layoutStore';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 
 export function DiagnosticsPanel() {
   const project = useWorkspaceStore((state) => state.project);
   const documentMode = useWorkspaceStore((state) => state.documentMode);
   const importedCreasePattern = useWorkspaceStore((state) => state.importedCreasePattern);
+  const oristudioCpDocument = useWorkspaceStore((state) => state.oristudioCpDocument);
+  const oristudioCpCamvResult = useWorkspaceStore((state) => state.oristudioCpCamvResult);
+  const oristudioCpActiveDiagnosticId = useWorkspaceStore(
+    (state) => state.oristudioCpActiveDiagnosticId
+  );
+  const setOristudioCpActiveDiagnostic = useWorkspaceStore(
+    (state) => state.setOristudioCpActiveDiagnostic
+  );
   const status = useWorkspaceStore((state) => state.status);
   const engineReady = useWorkspaceStore((state) => state.engineReady);
   const error = useWorkspaceStore((state) => state.error);
@@ -30,6 +39,27 @@ export function DiagnosticsPanel() {
 
   if (documentMode === 'crease-pattern') {
     const diagnostics = importedCreasePattern?.diagnostics;
+    const lastCommandResult = oristudioCpDocument?.lastCommandResult ?? null;
+    const camvDiagnosticEntries = oristudioCpCamvResult?.diagnostic_entries ?? [];
+    const commandDiagnosticEntries =
+      lastCommandResult?.operation === 'CheckCamv'
+        ? []
+        : (lastCommandResult?.diagnostic_entries ?? []);
+    const cpDiagnosticEntries = [...camvDiagnosticEntries, ...commandDiagnosticEntries];
+    const cpDiagnosticSummary = semanticCpDiagnosticSummary(
+      (camvDiagnosticEntries.length > 0 ? oristudioCpCamvResult?.diagnostics[0] : null) ??
+      (commandDiagnosticEntries.length > 0 ? lastCommandResult?.diagnostics[0] : null) ??
+      oristudioCpCamvResult?.diagnostics[0] ??
+      lastCommandResult?.diagnostics[0] ??
+      null
+    );
+    const cpDiagnosticTone = cpDiagnosticEntries.some((entry) => entry.severity === 'error')
+      ? 'bad'
+      : cpDiagnosticEntries.some((entry) => entry.severity === 'warning')
+        ? 'warn'
+        : cpDiagnosticSummary
+          ? 'good'
+          : 'warn';
     const hasErrors = Boolean(diagnostics?.errors.length);
     const hasWarnings = Boolean(diagnostics?.warnings.length);
     return (
@@ -39,11 +69,56 @@ export function DiagnosticsPanel() {
         </div>
         <div className="panel-body">
           <div className="metric-grid">
-            <Metric label="Vertices" value={importedCreasePattern?.stats.vertices ?? 0} />
-            <Metric label="Edges" value={importedCreasePattern?.stats.edges ?? 0} />
+            <Metric
+              label="Vertices"
+              value={
+                importedCreasePattern?.stats.vertices ??
+                oristudioCpDocument?.summary.points ??
+                0
+              }
+            />
+            <Metric
+              label="Edges"
+              value={
+                importedCreasePattern?.stats.edges ??
+                oristudioCpDocument?.summary.line_segments ??
+                0
+              }
+            />
             <Metric label="Faces" value={importedCreasePattern?.stats.faces ?? 0} />
             <Metric label="Mode" value="CP-only" />
           </div>
+          <div
+            className="status-row"
+            data-tone={cpDiagnosticTone}
+          >
+            {cpDiagnosticTone === 'bad' || cpDiagnosticTone === 'warn' ? (
+              <AlertTriangle size={15} />
+            ) : (
+              <CheckCircle2 size={15} />
+            )}
+            <span>{cpDiagnosticSummary ?? 'No Oriedita check has been run'}</span>
+          </div>
+          {cpDiagnosticEntries.length > 0 && (
+            <div className="diagnostic-list" aria-label="Oriedita check results">
+              {cpDiagnosticEntries.slice(0, 12).map((entry) => (
+                <button
+                  type="button"
+                  className="diagnostic-list__item"
+                  data-active={entry.id === oristudioCpActiveDiagnosticId || undefined}
+                  data-severity={entry.severity}
+                  key={entry.id}
+                  onClick={() => {
+                    setOristudioCpActiveDiagnostic(entry.id);
+                    useLayoutStore.getState().activatePanel('crease-pattern');
+                  }}
+                >
+                  <span>{semanticCpDiagnosticKind(entry.kind)}</span>
+                  <span>{entry.message}</span>
+                </button>
+              ))}
+            </div>
+          )}
           <div className="status-row" data-tone={hasErrors ? 'bad' : hasWarnings ? 'warn' : 'good'}>
             {hasErrors ? <AlertTriangle size={15} /> : <CheckCircle2 size={15} />}
             <span>
@@ -155,4 +230,30 @@ function Metric({ label, value }: { label: string; value: number | string }) {
       <div className="metric__value">{value}</div>
     </div>
   );
+}
+
+function semanticCpDiagnosticKind(kind: string): string {
+  switch (kind) {
+    case 'Check1':
+      return 'Overlap check';
+    case 'Check2':
+      return 'T-junction check';
+    case 'Check3':
+      return 'Vertex foldability';
+    case 'Check4':
+    case 'CheckCamv':
+      return 'Maekawa/LBL';
+    default:
+      return kind;
+  }
+}
+
+function semanticCpDiagnosticSummary(summary: string | null): string | null {
+  if (!summary) return null;
+  return summary
+    .replace(/^Check1\b/u, 'Overlap check')
+    .replace(/^Check2\b/u, 'T-junction check')
+    .replace(/^Check3\b/u, 'Vertex foldability check')
+    .replace(/^Check4\b/u, 'Maekawa/LBL check')
+    .replace(/^CheckCamv\b/u, 'CAMV check');
 }

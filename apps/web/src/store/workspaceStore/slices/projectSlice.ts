@@ -7,6 +7,12 @@ import {
   withFlatFoldArtifacts,
   withFlatFoldError,
 } from '../../../lib/creasePatternImport';
+import {
+  emptyOristudioCpSelection,
+  getCpVertices,
+} from '../../../lib/creasePatternViewport';
+import type { OristudioCpSelection } from '../../../lib/creasePatternViewport';
+import type { OristudioCpOperationId } from '../../../lib/oristudioCpCommands';
 import { createEmptyProject, DEFAULT_CREASE_COLOR_MODE } from '../../../lib/sampleProject';
 import {
   getWorkspaceCapabilities,
@@ -26,7 +32,23 @@ import {
   projectStateFromSnapshot,
   statusFromSnapshot,
 } from '../engineRuntime';
+import {
+  executeOristudioCpCommand as executeRuntimeOristudioCpCommand,
+  exportOristudioCpDocumentAsCp,
+  exportOristudioCpDocumentAsFold,
+  getOristudioCpOperationDescriptors,
+  loadOristudioCpDocumentFromText,
+  oristudioCpError,
+  previewOristudioCpCommand as previewRuntimeOristudioCpCommand,
+  releaseOristudioCpDocument,
+  setOristudioCpDocumentSource,
+} from '../oristudioCpRuntime';
 import type { ProjectSlice, RecentProject, WorkspaceSliceCreator } from '../types';
+import type {
+  OristudioCpCommandResult,
+  OristudioCpDocumentSnapshot,
+  OristudioCpDocumentState,
+} from '../../../engine/oristudioCpTypes';
 
 const RECENTS_STORAGE_KEY = 'treemaker.recentProjects.v1';
 const AUTOSAVE_STORAGE_KEY = 'treemaker.autosave.v1';
@@ -34,6 +56,108 @@ const MAX_RECENTS = 8;
 
 function nowIso(): string {
   return new Date().toISOString();
+}
+
+function cpHistoryEntry(
+  document: Awaited<ReturnType<typeof loadOristudioCpDocumentFromText>>['document'],
+  label: string,
+  selection: OristudioCpSelection
+) {
+  return {
+    document,
+    selection,
+    label,
+    timestamp: nowIso(),
+  };
+}
+
+async function refreshAlwaysOnCamvDiagnostics(
+  documentState: OristudioCpDocumentState
+): Promise<{
+  documentState: OristudioCpDocumentState;
+  camvResult: OristudioCpCommandResult | null;
+}> {
+  try {
+    const checkedDocument = await executeRuntimeOristudioCpCommand('CheckCamv');
+    return {
+      documentState: {
+        ...checkedDocument,
+        lastCommandResult: documentState.lastCommandResult,
+      },
+      camvResult:
+        checkedDocument.lastCommandResult?.operation === 'CheckCamv'
+          ? checkedDocument.lastCommandResult
+          : null,
+    };
+  } catch {
+    return { documentState, camvResult: null };
+  }
+}
+
+const CLEAR_CP_SELECTION_AFTER_OPERATIONS = new Set<OristudioCpOperationId>([
+  'LineSegmentDelete',
+  'CreaseMakeAux',
+  'CreaseMove',
+  'CreaseCopy',
+  'CreaseMove4p',
+  'CreaseCopy4p',
+  'CreaseDeleteOverlapping',
+  'CreaseDeleteIntersecting',
+  'DeletePoint',
+  'FixInaccurate',
+  'ReplaceLineTypeSelect',
+  'DeleteLineTypeSelect',
+  'VertexDeleteOnCrease',
+]);
+
+const SYNC_CP_LINE_SELECTION_AFTER_OPERATIONS = new Set<OristudioCpOperationId>([
+  'CreaseSelect',
+  'CreaseUnselect',
+  'SelectPolygon',
+  'UnselectPolygon',
+  'SelectLineIntersecting',
+  'UnselectLineIntersecting',
+  'SelectLasso',
+  'UnselectLasso',
+]);
+
+const NON_MUTATING_CP_OPERATIONS = new Set<OristudioCpOperationId>([
+  'Check1',
+  'Check2',
+  'Check3',
+  'Check4',
+  'CheckCamv',
+  'FlatFoldableCheck',
+]);
+
+function oristudioCpSelectionAfterCommand(
+  operationId: OristudioCpOperationId,
+  selection: OristudioCpSelection,
+  document: OristudioCpDocumentSnapshot
+): OristudioCpSelection {
+  if (CLEAR_CP_SELECTION_AFTER_OPERATIONS.has(operationId)) {
+    return emptyOristudioCpSelection();
+  }
+
+  if (SYNC_CP_LINE_SELECTION_AFTER_OPERATIONS.has(operationId)) {
+    return {
+      ...emptyOristudioCpSelection(),
+      lines: document.crease_pattern.line_segments
+        .map((line, index) => (line.selected === 0 ? null : index + 1))
+        .filter((id): id is number => id !== null),
+    };
+  }
+
+  const vertexIds = new Set(getCpVertices(document).map((vertex) => vertex.id));
+
+  return {
+    lines: selection.lines.filter((id) => id >= 1 && id <= document.crease_pattern.line_segments.length),
+    vertices: (selection.vertices ?? []).filter((id) => vertexIds.has(id)),
+    points: selection.points.filter((id) => id >= 1 && id <= document.crease_pattern.points.length),
+    circles: selection.circles.filter((id) => id >= 1 && id <= document.crease_pattern.circles.length),
+    texts: selection.texts.filter((id) => id >= 1 && id <= document.crease_pattern.texts.length),
+    faces: selection.faces,
+  };
 }
 
 function basenameWithoutTreeMakerExtension(filename: string): string {
@@ -96,10 +220,19 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
       edgeCount: get().project.edges.length,
       creaseCount: get().project.creases.length,
       facetCount: get().project.facets.length,
+      hasEditableCreasePattern: get().oristudioCpDocument !== null,
       hasImportedCreasePattern: get().importedCreasePattern !== null,
       hasSimulationModel: get().foldArtifacts?.simulation_model != null,
-      historyPastCount: get().historyPast.length,
-      historyFutureCount: get().historyFuture.length,
+      oristudioCpSelectedLineCount: get().oristudioCpSelection.lines.length,
+      oristudioCpSelectedCircleCount: get().oristudioCpSelection.circles.length,
+      historyPastCount:
+        get().documentMode === 'crease-pattern'
+          ? get().oristudioCpHistoryPast.length
+          : get().historyPast.length,
+      historyFutureCount:
+        get().documentMode === 'crease-pattern'
+          ? get().oristudioCpHistoryFuture.length
+          : get().historyFuture.length,
       clipboard: get().clipboard,
       selection: get().selection,
     });
@@ -119,6 +252,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
     source: { title?: string; filename?: string; path?: string | null; dirty?: boolean } = {}
   ) => {
     set({ status: 'loading_engine', error: null, projectMessage: null });
+    await releaseOristudioCpDocument();
     const api = await getEngine();
     const snapshot = await loadTreeFromText(api, text);
     const filename = source.filename ?? 'Untitled.tmd5';
@@ -127,11 +261,18 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
       ...projectStateFromSnapshot(snapshot, title),
       documentMode: 'tree',
       importedCreasePattern: null,
+      oristudioCpDocument: null,
+      oristudioCpError: null,
+      oristudioCpCamvResult: null,
+      oristudioCpHistoryPast: [],
+      oristudioCpHistoryFuture: [],
       projectLoadId: get().projectLoadId + 1,
       currentFileName: filename,
       currentFilePath: source.path ?? null,
       projectMessage: `Loaded ${filename}`,
       selection: { kind: 'tree' },
+      oristudioCpSelection: emptyOristudioCpSelection(),
+      oristudioCpActiveDiagnosticId: null,
       toolMode: 'select',
       symmetryAuthoringPairs: [],
       creaseColorMode: DEFAULT_CREASE_COLOR_MODE,
@@ -158,13 +299,38 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
     text: string,
     source: { filename: string; path?: string | null }
   ) => {
-    set({ status: 'loading_engine', error: null, projectMessage: null });
+    set({
+      status: 'loading_engine',
+      error: null,
+      projectMessage: null,
+      oristudioCpCamvResult: null,
+    });
     const filename = source.filename;
+    const format = importedCreasePatternFormat(filename);
     const parsed = parseImportedCreasePattern(text, {
-      format: importedCreasePatternFormat(filename),
+      format,
       filename,
       path: source.path ?? null,
     });
+    await releaseOristudioCpDocument();
+    let oristudioCpDocument: Awaited<
+      ReturnType<typeof loadOristudioCpDocumentFromText>
+    > | null = null;
+    let oristudioCpCamvResult: OristudioCpCommandResult | null = null;
+    let oristudioCpRuntimeError: string | null = null;
+    try {
+      oristudioCpDocument = await loadOristudioCpDocumentFromText(text, {
+        format,
+        filename,
+        path: source.path ?? null,
+        title: parsed.document.title,
+      });
+      const checked = await refreshAlwaysOnCamvDiagnostics(oristudioCpDocument);
+      oristudioCpDocument = checked.documentState;
+      oristudioCpCamvResult = checked.camvResult;
+    } catch (error) {
+      oristudioCpRuntimeError = oristudioCpError(error).message;
+    }
     const result = await (async () => {
       try {
         const api = await getEngine();
@@ -180,11 +346,21 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
       project: result.project,
       documentMode: 'crease-pattern',
       importedCreasePattern: result.document,
+      oristudioCpDocument,
+      oristudioCpCamvResult,
+      oristudioCpOperationDescriptors: oristudioCpDocument
+        ? oristudioCpDocument.operationDescriptors
+        : get().oristudioCpOperationDescriptors,
+      oristudioCpError: oristudioCpRuntimeError,
+      oristudioCpHistoryPast: [],
+      oristudioCpHistoryFuture: [],
       projectLoadId: get().projectLoadId + 1,
       currentFileName: filename,
       currentFilePath: source.path ?? null,
       projectMessage: `Loaded ${filename}`,
       selection: { kind: 'tree' },
+      oristudioCpSelection: emptyOristudioCpSelection(),
+      oristudioCpActiveDiagnosticId: null,
       toolMode: 'select',
       creaseColorMode: DEFAULT_CREASE_COLOR_MODE,
       foldArtifacts: result.foldArtifacts,
@@ -244,10 +420,80 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
     return true;
   };
 
+  const saveEditableCreasePattern = async (
+    fileService: FileService,
+    forceSaveAs: boolean
+  ) => {
+    const documentState = get().oristudioCpDocument;
+    if (!documentState) {
+      set({
+        error: {
+          code: 'invalid_operation',
+          message: 'No editable crease-pattern document is loaded',
+        },
+        projectMessage: null,
+      });
+      return false;
+    }
+
+    const contents = await exportOristudioCpDocumentAsCp();
+    const suggestedName = defaultFilename(
+      documentState.summary.title || get().importedCreasePattern?.title || get().project.title,
+      'cp'
+    );
+    const canOverwriteCurrentCp = /\.cp$/i.test(get().currentFileName);
+    const result = await fileService.saveTextFile({
+      title: forceSaveAs ? 'Save Crease Pattern As' : 'Save Crease Pattern',
+      contents,
+      suggestedName: canOverwriteCurrentCp ? get().currentFileName : suggestedName,
+      path: forceSaveAs || !canOverwriteCurrentCp ? null : get().currentFilePath,
+      extensions: ['cp'],
+    });
+    if (!result) return false;
+
+    const source = {
+      format: 'cp' as const,
+      filename: result.name,
+      path: result.path,
+    };
+    const importedCreasePattern = get().importedCreasePattern;
+    setOristudioCpDocumentSource(source);
+    set({
+      currentFileName: result.name,
+      currentFilePath: result.path,
+      dirty: false,
+      projectMessage: `Saved ${result.name}`,
+      oristudioCpDocument: {
+        ...documentState,
+        source,
+      },
+      importedCreasePattern: importedCreasePattern
+        ? {
+            ...importedCreasePattern,
+            source,
+          }
+        : importedCreasePattern,
+    });
+    rememberRecent({
+      id: result.path ?? result.name,
+      title: documentState.summary.title || get().project.title,
+      filename: result.name,
+      savedAt: nowIso(),
+      text: contents,
+    });
+    return true;
+  };
+
   return {
     project: createEmptyProject(),
     documentMode: 'tree',
     importedCreasePattern: null,
+    oristudioCpDocument: null,
+    oristudioCpOperationDescriptors: [],
+    oristudioCpError: null,
+    oristudioCpCamvResult: null,
+    oristudioCpHistoryPast: [],
+    oristudioCpHistoryFuture: [],
     projectLoadId: 0,
     currentFilePath: null,
     currentFileName: 'Untitled.tmd5',
@@ -263,18 +509,28 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
     initEngine: async () => {
       set({ status: 'loading_engine', error: null });
       try {
+        const operationDescriptors = await getOristudioCpOperationDescriptors().catch(() => []);
         const api = await getEngine();
         const snapshot = await initializeBlankTree(api);
         if (get().documentMode !== 'tree') {
-          set({ engineReady: true });
+          set({ engineReady: true, oristudioCpOperationDescriptors: operationDescriptors });
           return;
         }
+        await releaseOristudioCpDocument();
         set({
           ...projectStateFromSnapshot(snapshot, get().project.title),
           documentMode: 'tree',
           importedCreasePattern: null,
+          oristudioCpDocument: null,
+          oristudioCpOperationDescriptors: operationDescriptors,
+          oristudioCpError: null,
+          oristudioCpCamvResult: null,
+          oristudioCpHistoryPast: [],
+          oristudioCpHistoryFuture: [],
           projectLoadId: get().projectLoadId + 1,
           selection: { kind: 'tree' },
+          oristudioCpSelection: emptyOristudioCpSelection(),
+          oristudioCpActiveDiagnosticId: null,
           symmetryAuthoringPairs: [],
           dirty: false,
           lastOptimization: null,
@@ -293,17 +549,25 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
       if (!(await confirmDiscardDirty(get().dirty))) return;
       set({ status: 'loading_engine', error: null, projectMessage: null });
       try {
+        await releaseOristudioCpDocument();
         const api = await getEngine();
         const snapshot = await createBlankTree(api);
         set({
           ...projectStateFromSnapshot(snapshot, 'Untitled'),
           documentMode: 'tree',
           importedCreasePattern: null,
+          oristudioCpDocument: null,
+          oristudioCpError: null,
+          oristudioCpCamvResult: null,
+          oristudioCpHistoryPast: [],
+          oristudioCpHistoryFuture: [],
           projectLoadId: get().projectLoadId + 1,
           currentFileName: 'Untitled.tmd5',
           currentFilePath: null,
           projectMessage: null,
           selection: { kind: 'tree' },
+          oristudioCpSelection: emptyOristudioCpSelection(),
+          oristudioCpActiveDiagnosticId: null,
           toolMode: 'select',
           symmetryAuthoringPairs: [],
           creaseColorMode: DEFAULT_CREASE_COLOR_MODE,
@@ -325,17 +589,25 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
       if (!(await confirmDiscardDirty(get().dirty))) return;
       set({ status: 'loading_engine', error: null, projectMessage: null });
       try {
+        await releaseOristudioCpDocument();
         const api = await getEngine();
         const snapshot = await createStarterTree(api);
         set({
           ...projectStateFromSnapshot(snapshot, 'Three terminal flaps'),
           documentMode: 'tree',
           importedCreasePattern: null,
+          oristudioCpDocument: null,
+          oristudioCpError: null,
+          oristudioCpCamvResult: null,
+          oristudioCpHistoryPast: [],
+          oristudioCpHistoryFuture: [],
           projectLoadId: get().projectLoadId + 1,
           currentFileName: 'three-terminal-flaps.tmd5',
           currentFilePath: null,
           projectMessage: 'Loaded starter project',
           selection: { kind: 'tree' },
+          oristudioCpSelection: emptyOristudioCpSelection(),
+          oristudioCpActiveDiagnosticId: null,
           toolMode: 'select',
           symmetryAuthoringPairs: [],
           creaseColorMode: DEFAULT_CREASE_COLOR_MODE,
@@ -369,6 +641,96 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
       }
     },
 
+    executeOristudioCpCommand: async (operationId, payload = {}) => {
+      if (!get().oristudioCpDocument) {
+        set({
+          oristudioCpError: 'No editable crease-pattern document is loaded',
+          error: {
+            code: 'invalid_operation',
+            message: 'No editable crease-pattern document is loaded',
+          },
+        });
+        return false;
+      }
+      try {
+        const previousDocument = get().oristudioCpDocument?.document ?? null;
+        const previousSelection = get().oristudioCpSelection;
+        const commandDocument = await executeRuntimeOristudioCpCommand(operationId, payload);
+        const mutatesDocument = !NON_MUTATING_CP_OPERATIONS.has(operationId);
+        const checked =
+          mutatesDocument
+            ? await refreshAlwaysOnCamvDiagnostics(commandDocument)
+            : {
+                documentState: commandDocument,
+                camvResult:
+                  operationId === 'CheckCamv' &&
+                  commandDocument.lastCommandResult?.operation === 'CheckCamv'
+                    ? commandDocument.lastCommandResult
+                    : get().oristudioCpCamvResult,
+              };
+        const nextDocument = checked.documentState;
+        const diagnosticEntries = nextDocument.lastCommandResult?.diagnostic_entries ?? [];
+        set({
+          oristudioCpDocument: nextDocument,
+          oristudioCpCamvResult: checked.camvResult,
+          oristudioCpOperationDescriptors: nextDocument.operationDescriptors,
+          oristudioCpError: null,
+          oristudioCpActiveDiagnosticId: mutatesDocument
+            ? null
+            : (diagnosticEntries[0]?.id ?? null),
+          oristudioCpSelection: oristudioCpSelectionAfterCommand(
+            operationId,
+            previousSelection,
+            nextDocument.document
+          ),
+          oristudioCpHistoryPast: previousDocument
+            ? mutatesDocument
+              ? [
+                ...get().oristudioCpHistoryPast,
+                cpHistoryEntry(previousDocument, String(operationId), previousSelection),
+              ]
+              : get().oristudioCpHistoryPast
+            : get().oristudioCpHistoryPast,
+          oristudioCpHistoryFuture: mutatesDocument ? [] : get().oristudioCpHistoryFuture,
+          error: null,
+          dirty: mutatesDocument ? true : get().dirty,
+        });
+        return true;
+      } catch (error) {
+        const normalized = oristudioCpError(error);
+        set({
+          oristudioCpError: normalized.message,
+          error: normalized,
+        });
+        return false;
+      }
+    },
+
+    previewOristudioCpCommand: async (operationId, payload = {}) => {
+      if (!get().oristudioCpDocument) return null;
+      try {
+        const preview = await previewRuntimeOristudioCpCommand(operationId, payload);
+        set({ oristudioCpError: null });
+        return preview;
+      } catch (error) {
+        const normalized = oristudioCpError(error);
+        set({ oristudioCpError: normalized.message });
+        return null;
+      }
+    },
+
+    clearOristudioCpDocument: async () => {
+      await releaseOristudioCpDocument();
+      set({
+        oristudioCpDocument: null,
+        oristudioCpError: null,
+        oristudioCpHistoryPast: [],
+        oristudioCpHistoryFuture: [],
+        oristudioCpActiveDiagnosticId: null,
+        oristudioCpCamvResult: null,
+      });
+    },
+
     openProject: async (fileService = getFileService()) => {
       if (rejectDisabled('file.open')) return false;
       if (!(await confirmDiscardDirty(get().dirty))) return false;
@@ -393,6 +755,9 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
     saveProject: async (fileService = getFileService()) => {
       try {
         if (rejectDisabled('file.save')) return false;
+        if (get().documentMode === 'crease-pattern') {
+          return await saveEditableCreasePattern(fileService, false);
+        }
         return await saveTmd5(fileService, false);
       } catch (error) {
         set({ status: 'error', error: engineError(error) });
@@ -403,6 +768,9 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
     saveProjectAs: async (fileService = getFileService()) => {
       try {
         if (rejectDisabled('file.saveAs')) return false;
+        if (get().documentMode === 'crease-pattern') {
+          return await saveEditableCreasePattern(fileService, true);
+        }
         return await saveTmd5(fileService, true);
       } catch (error) {
         set({ status: 'error', error: engineError(error) });
@@ -431,11 +799,36 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
       }
     },
 
+    exportCp: async (fileService = getFileService()) => {
+      try {
+        if (rejectDisabled('file.exportCp')) return false;
+        const contents = await exportOristudioCpDocumentAsCp();
+        const result = await fileService.saveTextFile({
+          title: 'Export CP Document',
+          contents,
+          suggestedName: defaultFilename(
+            get().oristudioCpDocument?.summary.title || get().project.title,
+            'cp'
+          ),
+          path: null,
+          extensions: ['cp'],
+        });
+        if (!result) return false;
+        set({ projectMessage: `Exported ${result.name}` });
+        return true;
+      } catch (error) {
+        set({ status: 'error', error: engineError(error) });
+        return false;
+      }
+    },
+
     exportFold: async (fileService = getFileService()) => {
       try {
         if (rejectDisabled('file.exportFold')) return false;
         const contents =
-          get().documentMode === 'crease-pattern' && get().importedCreasePattern
+          get().documentMode === 'crease-pattern' && get().oristudioCpDocument
+            ? await exportOristudioCpDocumentAsFold()
+            : get().documentMode === 'crease-pattern' && get().importedCreasePattern
             ? JSON.stringify(get().importedCreasePattern?.fold, null, 2)
             : await (async () => {
                 const { api, treeHandle } = await ensureTreeHandle();

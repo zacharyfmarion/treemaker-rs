@@ -82,6 +82,16 @@ export function FilesPanel() {
           <Button
             size="sm"
             variant="secondary"
+            disabled={!capabilities['file.exportCp'].enabled}
+            title={capabilities['file.exportCp'].reason}
+            onClick={() => void handleMenuAction('file.exportCp')}
+          >
+            <Download size={14} />
+            CP
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
             disabled={!capabilities['file.exportFold'].enabled}
             title={capabilities['file.exportFold'].reason}
             onClick={() => void handleMenuAction('file.exportFold')}

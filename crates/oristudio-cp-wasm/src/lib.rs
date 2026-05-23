@@ -97,7 +97,7 @@ pub fn load_document(document: JsValue) -> Result<u32, JsValue> {
 
 #[wasm_bindgen]
 pub fn document_snapshot(handle: u32) -> Result<JsValue, JsValue> {
-    with_document(handle, |document| to_js_value(document))
+    with_document(handle, to_js_value)
 }
 
 #[wasm_bindgen]

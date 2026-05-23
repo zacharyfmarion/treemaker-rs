@@ -2465,10 +2465,8 @@ fn flat_foldable_boundary_from_points(
     let closed = path
         .last()
         .is_some_and(|last| first.distance(*last) <= close_distance.max(Epsilon::UNKNOWN_1EN4));
-    if closed {
-        if let Some(last) = path.last_mut() {
-            *last = first;
-        }
+    if closed && let Some(last) = path.last_mut() {
+        *last = first;
     }
 
     let boundary = path

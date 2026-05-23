@@ -12,6 +12,9 @@ export function useWorkspaceCapabilities() {
   const hasEditableCreasePattern = useWorkspaceStore((state) => state.oristudioCpDocument !== null);
   const hasImportedCreasePattern = useWorkspaceStore((state) => state.importedCreasePattern !== null);
   const hasSimulationModel = useWorkspaceStore((state) => state.foldArtifacts?.simulation_model != null);
+  const oristudioCpSelectedLineCount = useWorkspaceStore(
+    (state) => state.oristudioCpSelection.lines.length
+  );
   const treeHistoryPastCount = useWorkspaceStore((state) => state.historyPast.length);
   const treeHistoryFutureCount = useWorkspaceStore((state) => state.historyFuture.length);
   const cpHistoryPastCount = useWorkspaceStore((state) => state.oristudioCpHistoryPast.length);
@@ -35,6 +38,7 @@ export function useWorkspaceCapabilities() {
         hasEditableCreasePattern,
         hasImportedCreasePattern,
         hasSimulationModel,
+        oristudioCpSelectedLineCount,
         historyPastCount,
         historyFutureCount,
         clipboard,
@@ -50,6 +54,7 @@ export function useWorkspaceCapabilities() {
       hasEditableCreasePattern,
       hasImportedCreasePattern,
       hasSimulationModel,
+      oristudioCpSelectedLineCount,
       historyFutureCount,
       historyPastCount,
       selection,

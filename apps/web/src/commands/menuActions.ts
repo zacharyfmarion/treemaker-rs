@@ -7,6 +7,13 @@ import { useWorkspaceStore } from '../store/workspaceStore';
 import { selectWorkspaceCapabilities } from '../store/workspaceStore/capabilities';
 import type { WorkspaceCapabilities, WorkspaceCapabilityId } from '../lib/workspaceCapabilities';
 import { requestPositiveNumber, type NumberDialogOptions } from '../store/commandDialogStore';
+import type {
+  OristudioCpCommandPayload,
+  OristudioCpDocumentState,
+} from '../engine/oristudioCpTypes';
+import type { OristudioCpSelection } from '../lib/creasePatternViewport';
+import type { OristudioCpOperationId } from '../lib/oristudioCpCommands';
+import type { DocumentMode } from '../lib/sampleProject';
 
 export const MENU_ACTION_IDS = [
   'app.about',
@@ -60,6 +67,16 @@ export const MENU_ACTION_IDS = [
   'optimize.edges',
   'optimize.strain',
   'cp.build',
+  'cp.foldedPreview',
+  'cp.deleteSelectedLines',
+  'cp.checkCamv',
+  'cp.check1',
+  'cp.check2',
+  'cp.check3',
+  'cp.check4',
+  'cp.fix1',
+  'cp.fix2',
+  'cp.fixInaccurate',
   'help.documentation',
   'help.about',
 ] as const;
@@ -109,6 +126,15 @@ export interface WorkspaceCommands {
   addLargestStubForSelectedNodes(): Promise<void>;
   addLargestStubForSelectedPoly(): Promise<void>;
   triangulateTree(): Promise<void>;
+  documentMode: DocumentMode;
+  oristudioCpDocument: OristudioCpDocumentState | null;
+  oristudioCpSelection: OristudioCpSelection;
+  setOristudioCpSelection(selection: OristudioCpSelection): void;
+  clearOristudioCpSelection(): void;
+  executeOristudioCpCommand(
+    operationId: OristudioCpOperationId,
+    payload?: OristudioCpCommandPayload
+  ): Promise<boolean>;
 }
 
 export interface LayoutCommands {
@@ -138,6 +164,16 @@ const FILE_ACTIONS: Partial<Record<MenuActionId, FileCommand>> = {
   'file.exportFold': 'exportFold',
   'file.exportSvg': 'exportSvg',
   'file.exportPng': 'exportPng',
+};
+
+const CP_OPERATION_ACTIONS: Partial<Record<MenuActionId, OristudioCpOperationId>> = {
+  'cp.checkCamv': 'CheckCamv',
+  'cp.check1': 'Check1',
+  'cp.check2': 'Check2',
+  'cp.check3': 'Check3',
+  'cp.check4': 'Check4',
+  'cp.fix1': 'Fix1',
+  'cp.fix2': 'Fix2',
 };
 
 export function isMenuActionId(id: string): id is MenuActionId {
@@ -179,6 +215,11 @@ export function createMenuActionHandler(deps: MenuActionDependencies) {
       }
     }
 
+    const cpOperation = CP_OPERATION_ACTIONS[id];
+    if (cpOperation) {
+      return deps.workspace.executeOristudioCpCommand(cpOperation);
+    }
+
     switch (id) {
       case 'app.about':
         deps.about?.();
@@ -208,13 +249,38 @@ export function createMenuActionHandler(deps: MenuActionDependencies) {
         await deps.workspace.pasteClipboard();
         return true;
       case 'edit.delete':
-        await deps.workspace.deleteSelection();
-        return true;
+        if (deps.workspace.documentMode === 'crease-pattern') {
+          const lineIds = deps.workspace.oristudioCpSelection.lines;
+          if (lineIds.length === 0) return false;
+          return deps.workspace.executeOristudioCpCommand('LineSegmentDelete', {
+            line_ids: lineIds,
+          });
+        } else {
+          await deps.workspace.deleteSelection();
+          return true;
+        }
       case 'edit.selectAll':
-        deps.workspace.selectAll();
+        if (deps.workspace.documentMode === 'crease-pattern') {
+          const lineCount =
+            deps.workspace.oristudioCpDocument?.document.crease_pattern.line_segments.length ?? 0;
+          deps.workspace.setOristudioCpSelection({
+            lines: Array.from({ length: lineCount }, (_value, index) => index + 1),
+            vertices: [],
+            points: [],
+            circles: [],
+            texts: [],
+            faces: [],
+          });
+        } else {
+          deps.workspace.selectAll();
+        }
         return true;
       case 'edit.deselectAll':
-        deps.workspace.selectNone();
+        if (deps.workspace.documentMode === 'crease-pattern') {
+          deps.workspace.clearOristudioCpSelection();
+        } else {
+          deps.workspace.selectNone();
+        }
         return true;
       case 'edit.selectByIndex':
         deps.selectByIndex?.();
@@ -339,6 +405,23 @@ export function createMenuActionHandler(deps: MenuActionDependencies) {
       case 'cp.build':
         await deps.workspace.buildCreasePattern();
         return true;
+      case 'cp.foldedPreview':
+        deps.layout.activatePanel('folded-base');
+        return true;
+      case 'cp.deleteSelectedLines': {
+        const lineIds = deps.workspace.oristudioCpSelection.lines;
+        if (lineIds.length === 0) return false;
+        return deps.workspace.executeOristudioCpCommand('LineSegmentDelete', {
+          line_ids: lineIds,
+        });
+      }
+      case 'cp.fixInaccurate': {
+        const lineIds = deps.workspace.oristudioCpSelection.lines;
+        if (lineIds.length === 0) return false;
+        return deps.workspace.executeOristudioCpCommand('FixInaccurate', {
+          line_ids: lineIds,
+        });
+      }
       case 'help.documentation':
         deps.help?.();
         return true;

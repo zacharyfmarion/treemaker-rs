@@ -16,6 +16,7 @@ export function workspaceCapabilityInput(state: WorkspaceState): WorkspaceCapabi
     hasEditableCreasePattern: state.oristudioCpDocument !== null,
     hasImportedCreasePattern: state.importedCreasePattern !== null,
     hasSimulationModel: state.foldArtifacts?.simulation_model != null,
+    oristudioCpSelectedLineCount: state.oristudioCpSelection.lines.length,
     historyPastCount:
       state.documentMode === 'crease-pattern'
         ? state.oristudioCpHistoryPast.length

@@ -13,6 +13,7 @@ function capabilities({
   engineReady = true,
   hasEditableCreasePattern = false,
   hasImportedCreasePattern = false,
+  oristudioCpSelectedLineCount = 0,
   historyPastCount = 0,
   historyFutureCount = 0,
   selection = treeSelection,
@@ -25,6 +26,7 @@ function capabilities({
   engineReady?: boolean;
   hasEditableCreasePattern?: boolean;
   hasImportedCreasePattern?: boolean;
+  oristudioCpSelectedLineCount?: number;
   historyPastCount?: number;
   historyFutureCount?: number;
   selection?: Selection;
@@ -39,6 +41,7 @@ function capabilities({
     hasEditableCreasePattern,
     hasImportedCreasePattern,
     hasSimulationModel: false,
+    oristudioCpSelectedLineCount,
     historyPastCount,
     historyFutureCount,
     clipboard: null,
@@ -130,6 +133,7 @@ describe('workspace capabilities', () => {
     expect(state['file.exportFold'].enabled).toBe(true);
     expect(state['file.exportSvg'].enabled).toBe(true);
     expect(state['view.foldedBase'].enabled).toBe(true);
+    expect(state['cp.foldedPreview'].enabled).toBe(true);
     expect(state['foldedBase.refresh'].enabled).toBe(false);
     expect(getNextDocumentAction(state)).toBe(null);
   });
@@ -155,6 +159,32 @@ describe('workspace capabilities', () => {
     expect(state['file.exportCp']).toMatchObject({
       enabled: true,
       reason: 'Export editable crease pattern as CP',
+    });
+    expect(state['cp.checkCamv'].enabled).toBe(true);
+    expect(state['cp.deleteSelectedLines'].enabled).toBe(false);
+    expect(state['cp.fixInaccurate'].enabled).toBe(false);
+  });
+
+  it('enables selected-line CP commands only when editable CP lines are selected', () => {
+    const state = capabilities({
+      documentMode: 'crease-pattern',
+      status: 'crease_pattern_ready',
+      hasEditableCreasePattern: true,
+      hasImportedCreasePattern: true,
+      oristudioCpSelectedLineCount: 2,
+    });
+
+    expect(state['cp.deleteSelectedLines']).toMatchObject({
+      enabled: true,
+      reason: 'Delete selected crease-pattern lines',
+    });
+    expect(state['edit.delete']).toMatchObject({
+      enabled: true,
+      reason: 'Delete selected crease-pattern lines',
+    });
+    expect(state['cp.fixInaccurate']).toMatchObject({
+      enabled: true,
+      reason: 'Snap selected creases to Oriedita fix targets',
     });
   });
 

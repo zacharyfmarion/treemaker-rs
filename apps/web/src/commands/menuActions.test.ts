@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { OristudioCpDocumentState } from '../engine/oristudioCpTypes';
 import { getWorkspaceCapabilities } from '../lib/workspaceCapabilities';
 import { createFileService } from '../platform/fileService';
 import { createMenuActionHandler, isMenuActionId } from './menuActions';
@@ -48,6 +49,19 @@ function createDeps() {
       addLargestStubForSelectedNodes: vi.fn().mockResolvedValue(undefined),
       addLargestStubForSelectedPoly: vi.fn().mockResolvedValue(undefined),
       triangulateTree: vi.fn().mockResolvedValue(undefined),
+      documentMode: 'tree' as 'tree' | 'crease-pattern',
+      oristudioCpDocument: null as OristudioCpDocumentState | null,
+      oristudioCpSelection: {
+        lines: [1, 2],
+        vertices: [],
+        points: [],
+        circles: [],
+        texts: [],
+        faces: [],
+      },
+      setOristudioCpSelection: vi.fn(),
+      clearOristudioCpSelection: vi.fn(),
+      executeOristudioCpCommand: vi.fn().mockResolvedValue(true),
     },
     layout: {
       activatePanel: vi.fn(),
@@ -67,6 +81,7 @@ describe('menu actions', () => {
   it('recognizes shared command ids', () => {
     expect(isMenuActionId('file.new')).toBe(true);
     expect(isMenuActionId('cp.build')).toBe(true);
+    expect(isMenuActionId('cp.checkCamv')).toBe(true);
     expect(isMenuActionId('not.real')).toBe(false);
   });
 
@@ -83,6 +98,7 @@ describe('menu actions', () => {
     await expect(handle('help.about')).resolves.toBe(true);
     await expect(handle('app.about')).resolves.toBe(true);
     await expect(handle('cp.build')).resolves.toBe(true);
+    await expect(handle('cp.foldedPreview')).resolves.toBe(true);
     await expect(handle('optimize.edges')).resolves.toBe(true);
 
     expect(deps.workspace.createNewProject).toHaveBeenCalledOnce();
@@ -94,6 +110,46 @@ describe('menu actions', () => {
     expect(deps.about).toHaveBeenCalledTimes(2);
     expect(deps.workspace.buildCreasePattern).toHaveBeenCalledOnce();
     expect(deps.workspace.optimizeEdges).toHaveBeenCalledOnce();
+  });
+
+  it('dispatches CP diagnostics and selected-line commands through the shared CP runtime', async () => {
+    const deps = createDeps();
+    const handle = createMenuActionHandler(deps);
+
+    await expect(handle('cp.checkCamv')).resolves.toBe(true);
+    await expect(handle('cp.check1')).resolves.toBe(true);
+    await expect(handle('cp.fix2')).resolves.toBe(true);
+    await expect(handle('cp.deleteSelectedLines')).resolves.toBe(true);
+    await expect(handle('cp.fixInaccurate')).resolves.toBe(true);
+
+    expect(deps.workspace.executeOristudioCpCommand).toHaveBeenCalledWith('CheckCamv');
+    expect(deps.workspace.executeOristudioCpCommand).toHaveBeenCalledWith('Check1');
+    expect(deps.workspace.executeOristudioCpCommand).toHaveBeenCalledWith('Fix2');
+    expect(deps.workspace.executeOristudioCpCommand).toHaveBeenCalledWith(
+      'LineSegmentDelete',
+      { line_ids: [1, 2] }
+    );
+    expect(deps.workspace.executeOristudioCpCommand).toHaveBeenCalledWith('FixInaccurate', {
+      line_ids: [1, 2],
+    });
+  });
+
+  it('does not dispatch selected-line CP commands without selected CP lines', async () => {
+    const deps = createDeps();
+    deps.workspace.oristudioCpSelection = {
+      lines: [],
+      vertices: [],
+      points: [],
+      circles: [],
+      texts: [],
+      faces: [],
+    };
+    const handle = createMenuActionHandler(deps);
+
+    await expect(handle('cp.deleteSelectedLines')).resolves.toBe(false);
+    await expect(handle('cp.fixInaccurate')).resolves.toBe(false);
+
+    expect(deps.workspace.executeOristudioCpCommand).not.toHaveBeenCalled();
   });
 
   it('dispatches edit commands through workspace actions', async () => {
@@ -127,6 +183,94 @@ describe('menu actions', () => {
     expect(deps.workspace.perturbAllNodes).toHaveBeenCalledOnce();
     expect(deps.workspace.relieveAllStrain).toHaveBeenCalledOnce();
     expect(deps.workspace.triangulateTree).toHaveBeenCalledOnce();
+  });
+
+  it('routes generic selection commands to editable CP state in CP mode', async () => {
+    const deps = createDeps();
+    deps.workspace.documentMode = 'crease-pattern';
+    deps.workspace.oristudioCpDocument = {
+      handle: 1,
+      source: { format: 'cp', filename: 'lines.cp', path: null },
+      operationDescriptors: [],
+      lastCommandResult: null,
+      summary: {
+        title: 'lines',
+        line_segments: 2,
+        circles: 0,
+        points: 0,
+        aux_line_segments: 0,
+        texts: 0,
+        can_save_as_cp: true,
+        is_empty: false,
+      },
+      document: {
+        title: 'lines',
+        metadata: {},
+        crease_pattern: {
+          line_segments: [
+            {
+              a: { x: 0, y: 0 },
+              b: { x: 1, y: 0 },
+              color: 'Red1',
+              active: 'Inactive0',
+              selected: 0,
+              customized: 0,
+              customized_color: { red: 0, green: 0, blue: 0 },
+            },
+            {
+              a: { x: 0, y: 0 },
+              b: { x: 0, y: 1 },
+              color: 'Blue2',
+              active: 'Inactive0',
+              selected: 0,
+              customized: 0,
+              customized_color: { red: 0, green: 0, blue: 0 },
+            },
+          ],
+          circles: [],
+          points: [],
+          aux_line_segments: [],
+          texts: [],
+          grid: {
+            interval_grid_size: 2,
+            grid_size: 8,
+            grid_xa: 1,
+            grid_xb: 0,
+            grid_xc: 1,
+            grid_ya: 1,
+            grid_yb: 0,
+            grid_yc: 1,
+            grid_angle: 90,
+            base_state: 'WithinPaper',
+            vertical_scale_position: 0,
+            horizontal_scale_position: 0,
+            draw_diagonal_gridlines: false,
+          },
+        },
+      },
+    };
+    const handle = createMenuActionHandler(deps);
+
+    await expect(handle('edit.selectAll')).resolves.toBe(true);
+    await expect(handle('edit.deselectAll')).resolves.toBe(true);
+    await expect(handle('edit.delete')).resolves.toBe(true);
+
+    expect(deps.workspace.setOristudioCpSelection).toHaveBeenCalledWith({
+      lines: [1, 2],
+      vertices: [],
+      points: [],
+      circles: [],
+      texts: [],
+      faces: [],
+    });
+    expect(deps.workspace.clearOristudioCpSelection).toHaveBeenCalledOnce();
+    expect(deps.workspace.executeOristudioCpCommand).toHaveBeenCalledWith(
+      'LineSegmentDelete',
+      { line_ids: [1, 2] }
+    );
+    expect(deps.workspace.selectAll).not.toHaveBeenCalled();
+    expect(deps.workspace.selectNone).not.toHaveBeenCalled();
+    expect(deps.workspace.deleteSelection).not.toHaveBeenCalled();
   });
 
   it('requests in-app numeric values for parameterized edit commands', async () => {
@@ -185,6 +329,7 @@ describe('menu actions', () => {
         hasEditableCreasePattern: false,
         hasImportedCreasePattern: true,
         hasSimulationModel: true,
+        oristudioCpSelectedLineCount: 0,
         historyPastCount: 0,
         historyFutureCount: 0,
         clipboard: null,

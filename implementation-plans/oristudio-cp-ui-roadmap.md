@@ -610,16 +610,23 @@ Done when:
 
 - Users can locate and repair the same classes of CP problems Oriedita reports.
 
-### Stage 10: Folding Estimate And Folded Figure UX
+### Stage 10: Folded Preview And Oriedita Session Parity
 
 Intent:
 
-- Surface the Oriedita folding-estimate workflow once the non-UI folding
-  session APIs are ready.
+- Keep the existing Flat-Folder-derived Folded Base and Simulator panes as the
+  default folded-preview workflow, and add Oriedita folded-figure session parity
+  only for behavior that the existing preview path does not cover.
 
 UX work:
 
-- Add folding commands:
+- Do not replace the current folded-base/simulator preview with Oriedita's
+  folded-figure workflow. The current path remains the app's primary way to
+  inspect a solved flat-folded result.
+- Route "fold preview" affordances to the existing Folded Base or Simulator
+  panes when the user only needs to inspect the folded geometry.
+- Keep Oriedita-specific folding commands visible but disabled or explicitly
+  pending until their session APIs expose distinct Oriedita behavior:
   - Fold estimate order 1 through 5.
   - Fold estimate order 6 where supported.
   - Fold to case.
@@ -629,10 +636,11 @@ UX work:
   - Save 100 simulations/export batch.
   - Change standard face, move calculated shape, modify calculated shape, and
     folding constraints when the kernel exposes them.
-- Add folded-figure session state with visible solution number, face count,
-  subface count, warning status, and whether another solution is available.
-- Reuse or extend the existing Folded Base pane for folded-figure previews
-  rather than hiding results inside the CP command rail.
+- Later, add folded-figure session state with visible solution number, face
+  count, subface count, warning status, and whether another solution is
+  available.
+- Reuse or extend the existing Folded Base pane for Oriedita folded-session
+  previews rather than hiding results inside the CP command rail.
 - Make `Another solution` disabled only when the kernel says no next solution
   exists, not merely because the UI has lost session state.
 - Treat Save 100 carefully:
@@ -645,25 +653,34 @@ UX work:
 
 Technical work:
 
-- Add folded-session state to the workspace store separate from editable CP
-  document state.
-- Add command APIs for starting, continuing, duplicating, and exporting folded
-  sessions.
-- Add rendering for folded faces, face order overlays, selected face, and
-  calculated-shape handles.
-- Add cancellation and progress reporting for long folding estimates.
+- Current slice: route folded-preview commands to the existing Folded Base
+  pane; keep Oriedita-specific session commands pending unless they expose
+  behavior not covered by the existing preview.
+- Later, add folded-session state to the workspace store separate from editable
+  CP document state.
+- Later, add command APIs for starting, continuing, duplicating, and exporting
+  Oriedita folded sessions.
+- Later, add rendering for folded faces, face order overlays, selected face,
+  and calculated-shape handles when those are backed by session data.
+- Later, add cancellation and progress reporting for long folding estimates.
 
 Validation:
 
-- Oracle-test folded-session command sequences and batch filenames.
+- Unit-test that folded-preview commands route to the existing folded-base
+  surface.
+- Oracle-test Oriedita folded-session command sequences and batch filenames
+  only when those commands are implemented.
 - Add visual tests for first solution, next solution, duplicated solution, and
-  folded-preview rendering.
-- Add large-pattern timeout/cancellation tests.
+  folded-preview rendering when the session UI exists.
+- Add large-pattern timeout/cancellation tests when long-running session
+  commands are exposed.
 
 Done when:
 
-- A user can run and inspect Oriedita-equivalent folding estimates from the CP
-  window without losing the editable CP document state.
+- A user can inspect folded geometry from the CP window through the existing
+  folded-base/simulator path, and every Oriedita-specific folded-figure command
+  is either routed to a real session implementation or visibly pending with a
+  precise reason.
 
 ### Stage 11: Menus, Shortcuts, Desktop Parity, And Polish
 
@@ -678,6 +695,10 @@ UX work:
   command search.
 - Add context-sensitive inspector actions for selected lines, vertices, circles,
   text, diagnostics, and folded faces.
+- Current slice: menu, keyboard, Tauri, and inspector integration covers
+  editable CP diagnostics, selected-line repair/delete, and folded preview
+  routing. Broader command search and rare Oriedita-only folded-face actions
+  remain Stage 12-plus polish.
 - Add the remaining text deletion affordances from Oriedita's text handler:
   nearest-text delete and drag-box text delete should route through the ported
   `Text` command actions instead of ad hoc document mutation.
@@ -907,6 +928,16 @@ Done when:
 - [x] Stage 9 slice: Keep CAMV diagnostics visible after loads, mutating
       commands, undo, and redo without adding history entries, dirtying the
       document, or showing automatic OK HUDs.
+- [x] Stage 10 slice: Keep Folded Base and Simulator as the default folded
+      preview route; scope future Oriedita folding work to distinct
+      folded-figure session parity.
+- [x] Stage 10 slice: Route folded-preview menu affordances to the existing
+      Folded Base pane instead of duplicating the Flat-Folder-derived preview.
+- [x] Stage 11 slice: Add shared CP command IDs for diagnostics, selected-line
+      repair/delete, and folded preview across web menu, keyboard, and Tauri
+      menu surfaces.
+- [x] Stage 11 slice: Add CP inspector actions for selected editable lines,
+      active diagnostics, and folded preview routing.
 - [ ] Stage 9: Enable checks, diagnostics, issue navigation, and repair
       commands.
 - [ ] Stage 9: Validate diagnostic overlays and repair results against the

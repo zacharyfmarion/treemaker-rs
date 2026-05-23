@@ -49,6 +49,16 @@ export type WorkspaceCapabilityId =
   | 'optimize.edges'
   | 'optimize.strain'
   | 'cp.build'
+  | 'cp.foldedPreview'
+  | 'cp.deleteSelectedLines'
+  | 'cp.checkCamv'
+  | 'cp.check1'
+  | 'cp.check2'
+  | 'cp.check3'
+  | 'cp.check4'
+  | 'cp.fix1'
+  | 'cp.fix2'
+  | 'cp.fixInaccurate'
   | 'simulator.refresh'
   | 'foldedBase.refresh';
 
@@ -71,6 +81,7 @@ export interface WorkspaceCapabilityInput {
   hasEditableCreasePattern: boolean;
   hasImportedCreasePattern: boolean;
   hasSimulationModel: boolean;
+  oristudioCpSelectedLineCount: number;
   historyPastCount: number;
   historyFutureCount: number;
   clipboard: unknown | null;
@@ -95,6 +106,8 @@ export function getWorkspaceCapabilities(input: WorkspaceCapabilityInput): Works
   const canSaveEditableCreasePattern = creasePatternMode && input.hasEditableCreasePattern;
   const canExportEditableCp = creasePatternMode && input.hasEditableCreasePattern;
   const canExportCreasePattern = hasCreasePattern && !isBusy;
+  const canEditCp = creasePatternMode && input.hasEditableCreasePattern && !isBusy;
+  const hasSelectedCpLines = input.oristudioCpSelectedLineCount > 0;
   const hasSelection = selectionHasEditableParts(input.selection);
   const hasSelectedEdges = selectedEdgeCount(input.selection) > 0;
   const hasOneSelectedEdge = selectedEdgeCount(input.selection) === 1;
@@ -193,9 +206,15 @@ export function getWorkspaceCapabilities(input: WorkspaceCapabilityInput): Works
       treeMode ? 'Paste copied tree parts' : 'Imported crease patterns are read-only'
     ),
     'edit.delete': capability(
-      treeMode && hasSelection && !isBusy,
+      (treeMode && hasSelection && !isBusy) || (canEditCp && hasSelectedCpLines),
       'Delete Selected',
-      treeMode ? 'Delete selected tree parts' : 'Imported crease patterns are read-only'
+      treeMode
+        ? 'Delete selected tree parts'
+        : canEditCp
+          ? hasSelectedCpLines
+            ? 'Delete selected crease-pattern lines'
+            : 'Select one or more crease-pattern lines first'
+          : 'Imported crease patterns are read-only'
     ),
     'edit.selectAll': capability(true, 'Select All', 'Select visible document parts'),
     'edit.deselectAll': capability(true, 'Deselect All', 'Clear the current selection'),
@@ -337,6 +356,66 @@ export function getWorkspaceCapabilities(input: WorkspaceCapabilityInput): Works
       treeMode,
       buildLabel,
       canBuild ? buildReason : disabledBuildReason(input, isBusy, hasTreeEdges)
+    ),
+    'cp.foldedPreview': capability(
+      hasCreasePattern,
+      'Folded Preview',
+      hasCreasePattern
+        ? 'Show the existing folded-base preview'
+        : 'Build or import a crease pattern before viewing the folded preview'
+    ),
+    'cp.deleteSelectedLines': capability(
+      canEditCp && hasSelectedCpLines,
+      'Delete Selected CP Lines',
+      canEditCp
+        ? hasSelectedCpLines
+          ? 'Delete selected crease-pattern lines'
+          : 'Select one or more crease-pattern lines first'
+        : 'Open an editable crease pattern before deleting lines'
+    ),
+    'cp.checkCamv': capability(
+      canEditCp,
+      'Check CAMV',
+      canEditCp ? 'Check Maekawa and related vertex flat-foldability issues' : 'Open an editable crease pattern first'
+    ),
+    'cp.check1': capability(
+      canEditCp,
+      'Check 1',
+      canEditCp ? 'Check overlapping or contained non-auxiliary creases' : 'Open an editable crease pattern first'
+    ),
+    'cp.check2': capability(
+      canEditCp,
+      'Check 2',
+      canEditCp ? 'Check near T-intersections between creases' : 'Open an editable crease pattern first'
+    ),
+    'cp.check3': capability(
+      canEditCp,
+      'Check 3',
+      canEditCp ? 'Check vertex flat-foldability markers' : 'Open an editable crease pattern first'
+    ),
+    'cp.check4': capability(
+      canEditCp,
+      'Check 4',
+      canEditCp ? 'Check Maekawa, angle, and little-big-little violations' : 'Open an editable crease pattern first'
+    ),
+    'cp.fix1': capability(
+      canEditCp,
+      'Fix 1',
+      canEditCp ? 'Run Oriedita Fix1 repair' : 'Open an editable crease pattern first'
+    ),
+    'cp.fix2': capability(
+      canEditCp,
+      'Fix 2',
+      canEditCp ? 'Run Oriedita Fix2 repair' : 'Open an editable crease pattern first'
+    ),
+    'cp.fixInaccurate': capability(
+      canEditCp && hasSelectedCpLines,
+      'Fix Inaccurate Creases',
+      canEditCp
+        ? hasSelectedCpLines
+          ? 'Snap selected creases to Oriedita fix targets'
+          : 'Select one or more crease-pattern lines first'
+        : 'Open an editable crease pattern first'
     ),
     'simulator.refresh': capability(
       treeMode && hasCreasePattern && !isBusy,

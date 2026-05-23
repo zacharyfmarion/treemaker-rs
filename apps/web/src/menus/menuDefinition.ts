@@ -146,6 +146,35 @@ export function getMenuBarDef(): MenuDef[] {
       ],
     },
     {
+      label: 'Crease Pattern',
+      items: [
+        { type: 'action', id: 'cp.foldedPreview', label: 'Show Folded Preview', shortcut: `${mod}+Shift+F` },
+        { type: 'separator' },
+        {
+          type: 'submenu',
+          label: 'Diagnostics',
+          items: [
+            { type: 'action', id: 'cp.checkCamv', label: 'Check CAMV', shortcut: `${mod}+Shift+M` },
+            { type: 'action', id: 'cp.check1', label: 'Check 1' },
+            { type: 'action', id: 'cp.check2', label: 'Check 2' },
+            { type: 'action', id: 'cp.check3', label: 'Check 3' },
+            { type: 'action', id: 'cp.check4', label: 'Check 4' },
+          ],
+        },
+        {
+          type: 'submenu',
+          label: 'Repair',
+          items: [
+            { type: 'action', id: 'cp.fix1', label: 'Fix 1' },
+            { type: 'action', id: 'cp.fix2', label: 'Fix 2' },
+            { type: 'action', id: 'cp.fixInaccurate', label: 'Fix Inaccurate Creases' },
+          ],
+        },
+        { type: 'separator' },
+        { type: 'action', id: 'cp.deleteSelectedLines', label: 'Delete Selected Lines', shortcut: 'Delete' },
+      ],
+    },
+    {
       label: 'Help',
       items: [
         { type: 'action', id: 'help.documentation', label: 'Ori Studio Help', shortcut: 'F1' },

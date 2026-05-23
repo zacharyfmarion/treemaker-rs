@@ -208,6 +208,43 @@ pub fn setup_menu(app: &App) -> Result<(), Box<dyn std::error::Error>> {
         .item(&build_cp)
         .build()?;
 
+    let cp_folded_preview = MenuItemBuilder::with_id("cp.foldedPreview", "Show Folded Preview")
+        .accelerator("CmdOrCtrl+Shift+F")
+        .build(app)?;
+    let cp_delete_selected =
+        MenuItemBuilder::with_id("cp.deleteSelectedLines", "Delete Selected CP Lines").build(app)?;
+    let cp_check_camv = MenuItemBuilder::with_id("cp.checkCamv", "Check CAMV")
+        .accelerator("CmdOrCtrl+Shift+M")
+        .build(app)?;
+    let cp_check1 = MenuItemBuilder::with_id("cp.check1", "Check 1").build(app)?;
+    let cp_check2 = MenuItemBuilder::with_id("cp.check2", "Check 2").build(app)?;
+    let cp_check3 = MenuItemBuilder::with_id("cp.check3", "Check 3").build(app)?;
+    let cp_check4 = MenuItemBuilder::with_id("cp.check4", "Check 4").build(app)?;
+    let cp_fix1 = MenuItemBuilder::with_id("cp.fix1", "Fix 1").build(app)?;
+    let cp_fix2 = MenuItemBuilder::with_id("cp.fix2", "Fix 2").build(app)?;
+    let cp_fix_inaccurate =
+        MenuItemBuilder::with_id("cp.fixInaccurate", "Fix Inaccurate Creases").build(app)?;
+    let cp_diagnostics_menu = SubmenuBuilder::new(app, "Diagnostics")
+        .item(&cp_check_camv)
+        .item(&cp_check1)
+        .item(&cp_check2)
+        .item(&cp_check3)
+        .item(&cp_check4)
+        .build()?;
+    let cp_repair_menu = SubmenuBuilder::new(app, "Repair")
+        .item(&cp_fix1)
+        .item(&cp_fix2)
+        .item(&cp_fix_inaccurate)
+        .build()?;
+    let cp_menu = SubmenuBuilder::new(app, "Crease Pattern")
+        .item(&cp_folded_preview)
+        .separator()
+        .item(&cp_diagnostics_menu)
+        .item(&cp_repair_menu)
+        .separator()
+        .item(&cp_delete_selected)
+        .build()?;
+
     let help_docs = MenuItemBuilder::with_id("help.documentation", "Ori Studio Help")
         .accelerator("F1")
         .build(app)?;
@@ -224,6 +261,7 @@ pub fn setup_menu(app: &App) -> Result<(), Box<dyn std::error::Error>> {
         .item(&edit_menu)
         .item(&view_menu)
         .item(&design_menu)
+        .item(&cp_menu)
         .item(&help_menu)
         .build()?;
 

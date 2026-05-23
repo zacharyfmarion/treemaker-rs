@@ -26,6 +26,7 @@ import { panelComponents } from './components/panels/PanelComponents';
 import { handleMenuAction } from './commands/menuActions';
 import { useMacDownloadUrl } from './hooks/useMacDownloadUrl';
 import { handleAppKeyDown } from './lib/appKeyboard';
+import { cpSelectionSize } from './lib/creasePatternViewport';
 import { useTauriMenuListener } from './menus/tauriMenuListener';
 import { isFeatureVisible } from './platform/features';
 import { getRuntimeSurface } from './platform/runtime';
@@ -139,7 +140,6 @@ function FixedDockTab(props: IDockviewPanelHeaderProps) {
 
 export default function App() {
   const initEngine = useWorkspaceStore((state) => state.initEngine);
-  const deleteSelection = useWorkspaceStore((state) => state.deleteSelection);
   const selectNone = useWorkspaceStore((state) => state.selectNone);
   const project = useWorkspaceStore((state) => state.project);
   const dirty = useWorkspaceStore((state) => state.dirty);
@@ -204,7 +204,9 @@ export default function App() {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       handleAppKeyDown(event, {
-        deleteSelection,
+        getDocumentMode: () => useWorkspaceStore.getState().documentMode,
+        getCpSelectionSize: () =>
+          cpSelectionSize(useWorkspaceStore.getState().oristudioCpSelection),
         getSelection: () => useWorkspaceStore.getState().selection,
         handleMenuAction,
         selectNone,
@@ -212,7 +214,7 @@ export default function App() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [deleteSelection, selectNone]);
+  }, [selectNone]);
 
   const onReady = useCallback(
     (event: DockviewReadyEvent) => {

@@ -69,6 +69,15 @@ export const MENU_ACTION_IDS = [
   'cp.build',
   'cp.foldedPreview',
   'cp.deleteSelectedLines',
+  'cp.changeCreaseType',
+  'cp.advanceCreaseType',
+  'cp.makeMountain',
+  'cp.makeValley',
+  'cp.makeEdge',
+  'cp.makeAuxiliary',
+  'cp.toggleMountainValley',
+  'cp.replaceLineType',
+  'cp.deleteLineType',
   'cp.checkCamv',
   'cp.check1',
   'cp.check2',
@@ -77,6 +86,8 @@ export const MENU_ACTION_IDS = [
   'cp.fix1',
   'cp.fix2',
   'cp.fixInaccurate',
+  'cp.changeCircleColor',
+  'cp.organizeCircles',
   'help.documentation',
   'help.about',
 ] as const;
@@ -131,6 +142,7 @@ export interface WorkspaceCommands {
   oristudioCpSelection: OristudioCpSelection;
   setOristudioCpSelection(selection: OristudioCpSelection): void;
   clearOristudioCpSelection(): void;
+  requestOristudioCpAction(operationId: OristudioCpOperationId): void;
   executeOristudioCpCommand(
     operationId: OristudioCpOperationId,
     payload?: OristudioCpCommandPayload
@@ -176,6 +188,23 @@ const CP_OPERATION_ACTIONS: Partial<Record<MenuActionId, OristudioCpOperationId>
   'cp.fix2': 'Fix2',
 };
 
+const CP_SELECTED_LINE_ACTIONS: Partial<Record<MenuActionId, OristudioCpOperationId>> = {
+  'cp.changeCreaseType': 'ChangeCreaseType',
+  'cp.advanceCreaseType': 'CreaseAdvanceType',
+  'cp.makeMountain': 'CreaseMakeMountain',
+  'cp.makeValley': 'CreaseMakeValley',
+  'cp.makeEdge': 'CreaseMakeEdge',
+  'cp.makeAuxiliary': 'CreaseMakeAux',
+  'cp.toggleMountainValley': 'CreaseToggleMv',
+};
+
+const CP_CONTEXT_ACTIONS: Partial<Record<MenuActionId, OristudioCpOperationId>> = {
+  'cp.replaceLineType': 'ReplaceLineTypeSelect',
+  'cp.deleteLineType': 'DeleteLineTypeSelect',
+  'cp.fixInaccurate': 'FixInaccurate',
+  'cp.changeCircleColor': 'CircleChangeColor',
+};
+
 export function isMenuActionId(id: string): id is MenuActionId {
   return (MENU_ACTION_IDS as readonly string[]).includes(id);
 }
@@ -218,6 +247,37 @@ export function createMenuActionHandler(deps: MenuActionDependencies) {
     const cpOperation = CP_OPERATION_ACTIONS[id];
     if (cpOperation) {
       return deps.workspace.executeOristudioCpCommand(cpOperation);
+    }
+
+    const cpSelectedLineOperation = CP_SELECTED_LINE_ACTIONS[id];
+    if (cpSelectedLineOperation) {
+      const lineIds = deps.workspace.oristudioCpSelection.lines;
+      if (lineIds.length === 0) return false;
+      return deps.workspace.executeOristudioCpCommand(cpSelectedLineOperation, {
+        line_ids: lineIds,
+      });
+    }
+
+    const cpContextOperation = CP_CONTEXT_ACTIONS[id];
+    if (cpContextOperation) {
+      const selection = deps.workspace.oristudioCpSelection;
+      if (
+        (cpContextOperation === 'ReplaceLineTypeSelect' ||
+          cpContextOperation === 'DeleteLineTypeSelect' ||
+          cpContextOperation === 'FixInaccurate') &&
+        selection.lines.length === 0
+      ) {
+        return false;
+      }
+      if (
+        cpContextOperation === 'CircleChangeColor' &&
+        selection.lines.length === 0 &&
+        selection.circles.length === 0
+      ) {
+        return false;
+      }
+      deps.workspace.requestOristudioCpAction(cpContextOperation);
+      return true;
     }
 
     switch (id) {
@@ -415,13 +475,8 @@ export function createMenuActionHandler(deps: MenuActionDependencies) {
           line_ids: lineIds,
         });
       }
-      case 'cp.fixInaccurate': {
-        const lineIds = deps.workspace.oristudioCpSelection.lines;
-        if (lineIds.length === 0) return false;
-        return deps.workspace.executeOristudioCpCommand('FixInaccurate', {
-          line_ids: lineIds,
-        });
-      }
+      case 'cp.organizeCircles':
+        return deps.workspace.executeOristudioCpCommand('OrganizeCircles');
       case 'help.documentation':
         deps.help?.();
         return true;

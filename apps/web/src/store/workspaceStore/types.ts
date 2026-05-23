@@ -51,6 +51,11 @@ export interface OristudioCpHistoryEntry {
   timestamp: string;
 }
 
+export interface OristudioCpActionRequest {
+  id: number;
+  operationId: OristudioCpOperationId;
+}
+
 export interface ProjectSliceState {
   project: TreeProject;
   documentMode: DocumentMode;
@@ -235,6 +240,7 @@ export type ClipboardSlice = ClipboardSliceState & ClipboardSliceActions;
 export interface CreasePatternSliceState {
   creaseColorMode: CreaseColorMode;
   oristudioCpSelection: OristudioCpSelection;
+  oristudioCpActionRequest: OristudioCpActionRequest | null;
   oristudioCpActiveDiagnosticId: string | null;
   oristudioCpViewport: OristudioCpViewportOptions;
   foldArtifacts: FoldArtifacts | null;
@@ -265,6 +271,8 @@ export interface CreasePatternSliceActions {
     value: boolean
   ) => void;
   setOristudioCpSelection: (selection: OristudioCpSelection) => void;
+  requestOristudioCpAction: (operationId: OristudioCpOperationId) => void;
+  clearOristudioCpActionRequest: (id: number) => void;
   setOristudioCpActiveDiagnostic: (id: string | null) => void;
   clearOristudioCpSelection: () => void;
   toggleOristudioCpLineSelection: (id: number, additive?: boolean) => void;

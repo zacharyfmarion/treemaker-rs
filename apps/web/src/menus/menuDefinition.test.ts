@@ -47,6 +47,16 @@ describe('web menu definition', () => {
 
     expect(actionIds).toEqual([
       'cp.foldedPreview',
+      'cp.deleteSelectedLines',
+      'cp.changeCreaseType',
+      'cp.advanceCreaseType',
+      'cp.toggleMountainValley',
+      'cp.makeMountain',
+      'cp.makeValley',
+      'cp.makeEdge',
+      'cp.makeAuxiliary',
+      'cp.replaceLineType',
+      'cp.deleteLineType',
       'cp.checkCamv',
       'cp.check1',
       'cp.check2',
@@ -55,7 +65,8 @@ describe('web menu definition', () => {
       'cp.fix1',
       'cp.fix2',
       'cp.fixInaccurate',
-      'cp.deleteSelectedLines',
+      'cp.changeCircleColor',
+      'cp.organizeCircles',
     ]);
   });
 });

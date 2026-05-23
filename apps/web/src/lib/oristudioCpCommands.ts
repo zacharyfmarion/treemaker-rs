@@ -72,6 +72,7 @@ export type OristudioCpCommandGroupId = (typeof ORISTUDIO_CP_COMMAND_GROUPS)[num
 export type OristudioCpCommandPlacement =
   | 'left-rail'
   | 'left-rail-overflow'
+  | 'bottom-toolbar'
   | 'menu'
   | 'palette'
   | 'hidden-ui-only';
@@ -225,11 +226,13 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
     'eraser',
     'MouseHandlerLineSegmentDelete',
     {
+      placement: 'menu',
       selectionRequirement: 'selected line segment',
       tooltip: 'Delete selected line segments',
     }
   ),
   ready('ChangeCreaseType', 'Change crease type', 'color', 'paintbrush', 'MouseHandlerChangeCreaseType', {
+    placement: 'menu',
     selectionRequirement: 'selected folding lines',
     tooltip: 'Advance selected folding lines through edge, mountain, and valley',
   }),
@@ -293,14 +296,17 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
     toolSteps: ['Pick source point', 'Pick destination point'],
   }),
   ready('CreaseMakeMountain', 'Make mountain', 'color', 'mountain', 'MouseHandlerCreaseMakeMountain', {
+    placement: 'menu',
     selectionRequirement: 'selected lines',
     tooltip: 'Make selected lines mountain folds',
   }),
   ready('CreaseMakeValley', 'Make valley', 'color', 'waves', 'MouseHandlerCreaseMakeValley', {
+    placement: 'menu',
     selectionRequirement: 'selected lines',
     tooltip: 'Make selected lines valley folds',
   }),
   ready('CreaseMakeEdge', 'Make edge', 'color', 'box-select', 'MouseHandlerCreaseMakeEdge', {
+    placement: 'menu',
     selectionRequirement: 'selected lines',
     tooltip: 'Make selected lines edge folds',
   }),
@@ -322,6 +328,7 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
     toolSteps: ['Pick first corner', 'Pick second corner'],
   }),
   ready('CreaseAdvanceType', 'Advance crease type', 'color', 'list-restart', 'MouseHandlerCreaseAdvanceType', {
+    placement: 'menu',
     selectionRequirement: 'selected folding lines',
     tooltip: 'Advance selected folding lines through edge, mountain, and valley',
   }),
@@ -427,14 +434,17 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
     toolSteps: ['Pick first point', 'Pick vertex point', 'Pick second point'],
   }),
   ready('CreaseToggleMv', 'Toggle mountain/valley', 'color', 'repeat-2', 'MouseHandlerCreaseToggleMV', {
+    placement: 'menu',
     selectionRequirement: 'selected mountain or valley lines',
     tooltip: 'Toggle selected mountain and valley lines',
   }),
   ready('CircleChangeColor', 'Change circle color', 'annotations', 'palette', 'MouseHandlerCircleChangeColor', {
+    placement: 'menu',
     selectionRequirement: 'selected circles or auxiliary lines',
     tooltip: 'Apply the contextual custom color to selected circles and auxiliary lines',
   }),
   ready('CreaseMakeAux', 'Make auxiliary', 'color', 'scan-line', 'MouseHandlerCreaseMakeAux', {
+    placement: 'menu',
     selectionRequirement: 'selected folding lines',
     tooltip: 'Convert selected folding lines to auxiliary lines',
   }),
@@ -493,10 +503,12 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
     toolSteps: ['Pick start vertex', 'Pick destination'],
   }),
   ready('ReplaceLineTypeSelect', 'Replace selected line type', 'color', 'replace', 'MouseHandlerReplaceTypeSelect', {
+    placement: 'menu',
     selectionRequirement: 'selected lines',
     tooltip: 'Replace selected lines matching the active source line type',
   }),
   ready('DeleteLineTypeSelect', 'Delete selected line type', 'color', 'trash-2', 'MouseHandlerDeleteTypeSelect', {
+    placement: 'menu',
     selectionRequirement: 'selected lines',
     tooltip: 'Delete selected lines matching the active line type filter',
   }),
@@ -540,6 +552,7 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
     toolSteps: ['Pick target point', 'Pick target crease', 'Pick perpendicular crease', 'Pick destination crease'],
   }),
   ready('FixInaccurate', 'Fix inaccurate creases', 'check-fix', 'wrench', 'MouseHandlerCreaseFixInaccurate', {
+    placement: 'menu',
     selectionRequirement: 'selected folding lines',
     tooltip: 'Snap inaccurate selected folding lines to Oriedita fix targets',
   }),
@@ -558,6 +571,7 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
     placement: 'palette',
   }),
   ready('CheckCamv', 'Check CAMV', 'check-fix', 'shield-alert', 'CheckCAMVTask', {
+    placement: 'menu',
     tooltip: 'Run Oriedita CAMV flat-foldability diagnostics without changing the CP',
   }),
   porting('FoldingEstimate', 'Fold estimate', 'folding', 'origami', 'FoldingEstimateTask'),
@@ -568,24 +582,31 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
   porting('FoldAnother', 'Another solution', 'folding', 'skip-forward', 'FoldingServiceImpl.foldAnother'),
   porting('DuplicateFoldedModel', 'Duplicate folded model', 'folding', 'copy', 'FoldingServiceImpl.duplicate'),
   ready('Check1', 'Check overlaps', 'check-fix', 'badge-alert', 'Check1', {
+    placement: 'menu',
     tooltip: 'Find overlapping or contained non-auxiliary crease pairs',
   }),
   ready('Check2', 'Check T-junctions', 'check-fix', 'badge-alert', 'Check2', {
+    placement: 'menu',
     tooltip: 'Find near T-intersections between non-auxiliary crease pairs',
   }),
   ready('Check3', 'Check vertex foldability', 'check-fix', 'badge-alert', 'Check3', {
+    placement: 'menu',
     tooltip: 'Find Oriedita vertex flat-foldability markers',
   }),
   ready('Check4', 'Check Maekawa/LBL', 'check-fix', 'badge-alert', 'Check4', {
+    placement: 'menu',
     tooltip: 'Find Maekawa, angle, and little-big-little violations',
   }),
   ready('Fix1', 'Repair overlaps', 'check-fix', 'wrench', 'Fix1', {
+    placement: 'menu',
     tooltip: 'Merge exact duplicates and select remaining overlapping creases',
   }),
   ready('Fix2', 'Split T-junctions', 'check-fix', 'wrench', 'Fix2', {
+    placement: 'menu',
     tooltip: 'Split near T-intersections using Oriedita tolerances',
   }),
   ready('OrganizeCircles', 'Organize circles', 'annotations', 'circle-ellipsis', 'OrganizeCircles', {
+    placement: 'menu',
     tooltip: 'Prune invalid zero-radius circles using Oriedita cleanup rules',
   }),
 ];

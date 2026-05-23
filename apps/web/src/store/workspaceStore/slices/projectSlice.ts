@@ -224,6 +224,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
       hasImportedCreasePattern: get().importedCreasePattern !== null,
       hasSimulationModel: get().foldArtifacts?.simulation_model != null,
       oristudioCpSelectedLineCount: get().oristudioCpSelection.lines.length,
+      oristudioCpSelectedCircleCount: get().oristudioCpSelection.circles.length,
       historyPastCount:
         get().documentMode === 'crease-pattern'
           ? get().oristudioCpHistoryPast.length

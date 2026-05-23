@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { OristudioCpDocumentState } from '../engine/oristudioCpTypes';
+import type { OristudioCpSelection } from '../lib/creasePatternViewport';
 import { getWorkspaceCapabilities } from '../lib/workspaceCapabilities';
 import { createFileService } from '../platform/fileService';
 import { createMenuActionHandler, isMenuActionId } from './menuActions';
@@ -58,9 +59,10 @@ function createDeps() {
         circles: [],
         texts: [],
         faces: [],
-      },
+      } as OristudioCpSelection,
       setOristudioCpSelection: vi.fn(),
       clearOristudioCpSelection: vi.fn(),
+      requestOristudioCpAction: vi.fn(),
       executeOristudioCpCommand: vi.fn().mockResolvedValue(true),
     },
     layout: {
@@ -120,7 +122,13 @@ describe('menu actions', () => {
     await expect(handle('cp.check1')).resolves.toBe(true);
     await expect(handle('cp.fix2')).resolves.toBe(true);
     await expect(handle('cp.deleteSelectedLines')).resolves.toBe(true);
+    await expect(handle('cp.makeMountain')).resolves.toBe(true);
+    await expect(handle('cp.makeAuxiliary')).resolves.toBe(true);
+    await expect(handle('cp.toggleMountainValley')).resolves.toBe(true);
     await expect(handle('cp.fixInaccurate')).resolves.toBe(true);
+    await expect(handle('cp.replaceLineType')).resolves.toBe(true);
+    await expect(handle('cp.deleteLineType')).resolves.toBe(true);
+    await expect(handle('cp.organizeCircles')).resolves.toBe(true);
 
     expect(deps.workspace.executeOristudioCpCommand).toHaveBeenCalledWith('CheckCamv');
     expect(deps.workspace.executeOristudioCpCommand).toHaveBeenCalledWith('Check1');
@@ -129,9 +137,19 @@ describe('menu actions', () => {
       'LineSegmentDelete',
       { line_ids: [1, 2] }
     );
-    expect(deps.workspace.executeOristudioCpCommand).toHaveBeenCalledWith('FixInaccurate', {
+    expect(deps.workspace.executeOristudioCpCommand).toHaveBeenCalledWith('CreaseMakeMountain', {
       line_ids: [1, 2],
     });
+    expect(deps.workspace.executeOristudioCpCommand).toHaveBeenCalledWith('CreaseMakeAux', {
+      line_ids: [1, 2],
+    });
+    expect(deps.workspace.executeOristudioCpCommand).toHaveBeenCalledWith('CreaseToggleMv', {
+      line_ids: [1, 2],
+    });
+    expect(deps.workspace.executeOristudioCpCommand).toHaveBeenCalledWith('OrganizeCircles');
+    expect(deps.workspace.requestOristudioCpAction).toHaveBeenCalledWith('FixInaccurate');
+    expect(deps.workspace.requestOristudioCpAction).toHaveBeenCalledWith('ReplaceLineTypeSelect');
+    expect(deps.workspace.requestOristudioCpAction).toHaveBeenCalledWith('DeleteLineTypeSelect');
   });
 
   it('does not dispatch selected-line CP commands without selected CP lines', async () => {
@@ -147,8 +165,29 @@ describe('menu actions', () => {
     const handle = createMenuActionHandler(deps);
 
     await expect(handle('cp.deleteSelectedLines')).resolves.toBe(false);
+    await expect(handle('cp.makeMountain')).resolves.toBe(false);
     await expect(handle('cp.fixInaccurate')).resolves.toBe(false);
+    await expect(handle('cp.replaceLineType')).resolves.toBe(false);
 
+    expect(deps.workspace.executeOristudioCpCommand).not.toHaveBeenCalled();
+    expect(deps.workspace.requestOristudioCpAction).not.toHaveBeenCalled();
+  });
+
+  it('opens contextual CP action settings from the menu', async () => {
+    const deps = createDeps();
+    deps.workspace.oristudioCpSelection = {
+      lines: [],
+      vertices: [],
+      points: [],
+      circles: [1],
+      texts: [],
+      faces: [],
+    };
+    const handle = createMenuActionHandler(deps);
+
+    await expect(handle('cp.changeCircleColor')).resolves.toBe(true);
+
+    expect(deps.workspace.requestOristudioCpAction).toHaveBeenCalledWith('CircleChangeColor');
     expect(deps.workspace.executeOristudioCpCommand).not.toHaveBeenCalled();
   });
 
@@ -330,6 +369,7 @@ describe('menu actions', () => {
         hasImportedCreasePattern: true,
         hasSimulationModel: true,
         oristudioCpSelectedLineCount: 0,
+        oristudioCpSelectedCircleCount: 0,
         historyPastCount: 0,
         historyFutureCount: 0,
         clipboard: null,

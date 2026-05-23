@@ -128,7 +128,7 @@ function lineTypeAction(
     label,
     railLabel,
     group: 'line-type',
-    placement: 'left-rail',
+    placement: 'bottom-toolbar',
     icon,
     upstreamAction,
     tooltip: `Set active line type to ${label.toLowerCase()}`,
@@ -187,6 +187,15 @@ export function cpActionById(
   actionId: OristudioCpActionId
 ): OristudioCpActionDefinition | undefined {
   return ORISTUDIO_CP_ACTIONS.find((action) => action.id === actionId);
+}
+
+export function cpActionByOperation(
+  operationId: OristudioCpOperationId
+): OristudioCpCommandActionDefinition | undefined {
+  return ORISTUDIO_CP_ACTIONS.find(
+    (action): action is OristudioCpCommandActionDefinition =>
+      action.kind === 'command' && action.operationId === operationId
+  );
 }
 
 export function cpRailActions(): OristudioCpActionDefinition[] {

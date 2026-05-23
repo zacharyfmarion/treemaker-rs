@@ -3208,6 +3208,50 @@
   background: var(--border-default);
 }
 
+.cp-line-type-toolbar {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.cp-line-type-toolbar__button {
+  min-width: 28px;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.cp-line-type-toolbar__button[data-line-color='Red1'] {
+  color: var(--fold-mountain);
+}
+
+.cp-line-type-toolbar__button[data-line-color='Blue2'] {
+  color: var(--fold-valley);
+}
+
+.cp-line-type-toolbar__button[data-line-color='Black0'] {
+  color: var(--fold-border);
+}
+
+.cp-line-type-toolbar__button[data-line-color='Cyan3'] {
+  color: var(--fold-flat);
+}
+
+.cp-line-type-toolbar__button[data-active][data-line-color='Red1'] {
+  color: var(--fold-mountain);
+}
+
+.cp-line-type-toolbar__button[data-active][data-line-color='Blue2'] {
+  color: var(--fold-valley);
+}
+
+.cp-line-type-toolbar__button[data-active][data-line-color='Black0'] {
+  color: var(--fold-border);
+}
+
+.cp-line-type-toolbar__button[data-active][data-line-color='Cyan3'] {
+  color: var(--fold-flat);
+}
+
 .viewport-toolbar__mirror {
   min-width: 92px;
   padding-inline: 10px;

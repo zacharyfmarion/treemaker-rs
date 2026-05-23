@@ -26,6 +26,8 @@ import { formatNumber, paperToSvg, type Point } from '../../lib/geometry';
 import { getViewportFitScale, type ViewportSize } from '../../lib/designViewport';
 import {
   DEFAULT_ORISTUDIO_CP_ACTION_ID,
+  ORISTUDIO_CP_LINE_TYPE_ACTIONS,
+  cpActionByOperation,
   cpActionById,
   type OristudioCpActionDefinition,
   type OristudioCpActionInputMode,
@@ -377,6 +379,33 @@ function cpLineTypeStatusLabel(lineColor: OristudioCpLineColor): string {
   }
 }
 
+function CpLineTypeToolbar({
+  activeLineColor,
+  onSelectLineColor,
+}: {
+  activeLineColor: OristudioCpLineColor;
+  onSelectLineColor: (lineColor: OristudioCpLineColor) => void;
+}) {
+  return (
+    <div className="cp-line-type-toolbar" aria-label="Active crease line type">
+      {ORISTUDIO_CP_LINE_TYPE_ACTIONS.map((action) => (
+        <IconButton
+          key={action.id}
+          size="sm"
+          variant="toolbar"
+          title={action.label}
+          className="cp-line-type-toolbar__button"
+          data-line-color={action.lineColor}
+          isActive={activeLineColor === action.lineColor}
+          onClick={() => onSelectLineColor(action.lineColor)}
+        >
+          <span aria-hidden="true">{action.railLabel}</span>
+        </IconButton>
+      ))}
+    </div>
+  );
+}
+
 function activeActionInputMode(
   action: OristudioCpActionDefinition | undefined,
   command: OristudioCpCommandDefinition | undefined
@@ -632,6 +661,7 @@ export function CreasePatternPanel() {
   const oristudioCpCamvResult = useWorkspaceStore((state) => state.oristudioCpCamvResult);
   const oristudioCpError = useWorkspaceStore((state) => state.oristudioCpError);
   const oristudioCpSelection = useWorkspaceStore((state) => state.oristudioCpSelection);
+  const oristudioCpActionRequest = useWorkspaceStore((state) => state.oristudioCpActionRequest);
   const oristudioCpActiveDiagnosticId = useWorkspaceStore(
     (state) => state.oristudioCpActiveDiagnosticId
   );
@@ -660,6 +690,9 @@ export function CreasePatternPanel() {
     (state) => state.toggleOristudioCpTextSelection
   );
   const setOristudioCpSelection = useWorkspaceStore((state) => state.setOristudioCpSelection);
+  const clearOristudioCpActionRequest = useWorkspaceStore(
+    (state) => state.clearOristudioCpActionRequest
+  );
   const setOristudioCpActiveDiagnostic = useWorkspaceStore(
     (state) => state.setOristudioCpActiveDiagnostic
   );
@@ -927,6 +960,16 @@ export function CreasePatternPanel() {
     },
     [buildCpCommandPayload, editableCp, executeOristudioCpCommand, oristudioCpSelection.lines]
   );
+
+  useEffect(() => {
+    if (!oristudioCpActionRequest) return;
+
+    const action = cpActionByOperation(oristudioCpActionRequest.operationId);
+    if (action) {
+      handleCpToolAction(action);
+    }
+    clearOristudioCpActionRequest(oristudioCpActionRequest.id);
+  }, [clearOristudioCpActionRequest, handleCpToolAction, oristudioCpActionRequest]);
 
   const handleApplyActiveContextCommand = useCallback(() => {
     if (
@@ -2210,6 +2253,11 @@ export function CreasePatternPanel() {
                     >
                       <Magnet size={14} />
                     </IconButton>
+                    <ViewportToolbarSeparator />
+                    <CpLineTypeToolbar
+                      activeLineColor={activeCpLineColor}
+                      onSelectLineColor={setActiveCpLineColor}
+                    />
                   </>
                 )}
               </ViewportToolbar>

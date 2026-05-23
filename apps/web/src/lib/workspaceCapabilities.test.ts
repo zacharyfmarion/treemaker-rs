@@ -14,6 +14,7 @@ function capabilities({
   hasEditableCreasePattern = false,
   hasImportedCreasePattern = false,
   oristudioCpSelectedLineCount = 0,
+  oristudioCpSelectedCircleCount = 0,
   historyPastCount = 0,
   historyFutureCount = 0,
   selection = treeSelection,
@@ -27,6 +28,7 @@ function capabilities({
   hasEditableCreasePattern?: boolean;
   hasImportedCreasePattern?: boolean;
   oristudioCpSelectedLineCount?: number;
+  oristudioCpSelectedCircleCount?: number;
   historyPastCount?: number;
   historyFutureCount?: number;
   selection?: Selection;
@@ -42,6 +44,7 @@ function capabilities({
     hasImportedCreasePattern,
     hasSimulationModel: false,
     oristudioCpSelectedLineCount,
+    oristudioCpSelectedCircleCount,
     historyPastCount,
     historyFutureCount,
     clipboard: null,
@@ -163,6 +166,9 @@ describe('workspace capabilities', () => {
     expect(state['cp.checkCamv'].enabled).toBe(true);
     expect(state['cp.deleteSelectedLines'].enabled).toBe(false);
     expect(state['cp.fixInaccurate'].enabled).toBe(false);
+    expect(state['cp.makeMountain'].enabled).toBe(false);
+    expect(state['cp.changeCircleColor'].enabled).toBe(false);
+    expect(state['cp.organizeCircles'].enabled).toBe(true);
   });
 
   it('enables selected-line CP commands only when editable CP lines are selected', () => {
@@ -184,7 +190,37 @@ describe('workspace capabilities', () => {
     });
     expect(state['cp.fixInaccurate']).toMatchObject({
       enabled: true,
-      reason: 'Snap selected creases to Oriedita fix targets',
+      reason: 'Open inaccurate-crease repair settings for selected lines',
+    });
+    expect(state['cp.makeMountain']).toMatchObject({
+      enabled: true,
+      reason: 'Make selected lines mountain folds',
+    });
+    expect(state['cp.replaceLineType']).toMatchObject({
+      enabled: true,
+      reason: 'Open line-type replacement settings for selected lines',
+    });
+  });
+
+  it('enables selected-circle CP actions only when circle or auxiliary selections exist', () => {
+    const noSelection = capabilities({
+      documentMode: 'crease-pattern',
+      status: 'crease_pattern_ready',
+      hasEditableCreasePattern: true,
+      hasImportedCreasePattern: true,
+    });
+    const circleSelection = capabilities({
+      documentMode: 'crease-pattern',
+      status: 'crease_pattern_ready',
+      hasEditableCreasePattern: true,
+      hasImportedCreasePattern: true,
+      oristudioCpSelectedCircleCount: 1,
+    });
+
+    expect(noSelection['cp.changeCircleColor'].enabled).toBe(false);
+    expect(circleSelection['cp.changeCircleColor']).toMatchObject({
+      enabled: true,
+      reason: 'Open color settings for selected circles or auxiliary lines',
     });
   });
 

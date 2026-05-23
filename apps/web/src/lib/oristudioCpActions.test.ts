@@ -27,6 +27,7 @@ describe('oristudio CP action registry', () => {
       'Black0',
       'Cyan3',
     ]);
+    expect(ORISTUDIO_CP_LINE_TYPE_ACTIONS.every((action) => action.placement === 'bottom-toolbar')).toBe(true);
   });
 
   it('keeps every operation-backed command reachable through an action', () => {

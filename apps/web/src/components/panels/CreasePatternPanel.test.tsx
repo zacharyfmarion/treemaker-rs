@@ -612,16 +612,14 @@ describe('CreasePatternPanel', () => {
     );
     expect(drawCreaseButton?.getAttribute('aria-disabled')).toBe('false');
     expect(drawCreaseButton?.getAttribute('data-ui-status')).toBe('ready');
-    expect(makeMountainButton?.getAttribute('aria-disabled')).toBe('false');
-    expect(makeMountainButton?.getAttribute('data-ui-status')).toBe('ready');
+    expect(makeMountainButton).toBeNull();
     expect(moveButton?.getAttribute('aria-disabled')).toBe('false');
     expect(moveButton?.getAttribute('data-ui-status')).toBe('ready');
     expect(deleteIntersectingButton?.getAttribute('aria-disabled')).toBe('false');
     expect(deleteIntersectingButton?.getAttribute('data-ui-status')).toBe('ready');
     expect(selectIntersectingButton?.getAttribute('aria-disabled')).toBe('false');
     expect(selectIntersectingButton?.getAttribute('data-ui-status')).toBe('ready');
-    expect(fixInaccurateButton?.getAttribute('aria-disabled')).toBe('false');
-    expect(fixInaccurateButton?.getAttribute('data-ui-status')).toBe('ready');
+    expect(fixInaccurateButton).toBeNull();
     expect(operationFrameButton?.getAttribute('aria-disabled')).toBe('false');
     expect(operationFrameButton?.getAttribute('data-ui-status')).toBe('ready');
     expect(selectLassoButton?.getAttribute('aria-disabled')).toBe('false');
@@ -690,7 +688,7 @@ describe('CreasePatternPanel', () => {
     expect(useWorkspaceStore.getState().oristudioCpViewport.snapToLines).toBe(false);
   });
 
-  it('runs ready CP line commands with the current editable selection payload', async () => {
+  it('opens contextual CP actions from menu requests with the current editable selection', async () => {
     const executeOristudioCpCommand = vi.fn(async () => true);
     const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
       documentMode: 'crease-pattern',
@@ -707,12 +705,23 @@ describe('CreasePatternPanel', () => {
     });
 
     await act(async () => {
-      container.querySelector<HTMLButtonElement>('button[aria-label="Make mountain"]')?.click();
+      useWorkspaceStore.getState().requestOristudioCpAction('FixInaccurate');
       await Promise.resolve();
     });
 
-    expect(executeOristudioCpCommand).toHaveBeenCalledWith('CreaseMakeMountain', {
+    expect(container.textContent).toContain('Fix inaccurate creases');
+    expect(executeOristudioCpCommand).not.toHaveBeenCalled();
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('button.cp-context-panel__apply')?.click();
+      await Promise.resolve();
+    });
+
+    expect(executeOristudioCpCommand).toHaveBeenCalledWith('FixInaccurate', {
       line_ids: [1],
+      fix_precision: 0.05,
+      fix_precision_use_22_5: true,
+      fix_precision_use_bp: true,
     });
   });
 
@@ -1055,9 +1064,7 @@ describe('CreasePatternPanel', () => {
     });
 
     await act(async () => {
-      container
-        .querySelector<HTMLButtonElement>('button[aria-label="Replace selected line type"]')
-        ?.click();
+      useWorkspaceStore.getState().requestOristudioCpAction('ReplaceLineTypeSelect');
       await Promise.resolve();
     });
 
@@ -1104,9 +1111,7 @@ describe('CreasePatternPanel', () => {
     });
 
     await act(async () => {
-      container
-        .querySelector<HTMLButtonElement>('button[aria-label="Fix inaccurate creases"]')
-        ?.click();
+      useWorkspaceStore.getState().requestOristudioCpAction('FixInaccurate');
       await Promise.resolve();
     });
 
@@ -1172,14 +1177,8 @@ describe('CreasePatternPanel', () => {
     expect(container.querySelector('.cp-diagnostic-segment--active')).not.toBeNull();
     expect(transformMocks.setTransform).toHaveBeenCalled();
 
-    await act(async () => {
-      container.querySelector<HTMLButtonElement>('button[aria-label="Check overlaps"]')?.click();
-      await Promise.resolve();
-    });
-
-    expect(executeOristudioCpCommand).toHaveBeenCalledWith('Check1', {
-      line_ids: [],
-    });
+    expect(container.querySelector<HTMLButtonElement>('button[aria-label="Check overlaps"]')).toBeNull();
+    expect(executeOristudioCpCommand).not.toHaveBeenCalled();
   });
 
   it('renders point-only CAMV diagnostics without segment arrays', () => {
@@ -1260,9 +1259,7 @@ describe('CreasePatternPanel', () => {
     expect(useWorkspaceStore.getState().oristudioCpSelection.circles).toEqual([1]);
 
     await act(async () => {
-      container
-        .querySelector<HTMLButtonElement>('button[aria-label="Change circle color"]')
-        ?.click();
+      useWorkspaceStore.getState().requestOristudioCpAction('CircleChangeColor');
       await Promise.resolve();
     });
 
@@ -1295,7 +1292,7 @@ describe('CreasePatternPanel', () => {
     });
   });
 
-  it('runs organize circles as an immediate annotation cleanup command', async () => {
+  it('keeps immediate annotation cleanup actions out of the left rail', async () => {
     const executeOristudioCpCommand = vi.fn(async () => true);
     const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
       documentMode: 'crease-pattern',
@@ -1304,14 +1301,8 @@ describe('CreasePatternPanel', () => {
       executeOristudioCpCommand,
     });
 
-    await act(async () => {
-      container.querySelector<HTMLButtonElement>('button[aria-label="Organize circles"]')?.click();
-      await Promise.resolve();
-    });
-
-    expect(executeOristudioCpCommand).toHaveBeenCalledWith('OrganizeCircles', {
-      line_ids: [],
-    });
+    expect(container.querySelector<HTMLButtonElement>('button[aria-label="Organize circles"]')).toBeNull();
+    expect(executeOristudioCpCommand).not.toHaveBeenCalled();
   });
 
   it('shows active tool inputs for line division count and sends the edited count', async () => {

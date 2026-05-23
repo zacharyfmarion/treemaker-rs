@@ -113,6 +113,7 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
   return {
     creaseColorMode: DEFAULT_CREASE_COLOR_MODE,
     oristudioCpSelection: emptyOristudioCpSelection(),
+    oristudioCpActionRequest: null,
     oristudioCpActiveDiagnosticId: null,
     oristudioCpViewport: DEFAULT_ORISTUDIO_CP_VIEWPORT_OPTIONS,
     foldArtifacts: null,
@@ -273,6 +274,17 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
       set({ oristudioCpViewport: { ...get().oristudioCpViewport, [key]: value } }),
 
     setOristudioCpSelection: (oristudioCpSelection) => set({ oristudioCpSelection }),
+
+    requestOristudioCpAction: (operationId) => {
+      const previousId = get().oristudioCpActionRequest?.id ?? 0;
+      set({ oristudioCpActionRequest: { id: previousId + 1, operationId } });
+    },
+
+    clearOristudioCpActionRequest: (id) =>
+      set({
+        oristudioCpActionRequest:
+          get().oristudioCpActionRequest?.id === id ? null : get().oristudioCpActionRequest,
+      }),
 
     setOristudioCpActiveDiagnostic: (oristudioCpActiveDiagnosticId) =>
       set({ oristudioCpActiveDiagnosticId }),

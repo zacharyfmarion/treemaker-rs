@@ -35,6 +35,7 @@ describe('oristudio CP command registry', () => {
     });
     expect(cpCommandByOperation('CreaseMakeMountain')).toMatchObject({
       uiStatus: 'ready',
+      placement: 'menu',
       selectionRequirement: 'selected lines',
     });
     expect(cpCommandByOperation('CreaseMove')).toMatchObject({
@@ -79,6 +80,7 @@ describe('oristudio CP command registry', () => {
     });
     expect(cpCommandByOperation('FixInaccurate')).toMatchObject({
       uiStatus: 'ready',
+      placement: 'menu',
       selectionRequirement: 'selected folding lines',
     });
     expect(cpCommandByOperation('Check1')).toMatchObject({

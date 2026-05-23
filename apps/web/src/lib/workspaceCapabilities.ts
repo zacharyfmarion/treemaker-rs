@@ -51,6 +51,15 @@ export type WorkspaceCapabilityId =
   | 'cp.build'
   | 'cp.foldedPreview'
   | 'cp.deleteSelectedLines'
+  | 'cp.changeCreaseType'
+  | 'cp.advanceCreaseType'
+  | 'cp.makeMountain'
+  | 'cp.makeValley'
+  | 'cp.makeEdge'
+  | 'cp.makeAuxiliary'
+  | 'cp.toggleMountainValley'
+  | 'cp.replaceLineType'
+  | 'cp.deleteLineType'
   | 'cp.checkCamv'
   | 'cp.check1'
   | 'cp.check2'
@@ -59,6 +68,8 @@ export type WorkspaceCapabilityId =
   | 'cp.fix1'
   | 'cp.fix2'
   | 'cp.fixInaccurate'
+  | 'cp.changeCircleColor'
+  | 'cp.organizeCircles'
   | 'simulator.refresh'
   | 'foldedBase.refresh';
 
@@ -82,6 +93,7 @@ export interface WorkspaceCapabilityInput {
   hasImportedCreasePattern: boolean;
   hasSimulationModel: boolean;
   oristudioCpSelectedLineCount: number;
+  oristudioCpSelectedCircleCount: number;
   historyPastCount: number;
   historyFutureCount: number;
   clipboard: unknown | null;
@@ -108,6 +120,8 @@ export function getWorkspaceCapabilities(input: WorkspaceCapabilityInput): Works
   const canExportCreasePattern = hasCreasePattern && !isBusy;
   const canEditCp = creasePatternMode && input.hasEditableCreasePattern && !isBusy;
   const hasSelectedCpLines = input.oristudioCpSelectedLineCount > 0;
+  const hasSelectedCpCircles = input.oristudioCpSelectedCircleCount > 0;
+  const hasSelectedCpLinesOrCircles = hasSelectedCpLines || hasSelectedCpCircles;
   const hasSelection = selectionHasEditableParts(input.selection);
   const hasSelectedEdges = selectedEdgeCount(input.selection) > 0;
   const hasOneSelectedEdge = selectedEdgeCount(input.selection) === 1;
@@ -373,6 +387,60 @@ export function getWorkspaceCapabilities(input: WorkspaceCapabilityInput): Works
           : 'Select one or more crease-pattern lines first'
         : 'Open an editable crease pattern before deleting lines'
     ),
+    'cp.changeCreaseType': selectedCpLineCapability(
+      canEditCp,
+      hasSelectedCpLines,
+      'Change Crease Type',
+      'Change selected crease-pattern line types'
+    ),
+    'cp.advanceCreaseType': selectedCpLineCapability(
+      canEditCp,
+      hasSelectedCpLines,
+      'Advance Crease Type',
+      'Advance selected crease-pattern line types'
+    ),
+    'cp.makeMountain': selectedCpLineCapability(
+      canEditCp,
+      hasSelectedCpLines,
+      'Make Mountain',
+      'Make selected lines mountain folds'
+    ),
+    'cp.makeValley': selectedCpLineCapability(
+      canEditCp,
+      hasSelectedCpLines,
+      'Make Valley',
+      'Make selected lines valley folds'
+    ),
+    'cp.makeEdge': selectedCpLineCapability(
+      canEditCp,
+      hasSelectedCpLines,
+      'Make Edge',
+      'Make selected lines edge folds'
+    ),
+    'cp.makeAuxiliary': selectedCpLineCapability(
+      canEditCp,
+      hasSelectedCpLines,
+      'Make Auxiliary',
+      'Convert selected lines to auxiliary lines'
+    ),
+    'cp.toggleMountainValley': selectedCpLineCapability(
+      canEditCp,
+      hasSelectedCpLines,
+      'Toggle Mountain/Valley',
+      'Toggle selected mountain and valley lines'
+    ),
+    'cp.replaceLineType': selectedCpLineCapability(
+      canEditCp,
+      hasSelectedCpLines,
+      'Replace Selected Line Type...',
+      'Open line-type replacement settings for selected lines'
+    ),
+    'cp.deleteLineType': selectedCpLineCapability(
+      canEditCp,
+      hasSelectedCpLines,
+      'Delete Selected Line Type...',
+      'Open line-type deletion settings for selected lines'
+    ),
     'cp.checkCamv': capability(
       canEditCp,
       'Check CAMV',
@@ -414,12 +482,26 @@ export function getWorkspaceCapabilities(input: WorkspaceCapabilityInput): Works
     ),
     'cp.fixInaccurate': capability(
       canEditCp && hasSelectedCpLines,
-      'Fix Inaccurate Creases',
+      'Fix Inaccurate Creases...',
       canEditCp
         ? hasSelectedCpLines
-          ? 'Snap selected creases to Oriedita fix targets'
+          ? 'Open inaccurate-crease repair settings for selected lines'
           : 'Select one or more crease-pattern lines first'
         : 'Open an editable crease pattern first'
+    ),
+    'cp.changeCircleColor': capability(
+      canEditCp && hasSelectedCpLinesOrCircles,
+      'Change Circle Color...',
+      canEditCp
+        ? hasSelectedCpLinesOrCircles
+          ? 'Open color settings for selected circles or auxiliary lines'
+          : 'Select one or more circles or auxiliary lines first'
+        : 'Open an editable crease pattern first'
+    ),
+    'cp.organizeCircles': capability(
+      canEditCp,
+      'Organize Circles',
+      canEditCp ? 'Prune invalid zero-radius circles' : 'Open an editable crease pattern first'
     ),
     'simulator.refresh': capability(
       treeMode && hasCreasePattern && !isBusy,
@@ -448,6 +530,23 @@ export function isWorkspaceBusy(status: AppStatus): boolean {
 
 function capability(enabled: boolean, label: string, reason: string): WorkspaceCapability {
   return { enabled, visible: true, label, reason };
+}
+
+function selectedCpLineCapability(
+  canEditCp: boolean,
+  hasSelectedCpLines: boolean,
+  label: string,
+  enabledReason: string
+): WorkspaceCapability {
+  return capability(
+    canEditCp && hasSelectedCpLines,
+    label,
+    canEditCp
+      ? hasSelectedCpLines
+        ? enabledReason
+        : 'Select one or more crease-pattern lines first'
+      : 'Open an editable crease pattern first'
+  );
 }
 
 function commandCapability(

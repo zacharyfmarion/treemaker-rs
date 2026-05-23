@@ -152,6 +152,25 @@ export function getMenuBarDef(): MenuDef[] {
         { type: 'separator' },
         {
           type: 'submenu',
+          label: 'Selected Lines',
+          items: [
+            { type: 'action', id: 'cp.deleteSelectedLines', label: 'Delete Selected Lines', shortcut: 'Delete' },
+            { type: 'separator' },
+            { type: 'action', id: 'cp.changeCreaseType', label: 'Change Crease Type' },
+            { type: 'action', id: 'cp.advanceCreaseType', label: 'Advance Crease Type' },
+            { type: 'action', id: 'cp.toggleMountainValley', label: 'Toggle Mountain/Valley' },
+            { type: 'separator' },
+            { type: 'action', id: 'cp.makeMountain', label: 'Make Mountain' },
+            { type: 'action', id: 'cp.makeValley', label: 'Make Valley' },
+            { type: 'action', id: 'cp.makeEdge', label: 'Make Edge' },
+            { type: 'action', id: 'cp.makeAuxiliary', label: 'Make Auxiliary' },
+            { type: 'separator' },
+            { type: 'action', id: 'cp.replaceLineType', label: 'Replace Selected Line Type...' },
+            { type: 'action', id: 'cp.deleteLineType', label: 'Delete Selected Line Type...' },
+          ],
+        },
+        {
+          type: 'submenu',
           label: 'Diagnostics',
           items: [
             { type: 'action', id: 'cp.checkCamv', label: 'Check CAMV', shortcut: `${mod}+Shift+M` },
@@ -167,11 +186,17 @@ export function getMenuBarDef(): MenuDef[] {
           items: [
             { type: 'action', id: 'cp.fix1', label: 'Repair Overlaps' },
             { type: 'action', id: 'cp.fix2', label: 'Split T-junctions' },
-            { type: 'action', id: 'cp.fixInaccurate', label: 'Fix Inaccurate Creases' },
+            { type: 'action', id: 'cp.fixInaccurate', label: 'Fix Inaccurate Creases...' },
           ],
         },
-        { type: 'separator' },
-        { type: 'action', id: 'cp.deleteSelectedLines', label: 'Delete Selected Lines', shortcut: 'Delete' },
+        {
+          type: 'submenu',
+          label: 'Annotations',
+          items: [
+            { type: 'action', id: 'cp.changeCircleColor', label: 'Change Circle Color...' },
+            { type: 'action', id: 'cp.organizeCircles', label: 'Organize Circles' },
+          ],
+        },
       ],
     },
     {

@@ -800,7 +800,38 @@ describe('CreasePatternPanel', () => {
     const [operation, payload] = executeOristudioCpCommand.mock.calls[0] ?? [];
     expect(operation).toBe('CreaseSelect');
     expect(payload?.points).toHaveLength(2);
+    expect(payload?.replace_selection).toBe(true);
     expect(selectButton?.hasAttribute('data-active')).toBe(true);
+  });
+
+  it('clears the selection on Escape without cancelling the default box-select mode', () => {
+    const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
+      documentMode: 'crease-pattern',
+      importedCreasePattern: importedCpDocument(),
+      oristudioCpDocument: editableCpState(),
+    });
+    const selectButton = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Select crease"]'
+    );
+    const body = container.querySelector<HTMLElement>('.cp-panel__body');
+
+    act(() => {
+      useWorkspaceStore.getState().setOristudioCpSelection({
+        ...useWorkspaceStore.getState().oristudioCpSelection,
+        lines: [1, 2],
+      });
+    });
+    expect(container.textContent).toContain('2 selected');
+
+    act(() => {
+      body?.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+      );
+    });
+
+    expect(useWorkspaceStore.getState().oristudioCpSelection.lines).toEqual([]);
+    expect(selectButton?.hasAttribute('data-active')).toBe(true);
+    expect(container.textContent).toContain('Select crease: Drag selection box');
   });
 
   it('runs ready multi-step CP transform commands with resolved model points', async () => {

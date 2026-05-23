@@ -110,6 +110,11 @@ pub struct CreasePatternCommandPayload {
     /// Optional model-space hit tolerance for point/line tools.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub selection_distance: Option<f64>,
+    /// Optional UI-level replacement selection mode. Oriedita's primitive
+    /// select operations are additive by default; callers set this when a
+    /// normal click/box selection should replace the previous selected set.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub replace_selection: Option<bool>,
     /// Optional active grid width for grid-spaced construction tools.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub grid_width: Option<f64>,
@@ -1380,6 +1385,9 @@ pub fn execute_command(
             ))
         }
         OperationId::CreaseSelect => {
+            if command.payload.replace_selection.unwrap_or(false) {
+                operations::selection::unselect_all(&mut document.crease_pattern);
+            }
             if command.payload.line_ids.is_empty() {
                 let polygon = required_selection_polygon(&command)?;
                 operations::selection::select_box(&mut document.crease_pattern, &polygon)
@@ -3558,6 +3566,43 @@ mod tests {
         assert_eq!(
             document.crease_pattern.line_segments[1].color,
             LineColor::Red1
+        );
+    }
+
+    #[test]
+    fn command_dispatch_can_replace_existing_box_selection() {
+        let mut document = CreasePatternDocument::default();
+        for x in [0.0, 5.0, 10.0] {
+            document.crease_pattern.add_line(
+                Point::new(x, 0.0),
+                Point::new(x, 1.0),
+                LineColor::Blue2,
+            );
+        }
+        document.crease_pattern.line_segments[0].selected = 2;
+
+        let result = execute_command(
+            &mut document,
+            CreasePatternCommand::new(OperationId::CreaseSelect).with_payload(
+                CreasePatternCommandPayload {
+                    points: vec![Point::new(4.0, -1.0), Point::new(6.0, 2.0)],
+                    replace_selection: Some(true),
+                    ..CreasePatternCommandPayload::default()
+                },
+            ),
+        )
+        .expect("replace selection box command should execute");
+
+        assert_eq!(result.operation, OperationId::CreaseSelect);
+        assert_eq!(result.diagnostics, vec!["Changed 1 line(s)"]);
+        assert_eq!(
+            document
+                .crease_pattern
+                .line_segments
+                .iter()
+                .map(|line| line.selected)
+                .collect::<Vec<_>>(),
+            vec![0, 2, 0]
         );
     }
 

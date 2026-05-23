@@ -345,6 +345,19 @@ function allowsDirectEntitySelection(operationId: string | null | undefined): bo
   return operationId === 'CreaseSelect';
 }
 
+function isDefaultSelectionMode(
+  state: { activeOperationId: string | null; phase: string },
+  pendingPointCount: number,
+  pendingPathCount: number
+): boolean {
+  return (
+    state.phase === 'active' &&
+    state.activeOperationId === 'CreaseSelect' &&
+    pendingPointCount === 0 &&
+    pendingPathCount === 0
+  );
+}
+
 function isRestrictedDrawOperation(operationId: string | null | undefined): boolean {
   return operationId === 'DrawCreaseRestricted';
 }
@@ -606,6 +619,7 @@ export function CreasePatternPanel() {
     mode: 'drag-line' | 'drag-path' | 'drag-box' | 'text-drag';
     pointerId: number;
     points: Point[];
+    replaceSelection?: boolean;
     textId?: number;
   } | null>(null);
 
@@ -1317,6 +1331,7 @@ export function CreasePatternPanel() {
           mode: 'drag-box',
           pointerId: event.pointerId,
           points: [point],
+          replaceSelection: !(event.shiftKey || event.metaKey || event.ctrlKey),
         };
         if (typeof event.pointerId === 'number') {
           event.currentTarget.setPointerCapture?.(event.pointerId);
@@ -1567,6 +1582,8 @@ export function CreasePatternPanel() {
             line_ids: oristudioCpSelection.lines,
             circle_ids: oristudioCpSelection.circles,
             points,
+            replace_selection:
+              drag.operationId === 'CreaseSelect' ? drag.replaceSelection : undefined,
           })
         );
         setCpToolState((state) =>
@@ -1621,6 +1638,8 @@ export function CreasePatternPanel() {
             activeCpCommand.operationId,
             buildCpCommandPayload(activeCpCommand, {
               line_ids: [id],
+              replace_selection:
+                activeCpCommand.operationId === 'CreaseSelect' ? !additive : undefined,
             })
           );
           setCpToolState((state) =>
@@ -1873,6 +1892,14 @@ export function CreasePatternPanel() {
     const onKeyDown = (event: KeyboardEvent) => {
       const interactive = isViewportInteractiveTarget(event.target);
       if (event.key === 'Escape' && editableCp) {
+        if (
+          editableSelectionSize > 0 &&
+          isDefaultSelectionMode(cpToolState, cpToolPoints.length, cpToolPath.length)
+        ) {
+          event.preventDefault();
+          clearOristudioCpSelection();
+          return;
+        }
         const cancellation = cancelOristudioCpToolState(cpToolState);
         if (cancellation.handled) {
           event.preventDefault();
@@ -1936,6 +1963,8 @@ export function CreasePatternPanel() {
     };
   }, [
     clearOristudioCpSelection,
+    cpToolPath.length,
+    cpToolPoints.length,
     cpToolState,
     editableCp,
     editableSelectionSize,

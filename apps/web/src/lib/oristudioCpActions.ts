@@ -299,6 +299,175 @@ const ORIEDITA_RAIL_ACTION_OVERRIDES: Partial<
     upstreamMouseMode: 'AXIOM_7',
     railOrder: 230,
   },
+  DrawPoint: {
+    upstreamAction: 'vertexAddAction',
+    upstreamMouseMode: 'DRAW_POINT_14',
+  },
+  DrawCreaseSymmetric: {
+    upstreamAction: 'reflectAction',
+    upstreamMouseMode: 'DRAW_CREASE_SYMMETRIC_12',
+  },
+  DrawCreaseAngleRestricted3: {
+    upstreamAction: 'deg4Action',
+    upstreamMouseMode: 'DRAW_CREASE_ANGLE_RESTRICTED_3_18',
+  },
+  ParallelDrawWidth: {
+    upstreamAction: 'setParallelDrawWidthAction',
+    upstreamMouseMode: 'PARALLEL_DRAW_WIDTH_51',
+  },
+  CreaseMove: {
+    upstreamAction: 'moveAction',
+    upstreamMouseMode: 'CREASE_MOVE_21',
+  },
+  CreaseCopy: {
+    upstreamAction: 'copyAction',
+    upstreamMouseMode: 'CREASE_COPY_22',
+  },
+  CreaseMove4p: {
+    upstreamAction: 'move2p2pAction',
+    upstreamMouseMode: 'CREASE_MOVE_4P_31',
+  },
+  CreaseCopy4p: {
+    upstreamAction: 'copy2p2pAction',
+    upstreamMouseMode: 'CREASE_COPY_4P_32',
+  },
+  OperationFrameCreate: {
+    upstreamAction: 'operationFrameSelectAction',
+    upstreamMouseMode: 'OPERATION_FRAME_CREATE_61',
+  },
+  LengthenCreaseSameColor: {
+    upstreamAction: 'lengthenCrease2Action',
+    upstreamMouseMode: 'LENGTHEN_CREASE_SAME_COLOR_70',
+  },
+  CreaseMakeMv: {
+    upstreamAction: 'in_L_col_changeAction',
+    upstreamMouseMode: 'CREASE_MAKE_MV_34',
+  },
+  CreasesAlternateMv: {
+    upstreamAction: 'on_L_col_changeAction',
+    upstreamMouseMode: 'CREASES_ALTERNATE_MV_36',
+  },
+  CircleDraw: {
+    upstreamAction: 'circleDrawAction',
+    upstreamMouseMode: 'CIRCLE_DRAW_42',
+  },
+  CircleDrawThreePoint: {
+    upstreamAction: 'circleDrawThreePointAction',
+    upstreamMouseMode: 'CIRCLE_DRAW_THREE_POINT_43',
+  },
+  CircleDrawSeparate: {
+    upstreamAction: 'circleDrawSeparateAction',
+    upstreamMouseMode: 'CIRCLE_DRAW_SEPARATE_44',
+  },
+  CircleDrawTangentLine: {
+    upstreamAction: 'circleDrawTangentLineAction',
+    upstreamMouseMode: 'CIRCLE_DRAW_TANGENT_LINE_45',
+  },
+  CircleDrawInverted: {
+    upstreamAction: 'circleDrawInvertedAction',
+    upstreamMouseMode: 'CIRCLE_DRAW_INVERTED_46',
+  },
+  CircleDrawFree: {
+    upstreamAction: 'circleDrawFreeAction',
+    upstreamMouseMode: 'CIRCLE_DRAW_FREE_47',
+  },
+  CircleDrawConcentric: {
+    upstreamAction: 'circleDrawConcentricAction',
+    upstreamMouseMode: 'CIRCLE_DRAW_CONCENTRIC_48',
+  },
+  CircleDrawConcentricSelect: {
+    upstreamAction: 'circleDrawConcentricSelectAction',
+    upstreamMouseMode: 'CIRCLE_DRAW_CONCENTRIC_SELECT_49',
+  },
+  CircleDrawConcentricTwoCircleSelect: {
+    upstreamAction: 'circleDrawTwoConcentricAction',
+    upstreamMouseMode: 'CIRCLE_DRAW_CONCENTRIC_TWO_CIRCLE_SELECT_50',
+  },
+  Text: {
+    upstreamAction: 'textAction',
+    upstreamMouseMode: 'TEXT',
+  },
+  DrawBlintz: {
+    upstreamAction: 'drawBlintzAction',
+    upstreamMouseMode: 'DRAW_BLINTZ',
+  },
+  DrawFishBase: {
+    upstreamAction: 'drawFishBaseAction',
+    upstreamMouseMode: 'DRAW_FISH_BASE',
+  },
+  DrawDoveBase: {
+    upstreamAction: 'drawDoveBaseAction',
+    upstreamMouseMode: 'DRAW_DOVE_BASE',
+  },
+  DrawBirdBase: {
+    upstreamAction: 'drawBirdBaseAction',
+    upstreamMouseMode: 'DRAW_BIRD_BASE',
+  },
+  DrawFrogBase: {
+    upstreamAction: 'drawFrogBaseAction',
+    upstreamMouseMode: 'DRAW_FROG_BASE',
+  },
+  DisplayLengthBetweenPoints1: {
+    upstreamAction: 'l1Action',
+    upstreamMouseMode: 'DISPLAY_LENGTH_BETWEEN_POINTS_1_53',
+  },
+  DisplayLengthBetweenPoints2: {
+    upstreamAction: 'l2Action',
+    upstreamMouseMode: 'DISPLAY_LENGTH_BETWEEN_POINTS_2_54',
+  },
+  DisplayAngleBetweenThreePoints1: {
+    upstreamAction: 'a1Action',
+    upstreamMouseMode: 'DISPLAY_ANGLE_BETWEEN_THREE_POINTS_1_55',
+  },
+  DisplayAngleBetweenThreePoints2: {
+    upstreamAction: 'a2Action',
+    upstreamMouseMode: 'DISPLAY_ANGLE_BETWEEN_THREE_POINTS_2_56',
+  },
+  DisplayAngleBetweenThreePoints3: {
+    upstreamAction: 'a3Action',
+    upstreamMouseMode: 'DISPLAY_ANGLE_BETWEEN_THREE_POINTS_3_57',
+  },
+  FlatFoldableCheck: {
+    upstreamAction: 'o_F_checkAction',
+    upstreamMouseMode: 'FLAT_FOLDABLE_CHECK_63',
+  },
+  ModifyCalculatedShape: {
+    upstreamAction: 'oriagari_sousa_2Action',
+    upstreamMouseMode: 'MODIFY_CALCULATED_SHAPE_101',
+  },
+  MoveCalculatedShape: {
+    upstreamAction: 'foldedFigureMoveAction',
+    upstreamMouseMode: 'MOVE_CALCULATED_SHAPE_102',
+  },
+  ChangeStandardFace: {
+    upstreamAction: 'koteimen_siteiAction',
+    upstreamMouseMode: 'CHANGE_STANDARD_FACE_103',
+  },
+  AddFoldingConstraint: {
+    upstreamAction: 'addColorConstraintAction',
+    upstreamMouseMode: 'ADD_FOLDING_CONSTRAINT',
+  },
+  FoldingEstimate: {
+    upstreamAction: 'foldAction',
+  },
+  FoldingEstimateSpecific: {
+    upstreamAction: 'goToFoldedFigureAction',
+  },
+  FoldingEstimateSave100: {
+    upstreamAction: 'As100Action',
+  },
+  TwoColoredCp: {
+    upstreamAction: 'drawTwoColoredCpAction',
+  },
+  Fold: {
+    upstreamAction: 'foldAction',
+  },
+  FoldAnother: {
+    upstreamAction: 'anotherSolutionAction',
+  },
+  DuplicateFoldedModel: {
+    upstreamAction: 'duplicateFoldedModelAction',
+  },
   DeletePoint: {
     label: 'Delete Point',
     group: 'edit',

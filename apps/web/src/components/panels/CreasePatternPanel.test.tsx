@@ -749,6 +749,13 @@ describe('CreasePatternPanel', () => {
     expect(panel?.textContent).toContain('Three lines toward inner center are drawn.');
     expect(panel?.textContent).toContain('Line type');
     expect(panel?.textContent).toContain('Line M');
+
+    act(() => {
+      container.querySelector<HTMLButtonElement>('button[aria-label="Delete Point"]')?.click();
+    });
+
+    expect(panel?.textContent).toContain('Delete Point');
+    expect(panel?.textContent).toContain('Delete a vertex on a straight line of uniform color.');
   });
 
   it('opens contextual CP actions from menu requests with the current editable selection', async () => {

@@ -6,6 +6,12 @@ import {
 } from './oristudioCpToolInstructions';
 
 describe('Oriedita CP tool instructions', () => {
+  it('provides instructions for every visible sidebar tool', () => {
+    const missing = cpRailActions().filter((action) => !instructionsForCpAction(action));
+
+    expect(missing.map((action) => action.label)).toEqual([]);
+  });
+
   it('resolves Rabbit Ear to the detailed Oriedita instruction text', () => {
     expect(instructionsForOrieditaAction('rabbitEarAction')).toMatchObject({
       intro: ['Draw lines toward inner center.'],
@@ -52,6 +58,24 @@ describe('Oriedita CP tool instructions', () => {
         )
       )?.notes
     ).toEqual(['Select a line to extend it.']);
+
+    expect(
+      instructionsForCpAction(
+        railActions.find((action) => action.kind === 'command' && action.operationId === 'DrawPoint')
+      )?.intro
+    ).toEqual(['Add a vertex.']);
+
+    expect(
+      instructionsForCpAction(
+        railActions.find((action) => action.kind === 'command' && action.operationId === 'CreaseMove')
+      )?.intro
+    ).toEqual(['Move selected lines by drawing a line.']);
+
+    expect(
+      instructionsForCpAction(
+        railActions.find((action) => action.kind === 'command' && action.operationId === 'CircleDraw')
+      )?.intro
+    ).toEqual(['Draw circles snapping to grid and vertices.']);
   });
 
   it('returns null for unmapped Oriedita actions', () => {

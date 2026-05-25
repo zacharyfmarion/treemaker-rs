@@ -86,6 +86,39 @@ describe('oristudio CP action registry', () => {
     });
   });
 
+  it('keeps Oriedita mouse-mode edit tools in the sidebar', () => {
+    expect(
+      cpRailActions()
+        .filter((action) => action.group === 'edit')
+        .map((action) => ({
+          label: action.label,
+          upstreamAction: action.upstreamAction,
+          upstreamMouseMode: action.kind === 'command' ? action.upstreamMouseMode : undefined,
+        }))
+    ).toEqual([
+      {
+        label: 'Delete Point',
+        upstreamAction: 'vertexDeleteAction',
+        upstreamMouseMode: 'DELETE_POINT_15',
+      },
+      {
+        label: 'Delete any Vertex',
+        upstreamAction: 'v_del_ccAction',
+        upstreamMouseMode: 'VERTEX_DELETE_ON_CREASE_41',
+      },
+      {
+        label: 'Delete Coincident Lines',
+        upstreamAction: 'del_lAction',
+        upstreamMouseMode: 'CREASE_DELETE_OVERLAPPING_64',
+      },
+      {
+        label: 'Delete Overlapping Lines',
+        upstreamAction: 'del_l_XAction',
+        upstreamMouseMode: 'CREASE_DELETE_INTERSECTING_65',
+      },
+    ]);
+  });
+
   it('models the Oriedita line tool as a repeatable drag-line action', () => {
     expect(cpActionById(DEFAULT_ORISTUDIO_CP_ACTION_ID)).toMatchObject({
       kind: 'command',

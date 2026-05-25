@@ -11,6 +11,7 @@ import type {
 import type { WasmErrorEnvelope } from '../../engine/types';
 import type { ImportedCreasePatternFormat } from '../../lib/creasePatternImport';
 import type { OristudioCpOperationId } from '../../lib/oristudioCpCommands';
+import { createStarterOristudioCpDocument } from '../../lib/oristudioCpStarterDocument';
 import type { OristudioCpWorkerApi } from '../../workers/oristudioCpWorker';
 
 export type OristudioCpClient = Remote<OristudioCpWorkerApi>;
@@ -107,30 +108,7 @@ export async function createBlankOristudioCpDocument(
     path: null,
   };
   const nextHandle = await api.loadDocument({
-    title,
-    crease_pattern: {
-      line_segments: [],
-      circles: [],
-      points: [],
-      aux_line_segments: [],
-      texts: [],
-      grid: {
-        interval_grid_size: 4,
-        grid_size: 8,
-        grid_xa: 1,
-        grid_xb: 0,
-        grid_xc: 1,
-        grid_ya: 1,
-        grid_yb: 0,
-        grid_yc: 1,
-        grid_angle: 90,
-        base_state: 'WithinPaper',
-        vertical_scale_position: 0,
-        horizontal_scale_position: 0,
-        draw_diagonal_gridlines: false,
-      },
-    },
-    metadata: {},
+    ...createStarterOristudioCpDocument(title),
   });
 
   try {

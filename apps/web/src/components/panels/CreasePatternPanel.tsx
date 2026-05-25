@@ -25,6 +25,10 @@ import type {
 import { formatNumber, paperToSvg, type Point } from '../../lib/geometry';
 import { getViewportFitScale, type ViewportSize } from '../../lib/designViewport';
 import {
+  cpDiagnosticEntryMessage,
+  semanticCpDiagnosticKind,
+} from '../../lib/oristudioCpDiagnostics';
+import {
   DEFAULT_ORISTUDIO_CP_ACTION_ID,
   ORISTUDIO_CP_LINE_TYPE_ACTIONS,
   cpActionByOperation,
@@ -165,7 +169,11 @@ function diagnosticHudStatus(
   const errorCount = entries.filter((entry) => entry.severity === 'error').length;
   const warningCount = entries.filter((entry) => entry.severity === 'warning').length;
   const detail =
-    entries.length === 1 ? entries[0]?.message ?? result.diagnostics[0] : result.diagnostics[0];
+    entries.length === 1
+      ? entries[0]
+        ? cpDiagnosticEntryMessage(entries[0])
+        : result.diagnostics[0]
+      : result.diagnostics[0];
 
   if (errorCount > 0) {
     return {
@@ -639,6 +647,7 @@ export function CreasePatternPanel() {
     createEmptyCpMeasurementSlots
   );
   const [cpCommandPreview, setCpCommandPreview] = useState<OristudioCpCommandPreview | null>(null);
+  const [diagnosticHudExpanded, setDiagnosticHudExpanded] = useState(false);
   const cpPreviewRequestRef = useRef(0);
   const lastFocusedDiagnosticRef = useRef<string | null>(null);
   const defaultCpToolDocumentRef = useRef<string | null>(null);
@@ -816,6 +825,16 @@ export function CreasePatternPanel() {
       diagnosticHudStatus(lastCommandResult),
     [lastCommandResult, oristudioCpCamvResult]
   );
+  const diagnosticHudEntries = useMemo(() => {
+    const hudResult =
+      diagnosticHudStatus(oristudioCpCamvResult, { issueOnly: true }) !== null
+        ? oristudioCpCamvResult
+        : lastCommandResult;
+    if (!hudResult || !isDiagnosticResultOperation(hudResult.operation)) {
+      return EMPTY_DIAGNOSTIC_ENTRIES;
+    }
+    return hudResult.diagnostic_entries ?? EMPTY_DIAGNOSTIC_ENTRIES;
+  }, [lastCommandResult, oristudioCpCamvResult]);
   const activeDiagnosticEntry = useMemo(
     () =>
       latestDiagnosticEntries.find((entry) => entry.id === oristudioCpActiveDiagnosticId) ?? null,
@@ -1894,6 +1913,10 @@ export function CreasePatternPanel() {
   }, [creasePatternFitKey, hasCreasePattern]);
 
   useEffect(() => {
+    if (!diagnosticStatus) setDiagnosticHudExpanded(false);
+  }, [diagnosticStatus]);
+
+  useEffect(() => {
     if (!activeDiagnosticEntry || !editableCp) {
       lastFocusedDiagnosticRef.current = null;
       return;
@@ -2102,11 +2125,44 @@ export function CreasePatternPanel() {
                 <div
                   className="cp-diagnostic-hud"
                   data-tone={diagnosticStatus.tone}
+                  data-expanded={diagnosticHudExpanded || undefined}
                   aria-live="polite"
                 >
-                  <span>{diagnosticStatus.label}</span>
-                  {diagnosticStatus.detail && diagnosticStatus.detail !== diagnosticStatus.label && (
-                    <small>{diagnosticStatus.detail}</small>
+                  <button
+                    type="button"
+                    className="cp-diagnostic-hud__summary"
+                    aria-expanded={diagnosticHudExpanded}
+                    onClick={() => setDiagnosticHudExpanded((expanded) => !expanded)}
+                  >
+                    <span className="cp-diagnostic-hud__copy">
+                      <span>{diagnosticStatus.label}</span>
+                      {diagnosticStatus.detail &&
+                        diagnosticStatus.detail !== diagnosticStatus.label && (
+                          <small>{diagnosticStatus.detail}</small>
+                        )}
+                    </span>
+                    {diagnosticHudExpanded ? (
+                      <ChevronDown aria-hidden="true" size={16} />
+                    ) : (
+                      <ChevronRight aria-hidden="true" size={16} />
+                    )}
+                  </button>
+                  {diagnosticHudExpanded && diagnosticHudEntries.length > 0 && (
+                    <div className="cp-diagnostic-hud__list" aria-label="Canvas diagnostics">
+                      {diagnosticHudEntries.slice(0, 12).map((entry) => (
+                        <button
+                          type="button"
+                          className="cp-diagnostic-hud__row"
+                          data-active={entry.id === oristudioCpActiveDiagnosticId || undefined}
+                          data-severity={entry.severity}
+                          key={entry.id}
+                          onClick={() => handleSelectCpDiagnostic(entry.id)}
+                        >
+                          <span>{semanticCpDiagnosticKind(entry.kind)}</span>
+                          <span>{cpDiagnosticEntryMessage(entry)}</span>
+                        </button>
+                      ))}
+                    </div>
                   )}
                 </div>
               )}

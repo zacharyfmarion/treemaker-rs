@@ -559,7 +559,7 @@ describe('CreasePatternPanel', () => {
     expect(container.textContent).not.toContain('Build CP');
   });
 
-  it('renders editable CP kernel geometry with grid, selection, and viewport toggles', () => {
+  it('renders editable CP kernel geometry with grid, selection, and viewport toggles', async () => {
     const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
       documentMode: 'crease-pattern',
       importedCreasePattern: importedCpDocument(),
@@ -574,8 +574,23 @@ describe('CreasePatternPanel', () => {
     expect(container.querySelector('.cp-circle')).not.toBeNull();
     expect(container.querySelector('.cp-point')).not.toBeNull();
     expect(container.querySelector('.cp-text')?.textContent).toBe('note');
-    expect(container.querySelector('.cp-tool-rail')).not.toBeNull();
-    expect(container.textContent).toContain('Select crease: Drag selection box');
+    const toolRail = container.querySelector('.cp-tool-rail');
+    expect(toolRail).not.toBeNull();
+    expect(toolRail?.querySelector('.cp-tool-rail__buttons')).not.toBeNull();
+    expect(toolRail?.querySelector('button[aria-label="Mountain"]')).toBeNull();
+    expect(toolRail?.querySelector('.cp-tool-rail__status-dot')).toBeNull();
+    expect(toolRail?.querySelector('button[aria-label="Line"]')).not.toBeNull();
+    expect(toolRail?.querySelector('button[aria-label="Rabbit Ear"]')).not.toBeNull();
+    expect(toolRail?.querySelector('button[aria-label="Flat Foldable Line"]')).not.toBeNull();
+    expect(toolRail?.querySelector('button[aria-label="Perpendicular Line"]')).not.toBeNull();
+    expect(
+      toolRail?.querySelector('button[aria-label="Line"] .cp-tool-rail__oriedita-icon')?.textContent
+    ).toBe('\uE000');
+    expect(
+      toolRail?.querySelector('button[aria-label="Rabbit Ear"] .cp-tool-rail__oriedita-icon')
+        ?.textContent
+    ).toBe('\uE007');
+    expect(container.textContent).toContain('Box Select: Drag selection box');
     expect(container.textContent).toContain('Line M');
     expect(container.textContent).toContain('2 lines');
     expect(container.querySelector('button[aria-label="Mountain"]')?.textContent).toContain('M');
@@ -584,7 +599,10 @@ describe('CreasePatternPanel', () => {
     expect(container.querySelector('button[aria-label="Auxiliary"]')?.textContent).toContain('A');
 
     const drawCreaseButton = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="Draw crease"]'
+      'button[aria-label="Line"]'
+    );
+    const boxSelectButton = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Box Select"]'
     );
     const foldEstimateButton = container.querySelector<HTMLButtonElement>(
       'button[aria-label="Fold estimate"]'
@@ -596,10 +614,10 @@ describe('CreasePatternPanel', () => {
       'button[aria-label="Move selected creases"]'
     );
     const deleteIntersectingButton = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="Delete intersecting creases"]'
+      'button[aria-label="Delete Overlapping Lines"]'
     );
     const selectIntersectingButton = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="Select intersecting line"]'
+      'button[aria-label="Select Overlapping Lines"]'
     );
     const fixInaccurateButton = container.querySelector<HTMLButtonElement>(
       'button[aria-label="Fix inaccurate creases"]'
@@ -608,7 +626,7 @@ describe('CreasePatternPanel', () => {
       'button[aria-label="Operation frame"]'
     );
     const selectLassoButton = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="Select lasso"]'
+      'button[aria-label="Lasso Select"]'
     );
     expect(drawCreaseButton?.getAttribute('aria-disabled')).toBe('false');
     expect(drawCreaseButton?.getAttribute('data-ui-status')).toBe('ready');
@@ -626,23 +644,29 @@ describe('CreasePatternPanel', () => {
     expect(selectLassoButton?.getAttribute('data-ui-status')).toBe('ready');
     expect(foldEstimateButton?.getAttribute('aria-disabled')).toBe('true');
     expect(foldEstimateButton?.getAttribute('data-ui-status')).toBe('porting');
-    expect(container.querySelector('button[aria-label="Select crease"]')?.hasAttribute('data-active')).toBe(
-      true
-    );
+    expect(foldEstimateButton?.title).toContain('Kernel port is in progress');
+    expect(boxSelectButton?.hasAttribute('data-active')).toBe(true);
 
     act(() => {
       drawCreaseButton?.click();
     });
-    expect(container.textContent).toContain('Draw crease: Drag crease endpoint');
+    expect(container.textContent).toContain('Line: Drag crease endpoint');
     expect(drawCreaseButton?.hasAttribute('data-active')).toBe(true);
 
     act(() => {
       foldEstimateButton?.click();
     });
-    expect(container.textContent).toContain('Fold estimate: Porting');
-    expect(foldEstimateButton?.hasAttribute('data-active')).toBe(true);
+    expect(container.textContent).toContain('Line: Drag crease endpoint');
+    expect(foldEstimateButton?.hasAttribute('data-active')).toBe(false);
+    expect(drawCreaseButton?.hasAttribute('data-active')).toBe(true);
 
-    act(() => {
+    await act(async () => {
+      container.querySelector<HTMLElement>('.cp-panel__body')?.dispatchEvent(
+        new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' })
+      );
+    });
+
+    await act(async () => {
       container.querySelector<SVGLineElement>('[data-cp-line-id="1"]')?.dispatchEvent(
         new MouseEvent('click', { bubbles: true })
       );
@@ -660,6 +684,9 @@ describe('CreasePatternPanel', () => {
     expect(container.textContent).toContain('2 selected');
 
     const body = container.querySelector<HTMLElement>('.cp-panel__body');
+    act(() => {
+      drawCreaseButton?.click();
+    });
     act(() => {
       body?.dispatchEvent(
         new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
@@ -735,7 +762,7 @@ describe('CreasePatternPanel', () => {
     });
 
     await act(async () => {
-      container.querySelector<HTMLButtonElement>('button[aria-label="Unselect crease"]')?.click();
+      container.querySelector<HTMLButtonElement>('button[aria-label="Box Deselect"]')?.click();
       await Promise.resolve();
     });
 
@@ -768,7 +795,7 @@ describe('CreasePatternPanel', () => {
     });
     const canvas = setCanvasClientRect(container);
     const selectButton = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="Select crease"]'
+      'button[aria-label="Box Select"]'
     );
 
     expect(selectButton?.hasAttribute('data-active')).toBe(true);
@@ -820,7 +847,7 @@ describe('CreasePatternPanel', () => {
       oristudioCpDocument: editableCpState(),
     });
     const selectButton = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="Select crease"]'
+      'button[aria-label="Box Select"]'
     );
     const body = container.querySelector<HTMLElement>('.cp-panel__body');
 
@@ -840,7 +867,7 @@ describe('CreasePatternPanel', () => {
 
     expect(useWorkspaceStore.getState().oristudioCpSelection.lines).toEqual([]);
     expect(selectButton?.hasAttribute('data-active')).toBe(true);
-    expect(container.textContent).toContain('Select crease: Drag selection box');
+    expect(container.textContent).toContain('Box Select: Drag selection box');
   });
 
   it('runs ready multi-step CP transform commands with resolved model points', async () => {
@@ -931,12 +958,12 @@ describe('CreasePatternPanel', () => {
 
     await act(async () => {
       container
-        .querySelector<HTMLButtonElement>('button[aria-label="Delete intersecting creases"]')
+        .querySelector<HTMLButtonElement>('button[aria-label="Delete Overlapping Lines"]')
         ?.click();
       await Promise.resolve();
     });
     expect(container.textContent).toContain(
-      'Delete intersecting creases: Pick drag start point'
+      'Delete Overlapping Lines: Pick drag start point'
     );
 
     act(() => {
@@ -1325,7 +1352,7 @@ describe('CreasePatternPanel', () => {
 
     await act(async () => {
       container
-        .querySelector<HTMLButtonElement>('button[aria-label="Divide line by count"]')
+        .querySelector<HTMLButtonElement>('button[aria-label="Equally Divided Line"]')
         ?.click();
       await Promise.resolve();
     });
@@ -1379,7 +1406,7 @@ describe('CreasePatternPanel', () => {
 
     await act(async () => {
       container
-        .querySelector<HTMLButtonElement>('button[aria-label="Divide line by ratio"]')
+        .querySelector<HTMLButtonElement>('button[aria-label="Divided Line (ratio)"]')
         ?.click();
       await Promise.resolve();
     });
@@ -1820,7 +1847,7 @@ describe('CreasePatternPanel', () => {
 
     await act(async () => {
       container.querySelector<HTMLButtonElement>('button[aria-label="Valley"]')?.click();
-      container.querySelector<HTMLButtonElement>('button[aria-label="Regular polygon"]')?.click();
+      container.querySelector<HTMLButtonElement>('button[aria-label="Regular Polygon"]')?.click();
       await Promise.resolve();
     });
 
@@ -2220,7 +2247,7 @@ describe('CreasePatternPanel', () => {
     const canvas = setCanvasClientRect(container);
 
     await act(async () => {
-      container.querySelector<HTMLButtonElement>('button[aria-label="Lengthen crease"]')?.click();
+      container.querySelector<HTMLButtonElement>('button[aria-label="Extend Line"]')?.click();
       await Promise.resolve();
     });
 
@@ -2287,7 +2314,7 @@ describe('CreasePatternPanel', () => {
 
     await act(async () => {
       container.querySelector<HTMLButtonElement>('button[aria-label="Valley"]')?.click();
-      container.querySelector<HTMLButtonElement>('button[aria-label="Draw crease"]')?.click();
+      container.querySelector<HTMLButtonElement>('button[aria-label="Line"]')?.click();
       await Promise.resolve();
     });
     expect(container.textContent).toContain('Line V');
@@ -2332,7 +2359,7 @@ describe('CreasePatternPanel', () => {
     expect(payload?.line_color).toBe('Blue2');
     expect(payload?.selection_distance).toBeGreaterThan(0);
     expect(payload?.points).toHaveLength(2);
-    expect(container.textContent).toContain('Draw crease: Drag crease endpoint');
+    expect(container.textContent).toContain('Line: Drag crease endpoint');
   });
 
   it('snaps draw crease drag endpoints to existing Oriedita vertices', async () => {
@@ -2354,7 +2381,7 @@ describe('CreasePatternPanel', () => {
     const canvas = setCanvasClientRect(container);
 
     await act(async () => {
-      container.querySelector<HTMLButtonElement>('button[aria-label="Draw crease"]')?.click();
+      container.querySelector<HTMLButtonElement>('button[aria-label="Line"]')?.click();
       await Promise.resolve();
     });
 
@@ -2410,7 +2437,7 @@ describe('CreasePatternPanel', () => {
     const canvas = setCanvasClientRect(container);
 
     await act(async () => {
-      container.querySelector<HTMLButtonElement>('button[aria-label="Select lasso"]')?.click();
+      container.querySelector<HTMLButtonElement>('button[aria-label="Lasso Select"]')?.click();
       await Promise.resolve();
     });
 

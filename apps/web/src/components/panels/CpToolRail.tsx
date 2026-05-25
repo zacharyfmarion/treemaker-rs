@@ -175,6 +175,111 @@ const ICON_ALIASES: Record<string, string> = {
   split: 'Split',
 };
 
+const ORIEDITA_ICON_GLYPHS: Partial<Record<string, string>> = {
+  angleBisectorAction: '\uE006',
+  axiom5Action: '\uE076',
+  axiom7Action: '\uE078',
+  copy2p2pAction: '\uE064',
+  copyAction: '\uE063',
+  deg1Action: '\uE04A',
+  deg2Action: '\uE04C',
+  deg3Action: '\uE04D',
+  del_lAction: '\uE06B',
+  del_l_XAction: '\uE06C',
+  del_l_typeAction: '\uE013',
+  doubleSymmetricDrawAction: '\uE010',
+  drawBlintzAction: '\uE090',
+  drawBirdBaseAction: '\uE093',
+  drawCreaseFreeAction: '\uE000',
+  drawCreaseRestrictedAction: '\uE001',
+  drawDoveBaseAction: '\uE092',
+  drawFishBaseAction: '\uE091',
+  drawFrogBaseAction: '\uE094',
+  drawLineSegmentInternalDivisionRatioAction: '\uE044',
+  fishBoneDrawAction: '\uE00F',
+  fixInaccurateAction: '\uE089',
+  foldableLineDrawAction: '\uE00D',
+  foldableLinePlusGridInputAction: '\uE00D',
+  lengthenCreaseAction: '\uE004',
+  lengthenCrease2Action: '\uE005',
+  move2p2pAction: '\uE062',
+  moveAction: '\uE061',
+  on_L_col_changeAction: '\uE01E',
+  perpendicularDrawAction: '\uE008',
+  regularPolygonAction: '\uE04F',
+  replace_lineAction: '\uE017',
+  selectAction: '\uE05D',
+  selectLassoAction: '\uE07A',
+  select_lXAction: '\uE069',
+  select_polygonAction: '\uE06D',
+  senbun_b_nyuryokuAction: '\uE011',
+  senbun_henkan2Action: '\uE01B',
+  senbun_henkanAction: '\uE01C',
+  senbun_yoke_henkanAction: '\uE01C',
+  symmetricDrawAction: '\uE009',
+  toAuxAction: '\uE01A',
+  toEdgeAction: '\uE019',
+  toMountainAction: '\uE017',
+  toValleyAction: '\uE018',
+  trimBranchesAction: '\uE016',
+  unselectAction: '\uE05F',
+  unselectLassoAction: '\uE07B',
+  unselect_lXAction: '\uE06A',
+  unselect_polygonAction: '\uE06E',
+  v_del_allAction: '\uE022',
+  v_del_all_ccAction: '\uE023',
+  v_del_ccAction: '\uE021',
+  vertexAddAction: '\uE01F',
+  vertexDeleteAction: '\uE020',
+  voronoiAction: '\uE002',
+};
+
+const ORIEDITA_OPERATION_GLYPHS: Partial<Record<OristudioCpOperationId, string>> = {
+  Axiom5: '\uE076',
+  Axiom7: '\uE078',
+  CreaseCopy: '\uE063',
+  CreaseCopy4p: '\uE064',
+  CreaseDeleteIntersecting: '\uE06C',
+  CreaseDeleteOverlapping: '\uE06B',
+  CreaseMove: '\uE061',
+  CreaseMove4p: '\uE062',
+  CreaseSelect: '\uE05D',
+  CreaseUnselect: '\uE05F',
+  DeletePoint: '\uE020',
+  DoubleSymmetricDraw: '\uE010',
+  DrawBlintz: '\uE090',
+  DrawBirdBase: '\uE093',
+  DrawCreaseAngleRestricted: '\uE04A',
+  DrawCreaseAngleRestricted5: '\uE04C',
+  DrawCreaseFree: '\uE000',
+  DrawCreaseRestricted: '\uE001',
+  DrawDoveBase: '\uE092',
+  DrawFishBase: '\uE091',
+  DrawFrogBase: '\uE094',
+  FishBoneDraw: '\uE00F',
+  FoldableLineDraw: '\uE00D',
+  FoldableLineInput: '\uE00D',
+  Inward: '\uE007',
+  LengthenCrease: '\uE004',
+  LengthenCreaseSameColor: '\uE005',
+  LineSegmentDivision: '\uE011',
+  LineSegmentRatioSet: '\uE044',
+  ParallelDraw: '\uE00B',
+  PerpendicularDraw: '\uE008',
+  PolygonSetNoCorners: '\uE04F',
+  SelectLasso: '\uE07A',
+  SelectLineIntersecting: '\uE069',
+  SelectPolygon: '\uE06D',
+  SquareBisector: '\uE006',
+  SymmetricDraw: '\uE009',
+  UnselectLasso: '\uE07B',
+  UnselectLineIntersecting: '\uE06A',
+  UnselectPolygon: '\uE06E',
+  VertexDeleteOnCrease: '\uE021',
+  VertexMakeAngularlyFlatFoldable: '\uE003',
+  VoronoiCreate: '\uE002',
+};
+
 const CP_TOOL_ICON_BY_OPERATION = Object.fromEntries(
   ORISTUDIO_CP_ACTIONS.filter((action) => action.kind === 'command').map((action) => [
     action.operationId,
@@ -244,6 +349,9 @@ function CpToolButton({
     action.kind === 'command'
       ? (CP_TOOL_ICON_BY_OPERATION[action.operationId] ?? CircleDashed)
       : (CP_TOOL_ICON_BY_ACTION[action.id] ?? CircleDashed);
+  const orieditaGlyph =
+    ORIEDITA_ICON_GLYPHS[action.upstreamAction] ??
+    (action.kind === 'command' ? ORIEDITA_OPERATION_GLYPHS[action.operationId] : undefined);
   const available = editable && action.uiStatus === 'ready';
   const statusLabel = commandStatusLabel(action, editable);
 
@@ -258,16 +366,22 @@ function CpToolButton({
       data-line-color={action.kind === 'line-type' ? action.lineColor : undefined}
       data-ui-status={action.uiStatus}
       title={`${action.label} - ${statusLabel}`}
-      onClick={() => onSelectAction(action)}
+      onClick={() => {
+        if (!available) return;
+        onSelectAction(action);
+      }}
     >
       {action.railLabel ? (
         <span className="cp-tool-rail__button-label" aria-hidden="true">
           {action.railLabel}
         </span>
+      ) : orieditaGlyph ? (
+        <span className="cp-tool-rail__oriedita-icon" aria-hidden="true">
+          {orieditaGlyph}
+        </span>
       ) : (
-        <Icon size={15} aria-hidden="true" />
+        <Icon size={20} aria-hidden="true" />
       )}
-      <span className="cp-tool-rail__status-dot" aria-hidden="true" />
     </button>
   );
 }

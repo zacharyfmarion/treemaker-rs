@@ -1,4 +1,9 @@
 import { AlertTriangle, CheckCircle2, CircleDashed } from 'lucide-react';
+import {
+  cpDiagnosticEntryMessage,
+  semanticCpDiagnosticKind,
+  semanticCpDiagnosticSummary,
+} from '../../lib/oristudioCpDiagnostics';
 import { useLayoutStore } from '../../store/layoutStore';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 
@@ -114,7 +119,7 @@ export function DiagnosticsPanel() {
                   }}
                 >
                   <span>{semanticCpDiagnosticKind(entry.kind)}</span>
-                  <span>{entry.message}</span>
+                  <span>{cpDiagnosticEntryMessage(entry)}</span>
                 </button>
               ))}
             </div>
@@ -230,30 +235,4 @@ function Metric({ label, value }: { label: string; value: number | string }) {
       <div className="metric__value">{value}</div>
     </div>
   );
-}
-
-function semanticCpDiagnosticKind(kind: string): string {
-  switch (kind) {
-    case 'Check1':
-      return 'Overlap check';
-    case 'Check2':
-      return 'T-junction check';
-    case 'Check3':
-      return 'Vertex foldability';
-    case 'Check4':
-    case 'CheckCamv':
-      return 'Maekawa/LBL';
-    default:
-      return kind;
-  }
-}
-
-function semanticCpDiagnosticSummary(summary: string | null): string | null {
-  if (!summary) return null;
-  return summary
-    .replace(/^Check1\b/u, 'Overlap check')
-    .replace(/^Check2\b/u, 'T-junction check')
-    .replace(/^Check3\b/u, 'Vertex foldability check')
-    .replace(/^Check4\b/u, 'Maekawa/LBL check')
-    .replace(/^CheckCamv\b/u, 'CAMV check');
 }

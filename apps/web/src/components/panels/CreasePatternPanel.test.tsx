@@ -1207,6 +1207,28 @@ describe('CreasePatternPanel', () => {
     expect(container.querySelector('.cp-diagnostic-hud')?.textContent).toContain(
       'Flat-foldability violation: Maekawa'
     );
+    expect(container.querySelector('.cp-diagnostic-hud')?.textContent).not.toContain('(0, 0)');
+    expect(container.querySelectorAll('.cp-diagnostic-hud__row')).toHaveLength(0);
+
+    act(() => {
+      container.querySelector<HTMLButtonElement>('.cp-diagnostic-hud__summary')?.click();
+    });
+
+    expect(
+      container
+        .querySelector<HTMLButtonElement>('.cp-diagnostic-hud__summary')
+        ?.getAttribute('aria-expanded')
+    ).toBe('true');
+    expect(container.querySelectorAll('.cp-diagnostic-hud__row')).toHaveLength(1);
+    expect(container.querySelector('.cp-diagnostic-hud__row')?.textContent).toContain(
+      'Maekawa/LBL'
+    );
+
+    act(() => {
+      container.querySelector<HTMLButtonElement>('.cp-diagnostic-hud__row')?.click();
+    });
+
+    expect(useWorkspaceStore.getState().oristudioCpActiveDiagnosticId).toBe('CheckCamv-1');
   });
 
   it('does not show the diagnostic HUD for ordinary edit command results', () => {

@@ -1675,9 +1675,9 @@
   top: var(--space-4);
   right: var(--space-4);
   display: grid;
-  justify-items: end;
-  max-width: min(340px, calc(100% - var(--space-8)));
-  padding: 8px 11px;
+  width: min(420px, calc(100% - var(--space-8)));
+  max-width: min(420px, calc(100% - var(--space-8)));
+  overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--border-strong) 68%, transparent);
   border-radius: 6px;
   background: color-mix(in srgb, var(--bg-primary) 80%, transparent);
@@ -1685,11 +1685,35 @@
   color: var(--text-primary);
   font-weight: 760;
   line-height: 1.2;
-  pointer-events: none;
   text-align: right;
 }
 
-.cp-diagnostic-hud small {
+.cp-diagnostic-hud__summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: 8px 10px 8px 11px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: right;
+}
+
+.cp-diagnostic-hud__summary:hover {
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+
+.cp-diagnostic-hud__copy {
+  display: grid;
+  min-width: 0;
+  justify-items: end;
+}
+
+.cp-diagnostic-hud__copy small {
   max-width: 100%;
   margin-top: 3px;
   color: var(--text-secondary);
@@ -1698,6 +1722,61 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.cp-diagnostic-hud__list {
+  display: grid;
+  max-height: min(320px, calc(100vh - 170px));
+  overflow: auto;
+  border-top: 1px solid var(--border-subtle);
+  text-align: left;
+}
+
+.cp-diagnostic-hud__row {
+  display: grid;
+  grid-template-columns: minmax(76px, max-content) minmax(0, 1fr);
+  gap: var(--space-2);
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 0.72rem;
+  line-height: 1.25;
+  text-align: left;
+}
+
+.cp-diagnostic-hud__row + .cp-diagnostic-hud__row {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.cp-diagnostic-hud__row:hover,
+.cp-diagnostic-hud__row[data-active='true'] {
+  background: color-mix(in srgb, var(--status-danger) 11%, transparent);
+}
+
+.cp-diagnostic-hud__row[data-severity='warning']:hover,
+.cp-diagnostic-hud__row[data-severity='warning'][data-active='true'] {
+  background: color-mix(in srgb, var(--status-warning) 12%, transparent);
+}
+
+.cp-diagnostic-hud__row[data-severity='info']:hover,
+.cp-diagnostic-hud__row[data-severity='info'][data-active='true'] {
+  background: color-mix(in srgb, var(--status-success) 12%, transparent);
+}
+
+.cp-diagnostic-hud__row span:first-child {
+  color: var(--status-danger);
+  font-weight: 750;
+}
+
+.cp-diagnostic-hud__row[data-severity='warning'] span:first-child {
+  color: var(--status-warning);
+}
+
+.cp-diagnostic-hud__row[data-severity='info'] span:first-child {
+  color: var(--status-success);
 }
 
 .cp-diagnostic-hud[data-tone='error'] {

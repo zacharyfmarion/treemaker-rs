@@ -237,7 +237,7 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
     tooltip: 'Advance selected folding lines through edge, mountain, and valley',
   }),
   ready('LengthenCrease', 'Lengthen crease', 'transform', 'stretch-horizontal', 'MouseHandlerLengthenCrease', {
-    toolSteps: ['Pick crossing start point', 'Pick crossing end point', 'Pick extension target'],
+    toolSteps: ['Select line to extend', 'Select target line'],
     tooltip: 'Extend creases crossed by the guide line to the target crease',
   }),
   ready('SquareBisector', 'Square bisector', 'construct', 'square-dashed', 'MouseHandlerSquareBisector', {
@@ -496,7 +496,7 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
     tooltip: 'Unselect crease segments intersecting or overlapping a dragged line',
   }),
   ready('LengthenCreaseSameColor', 'Lengthen same color', 'transform', 'stretch-horizontal', 'MouseHandlerLengthenCreaseSameColor', {
-    toolSteps: ['Pick crossing start point', 'Pick crossing end point', 'Pick extension target'],
+    toolSteps: ['Select line to extend', 'Select target line'],
     tooltip: 'Extend creases crossed by the guide line while preserving original colors',
   }),
   ready('FoldableLineDraw', 'Foldable line draw', 'construct', 'pen-line', 'MouseHandlerFoldableLineDraw', {

@@ -20,7 +20,7 @@ use std::collections::BTreeMap;
 pub use canonical::CanonicalCreasePattern;
 use geometry::{
     Circle, Epsilon, LineColor, LineSegment, Point, Polygon, RgbColor,
-    determine_line_segment_distance,
+    determine_line_segment_distance, mid_point,
 };
 pub use model::CreasePatternModel;
 
@@ -2266,24 +2266,48 @@ pub fn execute_command(
             .num_fixed_lines
         }
         OperationId::LengthenCrease => {
-            let points = required_points(&command, 3)?;
-            operations::transform::lengthen_crease(
-                &mut document.crease_pattern,
-                LineSegment::with_color(points[0], points[1], LineColor::Magenta5),
-                points[2],
-                selection_distance(&command),
-                operations::transform::LengthenColorMode::Current(active_line_color(&command)),
-            )
+            if command.payload.line_ids.len() >= 2 {
+                let (selection_line, extension_point) =
+                    lengthen_line_id_inputs(document, &command)?;
+                operations::transform::lengthen_crease(
+                    &mut document.crease_pattern,
+                    selection_line,
+                    extension_point,
+                    selection_distance(&command),
+                    operations::transform::LengthenColorMode::Current(active_line_color(&command)),
+                )
+            } else {
+                let points = required_points(&command, 3)?;
+                operations::transform::lengthen_crease(
+                    &mut document.crease_pattern,
+                    LineSegment::with_color(points[0], points[1], LineColor::Magenta5),
+                    points[2],
+                    selection_distance(&command),
+                    operations::transform::LengthenColorMode::Current(active_line_color(&command)),
+                )
+            }
         }
         OperationId::LengthenCreaseSameColor => {
-            let points = required_points(&command, 3)?;
-            operations::transform::lengthen_crease(
-                &mut document.crease_pattern,
-                LineSegment::with_color(points[0], points[1], LineColor::Magenta5),
-                points[2],
-                selection_distance(&command),
-                operations::transform::LengthenColorMode::SameAsOriginal,
-            )
+            if command.payload.line_ids.len() >= 2 {
+                let (selection_line, extension_point) =
+                    lengthen_line_id_inputs(document, &command)?;
+                operations::transform::lengthen_crease(
+                    &mut document.crease_pattern,
+                    selection_line,
+                    extension_point,
+                    selection_distance(&command),
+                    operations::transform::LengthenColorMode::SameAsOriginal,
+                )
+            } else {
+                let points = required_points(&command, 3)?;
+                operations::transform::lengthen_crease(
+                    &mut document.crease_pattern,
+                    LineSegment::with_color(points[0], points[1], LineColor::Magenta5),
+                    points[2],
+                    selection_distance(&command),
+                    operations::transform::LengthenColorMode::SameAsOriginal,
+                )
+            }
         }
         OperationId::ReplaceLineTypeSelect => {
             let line_indices = required_line_indices(&command)?;
@@ -2923,6 +2947,29 @@ fn required_line_indices(command: &CreasePatternCommand) -> Result<Vec<usize>> {
                 })
         })
         .collect()
+}
+
+fn lengthen_line_id_inputs(
+    document: &CreasePatternDocument,
+    command: &CreasePatternCommand,
+) -> Result<(LineSegment, Point)> {
+    let line_indices = required_line_indices(command)?;
+    if line_indices.len() < 2 {
+        return Err(CommandError::InvalidInput {
+            operation: command.operation,
+            message: "select a line to extend and a target line".to_string(),
+        });
+    }
+
+    let source = line_segment_for_operation(document, command.operation, line_indices[0])?;
+    let target = line_segment_for_operation(document, command.operation, line_indices[1])?;
+    let source_point = mid_point(source.a, source.b);
+    let target_point = mid_point(target.a, target.b);
+
+    Ok((
+        LineSegment::with_color(source_point, source_point, LineColor::Magenta5),
+        target_point,
+    ))
 }
 
 fn optional_line_indices(command: &CreasePatternCommand) -> Result<Vec<usize>> {
@@ -4018,6 +4065,46 @@ mod tests {
         assert_eq!(
             document.crease_pattern.line_segments[1].b,
             Point::new(2.0, 0.0)
+        );
+    }
+
+    #[test]
+    fn command_dispatch_lengthens_first_line_to_second_line_ids() {
+        let mut document = CreasePatternDocument::default();
+        document.crease_pattern.add_line(
+            Point::new(0.0, 0.0),
+            Point::new(1.0, 0.0),
+            LineColor::Red1,
+        );
+        document.crease_pattern.add_line(
+            Point::new(2.0, -1.0),
+            Point::new(2.0, 1.0),
+            LineColor::Black0,
+        );
+
+        let result = execute_command(
+            &mut document,
+            CreasePatternCommand::new(OperationId::LengthenCrease).with_payload(
+                CreasePatternCommandPayload {
+                    line_ids: vec![1, 2],
+                    line_color: Some(LineColor::Blue2),
+                    selection_distance: Some(1.0),
+                    ..CreasePatternCommandPayload::default()
+                },
+            ),
+        )
+        .expect("line-id lengthen should execute");
+
+        assert_eq!(result.status, OperationStatus::OracleTested);
+        assert_eq!(result.diagnostics, vec!["Changed 1 line(s)"]);
+        assert!(
+            document
+                .crease_pattern
+                .line_segments
+                .iter()
+                .any(|segment| segment.a == Point::new(2.0, 0.0)
+                    && segment.b == Point::new(1.0, 0.0)
+                    && segment.color == LineColor::Blue2)
         );
     }
 

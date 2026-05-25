@@ -2264,7 +2264,7 @@ describe('CreasePatternPanel', () => {
     );
   });
 
-  it('runs ready lengthen CP commands with three resolved model points and current color', async () => {
+  it('runs ready lengthen CP commands by clicking source and target lines', async () => {
     const executeOristudioCpCommand = vi.fn(
       async (_operationId: string, _payload?: OristudioCpCommandPayload) => true
     );
@@ -2280,35 +2280,34 @@ describe('CreasePatternPanel', () => {
       },
       executeOristudioCpCommand,
     });
-    const canvas = setCanvasClientRect(container);
 
     await act(async () => {
       container.querySelector<HTMLButtonElement>('button[aria-label="Extend Line"]')?.click();
       await Promise.resolve();
     });
+    expect(container.textContent).toContain('Extend Line: Select line to extend');
 
-    for (const [clientX, clientY] of [
-      [360, 348],
-      [477.6, 348],
-      [477.6, 230.4],
-    ]) {
-      await act(async () => {
-        canvas.dispatchEvent(
-          new MouseEvent('pointerdown', {
-            bubbles: true,
-            button: 0,
-            clientX,
-            clientY,
-          })
-        );
-        await Promise.resolve();
-      });
-    }
+    await act(async () => {
+      container.querySelector<SVGLineElement>('[data-cp-line-id="1"]')?.dispatchEvent(
+        new MouseEvent('click', { bubbles: true })
+      );
+      await Promise.resolve();
+    });
+    expect(executeOristudioCpCommand).not.toHaveBeenCalled();
+    expect(container.textContent).toContain('Extend Line: Select target line');
+
+    await act(async () => {
+      container.querySelector<SVGLineElement>('[data-cp-line-id="2"]')?.dispatchEvent(
+        new MouseEvent('click', { bubbles: true })
+      );
+      await Promise.resolve();
+    });
 
     expect(executeOristudioCpCommand).toHaveBeenCalledOnce();
     const [operation, payload] = executeOristudioCpCommand.mock.calls[0] ?? [];
     expect(operation).toBe('LengthenCrease');
-    expect(payload?.points).toHaveLength(3);
+    expect(payload?.line_ids).toEqual([1, 2]);
+    expect(payload?.points).toBeUndefined();
     expect(payload?.line_color).toBe('Red1');
     expect(payload?.selection_distance).toBeGreaterThan(0);
   });

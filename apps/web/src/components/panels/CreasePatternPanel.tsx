@@ -347,6 +347,10 @@ function isLineClickSelectionOperation(operationId: string | null | undefined): 
   return operationId === 'CreaseSelect' || operationId === 'CreaseUnselect';
 }
 
+function isLengthenCreaseOperation(operationId: string | null | undefined): boolean {
+  return operationId === 'LengthenCrease' || operationId === 'LengthenCreaseSameColor';
+}
+
 function allowsDirectEntitySelection(operationId: string | null | undefined): boolean {
   return operationId === 'CreaseSelect';
 }
@@ -639,6 +643,7 @@ export function CreasePatternPanel() {
   );
   const [cpToolPoints, setCpToolPoints] = useState<Point[]>([]);
   const [cpToolPath, setCpToolPath] = useState<Point[]>([]);
+  const [pendingLengthenLineId, setPendingLengthenLineId] = useState<number | null>(null);
   const [cpMeasurementSlots, setCpMeasurementSlots] = useState<CpMeasurementSlots>(
     createEmptyCpMeasurementSlots
   );
@@ -913,6 +918,7 @@ export function CreasePatternPanel() {
 
   const handleCpToolAction = useCallback(
     (action: OristudioCpActionDefinition) => {
+      setPendingLengthenLineId(null);
       if (action.kind === 'line-type') {
         setActiveCpLineColor(action.lineColor);
         return;
@@ -1255,6 +1261,12 @@ export function CreasePatternPanel() {
         isLineClickSelectionOperation(activeCpCommand.operationId) &&
         isCpLineEventTarget(event.target)
       ) {
+        return;
+      }
+      if (isLengthenCreaseOperation(activeCpCommand.operationId)) {
+        if (isCpLineEventTarget(event.target)) return;
+        event.preventDefault();
+        event.stopPropagation();
         return;
       }
       if (
@@ -1676,6 +1688,49 @@ export function CreasePatternPanel() {
       if (
         activeCpCommand?.uiStatus === 'ready' &&
         cpToolState.phase === 'active' &&
+        isLengthenCreaseOperation(activeCpCommand.operationId)
+      ) {
+        setCpToolPoints([]);
+        setCpToolPath([]);
+        if (pendingLengthenLineId === null) {
+          setPendingLengthenLineId(id);
+          setCpToolState((state) =>
+            state.activeOperationId === activeCpCommand.operationId
+              ? transitionOristudioCpToolState(state, { type: 'advanceStep' })
+              : state
+          );
+          return;
+        }
+
+        const lineIds = [pendingLengthenLineId, id];
+        setPendingLengthenLineId(null);
+        void (async () => {
+          const succeeded = await executeOristudioCpCommand(
+            activeCpCommand.operationId,
+            buildCpCommandPayload(activeCpCommand, {
+              line_ids: lineIds,
+            })
+          );
+          setCpToolState((state) =>
+            state.activeOperationId === activeCpCommand.operationId
+              ? transitionOristudioCpToolState(
+                  state,
+                  succeeded
+                    ? { type: 'commit' }
+                    : {
+                        type: 'commandError',
+                        message: useWorkspaceStore.getState().oristudioCpError ?? 'Command failed',
+                      }
+                )
+              : state
+          );
+        })();
+        return;
+      }
+
+      if (
+        activeCpCommand?.uiStatus === 'ready' &&
+        cpToolState.phase === 'active' &&
         isLineClickSelectionOperation(activeCpCommand.operationId)
       ) {
         setCpToolPoints([]);
@@ -1717,6 +1772,7 @@ export function CreasePatternPanel() {
       buildCpCommandPayload,
       cpToolState.phase,
       executeOristudioCpCommand,
+      pendingLengthenLineId,
       toggleOristudioCpLineSelection,
     ]
   );
@@ -1952,6 +2008,7 @@ export function CreasePatternPanel() {
           event.preventDefault();
           setCpToolPoints([]);
           setCpToolPath([]);
+          setPendingLengthenLineId(null);
           cpToolDragRef.current = null;
           setCpToolState(cancellation.state);
           return;
@@ -2024,6 +2081,7 @@ export function CreasePatternPanel() {
     if (!editableCp) {
       setCpToolPoints([]);
       setCpToolPath([]);
+      setPendingLengthenLineId(null);
       cpToolDragRef.current = null;
       setCpToolState(IDLE_ORISTUDIO_CP_TOOL_STATE);
     }

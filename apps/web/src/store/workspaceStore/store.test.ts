@@ -346,6 +346,30 @@ function foldArtifactsFromFold(fold: FoldDocument): FoldArtifacts {
   };
 }
 
+const editableCpFoldText = JSON.stringify({
+  file_spec: 1.2,
+  frame_classes: ['creasePattern'],
+  vertices_coords: [
+    [0, 0],
+    [1, 0],
+    [1, 1],
+    [0, 1],
+  ],
+  edges_vertices: [
+    [0, 1],
+    [1, 2],
+    [2, 3],
+    [3, 0],
+    [0, 2],
+  ],
+  edges_assignment: ['B', 'B', 'B', 'B', 'M'],
+  edges_foldAngle: [null, null, null, null, -180],
+  faces_vertices: [
+    [0, 1, 2],
+    [0, 2, 3],
+  ],
+});
+
 function nextId<T extends { id: number }>(items: T[]): number {
   return Math.max(0, ...items.map((item) => item.id)) + 1;
 }
@@ -880,7 +904,7 @@ function resetStores(snapshot = makeSnapshot()) {
     .mockResolvedValue('1 0 0 1 0\n');
   oristudioCpMocks.exportOristudioCpDocumentAsFold
     .mockReset()
-    .mockResolvedValue('{"file_spec":1.1}');
+    .mockResolvedValue(editableCpFoldText);
   oristudioCpMocks.setOristudioCpDocumentSource.mockReset();
   oristudioCpMocks.loadOristudioCpDocumentFromText
     .mockReset()
@@ -1259,7 +1283,7 @@ describe('workspace store slices', () => {
     expect(fileService.saveTextFile).toHaveBeenLastCalledWith(
       expect.objectContaining({
         title: 'Export FOLD Document',
-        contents: '{"file_spec":1.1}',
+        contents: editableCpFoldText,
         extensions: ['fold'],
       })
     );
@@ -1285,7 +1309,7 @@ describe('workspace store slices', () => {
   });
 
   it('passes selected editable CP line IDs into kernel commands and keeps stable color selections', async () => {
-    resetStores(seedSnapshot());
+    const api = resetStores(seedSnapshot());
     await useWorkspaceStore.getState().loadCreasePatternText('1 0 0 1 0\n2 0 0 0 1', {
       filename: 'lines.cp',
       path: '/tmp/lines.cp',
@@ -1348,6 +1372,12 @@ describe('workspace store slices', () => {
     );
     expect(useWorkspaceStore.getState().oristudioCpSelection.lines).toEqual([1, 2]);
     expect(useWorkspaceStore.getState().dirty).toBe(true);
+    expect(oristudioCpMocks.exportOristudioCpDocumentAsFold).toHaveBeenCalledOnce();
+    expect(api.flatFoldArtifacts).toHaveBeenCalledTimes(2);
+    expect(api.flatFoldArtifacts).toHaveBeenLastCalledWith(editableCpFoldText, {
+      solution_limit: 10,
+    });
+    expect(useWorkspaceStore.getState().foldArtifacts?.folded_base?.facets).toHaveLength(2);
   });
 
   it('refreshes always-on CAMV diagnostics after editable CP mutations', async () => {

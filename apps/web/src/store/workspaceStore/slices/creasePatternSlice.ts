@@ -15,6 +15,7 @@ import {
   projectStateFromSnapshot,
   type EngineClient,
 } from '../engineRuntime';
+import { exportOristudioCpDocumentAsFold } from '../oristudioCpRuntime';
 import type { CreasePatternSlice, WorkspaceSliceCreator } from '../types';
 import type { WorkspaceCapabilityId } from '../../../lib/workspaceCapabilities';
 
@@ -33,7 +34,43 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
   }
 
   async function loadFoldArtifacts(): Promise<FoldArtifacts | null> {
-    if (get().documentMode === 'crease-pattern') return get().foldArtifacts;
+    if (get().documentMode === 'crease-pattern') {
+      if (!get().oristudioCpDocument) return get().foldArtifacts;
+      set({
+        foldArtifacts: null,
+        foldArtifactError: null,
+        sequenceTarget: null,
+        sequencePlan: null,
+        sequenceSimulationFocus: wholeSimulationFocus,
+        sequenceError: null,
+      });
+      try {
+        const [api, foldJson] = await Promise.all([
+          getEngine(),
+          exportOristudioCpDocumentAsFold(),
+        ]);
+        const foldArtifacts = await api.flatFoldArtifacts(foldJson, { solution_limit: 10 });
+        set({
+          foldArtifacts,
+          foldArtifactError: foldArtifacts.folded_base_error ?? null,
+          sequenceTarget: null,
+          sequencePlan: null,
+          sequenceSimulationFocus: wholeSimulationFocus,
+          sequenceError: null,
+        });
+        return foldArtifacts;
+      } catch (error) {
+        set({
+          foldArtifacts: null,
+          foldArtifactError: engineError(error).message,
+          sequenceTarget: null,
+          sequencePlan: null,
+          sequenceSimulationFocus: wholeSimulationFocus,
+          sequenceError: null,
+        });
+        return null;
+      }
+    }
     try {
       const { api, treeHandle } = await requireActiveTree();
       const foldArtifacts = await api.foldArtifacts(treeHandle);

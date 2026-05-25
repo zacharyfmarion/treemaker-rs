@@ -1,30 +1,43 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Layers3, RefreshCw } from 'lucide-react';
+import { Eye, GitBranch, Layers3 } from 'lucide-react';
 import type { FoldedBaseSnapshot, FoldedBaseVertex } from '../../engine/types';
 import { useWorkspaceStore } from '../../store/workspaceStore';
-import { useWorkspaceCapabilities } from '../../store/workspaceStore/useWorkspaceCapabilities';
 import { IconButton } from '../ui/IconButton';
 import { NextDocumentAction } from './NextDocumentAction';
 
 const VIEWBOX = 720;
 const PADDING = 62;
 
+interface FoldedBaseViewOptions {
+  wireframe: boolean;
+  translucent: boolean;
+}
+
 export function FoldedBasePanel() {
   const creaseCount = useWorkspaceStore((state) => state.project.creases.length);
   const status = useWorkspaceStore((state) => state.status);
   const documentMode = useWorkspaceStore((state) => state.documentMode);
+  const editableCpDocument = useWorkspaceStore((state) => state.oristudioCpDocument?.document ?? null);
   const foldArtifacts = useWorkspaceStore((state) => state.foldArtifacts);
   const foldArtifactError = useWorkspaceStore((state) => state.foldArtifactError);
   const refreshFoldArtifacts = useWorkspaceStore((state) => state.refreshFoldArtifacts);
-  const capabilities = useWorkspaceCapabilities();
   const [loading, setLoading] = useState(false);
+  const [viewOptions, setViewOptions] = useState<FoldedBaseViewOptions>({
+    wireframe: false,
+    translucent: false,
+  });
 
   const foldedBase = foldArtifacts?.folded_base ?? null;
   const foldedBaseError = foldArtifacts?.folded_base_error ?? foldArtifactError;
-  const refreshCapability = capabilities['foldedBase.refresh'];
 
   useEffect(() => {
-    if (documentMode !== 'tree' || creaseCount === 0 || foldArtifacts) return;
+    const needsTreeArtifacts = documentMode === 'tree' && creaseCount > 0 && !foldArtifacts;
+    const needsEditableCpArtifacts =
+      documentMode === 'crease-pattern' &&
+      editableCpDocument !== null &&
+      !foldArtifacts &&
+      !foldedBaseError;
+    if (!needsTreeArtifacts && !needsEditableCpArtifacts) return;
     let cancelled = false;
     setLoading(true);
     void refreshFoldArtifacts().finally(() => {
@@ -33,15 +46,22 @@ export function FoldedBasePanel() {
     return () => {
       cancelled = true;
     };
-  }, [creaseCount, documentMode, foldArtifacts, refreshFoldArtifacts]);
+  }, [
+    creaseCount,
+    documentMode,
+    editableCpDocument,
+    foldArtifacts,
+    foldedBaseError,
+    refreshFoldArtifacts,
+  ]);
 
-  const statusLabel =
-    creaseCount === 0
+  const emptyStatus =
+    documentMode === 'tree' && creaseCount === 0
       ? status === 'building_crease_pattern'
         ? 'Building crease pattern'
         : 'No crease pattern'
       : loading
-        ? 'Loading'
+        ? 'Updating folded base'
         : foldedBase
           ? `${foldedBase.vertices.length} vertices | ${foldedBase.facets.length} facets`
           : shortStatus(foldedBaseError ?? 'Folded base unavailable');
@@ -53,28 +73,49 @@ export function FoldedBasePanel() {
           <Layers3 size={14} />
           <span className="panel-title">Folded Base</span>
         </div>
-        <div className="panel-toolbar__group">
-          <span className="panel-toolbar__meta">{statusLabel}</span>
-          <IconButton
-            size="sm"
-            title="Refresh"
-            tooltipSide="bottom"
-            onClick={() => {
-              setLoading(true);
-              void refreshFoldArtifacts().finally(() => setLoading(false));
-            }}
-            disabled={!refreshCapability.enabled}
-          >
-            <RefreshCw size={14} />
-          </IconButton>
-        </div>
+        {foldedBase && (
+          <div className="panel-toolbar__group">
+            <div className="folded-base-view-controls" aria-label="Folded base view options">
+              <IconButton
+                size="sm"
+                variant="toolbar"
+                title="Wireframe"
+                tooltipSide="bottom"
+                isActive={viewOptions.wireframe}
+                onClick={() =>
+                  setViewOptions((current) => ({
+                    ...current,
+                    wireframe: !current.wireframe,
+                  }))
+                }
+              >
+                <GitBranch size={14} />
+              </IconButton>
+              <IconButton
+                size="sm"
+                variant="toolbar"
+                title="Translucent Layers"
+                tooltipSide="bottom"
+                isActive={viewOptions.translucent}
+                onClick={() =>
+                  setViewOptions((current) => ({
+                    ...current,
+                    translucent: !current.translucent,
+                  }))
+                }
+              >
+                <Eye size={14} />
+              </IconButton>
+            </div>
+          </div>
+        )}
       </div>
       <div className="panel-body folded-base-panel__body">
         {foldedBase ? (
-          <FoldedBaseSvg snapshot={foldedBase} />
+          <FoldedBaseSvg snapshot={foldedBase} viewOptions={viewOptions} />
         ) : (
           <div className="folded-base-panel__empty">
-            <span title={foldedBaseError ?? undefined}>{statusLabel}</span>
+            <span title={foldedBaseError ?? undefined}>{emptyStatus}</span>
             {documentMode === 'tree' && creaseCount === 0 && <NextDocumentAction />}
           </div>
         )}
@@ -83,7 +124,13 @@ export function FoldedBasePanel() {
   );
 }
 
-function FoldedBaseSvg({ snapshot }: { snapshot: FoldedBaseSnapshot }) {
+function FoldedBaseSvg({
+  snapshot,
+  viewOptions,
+}: {
+  snapshot: FoldedBaseSnapshot;
+  viewOptions: FoldedBaseViewOptions;
+}) {
   const projection = useMemo(() => createProjection(snapshot.vertices), [snapshot.vertices]);
   const verticesById = useMemo(
     () => new Map(snapshot.vertices.map((vertex) => [vertex.id, vertex])),
@@ -93,16 +140,20 @@ function FoldedBaseSvg({ snapshot }: { snapshot: FoldedBaseSnapshot }) {
     () => [...snapshot.facets].sort((a, b) => a.order - b.order || a.id - b.id),
     [snapshot.facets]
   );
+  const showCreases = viewOptions.wireframe;
+  const visibleCreases = showCreases
+    ? snapshot.creases
+    : snapshot.creases.filter((crease) => crease.fold === 3);
 
   return (
     <svg
       className="folded-base-canvas"
+      data-wireframe={viewOptions.wireframe || undefined}
+      data-translucent={viewOptions.translucent || undefined}
       viewBox={`0 0 ${VIEWBOX} ${VIEWBOX}`}
       role="img"
       aria-label="Folded base"
     >
-      <rect className="paper-shadow" x="48" y="46" width="624" height="624" rx="6" />
-      <rect className="folded-base-plane" x="54" y="54" width="612" height="612" />
       {facets.map((facet) => {
         const points = facet.vertices
           .map((id) => verticesById.get(id))
@@ -119,7 +170,7 @@ function FoldedBaseSvg({ snapshot }: { snapshot: FoldedBaseSnapshot }) {
           />
         );
       })}
-      {snapshot.creases.map((crease) => {
+      {visibleCreases.map((crease) => {
         const a = verticesById.get(crease.vertices[0]);
         const b = verticesById.get(crease.vertices[1]);
         if (!a || !b) return null;
@@ -128,7 +179,11 @@ function FoldedBaseSvg({ snapshot }: { snapshot: FoldedBaseSnapshot }) {
         return (
           <line
             key={crease.id}
-            className={`folded-base-crease folded-base-crease--fold-${crease.fold}`}
+            className={
+              showCreases
+                ? `folded-base-crease folded-base-crease--fold-${crease.fold}`
+                : 'folded-base-outline'
+            }
             x1={p1.x}
             y1={p1.y}
             x2={p2.x}
@@ -136,18 +191,23 @@ function FoldedBaseSvg({ snapshot }: { snapshot: FoldedBaseSnapshot }) {
           />
         );
       })}
-      {snapshot.vertices.map((vertex) => {
-        const point = projection(vertex);
-        return (
-          <circle
-            key={vertex.id}
-            className={vertex.is_border ? 'folded-base-vertex folded-base-vertex--border' : 'folded-base-vertex'}
-            cx={point.x}
-            cy={point.y}
-            r={vertex.is_border ? 3.2 : 2.4}
-          />
-        );
-      })}
+      {viewOptions.wireframe &&
+        snapshot.vertices.map((vertex) => {
+          const point = projection(vertex);
+          return (
+            <circle
+              key={vertex.id}
+              className={
+                vertex.is_border
+                  ? 'folded-base-vertex folded-base-vertex--border'
+                  : 'folded-base-vertex'
+              }
+              cx={point.x}
+              cy={point.y}
+              r={vertex.is_border ? 3.2 : 2.4}
+            />
+          );
+        })}
     </svg>
   );
 }

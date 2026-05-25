@@ -158,6 +158,7 @@ describe('DiagnosticsPanel', () => {
 
     expect(view.textContent).toContain('Check CAMV found 1 issue(s)');
     expect(view.textContent).toContain('Flat-foldability violation: Maekawa');
+    expect(view.textContent).not.toContain('(0, 0)');
     expect(view.textContent).toContain('Overlapping or contained non-auxiliary creases');
   });
 

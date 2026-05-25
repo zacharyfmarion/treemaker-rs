@@ -626,6 +626,9 @@ describe('CreasePatternPanel', () => {
     expect(selectLassoButton?.getAttribute('data-ui-status')).toBe('ready');
     expect(foldEstimateButton?.getAttribute('aria-disabled')).toBe('true');
     expect(foldEstimateButton?.getAttribute('data-ui-status')).toBe('porting');
+    expect(drawCreaseButton?.querySelector('.cp-tool-rail__glyph')?.textContent).toBe('\uE000');
+    expect(moveButton?.querySelector('.cp-tool-rail__glyph')?.textContent).toBe('\uE061');
+    expect(selectLassoButton?.querySelector('.cp-tool-rail__glyph')?.textContent).toBe('\uE07A');
     expect(container.querySelector('button[aria-label="Select crease"]')?.hasAttribute('data-active')).toBe(
       true
     );
@@ -1207,6 +1210,28 @@ describe('CreasePatternPanel', () => {
     expect(container.querySelector('.cp-diagnostic-hud')?.textContent).toContain(
       'Flat-foldability violation: Maekawa'
     );
+    expect(container.querySelector('.cp-diagnostic-hud')?.textContent).not.toContain('(0, 0)');
+    expect(container.querySelectorAll('.cp-diagnostic-hud__row')).toHaveLength(0);
+
+    act(() => {
+      container.querySelector<HTMLButtonElement>('.cp-diagnostic-hud__summary')?.click();
+    });
+
+    expect(
+      container
+        .querySelector<HTMLButtonElement>('.cp-diagnostic-hud__summary')
+        ?.getAttribute('aria-expanded')
+    ).toBe('true');
+    expect(container.querySelectorAll('.cp-diagnostic-hud__row')).toHaveLength(1);
+    expect(container.querySelector('.cp-diagnostic-hud__row')?.textContent).toContain(
+      'Maekawa/LBL'
+    );
+
+    act(() => {
+      container.querySelector<HTMLButtonElement>('.cp-diagnostic-hud__row')?.click();
+    });
+
+    expect(useWorkspaceStore.getState().oristudioCpActiveDiagnosticId).toBe('CheckCamv-1');
   });
 
   it('does not show the diagnostic HUD for ordinary edit command results', () => {

@@ -82,6 +82,7 @@ export interface ProjectSliceState {
 export interface ProjectSliceActions {
   initEngine: () => Promise<void>;
   createNewProject: () => Promise<void>;
+  createNewCreasePattern: () => Promise<void>;
   loadStarterProject: () => Promise<void>;
   loadProjectText: (
     text: string,

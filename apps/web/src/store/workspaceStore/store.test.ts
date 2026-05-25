@@ -39,6 +39,7 @@ const engineMocks = vi.hoisted(() => ({
 }));
 
 const oristudioCpMocks = vi.hoisted(() => ({
+  createBlankOristudioCpDocument: vi.fn(),
   executeOristudioCpCommand: vi.fn(),
   exportOristudioCpDocumentAsCp: vi.fn(),
   exportOristudioCpDocumentAsFold: vi.fn(),
@@ -74,6 +75,7 @@ vi.mock('./oristudioCpRuntime', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./oristudioCpRuntime')>();
   return {
     ...actual,
+    createBlankOristudioCpDocument: oristudioCpMocks.createBlankOristudioCpDocument,
     executeOristudioCpCommand: oristudioCpMocks.executeOristudioCpCommand,
     exportOristudioCpDocumentAsCp: oristudioCpMocks.exportOristudioCpDocumentAsCp,
     exportOristudioCpDocumentAsFold: oristudioCpMocks.exportOristudioCpDocumentAsFold,
@@ -864,6 +866,55 @@ function loadSnapshotIntoStore(snapshot: TreeSnapshot, title = 'Seed project') {
   });
 }
 
+function blankCpDocumentState(): OristudioCpDocumentState {
+  return {
+    handle: 4,
+    document: {
+      title: 'Untitled CP',
+      crease_pattern: {
+        line_segments: [],
+        circles: [],
+        points: [],
+        aux_line_segments: [],
+        texts: [],
+        grid: {
+          interval_grid_size: 4,
+          grid_size: 8,
+          grid_xa: 1,
+          grid_xb: 0,
+          grid_xc: 1,
+          grid_ya: 1,
+          grid_yb: 0,
+          grid_yc: 1,
+          grid_angle: 90,
+          base_state: 'WithinPaper',
+          vertical_scale_position: 0,
+          horizontal_scale_position: 0,
+          draw_diagonal_gridlines: false,
+        },
+      },
+      metadata: {},
+    },
+    summary: {
+      title: 'Untitled CP',
+      line_segments: 0,
+      circles: 0,
+      points: 0,
+      aux_line_segments: 0,
+      texts: 0,
+      can_save_as_cp: true,
+      is_empty: true,
+    },
+    source: {
+      format: 'cp',
+      filename: 'Untitled.cp',
+      path: null,
+    },
+    operationDescriptors: cpOperationDescriptors,
+    lastCommandResult: null,
+  };
+}
+
 function resetStores(snapshot = makeSnapshot()) {
   localStorage.clear();
   savedSnapshots.clear();
@@ -874,6 +925,9 @@ function resetStores(snapshot = makeSnapshot()) {
   oristudioCpMocks.getOristudioCpOperationDescriptors
     .mockReset()
     .mockResolvedValue(cpOperationDescriptors);
+  oristudioCpMocks.createBlankOristudioCpDocument
+    .mockReset()
+    .mockImplementation(async () => blankCpDocumentState());
   oristudioCpMocks.releaseOristudioCpDocument.mockReset().mockResolvedValue(undefined);
   oristudioCpMocks.exportOristudioCpDocumentAsCp
     .mockReset()
@@ -1051,6 +1105,7 @@ describe('workspace store slices', () => {
     expect(state.projectLoadId).toBe(0);
     expect(state.currentFileName).toBe('Untitled.tmd5');
     expect(state.createNewProject).toBeTypeOf('function');
+    expect(state.createNewCreasePattern).toBeTypeOf('function');
     expect(state.openProject).toBeTypeOf('function');
     expect(state.loadCreasePatternText).toBeTypeOf('function');
     expect(state.executeOristudioCpCommand).toBeTypeOf('function');
@@ -1158,6 +1213,35 @@ describe('workspace store slices', () => {
 
     useWorkspaceStore.getState().clearProjectMessage();
     expect(useWorkspaceStore.getState().projectMessage).toBeNull();
+  });
+
+  it('creates a blank editable CP document', async () => {
+    resetStores(seedSnapshot());
+    const activatePanel = vi.fn();
+    useLayoutStore.setState({ activatePanel });
+    useWorkspaceStore.setState({ engineReady: true, status: 'ready' });
+
+    await useWorkspaceStore.getState().createNewCreasePattern();
+
+    expect(oristudioCpMocks.releaseOristudioCpDocument).toHaveBeenCalledOnce();
+    expect(oristudioCpMocks.createBlankOristudioCpDocument).toHaveBeenCalledOnce();
+    expect(useWorkspaceStore.getState()).toMatchObject({
+      documentMode: 'crease-pattern',
+      currentFileName: 'Untitled.cp',
+      currentFilePath: null,
+      status: 'crease_pattern_ready',
+      dirty: false,
+      projectMessage: null,
+    });
+    expect(useWorkspaceStore.getState().project.title).toBe('Untitled CP');
+    expect(useWorkspaceStore.getState().oristudioCpDocument?.summary).toMatchObject({
+      is_empty: true,
+      line_segments: 0,
+      can_save_as_cp: true,
+    });
+    expect(useWorkspaceStore.getState().importedCreasePattern).toBeNull();
+    expect(useWorkspaceStore.getState().oristudioCpSelection).toEqual(emptyOristudioCpSelection());
+    expect(activatePanel).toHaveBeenCalledWith('crease-pattern');
   });
 
   it('loads CP-only documents and gates tree-only persistence', async () => {

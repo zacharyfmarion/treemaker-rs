@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { DockviewDefaultTab, DockviewReact } from 'dockview';
 import type { DockviewReadyEvent, IDockviewPanelHeaderProps } from 'dockview';
 import 'dockview/dist/styles/dockview.css';
@@ -19,6 +19,7 @@ import { GlobalToasts } from './components/GlobalToasts';
 import { HelpModal } from './components/HelpModal';
 import { SelectByIndexModal } from './components/SelectByIndexModal';
 import { SettingsModal } from './components/SettingsModal';
+import { StartScreen } from './components/StartScreen';
 import { TooltipProvider } from './components/ui/Tooltip';
 import { IconButton } from './components/ui/IconButton';
 import { Button } from './components/ui/Button';
@@ -140,13 +141,20 @@ function FixedDockTab(props: IDockviewPanelHeaderProps) {
 
 export default function App() {
   const initEngine = useWorkspaceStore((state) => state.initEngine);
+  const createNewCreasePattern = useWorkspaceStore((state) => state.createNewCreasePattern);
+  const createNewProject = useWorkspaceStore((state) => state.createNewProject);
+  const openProject = useWorkspaceStore((state) => state.openProject);
   const selectNone = useWorkspaceStore((state) => state.selectNone);
   const project = useWorkspaceStore((state) => state.project);
   const dirty = useWorkspaceStore((state) => state.dirty);
+  const status = useWorkspaceStore((state) => state.status);
+  const error = useWorkspaceStore((state) => state.error);
   const toasterTheme = useThemeStore((state) => state.currentTheme.type);
   const setDockviewApi = useLayoutStore((state) => state.setDockviewApi);
   const loadLayout = useLayoutStore((state) => state.loadLayout);
   const saveLayout = useLayoutStore((state) => state.saveLayout);
+  const [workspaceStarted, setWorkspaceStarted] = useState(false);
+  const [workspaceInitialPanel, setWorkspaceInitialPanel] = useState<string | null>(null);
 
   useTauriMenuListener();
 
@@ -238,26 +246,72 @@ export default function App() {
         applyDefaultLayout(api);
       }
 
+      if (workspaceInitialPanel) {
+        requestAnimationFrame(() => {
+          api.getPanel(workspaceInitialPanel)?.api.setActive();
+        });
+        setWorkspaceInitialPanel(null);
+      }
+
       let timer: ReturnType<typeof setTimeout> | null = null;
       api.onDidLayoutChange(() => {
         if (timer) clearTimeout(timer);
         timer = setTimeout(() => saveLayout(), 250);
       });
     },
-    [loadLayout, saveLayout, setDockviewApi]
+    [loadLayout, saveLayout, setDockviewApi, workspaceInitialPanel]
   );
+
+  const enterWorkspace = useCallback((panelId: string) => {
+    setWorkspaceInitialPanel(panelId);
+    setWorkspaceStarted(true);
+  }, []);
+
+  const handleCreateCreasePattern = useCallback(async () => {
+    await createNewCreasePattern();
+    if (useWorkspaceStore.getState().status !== 'error') {
+      enterWorkspace('crease-pattern');
+    }
+  }, [createNewCreasePattern, enterWorkspace]);
+
+  const handleCreateDesign = useCallback(async () => {
+    await createNewProject();
+    if (useWorkspaceStore.getState().status !== 'error') {
+      enterWorkspace('design');
+    }
+  }, [createNewProject, enterWorkspace]);
+
+  const handleOpenFile = useCallback(async () => {
+    const opened = await openProject();
+    if (!opened) return;
+    enterWorkspace(
+      useWorkspaceStore.getState().documentMode === 'crease-pattern' ? 'crease-pattern' : 'design'
+    );
+  }, [enterWorkspace, openProject]);
 
   return (
     <TooltipProvider>
-      <div className="app-layout">
-        <Toolbar />
-        <DockviewReact
-          components={panelComponents}
-          defaultTabComponent={FixedDockTab}
-          onReady={onReady}
-          className="dockview-theme-treemaker"
-          disableFloatingGroups
-        />
+      <div className={workspaceStarted ? 'app-layout' : 'app-layout app-layout--start'}>
+        {workspaceStarted ? (
+          <>
+            <Toolbar />
+            <DockviewReact
+              components={panelComponents}
+              defaultTabComponent={FixedDockTab}
+              onReady={onReady}
+              className="dockview-theme-treemaker"
+              disableFloatingGroups
+            />
+          </>
+        ) : (
+          <StartScreen
+            status={status}
+            errorMessage={error?.message ?? null}
+            onCreateCreasePattern={() => void handleCreateCreasePattern()}
+            onCreateDesign={() => void handleCreateDesign()}
+            onOpenFile={() => void handleOpenFile()}
+          />
+        )}
       </div>
       <HelpModal />
       <SelectByIndexModal />

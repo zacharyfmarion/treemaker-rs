@@ -96,6 +96,54 @@ export async function loadOristudioCpDocumentFromText(
   }
 }
 
+export async function createBlankOristudioCpDocument(
+  title = 'Untitled CP',
+  filename = 'Untitled.cp'
+): Promise<OristudioCpDocumentState> {
+  const api = await getOristudioCpClient();
+  const source = {
+    format: 'cp' as const,
+    filename,
+    path: null,
+  };
+  const nextHandle = await api.loadDocument({
+    title,
+    crease_pattern: {
+      line_segments: [],
+      circles: [],
+      points: [],
+      aux_line_segments: [],
+      texts: [],
+      grid: {
+        interval_grid_size: 4,
+        grid_size: 8,
+        grid_xa: 1,
+        grid_xb: 0,
+        grid_xc: 1,
+        grid_ya: 1,
+        grid_yb: 0,
+        grid_yc: 1,
+        grid_angle: 90,
+        base_state: 'WithinPaper',
+        vertical_scale_position: 0,
+        horizontal_scale_position: 0,
+        draw_diagonal_gridlines: false,
+      },
+    },
+    metadata: {},
+  });
+
+  try {
+    const nextState = await buildDocumentState(api, nextHandle, source, null);
+    await replaceHandle(api, nextHandle);
+    currentSource = source;
+    return nextState;
+  } catch (error) {
+    await api.freeDocument(nextHandle).catch(() => undefined);
+    throw error;
+  }
+}
+
 export async function refreshOristudioCpDocument(
   lastCommandResult: OristudioCpCommandResult | null = null
 ): Promise<OristudioCpDocumentState | null> {

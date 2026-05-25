@@ -36,6 +36,7 @@ import {
   executeOristudioCpCommand as executeRuntimeOristudioCpCommand,
   exportOristudioCpDocumentAsCp,
   exportOristudioCpDocumentAsFold,
+  createBlankOristudioCpDocument,
   getOristudioCpOperationDescriptors,
   loadOristudioCpDocumentFromText,
   oristudioCpError,
@@ -622,6 +623,54 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
         useLayoutStore.getState().activatePanel('design');
       } catch (error) {
         set({ status: 'error', error: engineError(error) });
+      }
+    },
+
+    createNewCreasePattern: async () => {
+      if (rejectDisabled('file.new')) return;
+      if (!(await confirmDiscardDirty(get().dirty))) return;
+      set({ status: 'loading_engine', error: null, projectMessage: null });
+      try {
+        await releaseOristudioCpDocument();
+        const documentState = await createBlankOristudioCpDocument();
+        set({
+          project: { ...createEmptyProject(), title: documentState.summary.title ?? 'Untitled CP' },
+          documentMode: 'crease-pattern',
+          importedCreasePattern: null,
+          oristudioCpDocument: documentState,
+          oristudioCpOperationDescriptors: documentState.operationDescriptors,
+          oristudioCpError: null,
+          oristudioCpCamvResult: null,
+          oristudioCpHistoryPast: [],
+          oristudioCpHistoryFuture: [],
+          projectLoadId: get().projectLoadId + 1,
+          currentFileName: documentState.source.filename,
+          currentFilePath: documentState.source.path,
+          projectMessage: null,
+          selection: { kind: 'tree' },
+          oristudioCpSelection: emptyOristudioCpSelection(),
+          oristudioCpActiveDiagnosticId: null,
+          toolMode: 'select',
+          symmetryAuthoringPairs: [],
+          creaseColorMode: DEFAULT_CREASE_COLOR_MODE,
+          foldArtifacts: null,
+          foldArtifactError: null,
+          sequenceTarget: null,
+          sequencePlan: null,
+          sequenceSimulationFocus: { kind: 'whole' },
+          sequencePlanning: false,
+          sequenceError: null,
+          status: 'crease_pattern_ready',
+          dirty: false,
+          engineReady: true,
+          lastOptimization: null,
+          historyPast: [],
+          historyFuture: [],
+          clipboardPasteCount: 0,
+        });
+        useLayoutStore.getState().activatePanel('crease-pattern');
+      } catch (error) {
+        set({ status: 'error', error: oristudioCpError(error) });
       }
     },
 

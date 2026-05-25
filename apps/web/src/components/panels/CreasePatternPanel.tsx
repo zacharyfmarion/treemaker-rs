@@ -728,12 +728,7 @@ export function CreasePatternPanel() {
     [editableCp]
   );
   const editableCpVertices = useMemo(() => getCpVertices(editableCp), [editableCp]);
-  const hasEditableCreasePattern =
-    !!editableCp &&
-    (editableCp.crease_pattern.line_segments.length > 0 ||
-      editableCp.crease_pattern.circles.length > 0 ||
-      editableCp.crease_pattern.points.length > 0 ||
-      editableCp.crease_pattern.texts.length > 0);
+  const hasEditableCreasePattern = !!editableCp;
   const hasCreasePattern =
     hasEditableCreasePattern || project.creases.length > 0 || project.facets.length > 0;
   const editableSelectionSize = cpSelectionSize(oristudioCpSelection);

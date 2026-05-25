@@ -715,6 +715,42 @@ describe('CreasePatternPanel', () => {
     expect(useWorkspaceStore.getState().oristudioCpViewport.snapToLines).toBe(false);
   });
 
+  it('renders Oriedita instructions in the CP context tool panel', () => {
+    const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
+      documentMode: 'crease-pattern',
+      importedCreasePattern: importedCpDocument(),
+      oristudioCpDocument: editableCpState(),
+    });
+
+    const panel = container.querySelector<HTMLElement>('.cp-context-panel');
+    expect(panel).not.toBeNull();
+    expect(panel?.textContent).toContain('Box Select');
+    expect(panel?.textContent).toContain('Instructions');
+    expect(panel?.textContent).toContain('Select lines by drawing a rectangle.');
+    expect(panel?.textContent).not.toContain('Line type');
+
+    act(() => {
+      container.querySelector<HTMLButtonElement>('.cp-context-panel__header')?.click();
+    });
+    expect(panel?.textContent).not.toContain('Select lines by drawing a rectangle.');
+
+    act(() => {
+      container.querySelector<HTMLButtonElement>('.cp-context-panel__header')?.click();
+    });
+    expect(panel?.textContent).toContain('Select lines by drawing a rectangle.');
+
+    act(() => {
+      container.querySelector<HTMLButtonElement>('button[aria-label="Rabbit Ear"]')?.click();
+    });
+
+    expect(panel?.textContent).toContain('Rabbit Ear');
+    expect(panel?.textContent).toContain('Draw lines toward inner center.');
+    expect(panel?.textContent).toContain('Select point A.');
+    expect(panel?.textContent).toContain('Three lines toward inner center are drawn.');
+    expect(panel?.textContent).toContain('Line type');
+    expect(panel?.textContent).toContain('Line M');
+  });
+
   it('opens contextual CP actions from menu requests with the current editable selection', async () => {
     const executeOristudioCpCommand = vi.fn(async () => true);
     const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {

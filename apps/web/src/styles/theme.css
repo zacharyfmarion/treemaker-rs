@@ -2948,7 +2948,46 @@
   min-width: 0;
 }
 
+.cp-context-panel__instructions {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  color: var(--text-secondary);
+  line-height: 1.35;
+}
+
+.cp-context-panel__instruction-copy,
+.cp-context-panel__instruction-notes {
+  display: grid;
+  gap: 5px;
+}
+
+.cp-context-panel__instruction-copy p,
+.cp-context-panel__instruction-notes p {
+  margin: 0;
+}
+
+.cp-context-panel__instruction-list {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.cp-context-panel__instruction-list li {
+  padding-left: 2px;
+}
+
+.cp-context-panel__instruction-notes {
+  color: var(--text-tertiary);
+}
+
 .cp-context-panel__group + .cp-context-panel__group {
+  padding-top: 8px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.cp-context-panel__instructions + .cp-context-panel__group {
   padding-top: 8px;
   border-top: 1px solid var(--border-subtle);
 }

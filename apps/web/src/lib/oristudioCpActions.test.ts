@@ -9,11 +9,12 @@ import {
 import { ORISTUDIO_CP_COMMANDS } from './oristudioCpCommands';
 
 describe('oristudio CP action registry', () => {
-  it('adds Oriedita line type actions before command actions', () => {
-    expect(ORISTUDIO_CP_ACTION_GROUPS.map((group) => group.id).slice(0, 3)).toEqual([
+  it('keeps Oriedita line type actions in the bottom toolbar', () => {
+    expect(ORISTUDIO_CP_ACTION_GROUPS.map((group) => group.id).slice(0, 4)).toEqual([
       'line-type',
       'select-edit',
       'draw',
+      'edit',
     ]);
     expect(ORISTUDIO_CP_LINE_TYPE_ACTIONS.map((action) => action.railLabel)).toEqual([
       'M',
@@ -28,6 +29,7 @@ describe('oristudio CP action registry', () => {
       'Cyan3',
     ]);
     expect(ORISTUDIO_CP_LINE_TYPE_ACTIONS.every((action) => action.placement === 'bottom-toolbar')).toBe(true);
+    expect(cpRailActions().some((action) => action.kind === 'line-type')).toBe(false);
   });
 
   it('keeps every operation-backed command reachable through an action', () => {
@@ -44,10 +46,84 @@ describe('oristudio CP action registry', () => {
     }
   });
 
-  it('models draw crease as a repeatable drag-line action', () => {
+  it('orders rail actions like Oriedita while exposing dropdown entries', () => {
+    expect(cpRailActions().slice(0, 14).map((action) => action.label)).toEqual([
+      'Box Select',
+      'Select Overlapping Lines',
+      'Polygon Select',
+      'Lasso Select',
+      'Box Deselect',
+      'Deselect Overlapping Lines',
+      'Polygon Deselect',
+      'Lasso Deselect',
+      'Line',
+      'Grid Restricted Line',
+      'Rabbit Ear',
+      'Flat Foldable Line',
+      'Extend Line',
+      'Perpendicular Line',
+    ]);
+
+    expect(cpRailActions().find((action) => action.kind === 'command' && action.operationId === 'DrawCreaseAngleRestricted5')).toMatchObject({
+      label: 'Angle Restricted Line',
+      upstreamAction: 'deg2Action',
+      upstreamMouseMode: 'DRAW_CREASE_ANGLE_RESTRICTED_5_37',
+    });
+    expect(cpRailActions().find((action) => action.kind === 'command' && action.operationId === 'AngleSystem')).toMatchObject({
+      label: 'Offset Restricted Line',
+      upstreamAction: 'deg3Action',
+      upstreamMouseMode: 'ANGLE_SYSTEM_16',
+    });
+    expect(cpRailActions().find((action) => action.kind === 'command' && action.operationId === 'DrawCreaseAngleRestricted')).toMatchObject({
+      label: 'Converging Lines',
+      upstreamAction: 'deg1Action',
+      upstreamMouseMode: 'DRAW_CREASE_ANGLE_RESTRICTED_13',
+    });
+    expect(cpRailActions().find((action) => action.kind === 'command' && action.operationId === 'FoldableLineInput')).toMatchObject({
+      label: 'Flat Foldable Line (extend)',
+      upstreamAction: 'foldableLinePlusGridInputAction',
+      upstreamMouseMode: 'FOLDABLE_LINE_INPUT_39',
+    });
+  });
+
+  it('keeps Oriedita mouse-mode edit tools in the sidebar', () => {
+    expect(
+      cpRailActions()
+        .filter((action) => action.group === 'edit')
+        .map((action) => ({
+          label: action.label,
+          upstreamAction: action.upstreamAction,
+          upstreamMouseMode: action.kind === 'command' ? action.upstreamMouseMode : undefined,
+        }))
+    ).toEqual([
+      {
+        label: 'Delete Point',
+        upstreamAction: 'vertexDeleteAction',
+        upstreamMouseMode: 'DELETE_POINT_15',
+      },
+      {
+        label: 'Delete any Vertex',
+        upstreamAction: 'v_del_ccAction',
+        upstreamMouseMode: 'VERTEX_DELETE_ON_CREASE_41',
+      },
+      {
+        label: 'Delete Coincident Lines',
+        upstreamAction: 'del_lAction',
+        upstreamMouseMode: 'CREASE_DELETE_OVERLAPPING_64',
+      },
+      {
+        label: 'Delete Overlapping Lines',
+        upstreamAction: 'del_l_XAction',
+        upstreamMouseMode: 'CREASE_DELETE_INTERSECTING_65',
+      },
+    ]);
+  });
+
+  it('models the Oriedita line tool as a repeatable drag-line action', () => {
     expect(cpActionById(DEFAULT_ORISTUDIO_CP_ACTION_ID)).toMatchObject({
       kind: 'command',
       operationId: 'CreaseSelect',
+      label: 'Box Select',
       inputMode: 'drag-box',
       repeatable: true,
     });
@@ -55,6 +131,7 @@ describe('oristudio CP action registry', () => {
     expect(cpActionById('cp.action.draw-crease')).toMatchObject({
       kind: 'command',
       operationId: 'DrawCreaseFree',
+      label: 'Line',
       inputMode: 'drag-line',
       repeatable: true,
       toolSteps: ['Drag crease endpoint'],

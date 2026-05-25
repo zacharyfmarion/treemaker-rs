@@ -64,14 +64,14 @@ describe('oristudio CP tool state', () => {
       activeActionId: 'cp.action.draw-crease',
       activeOperationId: 'DrawCreaseFree',
       phase: 'active',
-      prompt: 'Draw crease: Drag crease endpoint',
+      prompt: 'Line: Drag crease endpoint',
       stepIndex: 0,
     });
     expect(committed).toMatchObject({
       activeActionId: 'cp.action.draw-crease',
       activeOperationId: 'DrawCreaseFree',
       phase: 'active',
-      prompt: 'Draw crease: Drag crease endpoint',
+      prompt: 'Line: Drag crease endpoint',
       stepIndex: 0,
     });
   });

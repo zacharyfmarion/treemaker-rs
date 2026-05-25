@@ -67,6 +67,12 @@
   --leaf-radius-stroke: rgba(83, 105, 190, 0.48);
 }
 
+@font-face {
+  font-family: 'Oriedita Icons';
+  src: url('../assets/oriedita-icons.ttf') format('truetype');
+  font-display: block;
+}
+
 .ui-button {
   display: inline-flex;
   align-items: center;
@@ -1656,7 +1662,7 @@
 }
 
 .cp-panel__body--with-tools {
-  grid-template-columns: 86px minmax(0, 1fr);
+  grid-template-columns: 184px minmax(0, 1fr);
   place-items: stretch;
 }
 
@@ -1847,9 +1853,9 @@
 
 .cp-tool-rail__buttons {
   display: grid;
-  grid-template-columns: repeat(2, 32px);
+  grid-template-columns: repeat(4, 40px);
   justify-content: center;
-  gap: 3px;
+  gap: 4px;
 }
 
 .cp-tool-rail__button {
@@ -1857,13 +1863,14 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 30px;
+  width: 40px;
+  height: 38px;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
+  overflow: hidden;
 }
 
 .cp-tool-rail__button:hover,
@@ -1875,6 +1882,15 @@
 }
 
 .cp-tool-rail__button[aria-disabled='true'] {
+  color: var(--text-muted);
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.cp-tool-rail__button[aria-disabled='true']:hover,
+.cp-tool-rail__button[aria-disabled='true']:focus-visible {
+  border-color: transparent;
+  background: transparent;
   color: var(--text-muted);
 }
 
@@ -1922,29 +1938,32 @@
 }
 
 .cp-tool-rail__button-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
   line-height: 1;
+  pointer-events: none;
 }
 
-.cp-tool-rail__status-dot {
-  position: absolute;
-  right: 4px;
-  bottom: 4px;
-  width: 5px;
-  height: 5px;
-  border-radius: var(--radius-full);
-  background: var(--text-muted);
+.cp-tool-rail__oriedita-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-family: 'Oriedita Icons', sans-serif;
+  font-size: 23px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 1;
+  pointer-events: none;
+  transform: translateY(2px);
 }
 
-.cp-tool-rail__button[data-ui-status='ready'] .cp-tool-rail__status-dot {
-  background: var(--status-success);
-}
-
-.cp-tool-rail__button[data-ui-status='porting'] .cp-tool-rail__status-dot {
-  background: var(--status-warning);
-}
-
-.cp-tool-rail__button[data-ui-status='not-implemented'] .cp-tool-rail__status-dot {
-  background: var(--text-muted);
+.cp-tool-rail__button > svg {
+  pointer-events: none;
 }
 
 .design-canvas,
@@ -3008,7 +3027,46 @@
   min-width: 0;
 }
 
+.cp-context-panel__instructions {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  color: var(--text-secondary);
+  line-height: 1.35;
+}
+
+.cp-context-panel__instruction-copy,
+.cp-context-panel__instruction-notes {
+  display: grid;
+  gap: 5px;
+}
+
+.cp-context-panel__instruction-copy p,
+.cp-context-panel__instruction-notes p {
+  margin: 0;
+}
+
+.cp-context-panel__instruction-list {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.cp-context-panel__instruction-list li {
+  padding-left: 2px;
+}
+
+.cp-context-panel__instruction-notes {
+  color: var(--text-tertiary);
+}
+
 .cp-context-panel__group + .cp-context-panel__group {
+  padding-top: 8px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.cp-context-panel__instructions + .cp-context-panel__group {
   padding-top: 8px;
   border-top: 1px solid var(--border-subtle);
 }
@@ -3446,7 +3504,7 @@
   }
 
   .cp-panel__body--with-tools {
-    grid-template-columns: 72px minmax(0, 1fr);
+    grid-template-columns: 156px minmax(0, 1fr);
   }
 
   .cp-tool-rail__header {
@@ -3454,12 +3512,12 @@
   }
 
   .cp-tool-rail__buttons {
-    grid-template-columns: repeat(2, 28px);
+    grid-template-columns: repeat(4, 34px);
   }
 
   .cp-tool-rail__button {
-    width: 28px;
-    height: 28px;
+    width: 34px;
+    height: 32px;
   }
 }
 

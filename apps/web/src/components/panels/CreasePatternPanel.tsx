@@ -63,6 +63,10 @@ import {
   ratioHalvesFromExpression,
 } from '../../lib/oristudioCpToolSettings';
 import {
+  instructionsForCpTool,
+  type OristudioCpToolInstructions,
+} from '../../lib/oristudioCpToolInstructions';
+import {
   CP_PAPER_RECT,
   CP_PAPER_SHADOW_RECT,
   CP_VIEWBOX_SIZE,
@@ -349,6 +353,10 @@ function pointDistanceSquared(a: Point, b: Point): number {
 
 function isLineClickSelectionOperation(operationId: string | null | undefined): boolean {
   return operationId === 'CreaseSelect' || operationId === 'CreaseUnselect';
+}
+
+function isLengthenCreaseOperation(operationId: string | null | undefined): boolean {
+  return operationId === 'LengthenCrease' || operationId === 'LengthenCreaseSameColor';
 }
 
 function allowsDirectEntitySelection(operationId: string | null | undefined): boolean {
@@ -643,6 +651,7 @@ export function CreasePatternPanel() {
   );
   const [cpToolPoints, setCpToolPoints] = useState<Point[]>([]);
   const [cpToolPath, setCpToolPath] = useState<Point[]>([]);
+  const [pendingLengthenLineId, setPendingLengthenLineId] = useState<number | null>(null);
   const [cpMeasurementSlots, setCpMeasurementSlots] = useState<CpMeasurementSlots>(
     createEmptyCpMeasurementSlots
   );
@@ -923,6 +932,7 @@ export function CreasePatternPanel() {
 
   const handleCpToolAction = useCallback(
     (action: OristudioCpActionDefinition) => {
+      setPendingLengthenLineId(null);
       if (action.kind === 'line-type') {
         setActiveCpLineColor(action.lineColor);
         return;
@@ -1265,6 +1275,12 @@ export function CreasePatternPanel() {
         isLineClickSelectionOperation(activeCpCommand.operationId) &&
         isCpLineEventTarget(event.target)
       ) {
+        return;
+      }
+      if (isLengthenCreaseOperation(activeCpCommand.operationId)) {
+        if (isCpLineEventTarget(event.target)) return;
+        event.preventDefault();
+        event.stopPropagation();
         return;
       }
       if (
@@ -1686,6 +1702,49 @@ export function CreasePatternPanel() {
       if (
         activeCpCommand?.uiStatus === 'ready' &&
         cpToolState.phase === 'active' &&
+        isLengthenCreaseOperation(activeCpCommand.operationId)
+      ) {
+        setCpToolPoints([]);
+        setCpToolPath([]);
+        if (pendingLengthenLineId === null) {
+          setPendingLengthenLineId(id);
+          setCpToolState((state) =>
+            state.activeOperationId === activeCpCommand.operationId
+              ? transitionOristudioCpToolState(state, { type: 'advanceStep' })
+              : state
+          );
+          return;
+        }
+
+        const lineIds = [pendingLengthenLineId, id];
+        setPendingLengthenLineId(null);
+        void (async () => {
+          const succeeded = await executeOristudioCpCommand(
+            activeCpCommand.operationId,
+            buildCpCommandPayload(activeCpCommand, {
+              line_ids: lineIds,
+            })
+          );
+          setCpToolState((state) =>
+            state.activeOperationId === activeCpCommand.operationId
+              ? transitionOristudioCpToolState(
+                  state,
+                  succeeded
+                    ? { type: 'commit' }
+                    : {
+                        type: 'commandError',
+                        message: useWorkspaceStore.getState().oristudioCpError ?? 'Command failed',
+                      }
+                )
+              : state
+          );
+        })();
+        return;
+      }
+
+      if (
+        activeCpCommand?.uiStatus === 'ready' &&
+        cpToolState.phase === 'active' &&
         isLineClickSelectionOperation(activeCpCommand.operationId)
       ) {
         setCpToolPoints([]);
@@ -1727,6 +1786,7 @@ export function CreasePatternPanel() {
       buildCpCommandPayload,
       cpToolState.phase,
       executeOristudioCpCommand,
+      pendingLengthenLineId,
       toggleOristudioCpLineSelection,
     ]
   );
@@ -1966,6 +2026,7 @@ export function CreasePatternPanel() {
           event.preventDefault();
           setCpToolPoints([]);
           setCpToolPath([]);
+          setPendingLengthenLineId(null);
           cpToolDragRef.current = null;
           setCpToolState(cancellation.state);
           return;
@@ -2038,6 +2099,7 @@ export function CreasePatternPanel() {
     if (!editableCp) {
       setCpToolPoints([]);
       setCpToolPath([]);
+      setPendingLengthenLineId(null);
       cpToolDragRef.current = null;
       setCpToolState(IDLE_ORISTUDIO_CP_TOOL_STATE);
     }
@@ -2314,6 +2376,7 @@ export function CreasePatternPanel() {
               </ViewportToolbar>
               {editableCp && activeCpCommand && (
                 <CpContextToolPanel
+                  action={activeCpAction}
                   command={activeCpCommand}
                   options={cpToolOptions}
                   setOptions={setCpToolOptions}
@@ -2838,6 +2901,7 @@ function GeneratedCreasePattern({
 }
 
 function CpContextToolPanel({
+  action,
   command,
   options,
   setOptions,
@@ -2849,6 +2913,7 @@ function CpContextToolPanel({
   onClearInput,
   onDeleteText,
 }: {
+  action: OristudioCpActionDefinition | undefined;
   command: OristudioCpCommandDefinition;
   options: OristudioCpToolOptions;
   setOptions: Dispatch<SetStateAction<OristudioCpToolOptions>>;
@@ -2862,9 +2927,15 @@ function CpContextToolPanel({
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const groups = cpToolSettingGroupsForCommand(command);
+  const instructions = instructionsForCpTool(action, command);
   const applyDisabled = contextApplyDisabledForCommand(command, selection, pendingPointCount);
+  const title = action?.kind === 'command' ? action.label : command.label;
+  const meta =
+    groups.length > 0
+      ? `${groups.length} ${groups.length === 1 ? 'setting' : 'settings'}`
+      : 'Instructions';
 
-  if (groups.length === 0) return null;
+  if (groups.length === 0 && !instructions) return null;
 
   return (
     <section
@@ -2880,13 +2951,12 @@ function CpContextToolPanel({
         onClick={() => setCollapsed((current) => !current)}
       >
         {collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
-        <span className="cp-context-panel__title">{command.label}</span>
-        <span className="cp-context-panel__meta">
-          {groups.length} {groups.length === 1 ? 'setting' : 'settings'}
-        </span>
+        <span className="cp-context-panel__title">{title}</span>
+        <span className="cp-context-panel__meta">{meta}</span>
       </button>
       {!collapsed && (
         <div className="cp-context-panel__body">
+          {instructions && <CpContextToolInstructions instructions={instructions} />}
           {groups.map((group) => (
             <CpContextToolGroup
               key={group}
@@ -2932,6 +3002,37 @@ function CpContextToolPanel({
         </div>
       )}
     </section>
+  );
+}
+
+function CpContextToolInstructions({
+  instructions,
+}: {
+  instructions: OristudioCpToolInstructions;
+}) {
+  const hasIntro = (instructions.intro?.length ?? 0) > 0;
+  const hasSteps = (instructions.steps?.length ?? 0) > 0;
+  const hasNotes = (instructions.notes?.length ?? 0) > 0;
+
+  return (
+    <div className="cp-context-panel__instructions">
+      <div className="cp-context-panel__group-title">Instructions</div>
+      {hasIntro && (
+        <div className="cp-context-panel__instruction-copy">
+          {instructions.intro?.map((line) => <p key={line}>{line}</p>)}
+        </div>
+      )}
+      {hasSteps && (
+        <ol className="cp-context-panel__instruction-list">
+          {instructions.steps?.map((step) => <li key={step}>{step}</li>)}
+        </ol>
+      )}
+      {hasNotes && (
+        <div className="cp-context-panel__instruction-notes">
+          {instructions.notes?.map((note) => <p key={note}>{note}</p>)}
+        </div>
+      )}
+    </div>
   );
 }
 

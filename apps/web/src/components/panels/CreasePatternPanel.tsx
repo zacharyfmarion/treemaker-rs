@@ -361,6 +361,10 @@ function isLengthenCreaseOperation(operationId: string | null | undefined): bool
   return operationId === 'LengthenCrease' || operationId === 'LengthenCreaseSameColor';
 }
 
+function isSquareBisectorOperation(operationId: string | null | undefined): boolean {
+  return operationId === 'SquareBisector';
+}
+
 function allowsDirectEntitySelection(operationId: string | null | undefined): boolean {
   return operationId === 'CreaseSelect';
 }
@@ -654,6 +658,7 @@ export function CreasePatternPanel() {
   const [cpToolPoints, setCpToolPoints] = useState<Point[]>([]);
   const [cpToolPath, setCpToolPath] = useState<Point[]>([]);
   const [pendingLengthenLineId, setPendingLengthenLineId] = useState<number | null>(null);
+  const [pendingSquareBisectorLineIds, setPendingSquareBisectorLineIds] = useState<number[]>([]);
   const [cpMeasurementSlots, setCpMeasurementSlots] = useState<CpMeasurementSlots>(
     createEmptyCpMeasurementSlots
   );
@@ -821,6 +826,16 @@ export function CreasePatternPanel() {
       ? ([liveCommandPreviewPoints[0], liveCommandPreviewPoints[1]] as const)
       : null;
   const renderedCommandPreviewCircles = cpCommandPreview?.circles ?? [];
+  const activeCpToolPrompt =
+    isSquareBisectorOperation(activeCpCommand?.operationId) &&
+    cpToolState.phase === 'active' &&
+    cpToolPoints.length === 0
+      ? pendingSquareBisectorLineIds.length === 1
+        ? 'Angle Bisector: Select 2 lines'
+        : pendingSquareBisectorLineIds.length === 2
+          ? 'Angle Bisector: Select segment to end'
+          : cpToolState.prompt
+      : cpToolState.prompt;
   const lastCommandResult = oristudioCpDocument?.lastCommandResult ?? null;
   const camvDiagnosticEntries =
     oristudioCpCamvResult?.diagnostic_entries ?? EMPTY_DIAGNOSTIC_ENTRIES;
@@ -952,6 +967,7 @@ export function CreasePatternPanel() {
       const command = action.command;
       setCpToolPoints([]);
       setCpToolPath([]);
+      setPendingSquareBisectorLineIds([]);
       setCpCommandPreview(null);
       cpToolDragRef.current = null;
       setCpToolState((state) =>
@@ -1295,6 +1311,21 @@ export function CreasePatternPanel() {
         return;
       }
       if (
+        isSquareBisectorOperation(activeCpCommand.operationId) &&
+        isCpLineEventTarget(event.target) &&
+        (cpToolPoints.length === 0 || pendingSquareBisectorLineIds.length > 0)
+      ) {
+        return;
+      }
+      if (
+        isSquareBisectorOperation(activeCpCommand.operationId) &&
+        pendingSquareBisectorLineIds.length > 0
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+      if (
         allowsDirectEntitySelection(activeCpCommand.operationId) &&
         isCpSelectableEntityEventTarget(event.target)
       ) {
@@ -1516,6 +1547,7 @@ export function CreasePatternPanel() {
       executeOristudioCpCommand,
       oristudioCpSelection.circles,
       oristudioCpSelection.lines,
+      pendingSquareBisectorLineIds.length,
       resolveEditableDrawPoint,
       resolveEditableToolPoint,
       setOristudioCpSelection,
@@ -1789,15 +1821,61 @@ export function CreasePatternPanel() {
         return;
       }
 
+      if (
+        activeCpCommand?.uiStatus === 'ready' &&
+        cpToolState.phase === 'active' &&
+        isSquareBisectorOperation(activeCpCommand.operationId) &&
+        cpToolPoints.length === 0
+      ) {
+        setCpToolPath([]);
+        if (pendingSquareBisectorLineIds.length < 2) {
+          if (pendingSquareBisectorLineIds.includes(id)) return;
+          setPendingSquareBisectorLineIds((current) => [...current, id]);
+          setCpToolState((state) =>
+            state.activeOperationId === activeCpCommand.operationId
+              ? transitionOristudioCpToolState(state, { type: 'advanceStep' })
+              : state
+          );
+          return;
+        }
+
+        const lineIds = [...pendingSquareBisectorLineIds, id];
+        setPendingSquareBisectorLineIds([]);
+        void (async () => {
+          const succeeded = await executeOristudioCpCommand(
+            activeCpCommand.operationId,
+            buildCpCommandPayload(activeCpCommand, {
+              line_ids: lineIds,
+            })
+          );
+          setCpToolState((state) =>
+            state.activeOperationId === activeCpCommand.operationId
+              ? transitionOristudioCpToolState(
+                  state,
+                  succeeded
+                    ? { type: 'commit' }
+                    : {
+                        type: 'commandError',
+                        message: useWorkspaceStore.getState().oristudioCpError ?? 'Command failed',
+                      }
+                )
+              : state
+          );
+        })();
+        return;
+      }
+
       if (cpToolState.phase === 'active') return;
       toggleOristudioCpLineSelection(id, additive);
     },
     [
       activeCpCommand,
       buildCpCommandPayload,
+      cpToolPoints.length,
       cpToolState.phase,
       executeOristudioCpCommand,
       pendingLengthenLineId,
+      pendingSquareBisectorLineIds,
       toggleOristudioCpLineSelection,
     ]
   );
@@ -2038,6 +2116,7 @@ export function CreasePatternPanel() {
           setCpToolPoints([]);
           setCpToolPath([]);
           setPendingLengthenLineId(null);
+          setPendingSquareBisectorLineIds([]);
           cpToolDragRef.current = null;
           setCpToolState(cancellation.state);
           return;
@@ -2111,6 +2190,7 @@ export function CreasePatternPanel() {
       setCpToolPoints([]);
       setCpToolPath([]);
       setPendingLengthenLineId(null);
+      setPendingSquareBisectorLineIds([]);
       cpToolDragRef.current = null;
       setCpToolState(IDLE_ORISTUDIO_CP_TOOL_STATE);
     }
@@ -2308,6 +2388,7 @@ export function CreasePatternPanel() {
                         commandPreviewCircles={renderedCommandPreviewCircles}
                         commandPreviewPoints={renderedCommandPreviewPoints}
                         commandPreviewSegments={renderedCommandPreviewSegments}
+                        highlightedLineIds={pendingSquareBisectorLineIds}
                         activeDiagnosticId={oristudioCpActiveDiagnosticId}
                         diagnostics={latestDiagnosticEntries}
                         selectDiagnostic={handleSelectCpDiagnostic}
@@ -2416,7 +2497,7 @@ export function CreasePatternPanel() {
               )}
               <div className="viewport-status-readout">
                 <span>{formatZoom(zoomPercent / 100)}</span>
-                {editableCp && <span>{cpToolState.prompt}</span>}
+                {editableCp && <span>{activeCpToolPrompt}</span>}
                 {editableCp && <span>{cpLineTypeStatusLabel(activeCpLineColor)}</span>}
                 {editableCp && editableCpSummary && (
                   <span>{editableCpSummary.line_segments} lines</span>
@@ -2458,6 +2539,7 @@ interface EditableCreasePatternProps {
   commandPreviewPoints: Point[];
   commandPreviewSegments: OristudioCpLineSegment[];
   diagnostics: OristudioCpDiagnosticEntry[];
+  highlightedLineIds: number[];
   selectDiagnostic: (id: string) => void;
   selection: OristudioCpSelection;
   snapTarget: CpSnapTarget | null;
@@ -2484,6 +2566,7 @@ function EditableCreasePattern({
   commandPreviewPoints,
   commandPreviewSegments,
   diagnostics,
+  highlightedLineIds,
   selectDiagnostic,
   selection,
   snapTarget,
@@ -2535,7 +2618,9 @@ function EditableCreasePattern({
             <line
               className={[
                 cpLineColorClass(line.color, mode),
-                selection.lines.includes(id) ? 'crease--selected' : '',
+                selection.lines.includes(id) || highlightedLineIds.includes(id)
+                  ? 'crease--selected'
+                  : '',
               ].join(' ')}
               data-cp-line-id={id}
               x1={a.x}

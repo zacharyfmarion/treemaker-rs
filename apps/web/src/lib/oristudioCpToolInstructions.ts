@@ -14,8 +14,10 @@ const ORIEDITA_CP_TOOL_INSTRUCTIONS: Record<string, OristudioCpToolInstructions>
   angleBisectorAction: {
     intro: ['Draw angle bisector between lines or points.'],
     steps: [
-      'Select 2 lines or 3 points forming angle ABC.',
-      'Select a target line to extend to, or select the indicator to extend.',
+      'Select 2 segments or 3 points.',
+      '3-point method: select 3 points, then select segment to end.',
+      '2-line method: select 2 lines, then select segment to end.',
+      'Parallel line method: select segment/indicator to end.',
     ],
   },
   As100Action: {

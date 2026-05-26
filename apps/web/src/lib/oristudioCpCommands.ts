@@ -241,7 +241,12 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
     tooltip: 'Extend creases crossed by the guide line to the target crease',
   }),
   ready('SquareBisector', 'Square bisector', 'construct', 'square-dashed', 'MouseHandlerSquareBisector', {
-    toolSteps: ['Pick first point', 'Pick vertex point', 'Pick second point', 'Pick destination crease'],
+    toolSteps: [
+      'Select 2 segments or 3 points',
+      'Select 3 points',
+      'Select 3 points',
+      'Select segment to end',
+    ],
   }),
   ready('Inward', 'Inward fold line', 'construct', 'corner-down-left', 'MouseHandlerInward', {
     toolSteps: ['Pick first triangle point', 'Pick second triangle point', 'Pick third triangle point'],

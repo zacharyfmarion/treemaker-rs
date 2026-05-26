@@ -8,11 +8,13 @@ export type CreaseExportFormat = 'svg' | 'png';
 export interface CreaseExportOptions {
   viewMode: CreaseColorMode;
   includeUnassigned: boolean;
+  showBackgroundColor: boolean;
 }
 
 export const DEFAULT_CREASE_EXPORT_OPTIONS: CreaseExportOptions = {
   viewMode: 'mvf',
   includeUnassigned: true,
+  showBackgroundColor: true,
 };
 
 const FOLD_STYLES: Record<CreaseLine['fold'], string> = {
@@ -74,21 +76,23 @@ export function serializeCreasePatternSvg(
     y: offsetY + (paperHeight - p.y) * scale,
   });
 
-  const facets = project.facets
-    .map((facet) => {
-      const points = facet.vertices
-        .map(point)
-        .map((p) => `${p.x.toFixed(3)},${p.y.toFixed(3)}`)
-        .join(' ');
-      const fill =
-        facet.color === 'white'
-          ? 'rgba(125,183,232,0.18)'
-          : facet.color === 'color'
-            ? 'rgba(215,168,92,0.18)'
-            : 'rgba(95,179,165,0.12)';
-      return `  <polygon points="${points}" fill="${fill}" stroke="none"/>`;
-    })
-    .join('\n');
+  const facets = exportOptions.showBackgroundColor
+    ? project.facets
+        .map((facet) => {
+          const points = facet.vertices
+            .map(point)
+            .map((p) => `${p.x.toFixed(3)},${p.y.toFixed(3)}`)
+            .join(' ');
+          const fill =
+            facet.color === 'white'
+              ? 'rgba(125,183,232,0.18)'
+              : facet.color === 'color'
+                ? 'rgba(215,168,92,0.18)'
+                : 'rgba(95,179,165,0.12)';
+          return `  <polygon points="${points}" fill="${fill}" stroke="none"/>`;
+        })
+        .join('\n')
+    : '';
 
   const creases = project.creases
     .filter((crease) => exportOptions.includeUnassigned || !isUnassignedCrease(crease))
@@ -105,7 +109,7 @@ export function serializeCreasePatternSvg(
     '<?xml version="1.0" encoding="UTF-8"?>',
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${SIZE} ${SIZE}" role="img" aria-label="${esc(project.title)} crease pattern">`,
     '  <rect width="100%" height="100%" fill="#ffffff"/>',
-    `  <rect x="${offsetX.toFixed(3)}" y="${offsetY.toFixed(3)}" width="${width.toFixed(3)}" height="${height.toFixed(3)}" fill="#f8f5ec" stroke="#111417" stroke-width="3"/>`,
+    `  <rect x="${offsetX.toFixed(3)}" y="${offsetY.toFixed(3)}" width="${width.toFixed(3)}" height="${height.toFixed(3)}" fill="${exportOptions.showBackgroundColor ? '#f8f5ec' : '#ffffff'}" stroke="#111417" stroke-width="3"/>`,
     facets,
     creases,
     `  <rect x="${offsetX.toFixed(3)}" y="${offsetY.toFixed(3)}" width="${width.toFixed(3)}" height="${height.toFixed(3)}" fill="none" stroke="#111417" stroke-width="4"/>`,

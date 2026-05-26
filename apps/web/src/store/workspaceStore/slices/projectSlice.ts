@@ -215,6 +215,7 @@ function defaultCreaseExportOptions(viewMode: CreaseExportOptions['viewMode']): 
   return {
     viewMode,
     includeUnassigned: true,
+    showBackgroundColor: true,
   };
 }
 

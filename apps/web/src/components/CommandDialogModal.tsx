@@ -135,6 +135,21 @@ export function CommandDialogModal() {
                   aria-label="Include flat / unassigned creases"
                 />
               </div>
+              <div className="export-modal__toggle-row">
+                <div className="export-modal__toggle-copy">
+                  <span>Show background color</span>
+                </div>
+                <Toggle
+                  checked={options.showBackgroundColor}
+                  onChange={(showBackgroundColor) => {
+                    setExportOptions((current) => ({
+                      ...(current ?? options),
+                      showBackgroundColor,
+                    }));
+                  }}
+                  aria-label="Show background color"
+                />
+              </div>
             </div>
             <footer className="simple-modal__footer">
               <Button size="sm" variant="ghost" onClick={() => cancelCommandDialog(dialog.id)}>

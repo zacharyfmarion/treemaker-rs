@@ -108,6 +108,7 @@ describe('CommandDialogModal', () => {
     let result = Promise.resolve<CreaseExportOptions | null>({
       viewMode: 'mvf',
       includeUnassigned: true,
+      showBackgroundColor: true,
     });
 
     act(() => {
@@ -115,7 +116,7 @@ describe('CommandDialogModal', () => {
         title: 'Export SVG',
         format: 'svg',
         project: createSampleProject(),
-        initialOptions: { viewMode: 'mvf', includeUnassigned: true },
+        initialOptions: { viewMode: 'mvf', includeUnassigned: true, showBackgroundColor: true },
         confirmLabel: 'Export SVG',
       });
     });
@@ -123,14 +124,23 @@ describe('CommandDialogModal', () => {
     expect(rendered.querySelector('.export-modal__preview img')).not.toBeNull();
     await act(async () => {
       findButton('Crease roles').click();
-      (rendered.querySelector('[role="switch"]') as HTMLButtonElement).click();
+      (
+        rendered.querySelector(
+          '[aria-label="Include flat / unassigned creases"]'
+        ) as HTMLButtonElement
+      ).click();
+      (rendered.querySelector('[aria-label="Show background color"]') as HTMLButtonElement).click();
     });
     await act(async () => {
       findButton('Export SVG').click();
       await result;
     });
 
-    await expect(result).resolves.toEqual({ viewMode: 'agrh', includeUnassigned: false });
+    await expect(result).resolves.toEqual({
+      viewMode: 'agrh',
+      includeUnassigned: false,
+      showBackgroundColor: false,
+    });
   });
 
   it('cancels requests on Escape', async () => {

@@ -34,4 +34,19 @@ describe('crease pattern export', () => {
     expect(svg.match(/<line /g)).toHaveLength(4);
     expect(svg).not.toContain('stroke:#85919a');
   });
+
+  it('can hide background facet colors', () => {
+    const svg = serializeCreasePatternSvg(createSampleProject(), {
+      viewMode: 'mvf',
+      includeUnassigned: true,
+      showBackgroundColor: false,
+    });
+
+    expect(svg).toContain('fill="#ffffff" stroke="#111417" stroke-width="3"');
+    expect(svg).not.toContain('<polygon');
+    expect(svg).not.toContain('rgba(125,183,232,0.18)');
+    expect(svg).not.toContain('rgba(215,168,92,0.18)');
+    expect(svg).not.toContain('rgba(95,179,165,0.12)');
+    expect(svg).toContain('<line');
+  });
 });

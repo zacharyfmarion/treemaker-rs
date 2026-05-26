@@ -20,8 +20,8 @@ export function FoldedBasePanel() {
   const editableCpDocument = useWorkspaceStore((state) => state.oristudioCpDocument?.document ?? null);
   const foldArtifacts = useWorkspaceStore((state) => state.foldArtifacts);
   const foldArtifactError = useWorkspaceStore((state) => state.foldArtifactError);
-  const refreshFoldArtifacts = useWorkspaceStore((state) => state.refreshFoldArtifacts);
-  const [loading, setLoading] = useState(false);
+  const foldArtifactStatus = useWorkspaceStore((state) => state.foldArtifactStatus);
+  const ensureFoldArtifacts = useWorkspaceStore((state) => state.ensureFoldArtifacts);
   const [viewOptions, setViewOptions] = useState<FoldedBaseViewOptions>({
     wireframe: false,
     translucent: false,
@@ -31,28 +31,18 @@ export function FoldedBasePanel() {
   const foldedBaseError = foldArtifacts?.folded_base_error ?? foldArtifactError;
 
   useEffect(() => {
-    const needsTreeArtifacts = documentMode === 'tree' && creaseCount > 0 && !foldArtifacts;
+    const needsTreeArtifacts = documentMode === 'tree' && creaseCount > 0;
     const needsEditableCpArtifacts =
-      documentMode === 'crease-pattern' &&
-      editableCpDocument !== null &&
-      !foldArtifacts &&
-      !foldedBaseError;
+      documentMode === 'crease-pattern' && editableCpDocument !== null;
     if (!needsTreeArtifacts && !needsEditableCpArtifacts) return;
-    let cancelled = false;
-    setLoading(true);
-    void refreshFoldArtifacts().finally(() => {
-      if (!cancelled) setLoading(false);
-    });
-    return () => {
-      cancelled = true;
-    };
+    if (foldArtifactStatus !== 'idle' && foldArtifactStatus !== 'stale') return;
+    void ensureFoldArtifacts();
   }, [
     creaseCount,
     documentMode,
     editableCpDocument,
-    foldArtifacts,
-    foldedBaseError,
-    refreshFoldArtifacts,
+    ensureFoldArtifacts,
+    foldArtifactStatus,
   ]);
 
   const emptyStatus =
@@ -60,7 +50,7 @@ export function FoldedBasePanel() {
       ? status === 'building_crease_pattern'
         ? 'Building crease pattern'
         : 'No crease pattern'
-      : loading
+      : foldArtifactStatus === 'loading'
         ? 'Updating folded base'
         : foldedBase
           ? `${foldedBase.vertices.length} vertices | ${foldedBase.facets.length} facets`

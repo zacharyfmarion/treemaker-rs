@@ -1440,12 +1440,52 @@ describe('workspace store slices', () => {
     );
     expect(useWorkspaceStore.getState().oristudioCpSelection.lines).toEqual([1, 2]);
     expect(useWorkspaceStore.getState().dirty).toBe(true);
+    expect(useWorkspaceStore.getState().foldArtifactStatus).toBe('stale');
+    expect(useWorkspaceStore.getState().foldArtifacts).toBeNull();
+    expect(oristudioCpMocks.exportOristudioCpDocumentAsFold).not.toHaveBeenCalled();
+    expect(api.flatFoldArtifacts).toHaveBeenCalledOnce();
+
+    await expect(useWorkspaceStore.getState().ensureFoldArtifacts()).resolves.toBeTruthy();
+
     expect(oristudioCpMocks.exportOristudioCpDocumentAsFold).toHaveBeenCalledOnce();
     expect(api.flatFoldArtifacts).toHaveBeenCalledTimes(2);
     expect(api.flatFoldArtifacts).toHaveBeenLastCalledWith(editableCpFoldText, {
       solution_limit: 10,
     });
+    expect(useWorkspaceStore.getState().foldArtifactStatus).toBe('ready');
     expect(useWorkspaceStore.getState().foldArtifacts?.folded_base?.facets).toHaveLength(2);
+  });
+
+  it('surfaces demand-refresh flat-folder errors without leaving artifacts loading', async () => {
+    const api = resetStores(seedSnapshot());
+    await useWorkspaceStore.getState().loadCreasePatternText('1 0 0 1 0\n2 0 0 0 1', {
+      filename: 'lines.cp',
+      path: '/tmp/lines.cp',
+    });
+    const currentDocument = useWorkspaceStore.getState().oristudioCpDocument;
+    if (!currentDocument) throw new Error('expected editable CP document');
+    oristudioCpMocks.executeOristudioCpCommand.mockResolvedValueOnce({
+      ...currentDocument,
+      lastCommandResult: {
+        operation: 'CreaseMakeMountain',
+        status: 'OracleTested',
+        diagnostics: ['Changed 1 line'],
+      },
+    });
+
+    await expect(useWorkspaceStore.getState().executeOristudioCpCommand('CreaseMakeMountain')).resolves.toBe(
+      true
+    );
+    api.flatFoldArtifacts.mockRejectedValueOnce({
+      code: 'unsatisfied_component',
+      message: 'Layer ordering failed',
+    });
+
+    await expect(useWorkspaceStore.getState().ensureFoldArtifacts()).resolves.toBeNull();
+
+    expect(useWorkspaceStore.getState().foldArtifactStatus).toBe('error');
+    expect(useWorkspaceStore.getState().foldArtifactError).toBe('Layer ordering failed');
+    expect(useWorkspaceStore.getState().foldArtifacts).toBeNull();
   });
 
   it('refreshes always-on CAMV diagnostics after editable CP mutations', async () => {
@@ -1692,7 +1732,7 @@ describe('workspace store slices', () => {
   });
 
   it('restores editable CP snapshots and selections through undo and redo', async () => {
-    resetStores(seedSnapshot());
+    const api = resetStores(seedSnapshot());
     await useWorkspaceStore.getState().loadCreasePatternText('1 0 0 1 0', {
       filename: 'line.cp',
       path: '/tmp/line.cp',
@@ -1760,7 +1800,13 @@ describe('workspace store slices', () => {
     expect(useWorkspaceStore.getState().oristudioCpSelection.lines).toEqual([1]);
     expect(useWorkspaceStore.getState().oristudioCpCamvResult).toEqual(undoCamvResult);
     expect(useWorkspaceStore.getState().oristudioCpHistoryFuture).toHaveLength(1);
+    expect(useWorkspaceStore.getState().foldArtifactStatus).toBe('stale');
+    expect(useWorkspaceStore.getState().foldArtifacts).toBeNull();
     expect(useWorkspaceStore.getState().projectMessage).toBe('Undid CreaseMakeMountain');
+
+    await expect(useWorkspaceStore.getState().ensureFoldArtifacts()).resolves.toBeTruthy();
+    expect(api.flatFoldArtifacts).toHaveBeenCalledTimes(2);
+    expect(useWorkspaceStore.getState().foldArtifactStatus).toBe('ready');
 
     const redoCamvResult = camvErrorResult('CheckCamv-redo');
     oristudioCpMocks.executeOristudioCpCommand.mockResolvedValueOnce({
@@ -1778,7 +1824,13 @@ describe('workspace store slices', () => {
     expect(useWorkspaceStore.getState().oristudioCpSelection.lines).toEqual([1]);
     expect(useWorkspaceStore.getState().oristudioCpCamvResult).toEqual(redoCamvResult);
     expect(useWorkspaceStore.getState().oristudioCpHistoryPast).toHaveLength(1);
+    expect(useWorkspaceStore.getState().foldArtifactStatus).toBe('stale');
+    expect(useWorkspaceStore.getState().foldArtifacts).toBeNull();
     expect(useWorkspaceStore.getState().projectMessage).toBe('Redid CreaseMakeMountain');
+
+    await expect(useWorkspaceStore.getState().ensureFoldArtifacts()).resolves.toBeTruthy();
+    expect(api.flatFoldArtifacts).toHaveBeenCalledTimes(3);
+    expect(useWorkspaceStore.getState().foldArtifactStatus).toBe('ready');
   });
 
   it('saves imported FOLD documents as CP without overwriting the source FOLD path', async () => {
@@ -2333,6 +2385,39 @@ describe('workspace store slices', () => {
 
     useWorkspaceStore.getState().setCreaseColorMode('mvf');
     expect(useWorkspaceStore.getState().creaseColorMode).toBe('mvf');
+  });
+
+  it('ignores stale fold artifact responses after the source changes', async () => {
+    const api = resetStores(seedSnapshot());
+    const builtSnapshot = await api.buildCreasePattern();
+    loadSnapshotIntoStore(builtSnapshot);
+    const currentArtifacts = foldArtifactsFromSnapshot(builtSnapshot);
+    const staleArtifacts: FoldArtifacts = {
+      ...currentArtifacts,
+      folded_base_error: 'stale response',
+    };
+    let resolveStale: (artifacts: FoldArtifacts) => void = () => undefined;
+    const stalePromise = new Promise<FoldArtifacts>((resolve) => {
+      resolveStale = resolve;
+    });
+    api.foldArtifacts
+      .mockImplementationOnce(async () => stalePromise)
+      .mockResolvedValueOnce(currentArtifacts);
+
+    const staleRefresh = useWorkspaceStore.getState().ensureFoldArtifacts();
+    expect(useWorkspaceStore.getState().foldArtifactStatus).toBe('loading');
+
+    useWorkspaceStore.getState().markFoldSourceChanged();
+    await expect(useWorkspaceStore.getState().ensureFoldArtifacts()).resolves.toBe(
+      currentArtifacts
+    );
+    expect(useWorkspaceStore.getState().foldArtifactStatus).toBe('ready');
+
+    resolveStale(staleArtifacts);
+    await expect(staleRefresh).resolves.toBe(staleArtifacts);
+
+    expect(useWorkspaceStore.getState().foldArtifacts).toBe(currentArtifacts);
+    expect(useWorkspaceStore.getState().foldArtifactError).toBeNull();
   });
 
   it('plans a folding sequence from loaded fold artifacts', async () => {

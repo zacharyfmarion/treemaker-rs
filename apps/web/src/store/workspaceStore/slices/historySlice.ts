@@ -6,6 +6,7 @@ import {
   projectStateFromSnapshot,
   statusFromSnapshot,
 } from '../engineRuntime';
+import { staleFoldArtifactResourceState } from '../foldArtifactResource';
 import {
   executeOristudioCpCommand as executeRuntimeOristudioCpCommand,
   oristudioCpError,
@@ -148,6 +149,7 @@ export const createHistorySlice: WorkspaceSliceCreator<HistorySlice> = (set, get
             cpHistoryEntry(current.document, currentSelection, previous.label),
             ...get().oristudioCpHistoryFuture,
           ].slice(0, MAX_HISTORY),
+          ...staleFoldArtifactResourceState(get().foldArtifactRevision),
           historyBusy: false,
           projectMessage: `Undid ${previous.label}`,
         });
@@ -187,6 +189,7 @@ export const createHistorySlice: WorkspaceSliceCreator<HistorySlice> = (set, get
         dirty: true,
         projectMessage: `Undid ${previous.label}`,
         lastOptimization: null,
+        ...staleFoldArtifactResourceState(get().foldArtifactRevision),
       });
       void get().autosaveProject();
     } catch (error) {
@@ -212,6 +215,7 @@ export const createHistorySlice: WorkspaceSliceCreator<HistorySlice> = (set, get
             cpHistoryEntry(current.document, currentSelection, next.label),
           ].slice(-MAX_HISTORY),
           oristudioCpHistoryFuture: future.slice(1),
+          ...staleFoldArtifactResourceState(get().foldArtifactRevision),
           historyBusy: false,
           projectMessage: `Redid ${next.label}`,
         });
@@ -248,6 +252,7 @@ export const createHistorySlice: WorkspaceSliceCreator<HistorySlice> = (set, get
         dirty: true,
         projectMessage: `Redid ${next.label}`,
         lastOptimization: null,
+        ...staleFoldArtifactResourceState(get().foldArtifactRevision),
       });
       void get().autosaveProject();
     } catch (error) {

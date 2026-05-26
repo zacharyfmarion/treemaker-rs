@@ -9,6 +9,11 @@ import { DEFAULT_CREASE_COLOR_MODE } from '../../../lib/sampleProject';
 import { useLayoutStore } from '../../layoutStore';
 import { selectWorkspaceCapabilities } from '../capabilities';
 import {
+  emptyFoldArtifactResourceState,
+  readyFoldArtifactResourceState,
+  staleFoldArtifactResourceState,
+} from '../foldArtifactResource';
+import {
   engineError,
   ensureTreeHandle,
   getEngine,
@@ -24,6 +29,8 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
   get
 ) => {
   const wholeSimulationFocus = { kind: 'whole' as const };
+  let foldArtifactPromise: Promise<FoldArtifacts | null> | null = null;
+  let foldArtifactPromiseRevision: number | null = null;
 
   async function requireActiveTree() {
     const result = await ensureTreeHandle();
@@ -33,69 +40,133 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
     return result;
   }
 
-  async function loadFoldArtifacts(): Promise<FoldArtifacts | null> {
+  function hasFoldArtifactSource() {
+    const state = get();
+    if (state.documentMode === 'crease-pattern') return state.oristudioCpDocument !== null;
+    return state.project.creases.length > 0 || state.project.facets.length > 0;
+  }
+
+  function clearFoldArtifactSource() {
+    set({
+      ...emptyFoldArtifactResourceState(),
+      sequenceTarget: null,
+      sequencePlan: null,
+      sequenceSimulationFocus: wholeSimulationFocus,
+      sequencePlanning: false,
+      sequenceError: null,
+    });
+  }
+
+  async function computeFoldArtifacts(): Promise<FoldArtifacts | null> {
     if (get().documentMode === 'crease-pattern') {
-      if (!get().oristudioCpDocument) return get().foldArtifacts;
-      set({
-        foldArtifacts: null,
-        foldArtifactError: null,
-        sequenceTarget: null,
-        sequencePlan: null,
-        sequenceSimulationFocus: wholeSimulationFocus,
-        sequenceError: null,
-      });
-      try {
-        const [api, foldJson] = await Promise.all([
-          getEngine(),
-          exportOristudioCpDocumentAsFold(),
-        ]);
-        const foldArtifacts = await api.flatFoldArtifacts(foldJson, { solution_limit: 10 });
-        set({
-          foldArtifacts,
-          foldArtifactError: foldArtifacts.folded_base_error ?? null,
-          sequenceTarget: null,
-          sequencePlan: null,
-          sequenceSimulationFocus: wholeSimulationFocus,
-          sequenceError: null,
-        });
-        return foldArtifacts;
-      } catch (error) {
-        set({
-          foldArtifacts: null,
-          foldArtifactError: engineError(error).message,
-          sequenceTarget: null,
-          sequencePlan: null,
-          sequenceSimulationFocus: wholeSimulationFocus,
-          sequenceError: null,
-        });
-        return null;
-      }
+      if (!get().oristudioCpDocument) return null;
+      const [api, foldJson] = await Promise.all([
+        getEngine(),
+        exportOristudioCpDocumentAsFold(),
+      ]);
+      return api.flatFoldArtifacts(foldJson, { solution_limit: 10 });
     }
-    try {
-      const { api, treeHandle } = await requireActiveTree();
-      const foldArtifacts = await api.foldArtifacts(treeHandle);
-      set({
-        foldArtifacts,
-        foldArtifactError: null,
-        sequenceTarget: null,
-        sequencePlan: null,
-        sequenceSimulationFocus: wholeSimulationFocus,
-      });
-      return foldArtifacts;
-    } catch (error) {
-      set({
-        foldArtifacts: null,
-        foldArtifactError: engineError(error).message,
-        sequenceTarget: null,
-        sequencePlan: null,
-        sequenceSimulationFocus: wholeSimulationFocus,
-      });
+    const { api, treeHandle } = await requireActiveTree();
+    return api.foldArtifacts(treeHandle);
+  }
+
+  async function loadFoldArtifacts(force = false): Promise<FoldArtifacts | null> {
+    if (!hasFoldArtifactSource()) {
+      clearFoldArtifactSource();
       return null;
     }
+
+    const current = get();
+    const currentRevision = current.foldArtifactRevision;
+    if (
+      !force &&
+      current.foldArtifactStatus === 'ready' &&
+      current.foldArtifactResolvedRevision === currentRevision
+    ) {
+      return current.foldArtifacts;
+    }
+    if (
+      !force &&
+      current.foldArtifactStatus === 'error' &&
+      current.foldArtifactResolvedRevision === currentRevision
+    ) {
+      return null;
+    }
+    if (
+      !force &&
+      current.foldArtifactStatus === 'loading' &&
+      foldArtifactPromise &&
+      foldArtifactPromiseRevision === currentRevision
+    ) {
+      return foldArtifactPromise;
+    }
+
+    const requestId = current.foldArtifactRequestId + 1;
+    set({
+      foldArtifacts: null,
+      foldArtifactError: null,
+      foldArtifactStatus: 'loading',
+      foldArtifactResolvedRevision: null,
+      foldArtifactRequestId: requestId,
+      sequenceTarget: null,
+      sequencePlan: null,
+      sequenceSimulationFocus: wholeSimulationFocus,
+      sequencePlanning: false,
+      sequenceError: null,
+    });
+
+    foldArtifactPromiseRevision = currentRevision;
+    foldArtifactPromise = (async () => {
+      try {
+        const foldArtifacts = await computeFoldArtifacts();
+        const latest = get();
+        if (
+          foldArtifacts &&
+          latest.foldArtifactRevision === currentRevision &&
+          latest.foldArtifactRequestId === requestId
+        ) {
+          set({
+            ...readyFoldArtifactResourceState(foldArtifacts, currentRevision),
+            sequenceTarget: null,
+            sequencePlan: null,
+            sequenceSimulationFocus: wholeSimulationFocus,
+            sequencePlanning: false,
+            sequenceError: null,
+          });
+        }
+        return foldArtifacts;
+      } catch (error) {
+        const latest = get();
+        if (
+          latest.foldArtifactRevision === currentRevision &&
+          latest.foldArtifactRequestId === requestId
+        ) {
+          set({
+            foldArtifacts: null,
+            foldArtifactError: engineError(error).message,
+            foldArtifactStatus: 'error',
+            foldArtifactResolvedRevision: currentRevision,
+            sequenceTarget: null,
+            sequencePlan: null,
+            sequenceSimulationFocus: wholeSimulationFocus,
+            sequencePlanning: false,
+            sequenceError: null,
+          });
+        }
+        return null;
+      } finally {
+        if (foldArtifactPromiseRevision === currentRevision) {
+          foldArtifactPromise = null;
+          foldArtifactPromiseRevision = null;
+        }
+      }
+    })();
+
+    return foldArtifactPromise;
   }
 
   async function requireFoldForSequence(): Promise<FoldArtifacts | null> {
-    const foldArtifacts = get().foldArtifacts ?? (await loadFoldArtifacts());
+    const foldArtifacts = get().foldArtifacts ?? (await loadFoldArtifacts(false));
     if (!foldArtifacts) {
       set({
         sequencePlanning: false,
@@ -128,12 +199,7 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
         status: report.is_feasible ? 'optimized' : 'needs_optimization',
         error: null,
         lastOptimization: report,
-        foldArtifacts: null,
-        foldArtifactError: null,
-        sequenceTarget: null,
-        sequencePlan: null,
-        sequenceSimulationFocus: wholeSimulationFocus,
-        sequenceError: null,
+        ...staleFoldArtifactResourceState(get().foldArtifactRevision),
         dirty: true,
         projectMessage: label,
         designViewportFitRequestId: options.fitPaperView
@@ -153,8 +219,7 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
     oristudioCpActionRequest: null,
     oristudioCpActiveDiagnosticId: null,
     oristudioCpViewport: DEFAULT_ORISTUDIO_CP_VIEWPORT_OPTIONS,
-    foldArtifacts: null,
-    foldArtifactError: null,
+    ...emptyFoldArtifactResourceState(),
     sequenceTarget: null,
     sequencePlan: null,
     sequenceSimulationFocus: wholeSimulationFocus,
@@ -213,17 +278,18 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
               code: 'invalid_operation',
               message: 'Build CP completed but did not produce drawable crease-pattern geometry.',
             },
-            foldArtifacts: null,
-            foldArtifactError: null,
+            ...emptyFoldArtifactResourceState(),
             sequenceTarget: null,
             sequencePlan: null,
             sequenceSimulationFocus: wholeSimulationFocus,
+            sequencePlanning: false,
             sequenceError: null,
             projectMessage: null,
           });
           return;
         }
 
+        const artifactRevision = get().foldArtifactRevision + 1;
         let foldArtifactError: string | null = null;
         const foldArtifacts = await api.foldArtifacts(treeHandle).catch((error) => {
           foldArtifactError = engineError(error).message;
@@ -233,11 +299,19 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
           project,
           status: 'crease_pattern_ready',
           error: null,
-          foldArtifacts,
-          foldArtifactError,
+          ...(foldArtifacts
+            ? readyFoldArtifactResourceState(foldArtifacts, artifactRevision)
+            : {
+                foldArtifacts: null,
+                foldArtifactError: foldArtifactError ?? 'Fold artifacts unavailable',
+                foldArtifactStatus: 'error' as const,
+                foldArtifactRevision: artifactRevision,
+                foldArtifactResolvedRevision: artifactRevision,
+              }),
           sequenceTarget: null,
           sequencePlan: null,
           sequenceSimulationFocus: wholeSimulationFocus,
+          sequencePlanning: false,
           sequenceError: null,
           dirty: true,
           projectMessage: 'Built crease pattern',
@@ -250,17 +324,25 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
       }
     },
 
-    refreshFoldArtifacts: loadFoldArtifacts,
+    markFoldSourceChanged: () => {
+      set(staleFoldArtifactResourceState(get().foldArtifactRevision));
+    },
+
+    ensureFoldArtifacts: () => loadFoldArtifacts(false),
+
+    refreshFoldArtifacts: () => loadFoldArtifacts(true),
 
     analyzeSequenceTarget: async () => {
       set({ sequencePlanning: true, sequenceError: null });
       try {
         const foldArtifacts = await requireFoldForSequence();
         if (!foldArtifacts) return null;
+        const sourceRevision = get().foldArtifactResolvedRevision;
         const api = await getEngine();
         const target = await api.sequenceAnalyzeFold(JSON.stringify(foldArtifacts.fold), {
           solution_limit: 10,
         });
+        if (get().foldArtifactResolvedRevision !== sourceRevision) return null;
         set({ sequenceTarget: target, sequencePlanning: false, sequenceError: null });
         return target;
       } catch (error) {
@@ -275,6 +357,7 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
       try {
         const foldArtifacts = await requireFoldForSequence();
         if (!foldArtifacts) return null;
+        const sourceRevision = get().foldArtifactResolvedRevision;
         const api = await getEngine();
         const foldJson = JSON.stringify(foldArtifacts.fold);
         const { target, plan } = await api.sequencePlanFoldWithTarget(foldJson, {
@@ -282,6 +365,7 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
           max_steps: 64,
           max_states: 1024,
         });
+        if (get().foldArtifactResolvedRevision !== sourceRevision) return null;
         set({
           sequenceTarget: target,
           sequencePlan: plan,

@@ -24,6 +24,15 @@ describe('Oriedita CP tool instructions', () => {
     });
   });
 
+  it('uses Oriedita-style Angle Bisector line and point method instructions', () => {
+    expect(instructionsForOrieditaAction('angleBisectorAction')?.steps).toEqual([
+      'Select 2 segments or 3 points.',
+      '3-point method: select 3 points, then select segment to end.',
+      '2-line method: select 2 lines, then select segment to end.',
+      'Parallel line method: select segment/indicator to end.',
+    ]);
+  });
+
   it('resolves rail aliases by their upstream Oriedita action', () => {
     const railActions = cpRailActions();
 

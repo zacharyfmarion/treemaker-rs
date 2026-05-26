@@ -309,6 +309,41 @@ function editableCpStateWithCircleSet(): OristudioCpDocumentState {
   return state;
 }
 
+function editableCpStateWithAngleBisectorLines(): OristudioCpDocumentState {
+  const state = editableCpState();
+  state.summary.line_segments = 3;
+  state.document.crease_pattern.line_segments = [
+    {
+      a: { x: 0, y: 0 },
+      b: { x: 1, y: 0 },
+      active: 'Inactive0',
+      color: 'Red1',
+      selected: 0,
+      customized: 0,
+      customized_color: { red: 100, green: 200, blue: 200 },
+    },
+    {
+      a: { x: 0, y: 0 },
+      b: { x: 0, y: 1 },
+      active: 'Inactive0',
+      color: 'Blue2',
+      selected: 0,
+      customized: 0,
+      customized_color: { red: 100, green: 200, blue: 200 },
+    },
+    {
+      a: { x: 1, y: 0 },
+      b: { x: 1, y: 1 },
+      active: 'Inactive0',
+      color: 'Black0',
+      selected: 0,
+      customized: 0,
+      customized_color: { red: 100, green: 200, blue: 200 },
+    },
+  ];
+  return state;
+}
+
 function setCanvasClientRect(container: HTMLElement): SVGSVGElement {
   const canvas = container.querySelector<SVGSVGElement>('.cp-canvas');
   if (!canvas) throw new Error('expected CP canvas');
@@ -2439,6 +2474,73 @@ describe('CreasePatternPanel', () => {
     const [operation, payload] = executeOristudioCpCommand.mock.calls[0] ?? [];
     expect(operation).toBe('LengthenCrease');
     expect(payload?.line_ids).toEqual([1, 2]);
+    expect(payload?.points).toBeUndefined();
+    expect(payload?.line_color).toBe('Red1');
+    expect(payload?.selection_distance).toBeGreaterThan(0);
+  });
+
+  it('runs angle bisector two-line mode by highlighting selected lines before the destination line', async () => {
+    const executeOristudioCpCommand = vi.fn(
+      async (_operationId: string, _payload?: OristudioCpCommandPayload) => true
+    );
+    const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
+      documentMode: 'crease-pattern',
+      importedCreasePattern: importedCpDocument(),
+      oristudioCpDocument: editableCpStateWithAngleBisectorLines(),
+      oristudioCpViewport: {
+        gridVisible: true,
+        snapToGrid: false,
+        snapToVertices: false,
+        snapToLines: false,
+      },
+      executeOristudioCpCommand,
+    });
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('button[aria-label="Angle Bisector"]')?.click();
+      await Promise.resolve();
+    });
+    expect(container.textContent).toContain('Angle Bisector: Select 2 segments or 3 points');
+
+    await act(async () => {
+      const firstLine = container.querySelector<SVGLineElement>('[data-cp-line-id="1"]');
+      firstLine?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
+      firstLine?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+    expect(executeOristudioCpCommand).not.toHaveBeenCalled();
+    expect(
+      container
+        .querySelector<SVGLineElement>('[data-cp-line-id="1"]')
+        ?.classList.contains('crease--selected')
+    ).toBe(true);
+    expect(container.textContent).toContain('Angle Bisector: Select 2 lines');
+
+    await act(async () => {
+      const secondLine = container.querySelector<SVGLineElement>('[data-cp-line-id="2"]');
+      secondLine?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
+      secondLine?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+    expect(executeOristudioCpCommand).not.toHaveBeenCalled();
+    expect(
+      container
+        .querySelector<SVGLineElement>('[data-cp-line-id="2"]')
+        ?.classList.contains('crease--selected')
+    ).toBe(true);
+    expect(container.textContent).toContain('Angle Bisector: Select segment to end');
+
+    await act(async () => {
+      const destinationLine = container.querySelector<SVGLineElement>('[data-cp-line-id="3"]');
+      destinationLine?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
+      destinationLine?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    expect(executeOristudioCpCommand).toHaveBeenCalledOnce();
+    const [operation, payload] = executeOristudioCpCommand.mock.calls[0] ?? [];
+    expect(operation).toBe('SquareBisector');
+    expect(payload?.line_ids).toEqual([1, 2, 3]);
     expect(payload?.points).toBeUndefined();
     expect(payload?.line_color).toBe('Red1');
     expect(payload?.selection_distance).toBeGreaterThan(0);

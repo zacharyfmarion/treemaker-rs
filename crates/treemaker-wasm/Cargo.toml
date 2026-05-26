@@ -27,7 +27,7 @@ crate-type = ["cdylib", "rlib"]
 serde.workspace = true
 serde_json.workspace = true
 serde-wasm-bindgen.workspace = true
-treemaker-core = { version = "0.1.1", path = "../treemaker-core" }
+treemaker-core = { version = "0.1.2", path = "../treemaker-core" }
 treemaker-flatfold = { version = "0.1.0", path = "../treemaker-flatfold" }
 treemaker-fold = { version = "0.1.0", path = "../treemaker-fold" }
 treemaker-sequence.workspace = true

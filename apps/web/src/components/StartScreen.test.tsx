@@ -57,6 +57,15 @@ describe('StartScreen', () => {
     expect(rendered.textContent).toContain('Create a design');
   });
 
+  it('uses the authored crease-pattern image for the preview', () => {
+    const rendered = renderStartScreen().container;
+    const image = rendered.querySelector<HTMLImageElement>('.start-screen__preview-image');
+
+    expect(image).not.toBeNull();
+    expect(image?.getAttribute('src')).toContain('/start/crease-pattern-preview.png');
+    expect(image?.getAttribute('alt')).toBe('');
+  });
+
   it('dispatches the selected start action', () => {
     const onCreateCreasePattern = vi.fn();
     const onOpenFile = vi.fn();

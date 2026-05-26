@@ -2,6 +2,11 @@ import { DraftingCompass, FilePlus, FolderOpen, PenTool } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { AppStatus } from '../lib/sampleProject';
 
+const publicAssetBase = import.meta.env.BASE_URL.endsWith('/')
+  ? import.meta.env.BASE_URL
+  : `${import.meta.env.BASE_URL}/`;
+const creasePatternPreviewSrc = `${publicAssetBase}start/crease-pattern-preview.png`;
+
 interface StartScreenProps {
   status: AppStatus;
   errorMessage: string | null;
@@ -38,17 +43,13 @@ export function StartScreen({
             </p>
           </div>
           <div className="start-screen__preview" aria-hidden="true">
-            <div className="start-screen__paper">
-              <span className="start-screen__tree-edge start-screen__tree-edge--a" />
-              <span className="start-screen__tree-edge start-screen__tree-edge--b" />
-              <span className="start-screen__tree-edge start-screen__tree-edge--c" />
-              <span className="start-screen__node start-screen__node--root" />
-              <span className="start-screen__node start-screen__node--a" />
-              <span className="start-screen__node start-screen__node--b" />
-              <span className="start-screen__node start-screen__node--c" />
-              <span className="start-screen__crease start-screen__crease--a" />
-              <span className="start-screen__crease start-screen__crease--b" />
-              <span className="start-screen__crease start-screen__crease--c" />
+            <div className="start-screen__preview-frame">
+              <img
+                className="start-screen__preview-image"
+                src={creasePatternPreviewSrc}
+                alt=""
+                decoding="async"
+              />
             </div>
           </div>
         </div>

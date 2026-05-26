@@ -15,3 +15,7 @@ Introduce a focused start-screen component that uses existing theme tokens and s
 - [x] Add or update focused tests.
 - [x] Run targeted web validation.
 - [x] Open a draft PR and start a local web server.
+- [x] Replace the CSS-built preview with a safe authored crease-pattern image.
+- [x] Polish the NUX preview framing across desktop and mobile widths.
+- [x] Add focused coverage for the start-screen image asset.
+- [x] Re-run targeted web validation for the NUX follow-up.

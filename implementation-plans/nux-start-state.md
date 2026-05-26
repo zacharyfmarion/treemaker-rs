@@ -19,3 +19,6 @@ Introduce a focused start-screen component that uses existing theme tokens and s
 - [x] Polish the NUX preview framing across desktop and mobile widths.
 - [x] Add focused coverage for the start-screen image asset.
 - [x] Re-run targeted web validation for the NUX follow-up.
+- [x] Route File > New and Cmd+N back to the NUX start screen instead of creating a design immediately.
+- [x] Update command copy and focused tests for the new File > New behavior.
+- [x] Run targeted web validation for the command routing change.

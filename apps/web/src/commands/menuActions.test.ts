@@ -70,6 +70,7 @@ function createDeps() {
       resetLayout: vi.fn(),
     },
     fileService: createFileService('web'),
+    showStartScreen: vi.fn().mockResolvedValue(true),
     quit: vi.fn(),
     help: vi.fn(),
     about: vi.fn(),
@@ -103,7 +104,8 @@ describe('menu actions', () => {
     await expect(handle('cp.foldedPreview')).resolves.toBe(true);
     await expect(handle('optimize.edges')).resolves.toBe(true);
 
-    expect(deps.workspace.createNewProject).toHaveBeenCalledOnce();
+    expect(deps.showStartScreen).toHaveBeenCalledOnce();
+    expect(deps.workspace.createNewProject).not.toHaveBeenCalled();
     expect(deps.layout.activatePanel).toHaveBeenCalledWith('crease-pattern');
     expect(deps.layout.activatePanel).toHaveBeenCalledWith('simulator');
     expect(deps.layout.activatePanel).toHaveBeenCalledWith('folded-base');

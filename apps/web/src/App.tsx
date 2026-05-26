@@ -25,6 +25,7 @@ import { IconButton } from './components/ui/IconButton';
 import { Button } from './components/ui/Button';
 import { panelComponents } from './components/panels/PanelComponents';
 import { handleMenuAction } from './commands/menuActions';
+import { registerStartScreenRequestHandler } from './commands/startScreenController';
 import { useMacDownloadUrl } from './hooks/useMacDownloadUrl';
 import { handleAppKeyDown } from './lib/appKeyboard';
 import { cpSelectionSize } from './lib/creasePatternViewport';
@@ -155,6 +156,31 @@ export default function App() {
   const saveLayout = useLayoutStore((state) => state.saveLayout);
   const [workspaceStarted, setWorkspaceStarted] = useState(false);
   const [workspaceInitialPanel, setWorkspaceInitialPanel] = useState<string | null>(null);
+
+  const showStartScreen = useCallback(async () => {
+    const state = useWorkspaceStore.getState();
+    if (state.dirty) {
+      const confirmed = await requestConfirmation({
+        title: 'Discard unsaved changes?',
+        message: 'Your current project has unsaved changes. Return to the start screen and discard them?',
+        confirmLabel: 'Discard',
+        tone: 'danger',
+      });
+      if (!confirmed) return false;
+    }
+
+    useWorkspaceStore.setState({
+      dirty: false,
+      error: null,
+      projectMessage: null,
+      status: state.engineReady ? 'ready' : 'loading_engine',
+    });
+    setWorkspaceInitialPanel(null);
+    setWorkspaceStarted(false);
+    return true;
+  }, []);
+
+  useEffect(() => registerStartScreenRequestHandler(showStartScreen), [showStartScreen]);
 
   useTauriMenuListener();
 

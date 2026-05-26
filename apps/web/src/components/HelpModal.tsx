@@ -39,7 +39,7 @@ const HELP_TOPICS: HelpTopic[] = [
     imageAlt: 'Files pane showing New, Open, Save, export buttons, example projects, and file status',
     caption: 'The Files pane keeps project actions, exports, examples, and recent work in one compact place.',
     steps: [
-      'New starts a blank .tmd5 tree document; Open accepts .tmd, .tmd4, .tmd5, .fold, and .cp files.',
+      'New returns to the start screen; Open accepts .tmd, .tmd4, .tmd5, .fold, and .cp files.',
       'Save and Save As write canonical TreeMaker 5 files when you are editing a tree.',
       'Export V4, FOLD, SVG, and PNG become available when the current document has the data each format needs.',
       'Examples load checked-in starter designs that are useful for exploring optimization and crease generation.',

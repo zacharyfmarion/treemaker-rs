@@ -12,7 +12,8 @@ import type {
   OristudioCpCommandPayload,
   OristudioCpDocumentState,
 } from '../engine/oristudioCpTypes';
-import type { OristudioCpSelection } from '../lib/creasePatternViewport';
+import { getCpVertices, type OristudioCpSelection } from '../lib/creasePatternViewport';
+import type { Point } from '../lib/geometry';
 import type { OristudioCpOperationId } from '../lib/oristudioCpCommands';
 import type { DocumentMode } from '../lib/sampleProject';
 
@@ -148,6 +149,34 @@ export interface WorkspaceCommands {
     operationId: OristudioCpOperationId,
     payload?: OristudioCpCommandPayload
   ): Promise<boolean>;
+}
+
+function selectedCpDeletePoints(
+  selection: OristudioCpSelection,
+  documentState: OristudioCpDocumentState | null
+): Point[] {
+  if (!documentState) return [];
+
+  const points: Point[] = [];
+  const selectedVertices = new Set(selection.vertices ?? []);
+  for (const vertex of getCpVertices(documentState.document)) {
+    if (selectedVertices.has(vertex.id)) {
+      points.push(vertex.point);
+    }
+  }
+
+  for (const id of selection.points) {
+    const point = documentState.document.crease_pattern.points[id - 1];
+    if (point) points.push(point);
+  }
+
+  const seen = new Set<string>();
+  return points.filter((point) => {
+    const key = `${point.x}:${point.y}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 export interface LayoutCommands {
@@ -312,10 +341,25 @@ export function createMenuActionHandler(deps: MenuActionDependencies) {
       case 'edit.delete':
         if (deps.workspace.documentMode === 'crease-pattern') {
           const lineIds = deps.workspace.oristudioCpSelection.lines;
-          if (lineIds.length === 0) return false;
-          return deps.workspace.executeOristudioCpCommand('LineSegmentDelete', {
-            line_ids: lineIds,
-          });
+          const points = selectedCpDeletePoints(
+            deps.workspace.oristudioCpSelection,
+            deps.workspace.oristudioCpDocument
+          );
+          if (lineIds.length === 0 && points.length === 0) return false;
+          let succeeded = false;
+          if (lineIds.length > 0) {
+            succeeded = await deps.workspace.executeOristudioCpCommand('LineSegmentDelete', {
+              line_ids: lineIds,
+            });
+          }
+          for (const point of points) {
+            succeeded =
+              (await deps.workspace.executeOristudioCpCommand('DeletePoint', {
+                points: [point],
+                selection_distance: 1,
+              })) || succeeded;
+          }
+          return succeeded;
         } else {
           await deps.workspace.deleteSelection();
           return true;

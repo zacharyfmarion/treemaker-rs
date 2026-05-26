@@ -314,6 +314,92 @@ describe('menu actions', () => {
     expect(deps.workspace.deleteSelection).not.toHaveBeenCalled();
   });
 
+  it('routes Delete to selected editable CP vertices and points', async () => {
+    const deps = createDeps();
+    deps.workspace.documentMode = 'crease-pattern';
+    deps.workspace.oristudioCpSelection = {
+      lines: [],
+      vertices: ['1000000000:0'],
+      points: [1],
+      circles: [],
+      texts: [],
+      faces: [],
+    };
+    deps.workspace.oristudioCpDocument = {
+      handle: 1,
+      source: { format: 'cp', filename: 'points.cp', path: null },
+      operationDescriptors: [],
+      lastCommandResult: null,
+      summary: {
+        title: 'points',
+        line_segments: 2,
+        circles: 0,
+        points: 1,
+        aux_line_segments: 0,
+        texts: 0,
+        can_save_as_cp: true,
+        is_empty: false,
+      },
+      document: {
+        title: 'points',
+        metadata: {},
+        crease_pattern: {
+          line_segments: [
+            {
+              a: { x: 0, y: 0 },
+              b: { x: 1, y: 0 },
+              color: 'Red1',
+              active: 'Inactive0',
+              selected: 0,
+              customized: 0,
+              customized_color: { red: 0, green: 0, blue: 0 },
+            },
+            {
+              a: { x: 1, y: 0 },
+              b: { x: 2, y: 0 },
+              color: 'Red1',
+              active: 'Inactive0',
+              selected: 0,
+              customized: 0,
+              customized_color: { red: 0, green: 0, blue: 0 },
+            },
+          ],
+          circles: [],
+          points: [{ x: 2, y: 2 }],
+          aux_line_segments: [],
+          texts: [],
+          grid: {
+            interval_grid_size: 2,
+            grid_size: 8,
+            grid_xa: 1,
+            grid_xb: 0,
+            grid_xc: 1,
+            grid_ya: 1,
+            grid_yb: 0,
+            grid_yc: 1,
+            grid_angle: 90,
+            base_state: 'WithinPaper',
+            vertical_scale_position: 0,
+            horizontal_scale_position: 0,
+            draw_diagonal_gridlines: false,
+          },
+        },
+      },
+    };
+    const handle = createMenuActionHandler(deps);
+
+    await expect(handle('edit.delete')).resolves.toBe(true);
+
+    expect(deps.workspace.executeOristudioCpCommand).toHaveBeenNthCalledWith(1, 'DeletePoint', {
+      points: [{ x: 1, y: 0 }],
+      selection_distance: 1,
+    });
+    expect(deps.workspace.executeOristudioCpCommand).toHaveBeenNthCalledWith(2, 'DeletePoint', {
+      points: [{ x: 2, y: 2 }],
+      selection_distance: 1,
+    });
+  });
+
   it('requests in-app numeric values for parameterized edit commands', async () => {
     const deps = createDeps();
     deps.requestPositiveNumber
@@ -371,6 +457,8 @@ describe('menu actions', () => {
         hasImportedCreasePattern: true,
         hasSimulationModel: true,
         oristudioCpSelectedLineCount: 0,
+        oristudioCpSelectedVertexCount: 0,
+        oristudioCpSelectedPointCount: 0,
         oristudioCpSelectedCircleCount: 0,
         historyPastCount: 0,
         historyFutureCount: 0,

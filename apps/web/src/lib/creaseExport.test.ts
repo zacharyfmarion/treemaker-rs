@@ -18,10 +18,10 @@ describe('crease pattern export', () => {
     const mvf = serializeCreasePatternSvg(project, { viewMode: 'mvf', includeUnassigned: true });
     const agrh = serializeCreasePatternSvg(project, { viewMode: 'agrh', includeUnassigned: true });
 
-    expect(mvf).toContain('stroke:#8b2fc6');
+    expect(mvf).toContain('stroke:#b24dd8');
     expect(mvf).not.toContain('stroke:#d2545f');
     expect(agrh).toContain('stroke:#d2545f');
-    expect(agrh).not.toContain('stroke:#8b2fc6');
+    expect(agrh).not.toContain('stroke:#b24dd8');
   });
 
   it('can hide flat and unassigned creases', () => {

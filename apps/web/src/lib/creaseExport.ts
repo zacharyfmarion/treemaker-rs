@@ -17,10 +17,10 @@ export const DEFAULT_CREASE_EXPORT_OPTIONS: CreaseExportOptions = {
 
 const FOLD_STYLES: Record<CreaseLine['fold'], string> = {
   mountain: 'stroke:#111417;stroke-width:3',
-  valley: 'stroke:#8b2fc6;stroke-width:3;stroke-dasharray:12 8',
+  valley: 'stroke:#b24dd8;stroke-width:3;stroke-dasharray:10 7',
   flat: 'stroke:#85919a;stroke-width:1.5',
   border: 'stroke:#111417;stroke-width:4',
-  unassigned: 'stroke:#a6b0b8;stroke-width:1.5;stroke-dasharray:4 7',
+  unassigned: 'stroke:#85919a;stroke-width:1.5',
 };
 
 const KIND_STYLES: Record<CreaseLine['kind'], string> = {

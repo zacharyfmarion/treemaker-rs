@@ -13,6 +13,14 @@ import { CommandDialogModal } from './CommandDialogModal';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
+if (!globalThis.ResizeObserver) {
+  globalThis.ResizeObserver = class ResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+}
+
 let root: Root | null = null;
 let container: HTMLDivElement | null = null;
 
@@ -114,8 +122,8 @@ describe('CommandDialogModal', () => {
 
     expect(rendered.querySelector('.export-modal__preview img')).not.toBeNull();
     await act(async () => {
-      findButton('AGRH').click();
-      (rendered.querySelector('input[type="checkbox"]') as HTMLInputElement).click();
+      findButton('Crease roles').click();
+      (rendered.querySelector('[role="switch"]') as HTMLButtonElement).click();
     });
     await act(async () => {
       findButton('Export SVG').click();

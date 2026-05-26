@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CircleAlert, Download, Ruler, X } from 'lucide-react';
+import { CircleAlert, Download, GitBranch, Ruler, ScanLine, X } from 'lucide-react';
 import {
   cancelCommandDialog,
   registerCommandDialogHost,
@@ -9,6 +9,8 @@ import {
 import { serializeCreasePatternSvg, type CreaseExportOptions } from '../lib/creaseExport';
 import { Button } from './ui/Button';
 import { IconButton } from './ui/IconButton';
+import { SegmentedControl } from './ui/SegmentedControl';
+import { Toggle } from './ui/Toggle';
 
 export function CommandDialogModal() {
   const dialog = useCommandDialogStore((state) => state.dialog);
@@ -93,47 +95,46 @@ export function CommandDialogModal() {
             <div className="export-modal__controls">
               <div className="export-modal__control-group">
                 <span className="export-modal__label">View</span>
-                <div className="export-modal__segmented" role="group" aria-label="Export view">
-                  <button
-                    type="button"
-                    data-active={options.viewMode === 'mvf'}
-                    onClick={() =>
-                      setExportOptions((current) => ({
-                        ...(current ?? options),
-                        viewMode: 'mvf',
-                      }))
-                    }
-                  >
-                    M/V
-                  </button>
-                  <button
-                    type="button"
-                    data-active={options.viewMode === 'agrh'}
-                    onClick={() =>
-                      setExportOptions((current) => ({
-                        ...(current ?? options),
-                        viewMode: 'agrh',
-                      }))
-                    }
-                  >
-                    AGRH
-                  </button>
-                </div>
+                <SegmentedControl
+                  aria-label="Export view"
+                  value={options.viewMode}
+                  onChange={(viewMode) =>
+                    setExportOptions((current) => ({
+                      ...(current ?? options),
+                      viewMode,
+                    }))
+                  }
+                  options={[
+                    {
+                      value: 'mvf',
+                      label: 'M/V assignment',
+                      icon: <GitBranch size={13} />,
+                      title: 'Export mountain, valley, flat, and border fold colors',
+                    },
+                    {
+                      value: 'agrh',
+                      label: 'Crease roles',
+                      icon: <ScanLine size={13} />,
+                      title: 'Export axial, gusset, ridge, hinge, and pseudohinge role colors',
+                    },
+                  ]}
+                />
               </div>
-              <label className="export-modal__checkbox">
-                <input
-                  type="checkbox"
+              <div className="export-modal__toggle-row">
+                <div className="export-modal__toggle-copy">
+                  <span>Include flat / unassigned creases</span>
+                </div>
+                <Toggle
                   checked={options.includeUnassigned}
-                  onChange={(event) => {
-                    const includeUnassigned = event.currentTarget.checked;
+                  onChange={(includeUnassigned) => {
                     setExportOptions((current) => ({
                       ...(current ?? options),
                       includeUnassigned,
                     }));
                   }}
+                  aria-label="Include flat / unassigned creases"
                 />
-                <span>Include flat / unassigned creases</span>
-              </label>
+              </div>
             </div>
             <footer className="simple-modal__footer">
               <Button size="sm" variant="ghost" onClick={() => cancelCommandDialog(dialog.id)}>

@@ -9,6 +9,18 @@ export const CP_VIEWBOX_SIZE = 720;
 export const CP_WORLD_RECT: PlotRect = { x: 0, y: 0, width: CP_VIEWBOX_SIZE, height: CP_VIEWBOX_SIZE };
 export const CP_PAPER_RECT: PlotRect = { x: 66, y: 54, width: 588, height: 588 };
 export const CP_PAPER_SHADOW_RECT: PlotRect = { x: 56, y: 44, width: 608, height: 608 };
+export const CP_EDITABLE_CANVAS_RECT: PlotRect = {
+  x: CP_PAPER_RECT.x + CP_PAPER_RECT.width / 2 - 3000,
+  y: CP_PAPER_RECT.y + CP_PAPER_RECT.height / 2 - 3000,
+  width: 6000,
+  height: 6000,
+};
+export const CP_EDITABLE_FIT_RECT: PlotRect = {
+  x: CP_PAPER_RECT.x + CP_PAPER_RECT.width / 2 - 700,
+  y: CP_PAPER_RECT.y + CP_PAPER_RECT.height / 2 - 700,
+  width: 1400,
+  height: 1400,
+};
 export const ORIEDITA_PAPER_MIN = -200;
 export const ORIEDITA_PAPER_MAX = 200;
 export const ORIEDITA_PAPER_SIZE = ORIEDITA_PAPER_MAX - ORIEDITA_PAPER_MIN;
@@ -24,6 +36,7 @@ export const ORIEDITA_PAPER_BOUNDS: CpModelBounds = {
 const MODEL_PADDING_RATIO = 0.04;
 const DEFAULT_SPAN = 1;
 const MAX_GRID_LINES = 80;
+const MAX_ORIEDITA_GRID_LINES = 460;
 const GRID_EPSILON = 1e-9;
 
 export interface OristudioCpSelection {
@@ -81,6 +94,11 @@ export interface CpSnapTarget {
   kind: 'grid' | 'vertex' | 'point' | 'line';
   label: string;
   distance: number;
+}
+
+export interface CpGridRenderOptions {
+  canvasRect?: PlotRect;
+  paperRect?: PlotRect;
 }
 
 export interface CpVertex {
@@ -203,10 +221,9 @@ export function getOrieditaGridBasis(grid: OristudioCpGridMetadata): OrieditaGri
 export function visibleOrieditaGridMetadata(
   grid: OristudioCpGridMetadata
 ): OristudioCpGridMetadata {
-  if (orieditaGridBaseState(grid.base_state) !== 'hidden') return grid;
   return {
     ...grid,
-    base_state: 'WithinPaper',
+    base_state: 'Full',
   };
 }
 
@@ -334,10 +351,11 @@ export function cpLineAssignmentLabel(color: string): string {
 export function getCpGridLines(
   bounds: CpModelBounds,
   grid: OristudioCpGridMetadata | number,
-  intervalSize = 1
+  intervalSize = 1,
+  renderOptions: CpGridRenderOptions = {}
 ): CpGridLine[] {
   if (typeof grid !== 'number') {
-    return getOrieditaGridLines(bounds, grid);
+    return getOrieditaGridLines(bounds, grid, renderOptions);
   }
 
   const gridSize = grid;
@@ -368,12 +386,16 @@ export function getCpGridLines(
 
 export function getOrieditaGridLines(
   bounds: CpModelBounds,
-  grid: OristudioCpGridMetadata
+  grid: OristudioCpGridMetadata,
+  renderOptions: CpGridRenderOptions = {}
 ): CpGridLine[] {
   const basis = getOrieditaGridBasis(grid);
   if (basis.baseState === 'hidden' || !hasValidGridBasis(basis)) return [];
 
-  let { minA, maxA, minB, maxB } = gridIndexRange(gridDrawingBounds(bounds, basis), basis);
+  let { minA, maxA, minB, maxB } = gridIndexRange(
+    gridDrawingBounds(bounds, basis, renderOptions),
+    basis
+  );
   if (basis.baseState === 'within-paper') {
     minA = Math.max(0, minA);
     maxA = Math.min(basis.gridSize, maxA);
@@ -386,9 +408,10 @@ export function getOrieditaGridLines(
   const offsetB = positiveModulo(minB, basis.gridSize);
   const startA = minA - offsetA;
   const startB = minB - offsetB;
+  const lineStep = gridLineStep(minA, maxA, minB, maxB, grid.draw_diagonal_gridlines);
   const lines: CpGridLine[] = [];
 
-  for (let i = startA; i <= maxA; i += 1) {
+  for (let i = startA; i <= maxA; i += lineStep) {
     const a = gridPoint(basis, i, minB);
     const b = gridPoint(basis, i, maxB);
     lines.push({
@@ -399,7 +422,7 @@ export function getOrieditaGridLines(
     });
   }
 
-  for (let i = startB; i <= maxB; i += 1) {
+  for (let i = startB; i <= maxB; i += lineStep) {
     const a = gridPoint(basis, minA, i);
     const b = gridPoint(basis, maxA, i);
     lines.push({
@@ -411,7 +434,7 @@ export function getOrieditaGridLines(
   }
 
   if (grid.draw_diagonal_gridlines) {
-    for (let i = minA - (offsetA + offsetB); i <= maxA; i += 1) {
+    for (let i = minA - (offsetA + offsetB); i <= maxA; i += lineStep) {
       const a = gridPoint(basis, i, minB);
       lines.push({
         id: `oriedita-diagonal-a-${i}`,
@@ -420,7 +443,7 @@ export function getOrieditaGridLines(
         major: isIntervalLine(i + minB, grid.interval_grid_size, 0),
       });
     }
-    for (let i = minB - (offsetA + offsetB); i <= maxB; i += 1) {
+    for (let i = minB - (offsetA + offsetB); i <= maxB; i += lineStep) {
       const a = gridPoint(basis, maxA, i);
       lines.push({
         id: `oriedita-diagonal-b-${i}`,
@@ -584,15 +607,30 @@ function hasValidGridBasis(basis: OrieditaGridBasis): boolean {
   return Math.abs(determinant) > GRID_EPSILON;
 }
 
-function gridDrawingBounds(bounds: CpModelBounds, basis: OrieditaGridBasis): CpModelBounds {
+function gridDrawingBounds(
+  bounds: CpModelBounds,
+  basis: OrieditaGridBasis,
+  renderOptions: CpGridRenderOptions
+): CpModelBounds {
   if (basis.baseState !== 'full') return bounds;
+  const canvasRect = renderOptions.canvasRect ?? CP_WORLD_RECT;
+  const paperRect = renderOptions.paperRect ?? CP_PAPER_RECT;
   const points = [
-    cpSvgPointToModel({ x: CP_WORLD_RECT.x, y: CP_WORLD_RECT.y }, bounds),
-    cpSvgPointToModel({ x: CP_WORLD_RECT.x + CP_WORLD_RECT.width, y: CP_WORLD_RECT.y }, bounds),
-    cpSvgPointToModel({ x: CP_WORLD_RECT.x, y: CP_WORLD_RECT.y + CP_WORLD_RECT.height }, bounds),
+    cpSvgPointToModel({ x: canvasRect.x, y: canvasRect.y }, bounds, paperRect),
     cpSvgPointToModel(
-      { x: CP_WORLD_RECT.x + CP_WORLD_RECT.width, y: CP_WORLD_RECT.y + CP_WORLD_RECT.height },
-      bounds
+      { x: canvasRect.x + canvasRect.width, y: canvasRect.y },
+      bounds,
+      paperRect
+    ),
+    cpSvgPointToModel(
+      { x: canvasRect.x, y: canvasRect.y + canvasRect.height },
+      bounds,
+      paperRect
+    ),
+    cpSvgPointToModel(
+      { x: canvasRect.x + canvasRect.width, y: canvasRect.y + canvasRect.height },
+      bounds,
+      paperRect
     ),
   ];
   return boundsFromPoints(points);
@@ -664,6 +702,18 @@ function quantizeCoordinate(value: number): string {
 function isIntervalLine(index: number, intervalSize: number, position: number): boolean {
   const interval = Math.max(1, Math.trunc(intervalSize));
   return positiveModulo(index, interval) === positiveModulo(position, interval);
+}
+
+function gridLineStep(
+  minA: number,
+  maxA: number,
+  minB: number,
+  maxB: number,
+  includeDiagonals: boolean
+): number {
+  const baseCount = Math.max(0, maxA - minA + 1) + Math.max(0, maxB - minB + 1);
+  const estimatedCount = includeDiagonals ? baseCount * 2 : baseCount;
+  return Math.max(1, Math.ceil(estimatedCount / MAX_ORIEDITA_GRID_LINES));
 }
 
 function addPoints(a: Point, b: Point): Point {

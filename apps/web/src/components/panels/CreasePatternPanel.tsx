@@ -67,9 +67,10 @@ import {
   type OristudioCpToolInstructions,
 } from '../../lib/oristudioCpToolInstructions';
 import {
+  CP_EDITABLE_CANVAS_RECT,
+  CP_EDITABLE_FIT_RECT,
   CP_PAPER_RECT,
   CP_PAPER_SHADOW_RECT,
-  CP_VIEWBOX_SIZE,
   CP_WORLD_RECT,
   cpLineAssignmentLabel,
   cpLineColorClass,
@@ -78,13 +79,14 @@ import {
   emptyOristudioCpSelection,
   getCpGridLines,
   getCpVertices,
-  getEditableCpModelBounds,
   getOrieditaGridBasis,
   modelPointToCpSvg,
   nearestCpSnapTarget,
   nearestOrieditaDrawPointTarget,
+  ORIEDITA_PAPER_BOUNDS,
   textCoordinate,
   visibleOrieditaGridMetadata,
+  type CpModelBounds,
   type CpSnapTarget,
   type CpVertex,
   type OristudioCpSelection,
@@ -216,7 +218,7 @@ function isDiagnosticResultOperation(operation: string): boolean {
 }
 
 function modelSelectionDistance(
-  bounds: ReturnType<typeof getEditableCpModelBounds>,
+  bounds: CpModelBounds,
   zoomScale = 1
 ): number {
   const baseDistance =
@@ -230,7 +232,7 @@ function modelSelectionDistance(
 
 function cpCommandPayloadDefaults(
   command: OristudioCpCommandDefinition,
-  bounds: ReturnType<typeof getEditableCpModelBounds>,
+  bounds: CpModelBounds,
   gridWidth: number | undefined,
   lineColor: OristudioCpLineColor,
   zoomScale: number,
@@ -726,7 +728,10 @@ export function CreasePatternPanel() {
   const editableCpHandle =
     documentMode === 'crease-pattern' ? (oristudioCpDocument?.handle ?? null) : null;
   const editableCpSummary = oristudioCpDocument?.summary ?? null;
-  const editableCpBounds = useMemo(() => getEditableCpModelBounds(editableCp), [editableCp]);
+  const cpCanvasRect = editableCp ? CP_EDITABLE_CANVAS_RECT : CP_WORLD_RECT;
+  const cpFitRect = editableCp ? CP_EDITABLE_FIT_RECT : CP_WORLD_RECT;
+  const cpCanvasViewBox = `${cpCanvasRect.x} ${cpCanvasRect.y} ${cpCanvasRect.width} ${cpCanvasRect.height}`;
+  const editableCpBounds = ORIEDITA_PAPER_BOUNDS;
   const editableCpVisibleGrid = useMemo(
     () =>
       editableCp && oristudioCpViewport.gridVisible
@@ -735,8 +740,14 @@ export function CreasePatternPanel() {
     [editableCp, oristudioCpViewport.gridVisible]
   );
   const editableCpGridLines = useMemo(
-    () => (editableCpVisibleGrid ? getCpGridLines(editableCpBounds, editableCpVisibleGrid) : []),
-    [editableCpBounds, editableCpVisibleGrid]
+    () =>
+      editableCpVisibleGrid
+        ? getCpGridLines(editableCpBounds, editableCpVisibleGrid, 1, {
+            canvasRect: cpCanvasRect,
+            paperRect: CP_PAPER_RECT,
+          })
+        : [],
+    [cpCanvasRect, editableCpBounds, editableCpVisibleGrid]
   );
   const editableCpGridWidth = useMemo(
     () =>
@@ -1137,12 +1148,12 @@ export function CreasePatternPanel() {
       const bounds = svg.getBoundingClientRect();
       if (bounds.width <= 0 || bounds.height <= 0) return null;
       const svgPoint = {
-        x: ((event.clientX - bounds.left) / bounds.width) * CP_VIEWBOX_SIZE,
-        y: ((event.clientY - bounds.top) / bounds.height) * CP_VIEWBOX_SIZE,
+        x: cpCanvasRect.x + ((event.clientX - bounds.left) / bounds.width) * cpCanvasRect.width,
+        y: cpCanvasRect.y + ((event.clientY - bounds.top) / bounds.height) * cpCanvasRect.height,
       };
       return cpSvgPointToModel(svgPoint, editableCpBounds);
     },
-    [editableCp, editableCpBounds]
+    [cpCanvasRect, editableCp, editableCpBounds]
   );
 
   const resolveEditableToolPoint = useCallback(
@@ -1887,8 +1898,8 @@ export function CreasePatternPanel() {
   const computeFitScale = useCallback(() => {
     const viewport = getViewportSize();
     if (!viewport) return 1;
-    return getViewportFitScale(viewport, CP_WORLD_RECT);
-  }, [getViewportSize]);
+    return getViewportFitScale(viewport, cpFitRect);
+  }, [cpFitRect, getViewportSize]);
 
   const fitToView = useCallback(
     (animationTime = 180) => {
@@ -2252,10 +2263,11 @@ export function CreasePatternPanel() {
                   <svg
                     ref={svgRef}
                     className="cp-canvas"
-                    viewBox={`0 0 ${CP_VIEWBOX_SIZE} ${CP_VIEWBOX_SIZE}`}
-                    width={CP_VIEWBOX_SIZE}
-                    height={CP_VIEWBOX_SIZE}
-                    style={{ width: CP_VIEWBOX_SIZE, height: CP_VIEWBOX_SIZE }}
+                    data-canvas-mode={editableCp ? 'editable' : 'generated'}
+                    viewBox={cpCanvasViewBox}
+                    width={cpCanvasRect.width}
+                    height={cpCanvasRect.height}
+                    style={{ width: cpCanvasRect.width, height: cpCanvasRect.height }}
                     role="img"
                     aria-label="Crease pattern"
                     onPointerMove={handleEditablePointerMove}
@@ -2276,7 +2288,7 @@ export function CreasePatternPanel() {
                       rx="6"
                     />
                     <rect
-                      className="paper"
+                      className={editableCp ? 'paper paper--editable-cp-guide' : 'paper'}
                       x={CP_PAPER_RECT.x}
                       y={CP_PAPER_RECT.y}
                       width={CP_PAPER_RECT.width}
@@ -2434,7 +2446,7 @@ export function CreasePatternPanel() {
 
 interface EditableCreasePatternProps {
   activeDiagnosticId: string | null;
-  bounds: ReturnType<typeof getEditableCpModelBounds>;
+  bounds: CpModelBounds;
   clearSelectionOnBackgroundPointerDown: (event: PointerEvent<SVGElement>) => void;
   document: OristudioCpDocumentSnapshot;
   gridLines: ReturnType<typeof getCpGridLines>;
@@ -2799,7 +2811,7 @@ function SelectionBoxPreview({
   bounds,
   points,
 }: {
-  bounds: ReturnType<typeof getEditableCpModelBounds>;
+  bounds: CpModelBounds;
   points: readonly [Point, Point];
 }) {
   const first = modelPointToCpSvg(points[0], bounds);

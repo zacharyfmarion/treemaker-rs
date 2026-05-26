@@ -27,6 +27,7 @@ import {
   DEFAULT_ORISTUDIO_CP_VIEWPORT_OPTIONS,
   emptyOristudioCpSelection,
 } from '../../lib/creasePatternViewport';
+import { createStarterOristudioCpDocument } from '../../lib/oristudioCpStarterDocument';
 import { useLayoutStore } from '../layoutStore';
 
 const engineMocks = vi.hoisted(() => ({
@@ -891,43 +892,19 @@ function loadSnapshotIntoStore(snapshot: TreeSnapshot, title = 'Seed project') {
 }
 
 function blankCpDocumentState(): OristudioCpDocumentState {
+  const document = createStarterOristudioCpDocument();
   return {
     handle: 4,
-    document: {
-      title: 'Untitled CP',
-      crease_pattern: {
-        line_segments: [],
-        circles: [],
-        points: [],
-        aux_line_segments: [],
-        texts: [],
-        grid: {
-          interval_grid_size: 4,
-          grid_size: 8,
-          grid_xa: 1,
-          grid_xb: 0,
-          grid_xc: 1,
-          grid_ya: 1,
-          grid_yb: 0,
-          grid_yc: 1,
-          grid_angle: 90,
-          base_state: 'WithinPaper',
-          vertical_scale_position: 0,
-          horizontal_scale_position: 0,
-          draw_diagonal_gridlines: false,
-        },
-      },
-      metadata: {},
-    },
+    document,
     summary: {
       title: 'Untitled CP',
-      line_segments: 0,
+      line_segments: document.crease_pattern.line_segments.length,
       circles: 0,
       points: 0,
       aux_line_segments: 0,
       texts: 0,
       can_save_as_cp: true,
-      is_empty: true,
+      is_empty: false,
     },
     source: {
       format: 'cp',
@@ -1259,10 +1236,17 @@ describe('workspace store slices', () => {
     });
     expect(useWorkspaceStore.getState().project.title).toBe('Untitled CP');
     expect(useWorkspaceStore.getState().oristudioCpDocument?.summary).toMatchObject({
-      is_empty: true,
-      line_segments: 0,
+      is_empty: false,
+      line_segments: 4,
       can_save_as_cp: true,
     });
+    expect(
+      useWorkspaceStore
+        .getState()
+        .oristudioCpDocument?.document.crease_pattern.line_segments.every(
+          (line) => line.color === 'Black0'
+        )
+    ).toBe(true);
     expect(useWorkspaceStore.getState().importedCreasePattern).toBeNull();
     expect(useWorkspaceStore.getState().oristudioCpSelection).toEqual(emptyOristudioCpSelection());
     expect(activatePanel).toHaveBeenCalledWith('crease-pattern');

@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import type { OristudioCpDocumentSnapshot } from '../engine/oristudioCpTypes';
 import {
   closestOrieditaGridPoint,
+  CP_EDITABLE_CANVAS_RECT,
+  CP_EDITABLE_FIT_RECT,
+  CP_PAPER_RECT,
   cpLineAssignmentLabel,
   cpLineColorClass,
   cpSelectionSize,
@@ -112,8 +115,8 @@ describe('crease pattern viewport helpers', () => {
     expect(closestOrieditaGridPoint({ x: 0, y: 0 }, hiddenDocument.crease_pattern.grid)).toBeNull();
 
     const visibleGrid = visibleOrieditaGridMetadata(hiddenDocument.crease_pattern.grid);
-    expect(visibleGrid.base_state).toBe('WithinPaper');
-    expect(getCpGridLines(ORIEDITA_PAPER_BOUNDS, visibleGrid)).toHaveLength(22);
+    expect(visibleGrid.base_state).toBe('Full');
+    expect(getCpGridLines(ORIEDITA_PAPER_BOUNDS, visibleGrid).length).toBeGreaterThan(22);
   });
 
   it('ports Oriedita non-square and angled grid basis math', () => {
@@ -160,6 +163,50 @@ describe('crease pattern viewport helpers', () => {
     expect(withinPaperLines).toHaveLength(6);
     expect(fullLines.length).toBeGreaterThan(withinPaperLines.length);
     expect(fullLines.some((line) => line.a.x < -200 || line.a.y > 200)).toBe(true);
+  });
+
+  it('extends full-state grids across the larger editable CP canvas', () => {
+    const compactLines = getCpGridLines(ORIEDITA_PAPER_BOUNDS, {
+      ...document.crease_pattern.grid,
+      grid_size: 4,
+      base_state: 'Full',
+    });
+    const editableLines = getCpGridLines(
+      ORIEDITA_PAPER_BOUNDS,
+      {
+        ...document.crease_pattern.grid,
+        grid_size: 4,
+        base_state: 'Full',
+      },
+      1,
+      {
+        canvasRect: CP_EDITABLE_CANVAS_RECT,
+        paperRect: CP_PAPER_RECT,
+      }
+    );
+
+    expect(CP_EDITABLE_CANVAS_RECT.width).toBeGreaterThan(CP_EDITABLE_FIT_RECT.width);
+    expect(editableLines.length).toBeGreaterThan(compactLines.length);
+    expect(editableLines.some((line) => line.a.x < -200 || line.b.x > 200)).toBe(true);
+  });
+
+  it('caps dense full-canvas grid rendering for performance', () => {
+    const lines = getCpGridLines(
+      ORIEDITA_PAPER_BOUNDS,
+      {
+        ...document.crease_pattern.grid,
+        grid_size: 160,
+        base_state: 'Full',
+        draw_diagonal_gridlines: true,
+      },
+      1,
+      {
+        canvasRect: CP_EDITABLE_CANVAS_RECT,
+        paperRect: CP_PAPER_RECT,
+      }
+    );
+
+    expect(lines.length).toBeLessThanOrEqual(520);
   });
 
   it('draws optional diagonal grid lines from the Oriedita index ranges', () => {

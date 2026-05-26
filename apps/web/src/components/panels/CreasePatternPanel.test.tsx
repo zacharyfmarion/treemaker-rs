@@ -7,7 +7,13 @@ import {
   type AppStatus,
   type TreeProject,
 } from '../../lib/sampleProject';
+import {
+  CP_EDITABLE_CANVAS_RECT,
+  CP_PAPER_RECT,
+  CP_WORLD_RECT,
+} from '../../lib/creasePatternViewport';
 import type { ImportedCreasePatternDocument } from '../../lib/creasePatternImport';
+import { createStarterOristudioCpDocument } from '../../lib/oristudioCpStarterDocument';
 import type {
   OristudioCpCommandPayload,
   OristudioCpCommandResult,
@@ -242,6 +248,27 @@ function camvDiagnosticResult(): OristudioCpCommandResult {
   };
 }
 
+function blankEditableCpState(): OristudioCpDocumentState {
+  const state = editableCpState();
+  const document = createStarterOristudioCpDocument();
+  return {
+    ...state,
+    source: { format: 'cp', filename: 'Untitled.cp', path: null },
+    summary: {
+      ...state.summary,
+      title: 'Untitled CP',
+      line_segments: document.crease_pattern.line_segments.length,
+      circles: 0,
+      points: 0,
+      aux_line_segments: 0,
+      texts: 0,
+      can_save_as_cp: true,
+      is_empty: false,
+    },
+    document,
+  };
+}
+
 function editableCpStateWithCircleSet(): OristudioCpDocumentState {
   const state = editableCpState();
   state.summary.circles = 4;
@@ -285,18 +312,23 @@ function editableCpStateWithCircleSet(): OristudioCpDocumentState {
 function setCanvasClientRect(container: HTMLElement): SVGSVGElement {
   const canvas = container.querySelector<SVGSVGElement>('.cp-canvas');
   if (!canvas) throw new Error('expected CP canvas');
+  const [x = 0, y = 0, width = 720, height = 720] = (
+    canvas.getAttribute('viewBox') ?? '0 0 720 720'
+  )
+    .split(/\s+/u)
+    .map((value) => Number.parseFloat(value));
   Object.defineProperty(canvas, 'getBoundingClientRect', {
     configurable: true,
     value: () =>
       ({
-        x: 0,
-        y: 0,
-        left: 0,
-        top: 0,
-        right: 720,
-        bottom: 720,
-        width: 720,
-        height: 720,
+        x,
+        y,
+        left: x,
+        top: y,
+        right: x + width,
+        bottom: y + height,
+        width,
+        height,
         toJSON: () => ({}),
       }) as DOMRect,
   });
@@ -756,6 +788,75 @@ describe('CreasePatternPanel', () => {
 
     expect(panel?.textContent).toContain('Delete Point');
     expect(panel?.textContent).toContain('Delete a vertex on a straight line of uniform color.');
+  });
+
+  it('uses an expanded canvas for imported editable CP documents', () => {
+    const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
+      documentMode: 'crease-pattern',
+      importedCreasePattern: importedCpDocument(),
+      oristudioCpDocument: editableCpState(),
+    });
+
+    const canvas = container.querySelector<SVGSVGElement>('.cp-canvas');
+    expect(canvas?.getAttribute('data-canvas-mode')).toBe('editable');
+    expect(canvas?.getAttribute('viewBox')).toBe(
+      `${CP_EDITABLE_CANVAS_RECT.x} ${CP_EDITABLE_CANVAS_RECT.y} ${CP_EDITABLE_CANVAS_RECT.width} ${CP_EDITABLE_CANVAS_RECT.height}`
+    );
+    expect(Number(canvas?.getAttribute('width'))).toBeGreaterThan(CP_WORLD_RECT.width);
+    const paper = container.querySelector<SVGRectElement>('.paper');
+    expect(paper?.getAttribute('x')).toBe('66');
+    expect(paper?.classList.contains('paper--editable-cp-guide')).toBe(true);
+
+    act(() => {
+      container.querySelector<HTMLButtonElement>('button[aria-label="Fit"]')?.click();
+    });
+    const fitScale = transformMocks.centerView.mock.calls.at(-1)?.[0];
+    expect(fitScale).toBeLessThan(0.5);
+  });
+
+  it('renders a newly created CP as an editable uniform canvas with a square border', () => {
+    const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
+      documentMode: 'crease-pattern',
+      importedCreasePattern: null,
+      oristudioCpDocument: blankEditableCpState(),
+    });
+
+    const canvas = container.querySelector<SVGSVGElement>('.cp-canvas');
+    const paper = container.querySelector<SVGRectElement>('.paper');
+
+    expect(canvas?.getAttribute('data-canvas-mode')).toBe('editable');
+    expect(container.querySelector('.cp-panel__empty')).toBeNull();
+    expect(container.textContent).not.toContain('No imported crease pattern');
+    expect(paper?.classList.contains('paper--editable-cp-guide')).toBe(true);
+    expect(container.querySelectorAll<SVGLineElement>('[data-cp-line-id]')).toHaveLength(4);
+  });
+
+  it('does not resize the editable CP paper when geometry extends outside it', () => {
+    const state = editableCpState();
+    state.summary.line_segments = 3;
+    state.document.crease_pattern.line_segments.push({
+      a: { x: -520, y: 0 },
+      b: { x: -320, y: 0 },
+      active: 'Inactive0',
+      color: 'Red1',
+      selected: 0,
+      customized: 0,
+      customized_color: { red: 100, green: 200, blue: 200 },
+    });
+
+    const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
+      documentMode: 'crease-pattern',
+      importedCreasePattern: importedCpDocument(),
+      oristudioCpDocument: state,
+    });
+
+    const paper = container.querySelector<SVGRectElement>('.paper');
+    const outsideLine = container.querySelector<SVGLineElement>('[data-cp-line-id="3"]');
+
+    expect(paper?.getAttribute('x')).toBe(String(CP_PAPER_RECT.x));
+    expect(paper?.getAttribute('width')).toBe(String(CP_PAPER_RECT.width));
+    expect(Number(outsideLine?.getAttribute('x1'))).toBeLessThan(CP_PAPER_RECT.x);
+    expect(Number(outsideLine?.getAttribute('x2'))).toBeLessThan(CP_PAPER_RECT.x);
   });
 
   it('opens contextual CP actions from menu requests with the current editable selection', async () => {
@@ -1994,8 +2095,10 @@ describe('CreasePatternPanel', () => {
     const [operation, payload] = executeOristudioCpCommand.mock.calls[0] ?? [];
     expect(operation).toBe('DrawBlintz');
     expect(payload?.line_color).toBe('Blue2');
-    expect(payload?.points?.[0]).toEqual({ x: -200, y: 200 });
-    expect(payload?.points?.[1]).toEqual({ x: 200, y: -200 });
+    expect(payload?.points?.[0].x).toBeCloseTo(-200);
+    expect(payload?.points?.[0].y).toBeCloseTo(200);
+    expect(payload?.points?.[1].x).toBeCloseTo(200);
+    expect(payload?.points?.[1].y).toBeCloseTo(-200);
   });
 
   it('collects Voronoi seed presses, previews them, and applies from the context panel', async () => {

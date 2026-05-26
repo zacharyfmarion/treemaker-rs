@@ -1651,9 +1651,7 @@
   display: grid;
   place-items: center;
   overflow: hidden;
-  background:
-    radial-gradient(circle at 20% 20%, color-mix(in srgb, var(--accent-primary) 8%, transparent), transparent 22%),
-    linear-gradient(135deg, var(--bg-canvas), var(--bg-primary));
+  background: var(--bg-primary);
 }
 
 .design-panel__body:focus,
@@ -2527,6 +2525,13 @@
   fill: var(--bg-paper);
   stroke: var(--paper-stroke);
   stroke-width: 2;
+}
+
+.cp-canvas[data-canvas-mode='editable'] .paper--editable-cp-guide {
+  fill: transparent;
+  stroke: color-mix(in srgb, var(--border-strong) 66%, transparent);
+  stroke-width: 1.25;
+  pointer-events: all;
 }
 
 .paper-border {

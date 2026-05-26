@@ -7,6 +7,7 @@ import { useWorkspaceStore } from '../store/workspaceStore';
 import { selectWorkspaceCapabilities } from '../store/workspaceStore/capabilities';
 import type { WorkspaceCapabilities, WorkspaceCapabilityId } from '../lib/workspaceCapabilities';
 import { requestPositiveNumber, type NumberDialogOptions } from '../store/commandDialogStore';
+import { requestStartScreen } from './startScreenController';
 import type {
   OristudioCpCommandPayload,
   OristudioCpDocumentState,
@@ -159,6 +160,7 @@ export interface MenuActionDependencies {
   layout: LayoutCommands;
   fileService: FileService;
   capabilities?: () => WorkspaceCapabilities;
+  showStartScreen?: () => Promise<boolean>;
   quit?: () => void;
   help?: () => void;
   about?: () => void;
@@ -288,8 +290,7 @@ export function createMenuActionHandler(deps: MenuActionDependencies) {
         deps.quit?.();
         return true;
       case 'file.new':
-        await deps.workspace.createNewProject();
-        return true;
+        return (deps.showStartScreen ?? requestStartScreen)();
       case 'file.settings':
         deps.settings?.();
         return true;
@@ -495,6 +496,7 @@ export function handleMenuAction(id: string): Promise<boolean> {
     layout: useLayoutStore.getState(),
     fileService: getFileService(),
     capabilities: () => selectWorkspaceCapabilities(useWorkspaceStore.getState()),
+    showStartScreen: requestStartScreen,
     settings: () => {
       useSettingsStore.getState().openSettings();
     },

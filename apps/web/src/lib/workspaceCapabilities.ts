@@ -131,7 +131,7 @@ export function getWorkspaceCapabilities(input: WorkspaceCapabilityInput): Works
   const buildReason = hasCreasePattern ? 'Rebuild crease pattern' : 'Build crease pattern';
 
   return {
-    'file.new': capability(!isBusy, 'New', isBusy ? busyReason(input.status) : 'Create a new Ori Studio project'),
+    'file.new': capability(!isBusy, 'New', isBusy ? busyReason(input.status) : 'Choose a new Ori Studio workspace'),
     'file.open': capability(!isBusy, 'Open...', isBusy ? busyReason(input.status) : 'Open a project or crease pattern'),
     'file.save': capability(
       (treeMode || canSaveEditableCreasePattern) && !isBusy,

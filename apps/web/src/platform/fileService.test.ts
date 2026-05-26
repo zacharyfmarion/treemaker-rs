@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { createFileService, ensureExtension, filenameFromPath } from './fileService';
+import {
+  createFileService,
+  createOpenedPathFileService,
+  ensureExtension,
+  filenameFromPath,
+} from './fileService';
 
 describe('file service selection', () => {
   it('creates a browser service for web runtime', () => {
@@ -23,5 +28,15 @@ describe('file service selection', () => {
     expect(filenameFromPath('C:\\tmp\\base.tmd4')).toBe('base.tmd4');
     expect(ensureExtension('base', 'tmd5')).toBe('base.tmd5');
     expect(ensureExtension('base.tmd5', '.tmd5')).toBe('base.tmd5');
+  });
+
+  it('creates a desktop file service for Finder-opened paths', () => {
+    const service = createOpenedPathFileService('/tmp/project.osf');
+
+    expect(service.surface).toBe('desktop');
+    expect(service.supportsNativeDialogs).toBe(true);
+    expect(service.openTextFile).toBeTypeOf('function');
+    expect(service.saveTextFile).toBeTypeOf('function');
+    expect(service.saveBinaryFile).toBeTypeOf('function');
   });
 });

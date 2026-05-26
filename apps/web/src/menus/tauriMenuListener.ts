@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { listen } from '@tauri-apps/api/event';
 import { handleMenuAction } from '../commands/menuActions';
 import { isDesktopRuntime } from '../platform/runtime';
 
@@ -9,8 +10,8 @@ export function useTauriMenuListener(): void {
     let disposed = false;
     let unlisten: (() => void) | null = null;
 
-    import('@tauri-apps/api/event')
-      .then(({ listen }) =>
+    Promise.resolve()
+      .then(() =>
         listen<string>('menu-action', (event) => {
           void handleMenuAction(event.payload);
         })

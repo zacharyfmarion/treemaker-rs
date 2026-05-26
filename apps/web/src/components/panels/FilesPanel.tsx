@@ -65,10 +65,26 @@ export function FilesPanel() {
 
         <div className="file-summary">
           <span>{currentFileName}</span>
-          <span>{documentMode === 'crease-pattern' ? 'Imported CP' : dirty ? 'Unsaved changes' : 'Saved'}</span>
+          <span>
+            {dirty
+              ? 'Unsaved changes'
+              : documentMode === 'crease-pattern'
+                ? 'Editable CP project'
+                : 'Saved'}
+          </span>
         </div>
 
         <div className="file-actions file-actions--exports">
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={!capabilities['file.exportV5'].enabled}
+            title={capabilities['file.exportV5'].reason}
+            onClick={() => void handleMenuAction('file.exportV5')}
+          >
+            <Download size={14} />
+            TMD5
+          </Button>
           <Button
             size="sm"
             variant="secondary"

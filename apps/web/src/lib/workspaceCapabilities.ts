@@ -5,6 +5,7 @@ export type WorkspaceCapabilityId =
   | 'file.open'
   | 'file.save'
   | 'file.saveAs'
+  | 'file.exportV5'
   | 'file.exportV4'
   | 'file.exportCp'
   | 'file.exportFold'
@@ -114,7 +115,8 @@ export function getWorkspaceCapabilities(input: WorkspaceCapabilityInput): Works
     !isBusy &&
     (input.status === 'optimized' || input.status === 'crease_pattern_ready');
   const canExportTreeFold = treeMode && hasCreasePattern && !isBusy;
-  const canExportImportedFold = creasePatternMode && input.hasImportedCreasePattern;
+  const canExportEditableOrImportedFold =
+    creasePatternMode && (input.hasEditableCreasePattern || input.hasImportedCreasePattern);
   const canSaveEditableCreasePattern = creasePatternMode && input.hasEditableCreasePattern;
   const canExportEditableCp = creasePatternMode && input.hasEditableCreasePattern;
   const canExportCreasePattern = hasCreasePattern && !isBusy;
@@ -139,7 +141,7 @@ export function getWorkspaceCapabilities(input: WorkspaceCapabilityInput): Works
       treeMode
         ? busyOr('Save Ori Studio project', input.status)
         : canSaveEditableCreasePattern
-          ? busyOr('Save editable crease pattern as CP', input.status)
+          ? busyOr('Save editable crease pattern as an Ori Studio project', input.status)
           : 'Editable crease-pattern kernel is unavailable'
     ),
     'file.saveAs': capability(
@@ -148,8 +150,13 @@ export function getWorkspaceCapabilities(input: WorkspaceCapabilityInput): Works
       treeMode
         ? busyOr('Save Ori Studio project as a new file', input.status)
         : canSaveEditableCreasePattern
-          ? busyOr('Save editable crease pattern as a new CP file', input.status)
+          ? busyOr('Save editable crease pattern as a new Ori Studio project', input.status)
           : 'Editable crease-pattern kernel is unavailable'
+    ),
+    'file.exportV5': capability(
+      treeMode && !isBusy,
+      'Export TreeMaker 5...',
+      treeMode ? busyOr('Export TreeMaker 5 project', input.status) : 'TreeMaker 5 export requires a tree document'
     ),
     'file.exportV4': capability(
       treeMode && !isBusy,
@@ -164,9 +171,9 @@ export function getWorkspaceCapabilities(input: WorkspaceCapabilityInput): Works
         : 'Open an editable crease pattern before exporting CP'
     ),
     'file.exportFold': capability(
-      (canExportTreeFold || canExportImportedFold) && !isBusy,
+      (canExportTreeFold || canExportEditableOrImportedFold) && !isBusy,
       'Export FOLD...',
-      canExportTreeFold || canExportImportedFold
+      canExportTreeFold || canExportEditableOrImportedFold
         ? busyOr('Export FOLD document', input.status)
         : treeMode
           ? 'Build a crease pattern before exporting FOLD'

@@ -2299,9 +2299,17 @@
 
 .folded-base-panel__body {
   min-height: 0;
-  background:
-    radial-gradient(circle at 76% 18%, color-mix(in srgb, var(--status-danger) 8%, transparent), transparent 22%),
-    linear-gradient(135deg, var(--bg-canvas), var(--bg-primary));
+  background: linear-gradient(135deg, var(--bg-canvas), var(--bg-primary));
+}
+
+.folded-base-view-controls {
+  display: flex;
+  gap: var(--space-1);
+  padding: 3px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--bg-secondary) 88%, transparent);
+  box-shadow: 0 2px 8px color-mix(in srgb, black 12%, transparent);
 }
 
 .folded-base-canvas {
@@ -2319,25 +2327,43 @@
 }
 
 .folded-base-facet {
-  stroke: color-mix(in srgb, var(--bg-primary) 55%, transparent);
-  stroke-width: 1.5;
+  filter: drop-shadow(0 2px 5px color-mix(in srgb, black 5%, transparent));
+  stroke: color-mix(in srgb, var(--bg-paper) 72%, transparent);
+  stroke-width: 0.75;
 }
 
 .folded-base-facet--color-1 {
-  fill: color-mix(in srgb, var(--bg-paper) 90%, transparent);
+  fill: color-mix(in srgb, var(--bg-paper) 96%, white 4%);
 }
 
 .folded-base-facet--color-2 {
-  fill: color-mix(in srgb, var(--accent-tertiary) 55%, var(--bg-paper));
+  fill: color-mix(in srgb, var(--accent-tertiary) 26%, var(--bg-paper));
 }
 
 .folded-base-facet--color-0 {
-  fill: color-mix(in srgb, var(--text-secondary) 70%, transparent);
+  fill: color-mix(in srgb, var(--text-secondary) 26%, var(--bg-paper));
+}
+
+.folded-base-canvas[data-translucent='true'] .folded-base-facet {
+  opacity: 0.36;
+  stroke: color-mix(in srgb, var(--text-primary) 22%, transparent);
+}
+
+.folded-base-outline {
+  stroke: color-mix(in srgb, var(--text-primary) 48%, transparent);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .folded-base-crease {
-  stroke-width: 3;
+  opacity: 0.82;
+  stroke-width: 2.25;
   stroke-linecap: round;
+}
+
+.folded-base-canvas[data-wireframe='true'] .folded-base-crease {
+  opacity: 0.92;
 }
 
 .folded-base-crease--fold-1 {

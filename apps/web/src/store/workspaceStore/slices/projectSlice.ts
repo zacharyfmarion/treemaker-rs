@@ -741,9 +741,18 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
               : get().oristudioCpHistoryPast
             : get().oristudioCpHistoryPast,
           oristudioCpHistoryFuture: mutatesDocument ? [] : get().oristudioCpHistoryFuture,
+          foldArtifacts: mutatesDocument ? null : get().foldArtifacts,
+          foldArtifactError: mutatesDocument ? null : get().foldArtifactError,
+          sequenceTarget: mutatesDocument ? null : get().sequenceTarget,
+          sequencePlan: mutatesDocument ? null : get().sequencePlan,
+          sequenceSimulationFocus: mutatesDocument ? { kind: 'whole' } : get().sequenceSimulationFocus,
+          sequenceError: mutatesDocument ? null : get().sequenceError,
           error: null,
           dirty: mutatesDocument ? true : get().dirty,
         });
+        if (mutatesDocument) {
+          await get().refreshFoldArtifacts();
+        }
         return true;
       } catch (error) {
         const normalized = oristudioCpError(error);

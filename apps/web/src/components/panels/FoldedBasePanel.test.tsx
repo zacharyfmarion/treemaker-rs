@@ -52,7 +52,7 @@ afterEach(() => {
 });
 
 describe('FoldedBasePanel', () => {
-  it('renders folded-base artifacts for imported crease patterns', () => {
+  it('renders folded paper by default with icon view options', () => {
     const fold: FoldDocument = {
       file_spec: 1.2,
       frame_classes: ['creasePattern'],
@@ -90,7 +90,68 @@ describe('FoldedBasePanel', () => {
     const rendered = renderPanel({ fold, folded_base: foldedBase });
 
     expect(rendered.querySelector('[aria-label="Folded base"]')).not.toBeNull();
-    expect(rendered.textContent).toContain('3 vertices | 1 facets');
+    expect(rendered.querySelector('[aria-label="Wireframe"]')).not.toBeNull();
+    expect(rendered.querySelector('[aria-label="Translucent Layers"]')).not.toBeNull();
+    expect(rendered.querySelector('[aria-label="Refresh"]')).toBeNull();
+    expect(
+      rendered.querySelector(
+        '.panel-toolbar > .panel-toolbar__group:last-child .folded-base-view-controls'
+      )
+    ).not.toBeNull();
+    expect(
+      rendered.querySelector(
+        '.panel-toolbar > .panel-toolbar__group:first-child .folded-base-view-controls'
+      )
+    ).toBeNull();
+    expect(
+      rendered.querySelector('.folded-base-panel__body .folded-base-view-controls')
+    ).toBeNull();
+    expect(rendered.textContent).not.toContain('3 vertices | 1 facets');
+    expect(rendered.querySelectorAll('.folded-base-facet')).toHaveLength(1);
+    expect(rendered.querySelectorAll('.folded-base-outline')).toHaveLength(2);
+    expect(rendered.querySelectorAll('.folded-base-crease')).toHaveLength(0);
+    expect(rendered.querySelectorAll('.folded-base-vertex')).toHaveLength(0);
     expect(rendered.textContent).not.toContain('Unavailable for imported CP');
+
+    act(() => {
+      rendered.querySelector<HTMLButtonElement>('[aria-label="Wireframe"]')?.click();
+    });
+
+    expect(rendered.querySelectorAll('.folded-base-crease')).toHaveLength(3);
+    expect(rendered.querySelectorAll('.folded-base-vertex')).toHaveLength(3);
+
+    act(() => {
+      rendered.querySelector<HTMLButtonElement>('[aria-label="Wireframe"]')?.click();
+    });
+
+    expect(rendered.querySelectorAll('.folded-base-crease')).toHaveLength(0);
+    expect(rendered.querySelectorAll('.folded-base-vertex')).toHaveLength(0);
+
+    act(() => {
+      rendered.querySelector<HTMLButtonElement>('[aria-label="Translucent Layers"]')?.click();
+    });
+
+    expect(rendered.querySelectorAll('.folded-base-crease')).toHaveLength(0);
+    expect(rendered.querySelectorAll('.folded-base-vertex')).toHaveLength(0);
+    expect(rendered.querySelector('.folded-base-canvas')?.getAttribute('data-translucent')).toBe(
+      'true'
+    );
+  });
+
+  it('shows folded-base solve errors in the empty state', () => {
+    const rendered = renderPanel({
+      fold: {
+        file_spec: 1.2,
+        frame_classes: ['creasePattern'],
+        vertices_coords: [],
+        edges_vertices: [],
+        faces_vertices: [],
+      },
+      folded_base: null,
+      folded_base_error: 'Layer ordering failed',
+    });
+
+    expect(rendered.textContent).toContain('Layer ordering failed');
+    expect(rendered.querySelector('[aria-label="Refresh"]')).toBeNull();
   });
 });

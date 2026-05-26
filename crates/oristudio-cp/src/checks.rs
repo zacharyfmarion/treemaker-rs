@@ -58,6 +58,33 @@ pub struct CamvCheckResult {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
+pub struct CamvCheckOptions {
+    /// Angular flat-foldability tolerance in degrees.
+    pub angle_tolerance: f64,
+}
+
+impl Default for CamvCheckOptions {
+    fn default() -> Self {
+        Self {
+            angle_tolerance: Epsilon::FLAT,
+        }
+    }
+}
+
+impl CamvCheckOptions {
+    fn normalized(self) -> Self {
+        let default = Self::default();
+        Self {
+            angle_tolerance: if self.angle_tolerance.is_finite() && self.angle_tolerance > 0.0 {
+                self.angle_tolerance
+            } else {
+                default.angle_tolerance
+            },
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FixInaccurateOptions {
     pub fix_precision: f64,
     pub use_bp: bool,
@@ -221,16 +248,33 @@ pub fn check3(model: &CreasePatternModel) -> Vec<LineSegment> {
 
 /// Oriedita `Check4.apply`: collect CAMV and little-big-little violations.
 pub fn check4(model: &CreasePatternModel) -> Vec<FlatFoldabilityViolation> {
+    check4_with_options(model, CamvCheckOptions::default())
+}
+
+pub fn check4_with_options(
+    model: &CreasePatternModel,
+    options: CamvCheckOptions,
+) -> Vec<FlatFoldabilityViolation> {
+    let options = options.normalized();
     point_line_map(model)
         .into_iter()
-        .filter_map(|(point, lines)| find_flat_foldability_violation(point, &lines))
+        .filter_map(|(point, lines)| {
+            find_flat_foldability_violation_with_options(point, &lines, options)
+        })
         .collect()
 }
 
 /// Oriedita `CheckCAMVTask.run`: recompute Check4 violations and mark the canvas dirty.
 pub fn check_camv_task(model: &CreasePatternModel) -> CamvCheckResult {
+    check_camv_task_with_options(model, CamvCheckOptions::default())
+}
+
+pub fn check_camv_task_with_options(
+    model: &CreasePatternModel,
+    options: CamvCheckOptions,
+) -> CamvCheckResult {
     CamvCheckResult {
-        violations: check4(model),
+        violations: check4_with_options(model, options),
         dirty: true,
     }
 }
@@ -294,6 +338,15 @@ pub fn find_flat_foldability_violation(
     point: Point,
     lines: &[LineSegment],
 ) -> Option<FlatFoldabilityViolation> {
+    find_flat_foldability_violation_with_options(point, lines, CamvCheckOptions::default())
+}
+
+pub fn find_flat_foldability_violation_with_options(
+    point: Point,
+    lines: &[LineSegment],
+    options: CamvCheckOptions,
+) -> Option<FlatFoldabilityViolation> {
+    let angle_tolerance = options.normalized().angle_tolerance;
     let mut red = 0usize;
     let mut blue = 0usize;
     let mut black = 0usize;
@@ -325,7 +378,7 @@ pub fn find_flat_foldability_violation(
     }
 
     if black == 0 {
-        let angle_or_lbl = find_flat_foldability_violation_inside(point, nbox);
+        let angle_or_lbl = find_flat_foldability_violation_inside(point, nbox, angle_tolerance);
         let mut rule = angle_or_lbl
             .as_ref()
             .map(|violation| violation.rule)
@@ -369,7 +422,7 @@ pub fn find_flat_foldability_violation(
         return None;
     }
 
-    find_little_big_little_violation_on_sides(point, nbox)
+    find_little_big_little_violation_on_sides(point, nbox, angle_tolerance)
 }
 
 /// Oriedita `FLAT_FOLDABLE_CHECK_63` result coloring once the boundary loop is resolved.
@@ -848,6 +901,7 @@ fn maekawa_color(red: usize, blue: usize) -> FlatFoldabilityColor {
 fn find_flat_foldability_violation_inside(
     point: Point,
     mut nbox: SortingBox,
+    angle_tolerance: f64,
 ) -> Option<FlatFoldabilityViolation> {
     if nbox.total() % 2 == 1 {
         return Some(FlatFoldabilityViolation::new(
@@ -897,7 +951,7 @@ fn find_flat_foldability_violation_inside(
         ));
     }
 
-    if !angularly_flatfoldable(&nbox) {
+    if !angularly_flatfoldable(&nbox, angle_tolerance) {
         return Some(FlatFoldabilityViolation::new(
             point,
             FlatFoldabilityRule::Angles,
@@ -926,7 +980,7 @@ fn find_flat_foldability_violation_inside(
 
         for _ in 1..=nbox.total() {
             let temp_angle = angle_between_0_kmax(nbox.weight(2) - nbox.weight(1), max_angle);
-            if (temp_angle - min_angle).abs() < Epsilon::FLAT {
+            if (temp_angle - min_angle).abs() < angle_tolerance {
                 if nbox.value(1).color != nbox.value(2).color {
                     let next_angle = nbox.weight(3);
                     let mut temp = SortingBox::default();
@@ -967,7 +1021,7 @@ fn find_flat_foldability_violation_inside(
             - angle_between_0_kmax(nbox.weight(2), max_angle),
         max_angle,
     );
-    if (max_angle - temp_angle * 2.0).abs() < Epsilon::FLAT {
+    if (max_angle - temp_angle * 2.0).abs() < angle_tolerance {
         None
     } else {
         Some(FlatFoldabilityViolation::new(
@@ -981,6 +1035,7 @@ fn find_flat_foldability_violation_inside(
 fn find_little_big_little_violation_on_sides(
     point: Point,
     mut nbox: SortingBox,
+    angle_tolerance: f64,
 ) -> Option<FlatFoldabilityViolation> {
     if nbox.total() < 2 {
         return Some(FlatFoldabilityViolation::new(
@@ -1038,7 +1093,8 @@ fn find_little_big_little_violation_on_sides(
 
     let mut little_big_little = initial_little_big_little_segments(point, &nbox);
     while nbox.total() > 2 {
-        let next = little_big_little_single_step(&nbox, &mut little_big_little, point);
+        let next =
+            little_big_little_single_step(&nbox, &mut little_big_little, point, angle_tolerance);
         if next.total() == nbox.total() {
             return Some(FlatFoldabilityViolation::little_big_little(
                 point,
@@ -1055,6 +1111,7 @@ fn little_big_little_single_step(
     nbox: &SortingBox,
     little_big_little: &mut Vec<LittleBigLittleSegment>,
     point: Point,
+    angle_tolerance: f64,
 ) -> SortingBox {
     let mut min_angle = 10000.0;
     for k in 1..nbox.total() {
@@ -1065,7 +1122,7 @@ fn little_big_little_single_step(
     }
 
     let temp_angle = nbox.weight(2) - nbox.weight(1);
-    if (temp_angle - min_angle).abs() < Epsilon::FLAT {
+    if (temp_angle - min_angle).abs() < angle_tolerance {
         let mut reduced = SortingBox::default();
         for weighted in nbox.iter().skip(1) {
             reduced.add(weighted.clone());
@@ -1074,7 +1131,7 @@ fn little_big_little_single_step(
     }
 
     let temp_angle = nbox.weight(nbox.total()) - nbox.weight(nbox.total() - 1);
-    if (temp_angle - min_angle).abs() < Epsilon::FLAT {
+    if (temp_angle - min_angle).abs() < angle_tolerance {
         let mut reduced = SortingBox::default();
         for weighted in nbox.iter().take(nbox.total() - 1) {
             reduced.add(weighted.clone());
@@ -1084,7 +1141,7 @@ fn little_big_little_single_step(
 
     for k in 2..=nbox.total().saturating_sub(2) {
         let temp_angle = nbox.weight(k + 1) - nbox.weight(k);
-        if (temp_angle - min_angle).abs() < Epsilon::FLAT {
+        if (temp_angle - min_angle).abs() < angle_tolerance {
             if nbox.value(k).color != nbox.value(k + 1).color {
                 let mut reduced = SortingBox::default();
                 for weighted in nbox.iter().take(k - 1) {
@@ -1106,7 +1163,7 @@ fn little_big_little_single_step(
     nbox.clone()
 }
 
-fn angularly_flatfoldable(lines: &SortingBox) -> bool {
+fn angularly_flatfoldable(lines: &SortingBox, angle_tolerance: f64) -> bool {
     let mut even = 0.0;
     let mut odd = 0.0;
     for k in 1..=lines.total() {
@@ -1119,7 +1176,7 @@ fn angularly_flatfoldable(lines: &SortingBox) -> bool {
         }
     }
 
-    (even.abs() - odd.abs()).abs() < Epsilon::FLAT
+    (even.abs() - odd.abs()).abs() < angle_tolerance
 }
 
 fn initial_little_big_little_segments(
@@ -1541,5 +1598,49 @@ fn flat_foldable_boundary_color(crossings: &[LineSegment]) -> LineColor {
         LineColor::Cyan3
     } else {
         LineColor::Magenta5
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn add_ray(model: &mut CreasePatternModel, angle_degrees: f64, color: LineColor) {
+        let radians = angle_degrees.to_radians();
+        model.add_line(
+            Point::new(0.0, 0.0),
+            Point::new(radians.cos() * 10.0, radians.sin() * 10.0),
+            color,
+        );
+    }
+
+    #[test]
+    fn camv_angle_tolerance_can_accept_near_angle_balance() {
+        let mut model = CreasePatternModel::default();
+        add_ray(&mut model, 0.0, LineColor::Red1);
+        add_ray(&mut model, 90.05, LineColor::Blue2);
+        add_ray(&mut model, 180.0, LineColor::Red1);
+        add_ray(&mut model, 270.0, LineColor::Red1);
+
+        let strict = check4(&model);
+        assert!(
+            strict
+                .iter()
+                .any(|violation| violation.rule == FlatFoldabilityRule::Angles),
+            "expected the default Oriedita tolerance to report an angle violation: {strict:?}"
+        );
+
+        let loose = check4_with_options(
+            &model,
+            CamvCheckOptions {
+                angle_tolerance: 0.2,
+            },
+        );
+        assert!(
+            !loose
+                .iter()
+                .any(|violation| violation.rule == FlatFoldabilityRule::Angles),
+            "expected a looser CAMV angle tolerance to suppress the near-balanced angle diagnostic: {loose:?}"
+        );
     }
 }

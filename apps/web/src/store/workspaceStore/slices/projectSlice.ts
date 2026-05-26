@@ -38,6 +38,10 @@ import { ensureExtension, getFileService, type FileService } from '../../../plat
 import { requestConfirmation, requestCreasePatternExportOptions } from '../../commandDialogStore';
 import { useLayoutStore } from '../../layoutStore';
 import {
+  CAMV_ANGLE_TOLERANCE_OPERATIONS,
+  withCamvAngleTolerancePayload,
+} from '../camvDiagnostics';
+import {
   emptyFoldArtifactResourceState,
   readyFoldArtifactResourceState,
   staleFoldArtifactResourceState,
@@ -102,7 +106,10 @@ async function refreshAlwaysOnCamvDiagnostics(
   camvResult: OristudioCpCommandResult | null;
 }> {
   try {
-    const checkedDocument = await executeRuntimeOristudioCpCommand('CheckCamv');
+    const checkedDocument = await executeRuntimeOristudioCpCommand(
+      'CheckCamv',
+      withCamvAngleTolerancePayload()
+    );
     return {
       documentState: {
         ...checkedDocument,
@@ -933,7 +940,13 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
       try {
         const previousDocument = get().oristudioCpDocument?.document ?? null;
         const previousSelection = get().oristudioCpSelection;
-        const commandDocument = await executeRuntimeOristudioCpCommand(operationId, payload);
+        const commandPayload = CAMV_ANGLE_TOLERANCE_OPERATIONS.has(operationId)
+          ? withCamvAngleTolerancePayload(payload)
+          : payload;
+        const commandDocument = await executeRuntimeOristudioCpCommand(
+          operationId,
+          commandPayload
+        );
         const mutatesDocument = !NON_MUTATING_CP_OPERATIONS.has(operationId);
         const checked =
           mutatesDocument

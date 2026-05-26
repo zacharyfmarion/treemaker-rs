@@ -131,6 +131,7 @@ export interface OristudioCpCommandPayload {
   points?: Point[];
   line_color?: OristudioCpLineColor;
   selection_distance?: number;
+  camv_angle_tolerance?: number;
   replace_selection?: boolean;
   grid_width?: number;
   angle_system_divider?: number;

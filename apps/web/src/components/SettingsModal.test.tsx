@@ -2,7 +2,11 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useLayoutStore } from '../store/layoutStore';
-import { useSettingsStore, type SettingsTab } from '../store/settingsStore';
+import {
+  DEFAULT_CAMV_ANGLE_TOLERANCE,
+  useSettingsStore,
+  type SettingsTab,
+} from '../store/settingsStore';
 import { useThemeStore } from '../store/themeStore';
 import { applyTheme, DEFAULT_THEME, PRESET_THEMES } from '../themes';
 import { CommandDialogModal } from './CommandDialogModal';
@@ -30,6 +34,12 @@ function findExactButton(label: string): HTMLButtonElement {
   );
   expect(button).toBeDefined();
   return button as HTMLButtonElement;
+}
+
+function setInputValue(input: HTMLInputElement, value: string) {
+  const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+  valueSetter?.call(input, value);
+  input.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
 function themeNamesForSection(rendered: HTMLElement, label: string): string[] {
@@ -120,6 +130,30 @@ describe('SettingsModal', () => {
     });
 
     expect(resetLayout).toHaveBeenCalledOnce();
+  });
+
+  it('opens diagnostics settings and updates the CAMV tolerance', () => {
+    const rendered = renderModal('diagnostics');
+    expect(rendered.textContent).toContain('Diagnostics');
+
+    const input = rendered.querySelector<HTMLInputElement>(
+      'input[aria-label="CAMV angle tolerance"]'
+    );
+    expect(input).not.toBeNull();
+    expect(input?.value).toBe(String(DEFAULT_CAMV_ANGLE_TOLERANCE));
+
+    act(() => {
+      if (!input) throw new Error('expected CAMV angle tolerance input');
+      setInputValue(input, '0.25');
+    });
+
+    expect(useSettingsStore.getState().camvAngleTolerance).toBe(0.25);
+
+    act(() => {
+      findButton('Reset CAMV Tolerance').click();
+    });
+
+    expect(useSettingsStore.getState().camvAngleTolerance).toBe(DEFAULT_CAMV_ANGLE_TOLERANCE);
   });
 
   it('closes on Escape', () => {

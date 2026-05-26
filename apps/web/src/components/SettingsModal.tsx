@@ -1,20 +1,35 @@
 import { useEffect, useMemo, useState, type ReactElement } from 'react';
-import { Check, LayoutDashboard, Palette, RotateCcw, X } from 'lucide-react';
+import {
+  Check,
+  Gauge,
+  LayoutDashboard,
+  Palette,
+  RotateCcw,
+  X,
+  type LucideIcon,
+} from 'lucide-react';
 import { requestConfirmation } from '../store/commandDialogStore';
 import { useLayoutStore } from '../store/layoutStore';
-import { type SettingsTab, useSettingsStore } from '../store/settingsStore';
+import {
+  MAX_CAMV_ANGLE_TOLERANCE,
+  MIN_CAMV_ANGLE_TOLERANCE,
+  type SettingsTab,
+  useSettingsStore,
+} from '../store/settingsStore';
 import { useThemeStore } from '../store/themeStore';
 import type { TreeMakerTheme } from '../themes';
 import { Button } from './ui/Button';
 import { IconButton } from './ui/IconButton';
 
-const TABS: Array<{ key: SettingsTab; label: string; icon: typeof Palette }> = [
+const TABS: Array<{ key: SettingsTab; label: string; icon: LucideIcon }> = [
   { key: 'appearance', label: 'Appearance', icon: Palette },
+  { key: 'diagnostics', label: 'Diagnostics', icon: Gauge },
   { key: 'workspace', label: 'Workspace', icon: LayoutDashboard },
 ];
 
 const TAB_TITLES: Record<SettingsTab, string> = {
   appearance: 'Appearance',
+  diagnostics: 'Diagnostics',
   workspace: 'Workspace',
 };
 
@@ -126,8 +141,48 @@ function WorkspaceTab() {
   );
 }
 
+function DiagnosticsTab() {
+  const camvAngleTolerance = useSettingsStore((state) => state.camvAngleTolerance);
+  const setCamvAngleTolerance = useSettingsStore((state) => state.setCamvAngleTolerance);
+  const resetCamvAngleTolerance = useSettingsStore((state) => state.resetCamvAngleTolerance);
+
+  return (
+    <div className="settings-tab">
+      <section className="settings-section">
+        <h3 className="settings-section__title">CAMV</h3>
+        <label className="settings-number-field">
+          <span>Angle tolerance</span>
+          <input
+            aria-label="CAMV angle tolerance"
+            type="number"
+            min={MIN_CAMV_ANGLE_TOLERANCE}
+            max={MAX_CAMV_ANGLE_TOLERANCE}
+            step="0.001"
+            value={camvAngleTolerance}
+            onChange={(event) => {
+              const parsed = Number.parseFloat(event.currentTarget.value);
+              if (Number.isFinite(parsed)) setCamvAngleTolerance(parsed);
+            }}
+          />
+          <span className="settings-number-field__unit">deg</span>
+        </label>
+        <Button
+          size="md"
+          variant="secondary"
+          className="settings-full-width"
+          onClick={resetCamvAngleTolerance}
+        >
+          <RotateCcw size={14} />
+          Reset CAMV Tolerance
+        </Button>
+      </section>
+    </div>
+  );
+}
+
 const TAB_COMPONENTS: Record<SettingsTab, () => ReactElement> = {
   appearance: AppearanceTab,
+  diagnostics: DiagnosticsTab,
   workspace: WorkspaceTab,
 };
 

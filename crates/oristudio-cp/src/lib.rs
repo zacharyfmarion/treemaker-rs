@@ -110,6 +110,9 @@ pub struct CreasePatternCommandPayload {
     /// Optional model-space hit tolerance for point/line tools.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub selection_distance: Option<f64>,
+    /// Optional angular flat-foldability tolerance, in degrees, for CAMV checks.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub camv_angle_tolerance: Option<f64>,
     /// Optional UI-level replacement selection mode. Oriedita's primitive
     /// select operations are additive by default; callers set this when a
     /// normal click/box selection should replace the previous selected set.
@@ -2203,12 +2206,17 @@ pub fn execute_command(
             0
         }
         OperationId::Check4 => {
-            diagnostic_entries =
-                flat_foldability_diagnostics("Check4", checks::check4(&document.crease_pattern));
+            diagnostic_entries = flat_foldability_diagnostics(
+                "Check4",
+                checks::check4_with_options(&document.crease_pattern, camv_check_options(&command)),
+            );
             0
         }
         OperationId::CheckCamv => {
-            let result = checks::check_camv_task(&document.crease_pattern);
+            let result = checks::check_camv_task_with_options(
+                &document.crease_pattern,
+                camv_check_options(&command),
+            );
             diagnostic_entries = flat_foldability_diagnostics("CheckCamv", result.violations);
             0
         }
@@ -3111,6 +3119,16 @@ fn selection_distance(command: &CreasePatternCommand) -> f64 {
         .unwrap_or(DEFAULT_SELECTION_DISTANCE)
 }
 
+fn camv_check_options(command: &CreasePatternCommand) -> checks::CamvCheckOptions {
+    checks::CamvCheckOptions {
+        angle_tolerance: command
+            .payload
+            .camv_angle_tolerance
+            .filter(|tolerance| tolerance.is_finite() && *tolerance > 0.0)
+            .unwrap_or_default(),
+    }
+}
+
 fn grid_width(command: &CreasePatternCommand, model: &CreasePatternModel) -> f64 {
     command
         .payload
@@ -3503,6 +3521,15 @@ mod tests {
     use crate::geometry::{Circle, LineColor, Point, RgbColor};
     use std::collections::HashSet;
 
+    fn add_ray(document: &mut CreasePatternDocument, angle_degrees: f64, color: LineColor) {
+        let radians = angle_degrees.to_radians();
+        document.crease_pattern.add_line(
+            Point::new(0.0, 0.0),
+            Point::new(radians.cos() * 10.0, radians.sin() * 10.0),
+            color,
+        );
+    }
+
     #[test]
     fn registry_has_no_duplicate_operation_ids() {
         let mut ids = HashSet::new();
@@ -3574,6 +3601,46 @@ mod tests {
             }
         );
         assert_eq!(document, original);
+    }
+
+    #[test]
+    fn check_camv_command_uses_payload_angle_tolerance() {
+        let mut document = CreasePatternDocument::default();
+        add_ray(&mut document, 0.0, LineColor::Red1);
+        add_ray(&mut document, 90.05, LineColor::Blue2);
+        add_ray(&mut document, 180.0, LineColor::Red1);
+        add_ray(&mut document, 270.0, LineColor::Red1);
+
+        let strict = execute_command(
+            &mut document,
+            CreasePatternCommand::new(OperationId::CheckCamv),
+        )
+        .expect("strict CAMV check should execute");
+        assert!(
+            strict
+                .diagnostic_entries
+                .iter()
+                .any(|entry| entry.rule.as_deref() == Some("Angles")),
+            "expected the default CAMV tolerance to report an angle diagnostic: {strict:?}"
+        );
+
+        let loose = execute_command(
+            &mut document,
+            CreasePatternCommand::new(OperationId::CheckCamv).with_payload(
+                CreasePatternCommandPayload {
+                    camv_angle_tolerance: Some(0.2),
+                    ..CreasePatternCommandPayload::default()
+                },
+            ),
+        )
+        .expect("loose CAMV check should execute");
+        assert!(
+            !loose
+                .diagnostic_entries
+                .iter()
+                .any(|entry| entry.rule.as_deref() == Some("Angles")),
+            "expected the payload tolerance to suppress the near-balanced angle diagnostic: {loose:?}"
+        );
     }
 
     #[test]

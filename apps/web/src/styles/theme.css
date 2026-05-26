@@ -1267,6 +1267,42 @@
   text-transform: uppercase;
 }
 
+.settings-number-field {
+  display: grid;
+  grid-template-columns: minmax(112px, 0.8fr) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.settings-number-field input {
+  width: 100%;
+  min-width: 0;
+  height: 30px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  padding: 0 var(--space-2);
+}
+
+.settings-number-field input:focus-visible {
+  border-color: var(--accent-primary);
+  outline: none;
+}
+
+.settings-number-field__unit {
+  color: var(--text-tertiary);
+  font-size: 0.72rem;
+  font-weight: 750;
+}
+
 .settings-theme-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

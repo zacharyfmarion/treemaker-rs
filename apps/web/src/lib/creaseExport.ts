@@ -16,8 +16,8 @@ export const DEFAULT_CREASE_EXPORT_OPTIONS: CreaseExportOptions = {
 };
 
 const FOLD_STYLES: Record<CreaseLine['fold'], string> = {
-  mountain: 'stroke:#111417;stroke-width:3',
-  valley: 'stroke:#b24dd8;stroke-width:3;stroke-dasharray:10 7',
+  mountain: 'stroke:#ff4d5d;stroke-width:3',
+  valley: 'stroke:#60a5fa;stroke-width:3;stroke-dasharray:10 7',
   flat: 'stroke:#85919a;stroke-width:1.5',
   border: 'stroke:#111417;stroke-width:4',
   unassigned: 'stroke:#85919a;stroke-width:1.5',

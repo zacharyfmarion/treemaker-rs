@@ -288,6 +288,40 @@ describe('crease pattern viewport helpers', () => {
     ).toMatchObject({ kind: 'vertex', label: 'line 1 start', point: { x: 0, y: 0 } });
   });
 
+  it('uses a larger capture radius for Oriedita draw vertex snapping', () => {
+    const bounds = getEditableCpModelBounds(document);
+
+    expect(
+      nearestOrieditaDrawPointTarget(
+        document,
+        { x: 16.5, y: 0 },
+        bounds,
+        {
+          gridVisible: false,
+          snapToGrid: false,
+          snapToVertices: true,
+          snapToLines: false,
+        },
+        5
+      )
+    ).toMatchObject({ kind: 'vertex', label: 'line 1 end', point: { x: 10, y: 0 } });
+
+    expect(
+      nearestOrieditaDrawPointTarget(
+        document,
+        { x: 16.5, y: 0 },
+        bounds,
+        {
+          gridVisible: false,
+          snapToGrid: false,
+          snapToVertices: false,
+          snapToLines: false,
+        },
+        5
+      )
+    ).toBeNull();
+  });
+
   it('snaps to the same Oriedita paper grid basis used for rendering', () => {
     expect(closestOrieditaGridPoint({ x: 2, y: -3 }, document.crease_pattern.grid)).toEqual({
       x: 0,

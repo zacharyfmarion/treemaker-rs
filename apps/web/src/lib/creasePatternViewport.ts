@@ -38,6 +38,7 @@ const DEFAULT_SPAN = 1;
 const MAX_GRID_LINES = 80;
 const MAX_ORIEDITA_GRID_LINES = 460;
 const GRID_EPSILON = 1e-9;
+const POINT_SNAP_DISTANCE_MULTIPLIER = 1.75;
 
 export interface OristudioCpSelection {
   lines: number[];
@@ -498,18 +499,25 @@ export function nearestCpSnapTarget(
   maxDistance = Math.max(bounds.spanX, bounds.spanY) * 0.015
 ): CpSnapTarget | null {
   let best: CpSnapTarget | null = null;
-  const consider = (target: CpSnapTarget) => {
-    if (target.distance > maxDistance) return;
+  const pointSnapDistance = maxDistance * POINT_SNAP_DISTANCE_MULTIPLIER;
+  const consider = (target: CpSnapTarget, targetMaxDistance = maxDistance) => {
+    if (target.distance > targetMaxDistance) return;
     if (!best || target.distance < best.distance) best = target;
   };
 
   if (options.snapToVertices) {
     document.crease_pattern.line_segments.forEach((segment, index) => {
-      consider(pointTarget(segment.a, point, 'vertex', `line ${index + 1} start`));
-      consider(pointTarget(segment.b, point, 'vertex', `line ${index + 1} end`));
+      consider(
+        pointTarget(segment.a, point, 'vertex', `line ${index + 1} start`),
+        pointSnapDistance
+      );
+      consider(
+        pointTarget(segment.b, point, 'vertex', `line ${index + 1} end`),
+        pointSnapDistance
+      );
     });
     document.crease_pattern.points.forEach((candidate, index) => {
-      consider(pointTarget(candidate, point, 'point', `point ${index + 1}`));
+      consider(pointTarget(candidate, point, 'point', `point ${index + 1}`), pointSnapDistance);
     });
   }
 
@@ -541,22 +549,30 @@ export function nearestOrieditaDrawPointTarget(
   maxDistance = Math.max(bounds.spanX, bounds.spanY) * 0.015
 ): CpSnapTarget | null {
   let best: CpSnapTarget | null = null;
-  const consider = (target: CpSnapTarget) => {
-    if (target.distance > maxDistance) return;
+  const pointSnapDistance = maxDistance * POINT_SNAP_DISTANCE_MULTIPLIER;
+  const consider = (target: CpSnapTarget, targetMaxDistance = maxDistance) => {
+    if (target.distance > targetMaxDistance) return;
     if (!best || target.distance < best.distance) best = target;
   };
 
   if (options.snapToVertices) {
     document.crease_pattern.line_segments.forEach((segment, index) => {
-      consider(pointTarget(segment.a, point, 'vertex', `line ${index + 1} start`));
-      consider(pointTarget(segment.b, point, 'vertex', `line ${index + 1} end`));
+      consider(
+        pointTarget(segment.a, point, 'vertex', `line ${index + 1} start`),
+        pointSnapDistance
+      );
+      consider(
+        pointTarget(segment.b, point, 'vertex', `line ${index + 1} end`),
+        pointSnapDistance
+      );
     });
     document.crease_pattern.points.forEach((candidate, index) => {
-      consider(pointTarget(candidate, point, 'point', `point ${index + 1}`));
+      consider(pointTarget(candidate, point, 'point', `point ${index + 1}`), pointSnapDistance);
     });
     document.crease_pattern.circles.forEach((circle, index) => {
       consider(
-        pointTarget({ x: circle.x, y: circle.y }, point, 'point', `circle ${index + 1} center`)
+        pointTarget({ x: circle.x, y: circle.y }, point, 'point', `circle ${index + 1} center`),
+        pointSnapDistance
       );
     });
   }

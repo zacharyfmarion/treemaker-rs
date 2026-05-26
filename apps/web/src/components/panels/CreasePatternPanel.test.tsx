@@ -11,6 +11,8 @@ import {
   CP_EDITABLE_CANVAS_RECT,
   CP_PAPER_RECT,
   CP_WORLD_RECT,
+  getEditableCpModelBounds,
+  modelPointToCpSvg,
 } from '../../lib/creasePatternViewport';
 import type { ImportedCreasePatternDocument } from '../../lib/creasePatternImport';
 import { createStarterOristudioCpDocument } from '../../lib/oristudioCpStarterDocument';
@@ -2758,6 +2760,75 @@ describe('CreasePatternPanel', () => {
     const [, payload] = executeOristudioCpCommand.mock.calls[0] ?? [];
     expect(payload?.points?.[0]).toEqual({ x: 0, y: 0 });
     expect(payload?.points?.[1]).toEqual({ x: 1, y: 0 });
+  });
+
+  it('snaps angle bisector point picks to existing Oriedita vertices', async () => {
+    const executeOristudioCpCommand = vi.fn(
+      async (_operationId: string, _payload?: OristudioCpCommandPayload) => true
+    );
+    const editableCp = editableCpState();
+    const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
+      documentMode: 'crease-pattern',
+      importedCreasePattern: importedCpDocument(),
+      oristudioCpDocument: editableCp,
+      oristudioCpViewport: {
+        gridVisible: false,
+        snapToGrid: false,
+        snapToVertices: true,
+        snapToLines: true,
+      },
+      executeOristudioCpCommand,
+    });
+    const canvas = setCanvasClientRect(container);
+    const bounds = getEditableCpModelBounds(editableCp.document);
+    const pointerDownAtModelPoint = (point: { x: number; y: number }) => {
+      const svgPoint = modelPointToCpSvg(point, bounds);
+      canvas.dispatchEvent(
+        new MouseEvent('pointerdown', {
+          bubbles: true,
+          button: 0,
+          clientX: svgPoint.x,
+          clientY: svgPoint.y,
+        })
+      );
+    };
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('button[aria-label="Angle Bisector"]')?.click();
+      await Promise.resolve();
+    });
+    expect(container.textContent).toContain('Angle Bisector: Select 2 segments or 3 points');
+
+    act(() => {
+      pointerDownAtModelPoint({ x: 0.3, y: 0 });
+    });
+    expect(container.textContent).toContain('Angle Bisector: Select 3 points');
+
+    act(() => {
+      pointerDownAtModelPoint({ x: 0.7, y: 0 });
+    });
+    expect(container.textContent).toContain('Angle Bisector: Select 3 points');
+
+    act(() => {
+      pointerDownAtModelPoint({ x: 0, y: 0.7 });
+    });
+    expect(container.textContent).toContain('Angle Bisector: Select segment to end');
+
+    await act(async () => {
+      pointerDownAtModelPoint({ x: 0.5, y: 0 });
+      await Promise.resolve();
+    });
+
+    expect(executeOristudioCpCommand).toHaveBeenCalledOnce();
+    const [operation, payload] = executeOristudioCpCommand.mock.calls[0] ?? [];
+    expect(operation).toBe('SquareBisector');
+    expect(payload?.points?.slice(0, 3)).toEqual([
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+      { x: 0, y: 1 },
+    ]);
+    expect(payload?.points?.[3]?.x).toBeCloseTo(0.5);
+    expect(payload?.points?.[3]?.y).toBeCloseTo(0);
   });
 
   it('runs ready lasso commands from a freehand drag path', async () => {

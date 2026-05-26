@@ -369,6 +369,22 @@ function allowsDirectEntitySelection(operationId: string | null | undefined): bo
   return operationId === 'CreaseSelect';
 }
 
+function shouldPreferPointSnapForStep(
+  command: OristudioCpCommandDefinition | null | undefined,
+  stepIndex: number
+): boolean {
+  const step = command?.toolSteps?.[stepIndex]?.toLowerCase();
+  if (!step) return false;
+  if (step.includes('crease') || step.includes('line')) return false;
+  return (
+    step.includes('point') ||
+    step.includes('vertex') ||
+    step.includes('endpoint') ||
+    step.includes('center') ||
+    step.includes('radius')
+  );
+}
+
 function isDefaultSelectionMode(
   state: { activeOperationId: string | null; phase: string },
   pendingPointCount: number,
@@ -1161,18 +1177,26 @@ export function CreasePatternPanel() {
   );
 
   const resolveEditableToolPoint = useCallback(
-    (event: PointerEvent<SVGElement>): Point | null => {
+    (event: PointerEvent<SVGElement>, preferPointSnap = false): Point | null => {
       if (!editableCp) return null;
       const modelPoint = eventToEditableModelPoint(event);
       if (!modelPoint) return null;
       const selectionDistance = modelSelectionDistance(editableCpBounds, zoomPercent / 100);
-      const target = nearestCpSnapTarget(
-        editableCp,
-        modelPoint,
-        editableCpBounds,
-        oristudioCpViewport,
-        selectionDistance
-      );
+      const target = preferPointSnap
+        ? nearestOrieditaDrawPointTarget(
+            editableCp,
+            modelPoint,
+            editableCpBounds,
+            oristudioCpViewport,
+            selectionDistance
+          )
+        : nearestCpSnapTarget(
+            editableCp,
+            modelPoint,
+            editableCpBounds,
+            oristudioCpViewport,
+            selectionDistance
+          );
       return target?.point ?? modelPoint;
     },
     [editableCp, editableCpBounds, eventToEditableModelPoint, oristudioCpViewport, zoomPercent]
@@ -1216,20 +1240,32 @@ export function CreasePatternPanel() {
         );
         return;
       }
+      const preferPointSnap =
+        activeCpCommand && shouldPreferPointSnapForStep(activeCpCommand, cpToolPoints.length);
       setSnapTarget(
         modelPoint
-          ? nearestCpSnapTarget(
-              editableCp,
-              modelPoint,
-              editableCpBounds,
-              oristudioCpViewport,
-              modelSelectionDistance(editableCpBounds, zoomPercent / 100)
-            )
+          ? preferPointSnap
+            ? nearestOrieditaDrawPointTarget(
+                editableCp,
+                modelPoint,
+                editableCpBounds,
+                oristudioCpViewport,
+                modelSelectionDistance(editableCpBounds, zoomPercent / 100)
+              )
+            : nearestCpSnapTarget(
+                editableCp,
+                modelPoint,
+                editableCpBounds,
+                oristudioCpViewport,
+                modelSelectionDistance(editableCpBounds, zoomPercent / 100)
+              )
           : null
       );
     },
     [
+      activeCpCommand,
       activeCpInputMode,
+      cpToolPoints.length,
       editableCp,
       editableCpBounds,
       eventToEditableModelPoint,
@@ -1463,7 +1499,10 @@ export function CreasePatternPanel() {
         return;
       }
 
-      const point = resolveEditableToolPoint(event);
+      const point = resolveEditableToolPoint(
+        event,
+        shouldPreferPointSnapForStep(activeCpCommand, cpToolPoints.length)
+      );
       if (!point) return;
 
       event.preventDefault();

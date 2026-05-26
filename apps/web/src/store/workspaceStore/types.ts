@@ -26,6 +26,7 @@ import type { SelectablePartKind } from '../../lib/selection';
 import type { SymmetryAuthoringPair } from '../../lib/symmetryAuthoring';
 import type { FileService } from '../../platform/fileService';
 import type { ImportedCreasePatternDocument } from '../../lib/creasePatternImport';
+import type { FoldArtifactStatus } from './foldArtifactResource';
 import type {
   OristudioCpCommandPayload,
   OristudioCpCommandPreview,
@@ -246,6 +247,10 @@ export interface CreasePatternSliceState {
   oristudioCpViewport: OristudioCpViewportOptions;
   foldArtifacts: FoldArtifacts | null;
   foldArtifactError: string | null;
+  foldArtifactStatus: FoldArtifactStatus;
+  foldArtifactRevision: number;
+  foldArtifactResolvedRevision: number | null;
+  foldArtifactRequestId: number;
   sequenceTarget: SequenceTargetState | null;
   sequencePlan: SequencePlan | null;
   sequenceSimulationFocus: SequenceSimulationFocus;
@@ -262,6 +267,8 @@ export interface CreasePatternSliceActions {
   optimizeEdges: () => Promise<void>;
   optimizeStrain: () => Promise<void>;
   buildCreasePattern: () => Promise<void>;
+  markFoldSourceChanged: () => void;
+  ensureFoldArtifacts: () => Promise<FoldArtifacts | null>;
   refreshFoldArtifacts: () => Promise<FoldArtifacts | null>;
   analyzeSequenceTarget: () => Promise<SequenceTargetState | null>;
   planFoldingSequence: () => Promise<SequencePlan | null>;

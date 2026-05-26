@@ -17,12 +17,20 @@ const PREVIEW_PADDING = 24;
 export function SequencePanel() {
   const foldArtifacts = useWorkspaceStore((state) => state.foldArtifacts);
   const foldArtifactError = useWorkspaceStore((state) => state.foldArtifactError);
+  const foldArtifactStatus = useWorkspaceStore((state) => state.foldArtifactStatus);
   const sequencePlan = useWorkspaceStore((state) => state.sequencePlan);
   const sequenceTarget = useWorkspaceStore((state) => state.sequenceTarget);
   const sequencePlanning = useWorkspaceStore((state) => state.sequencePlanning);
   const sequenceError = useWorkspaceStore((state) => state.sequenceError);
+  const ensureFoldArtifacts = useWorkspaceStore((state) => state.ensureFoldArtifacts);
   const planFoldingSequence = useWorkspaceStore((state) => state.planFoldingSequence);
   const planningElapsedSeconds = usePlanningElapsed(sequencePlanning);
+
+  useEffect(() => {
+    if (foldArtifacts) return;
+    if (foldArtifactStatus !== 'idle' && foldArtifactStatus !== 'stale') return;
+    void ensureFoldArtifacts();
+  }, [ensureFoldArtifacts, foldArtifacts, foldArtifactStatus]);
 
   const statusTone =
     sequenceError || sequencePlan?.status === 'unsupported'
@@ -36,6 +44,8 @@ export function SequencePanel() {
     ? 'Planning sequence'
     : sequenceError
       ? sequenceError
+      : foldArtifactStatus === 'loading'
+        ? 'Preparing crease pattern'
       : sequencePlan
         ? formatStatus(sequencePlan.status)
         : foldArtifacts

@@ -22,6 +22,11 @@ import { ensureExtension, getFileService, type FileService } from '../../../plat
 import { requestConfirmation } from '../../commandDialogStore';
 import { useLayoutStore } from '../../layoutStore';
 import {
+  emptyFoldArtifactResourceState,
+  readyFoldArtifactResourceState,
+  staleFoldArtifactResourceState,
+} from '../foldArtifactResource';
+import {
   createBlankTree,
   createStarterTree,
   engineError,
@@ -277,8 +282,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
       toolMode: 'select',
       symmetryAuthoringPairs: [],
       creaseColorMode: DEFAULT_CREASE_COLOR_MODE,
-      foldArtifacts: null,
-      foldArtifactError: null,
+      ...emptyFoldArtifactResourceState(),
       status: statusFromSnapshot(snapshot),
       dirty: source.dirty ?? false,
       lastOptimization: null,
@@ -343,6 +347,17 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
         return withFlatFoldError(parsed, engineError(error).message);
       }
     })();
+    const artifactRevision = get().foldArtifactRevision + 1;
+    const artifactState =
+      result.foldArtifacts.folded_base_error && !result.foldArtifacts.folded_base
+        ? {
+            foldArtifacts: result.foldArtifacts,
+            foldArtifactError: result.foldArtifacts.folded_base_error,
+            foldArtifactStatus: 'error' as const,
+            foldArtifactRevision: artifactRevision,
+            foldArtifactResolvedRevision: artifactRevision,
+          }
+        : readyFoldArtifactResourceState(result.foldArtifacts, artifactRevision);
     set({
       project: result.project,
       documentMode: 'crease-pattern',
@@ -364,8 +379,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
       oristudioCpActiveDiagnosticId: null,
       toolMode: 'select',
       creaseColorMode: DEFAULT_CREASE_COLOR_MODE,
-      foldArtifacts: result.foldArtifacts,
-      foldArtifactError: null,
+      ...artifactState,
       sequenceTarget: null,
       sequencePlan: null,
       sequenceSimulationFocus: { kind: 'whole' },
@@ -506,6 +520,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
     error: null,
     lastOptimization: null,
     designViewportFitRequestId: 0,
+    ...emptyFoldArtifactResourceState(),
 
     initEngine: async () => {
       set({ status: 'loading_engine', error: null });
@@ -535,8 +550,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
           symmetryAuthoringPairs: [],
           dirty: false,
           lastOptimization: null,
-          foldArtifacts: null,
-          foldArtifactError: null,
+          ...emptyFoldArtifactResourceState(),
           historyPast: [],
           historyFuture: [],
         });
@@ -572,8 +586,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
           toolMode: 'select',
           symmetryAuthoringPairs: [],
           creaseColorMode: DEFAULT_CREASE_COLOR_MODE,
-          foldArtifacts: null,
-          foldArtifactError: null,
+          ...emptyFoldArtifactResourceState(),
           dirty: false,
           lastOptimization: null,
           historyPast: [],
@@ -612,8 +625,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
           toolMode: 'select',
           symmetryAuthoringPairs: [],
           creaseColorMode: DEFAULT_CREASE_COLOR_MODE,
-          foldArtifacts: null,
-          foldArtifactError: null,
+          ...emptyFoldArtifactResourceState(),
           dirty: false,
           lastOptimization: null,
           historyPast: [],
@@ -653,8 +665,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
           toolMode: 'select',
           symmetryAuthoringPairs: [],
           creaseColorMode: DEFAULT_CREASE_COLOR_MODE,
-          foldArtifacts: null,
-          foldArtifactError: null,
+          ...emptyFoldArtifactResourceState(),
           sequenceTarget: null,
           sequencePlan: null,
           sequenceSimulationFocus: { kind: 'whole' },
@@ -741,18 +752,24 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
               : get().oristudioCpHistoryPast
             : get().oristudioCpHistoryPast,
           oristudioCpHistoryFuture: mutatesDocument ? [] : get().oristudioCpHistoryFuture,
-          foldArtifacts: mutatesDocument ? null : get().foldArtifacts,
-          foldArtifactError: mutatesDocument ? null : get().foldArtifactError,
-          sequenceTarget: mutatesDocument ? null : get().sequenceTarget,
-          sequencePlan: mutatesDocument ? null : get().sequencePlan,
-          sequenceSimulationFocus: mutatesDocument ? { kind: 'whole' } : get().sequenceSimulationFocus,
-          sequenceError: mutatesDocument ? null : get().sequenceError,
+          ...(mutatesDocument
+            ? staleFoldArtifactResourceState(get().foldArtifactRevision)
+            : {
+                foldArtifacts: get().foldArtifacts,
+                foldArtifactError: get().foldArtifactError,
+                foldArtifactStatus: get().foldArtifactStatus,
+                foldArtifactRevision: get().foldArtifactRevision,
+                foldArtifactResolvedRevision: get().foldArtifactResolvedRevision,
+                foldArtifactRequestId: get().foldArtifactRequestId,
+                sequenceTarget: get().sequenceTarget,
+                sequencePlan: get().sequencePlan,
+                sequenceSimulationFocus: get().sequenceSimulationFocus,
+                sequencePlanning: get().sequencePlanning,
+                sequenceError: get().sequenceError,
+              }),
           error: null,
           dirty: mutatesDocument ? true : get().dirty,
         });
-        if (mutatesDocument) {
-          await get().refreshFoldArtifacts();
-        }
         return true;
       } catch (error) {
         const normalized = oristudioCpError(error);

@@ -12,7 +12,10 @@ import { FoldedBasePanel } from './FoldedBasePanel';
 let root: Root | null = null;
 let container: HTMLDivElement | null = null;
 
-function renderPanel(foldArtifacts: FoldArtifacts) {
+function renderPanel(
+  foldArtifacts: FoldArtifacts | null,
+  overrides: Partial<ReturnType<typeof useWorkspaceStore.getState>> = {}
+) {
   useWorkspaceStore.setState(
     {
       ...useWorkspaceStore.getInitialState(),
@@ -22,6 +25,8 @@ function renderPanel(foldArtifacts: FoldArtifacts) {
       status: 'crease_pattern_ready',
       engineReady: true,
       foldArtifacts,
+      foldArtifactStatus: foldArtifacts ? 'ready' : 'idle',
+      ...overrides,
     },
     true
   );
@@ -153,5 +158,14 @@ describe('FoldedBasePanel', () => {
 
     expect(rendered.textContent).toContain('Layer ordering failed');
     expect(rendered.querySelector('[aria-label="Refresh"]')).toBeNull();
+  });
+
+  it('shows resource-level folded-base refresh errors', () => {
+    const rendered = renderPanel(null, {
+      foldArtifactStatus: 'error',
+      foldArtifactError: 'Flat-folder solve failed',
+    });
+
+    expect(rendered.textContent).toContain('Flat-folder solve failed');
   });
 });

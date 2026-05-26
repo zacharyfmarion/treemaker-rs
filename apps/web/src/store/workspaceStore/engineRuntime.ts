@@ -9,6 +9,7 @@ import type {
 import type { Point } from '../../lib/geometry';
 import type { AppStatus, Selection } from '../../lib/sampleProject';
 import type { TreemakerWorkerApi } from '../../workers/treemakerWorker';
+import { emptyFoldArtifactResourceState } from './foldArtifactResource';
 
 export type EngineClient = Remote<TreemakerWorkerApi>;
 
@@ -160,8 +161,7 @@ export function projectStateFromSnapshot(snapshot: TreeSnapshot, title?: string)
     engineReady: true,
     status: 'ready' as const,
     error: null,
-    foldArtifacts: null,
-    foldArtifactError: null,
+    ...emptyFoldArtifactResourceState(),
     sequenceTarget: null,
     sequencePlan: null,
     sequenceSimulationFocus: { kind: 'whole' as const },

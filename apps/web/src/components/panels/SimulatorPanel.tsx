@@ -116,9 +116,11 @@ export function SimulatorPanel() {
   const creaseCount = useWorkspaceStore((state) => state.project.creases.length);
   const foldArtifacts = useWorkspaceStore((state) => state.foldArtifacts);
   const foldArtifactError = useWorkspaceStore((state) => state.foldArtifactError);
+  const foldArtifactStatus = useWorkspaceStore((state) => state.foldArtifactStatus);
   const sequencePlan = useWorkspaceStore((state) => state.sequencePlan);
   const sequenceSimulationFocus = useWorkspaceStore((state) => state.sequenceSimulationFocus);
   const setSequenceSimulationFocus = useWorkspaceStore((state) => state.setSequenceSimulationFocus);
+  const ensureFoldArtifacts = useWorkspaceStore((state) => state.ensureFoldArtifacts);
   const refreshFoldArtifacts = useWorkspaceStore((state) => state.refreshFoldArtifacts);
   const capabilities = useWorkspaceCapabilities();
 
@@ -269,22 +271,26 @@ export function SimulatorPanel() {
       return;
     }
 
-    let cancelled = false;
     setModelError(null);
+    if (foldArtifactStatus === 'loading') {
+      setLoadState('loading');
+      return;
+    }
+    if (foldArtifactStatus === 'error') {
+      setModelError(foldArtifactError ?? 'Simulator unavailable');
+      setLoadState('error');
+      return;
+    }
     setLoadState('loading');
-    void refreshFoldArtifacts().then((artifacts) => {
-      if (cancelled) return;
-      setLoadState(artifacts ? 'ready' : 'error');
-    });
-    return () => {
-      cancelled = true;
-    };
+    void ensureFoldArtifacts();
   }, [
     clearPlayback,
     clearSettling,
     creaseCount,
     foldArtifacts,
-    refreshFoldArtifacts,
+    foldArtifactError,
+    foldArtifactStatus,
+    ensureFoldArtifacts,
     simulationModelError,
     simulatorMode,
     activeStepSimulation,

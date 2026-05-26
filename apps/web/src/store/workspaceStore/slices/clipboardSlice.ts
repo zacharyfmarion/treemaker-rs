@@ -8,6 +8,7 @@ import {
   projectStateFromSnapshot,
   statusAfterEdit,
 } from '../engineRuntime';
+import { staleFoldArtifactResourceState } from '../foldArtifactResource';
 import type {
   ClipboardEdge,
   ClipboardNode,
@@ -230,9 +231,7 @@ export const createClipboardSlice: WorkspaceSliceCreator<ClipboardSlice> = (set,
         dirty: true,
         error: null,
         lastOptimization: null,
-        foldArtifacts: null,
-        foldArtifactError: null,
-        sequenceSimulationFocus: { kind: 'whole' },
+        ...staleFoldArtifactResourceState(get().foldArtifactRevision),
         clipboardPasteCount: get().clipboardPasteCount + 1,
         projectMessage: `Pasted ${pastedNodes.length} nodes`,
       });

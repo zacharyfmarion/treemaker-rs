@@ -11,6 +11,7 @@ import {
   projectStateFromSnapshot,
   statusAfterEdit,
 } from '../engineRuntime';
+import { staleFoldArtifactResourceState } from '../foldArtifactResource';
 import type { ConditionSlice, WorkspaceSliceCreator } from '../types';
 
 export const createConditionSlice: WorkspaceSliceCreator<ConditionSlice> = (set, get) => {
@@ -54,9 +55,7 @@ export const createConditionSlice: WorkspaceSliceCreator<ConditionSlice> = (set,
         dirty: true,
         error: null,
         lastOptimization: null,
-        foldArtifacts: null,
-        foldArtifactError: null,
-        sequenceSimulationFocus: { kind: 'whole' },
+        ...staleFoldArtifactResourceState(get().foldArtifactRevision),
         projectMessage: label,
       });
       get().commitHistoryCheckpoint(checkpoint, label);
@@ -90,9 +89,7 @@ export const createConditionSlice: WorkspaceSliceCreator<ConditionSlice> = (set,
         dirty: true,
         error: null,
         lastOptimization: null,
-        foldArtifacts: null,
-        foldArtifactError: null,
-        sequenceSimulationFocus: { kind: 'whole' },
+        ...staleFoldArtifactResourceState(get().foldArtifactRevision),
         projectMessage: label,
       });
       get().commitHistoryCheckpoint(checkpoint, label);

@@ -1,5 +1,10 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
+import type {
+  CreaseExportFormat,
+  CreaseExportOptions,
+} from '../lib/creaseExport';
+import type { TreeProject } from '../lib/sampleProject';
 
 export type ConfirmDialogOptions = {
   title: string;
@@ -20,9 +25,19 @@ export type NumberDialogOptions = {
   meta?: string;
 };
 
+export type CreasePatternExportDialogOptions = {
+  title: string;
+  format: CreaseExportFormat;
+  project: TreeProject;
+  initialOptions: CreaseExportOptions;
+  confirmLabel?: string;
+  cancelLabel?: string;
+};
+
 export type CommandDialog =
   | ({ id: number; type: 'confirm' } & ConfirmDialogOptions)
-  | ({ id: number; type: 'number' } & NumberDialogOptions);
+  | ({ id: number; type: 'number' } & NumberDialogOptions)
+  | ({ id: number; type: 'crease-export' } & CreasePatternExportDialogOptions);
 
 interface CommandDialogState {
   dialog: CommandDialog | null;
@@ -35,6 +50,11 @@ let mountedHostCount = 0;
 let pending:
   | { id: number; fallback: boolean; resolve: (value: boolean) => void }
   | { id: number; fallback: number | null; resolve: (value: number | null) => void }
+  | {
+      id: number;
+      fallback: CreaseExportOptions | null;
+      resolve: (value: CreaseExportOptions | null) => void;
+    }
   | null = null;
 
 export const useCommandDialogStore = create<CommandDialogState>()(
@@ -97,7 +117,28 @@ export function requestPositiveNumber(options: NumberDialogOptions): Promise<num
   });
 }
 
-export function resolveCommandDialog(id: number, value: boolean | number | null): void {
+export function requestCreasePatternExportOptions(
+  options: CreasePatternExportDialogOptions
+): Promise<CreaseExportOptions | null> {
+  if (mountedHostCount === 0) return Promise.resolve(options.initialOptions);
+
+  clearPendingWithFallback();
+  const id = nextDialogId;
+  nextDialogId += 1;
+  return new Promise<CreaseExportOptions | null>((resolve) => {
+    pending = { id, fallback: null, resolve };
+    useCommandDialogStore.getState().openDialog({
+      id,
+      type: 'crease-export',
+      ...options,
+    });
+  });
+}
+
+export function resolveCommandDialog(
+  id: number,
+  value: boolean | number | CreaseExportOptions | null
+): void {
   if (!pending || pending.id !== id) return;
   pending.resolve(value as never);
   pending = null;

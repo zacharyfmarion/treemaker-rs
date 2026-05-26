@@ -66,7 +66,7 @@ export interface TreePath {
 export interface CreaseLine {
   id: number;
   vertices: [Point, Point];
-  fold: 'mountain' | 'valley' | 'flat' | 'border';
+  fold: 'mountain' | 'valley' | 'flat' | 'border' | 'unassigned';
   kind: 'axial' | 'gusset' | 'ridge' | 'hinge' | 'pseudohinge';
 }
 

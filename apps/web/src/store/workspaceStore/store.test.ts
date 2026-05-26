@@ -1193,13 +1193,13 @@ describe('workspace store slices', () => {
     await expect(useWorkspaceStore.getState().exportSvg(fileService)).resolves.toBe(true);
     expect(exportMocks.serializeCreasePatternSvg).toHaveBeenCalledWith(
       useWorkspaceStore.getState().project,
-      DEFAULT_CREASE_COLOR_MODE
+      { viewMode: DEFAULT_CREASE_COLOR_MODE, includeUnassigned: true, showBackgroundColor: true }
     );
 
     await expect(useWorkspaceStore.getState().exportPng(fileService)).resolves.toBe(true);
     expect(exportMocks.renderCreasePatternPng).toHaveBeenCalledWith(
       useWorkspaceStore.getState().project,
-      DEFAULT_CREASE_COLOR_MODE
+      { viewMode: DEFAULT_CREASE_COLOR_MODE, includeUnassigned: true, showBackgroundColor: true }
     );
     expect(fileService.saveBinaryFile).toHaveBeenCalledWith(
       expect.objectContaining({ extensions: ['png'], mimeType: 'image/png' })

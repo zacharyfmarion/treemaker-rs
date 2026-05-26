@@ -26,6 +26,7 @@ import type { SelectablePartKind } from '../../lib/selection';
 import type { SymmetryAuthoringPair } from '../../lib/symmetryAuthoring';
 import type { FileService } from '../../platform/fileService';
 import type { ImportedCreasePatternDocument } from '../../lib/creasePatternImport';
+import type { CreaseExportOptions } from '../../lib/creaseExport';
 import type { FoldArtifactStatus } from './foldArtifactResource';
 import type {
   OristudioCpCommandPayload,
@@ -108,8 +109,8 @@ export interface ProjectSliceActions {
   exportV4: (fileService?: FileService) => Promise<boolean>;
   exportCp: (fileService?: FileService) => Promise<boolean>;
   exportFold: (fileService?: FileService) => Promise<boolean>;
-  exportSvg: (fileService?: FileService) => Promise<boolean>;
-  exportPng: (fileService?: FileService) => Promise<boolean>;
+  exportSvg: (fileService?: FileService, options?: CreaseExportOptions) => Promise<boolean>;
+  exportPng: (fileService?: FileService, options?: CreaseExportOptions) => Promise<boolean>;
   loadExampleProject: (id: string) => Promise<void>;
   loadRecentProject: (id: string) => Promise<void>;
   autosaveProject: () => Promise<void>;

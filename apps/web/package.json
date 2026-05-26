@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@radix-ui/react-select": "^2.2.6",
+    "@radix-ui/react-switch": "^1.2.6",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@tauri-apps/api": "^2.0.0",
     "@tauri-apps/plugin-dialog": "^2.0.0",

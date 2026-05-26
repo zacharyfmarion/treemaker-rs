@@ -3,12 +3,23 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   requestConfirmation,
+  requestCreasePatternExportOptions,
   requestPositiveNumber,
   useCommandDialogStore,
 } from '../store/commandDialogStore';
+import type { CreaseExportOptions } from '../lib/creaseExport';
+import { createSampleProject } from '../lib/sampleProject';
 import { CommandDialogModal } from './CommandDialogModal';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+if (!globalThis.ResizeObserver) {
+  globalThis.ResizeObserver = class ResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+}
 
 let root: Root | null = null;
 let container: HTMLDivElement | null = null;
@@ -90,6 +101,46 @@ describe('CommandDialogModal', () => {
     });
 
     await expect(result).resolves.toBe(0.5);
+  });
+
+  it('resolves crease-pattern export options with a live preview', async () => {
+    const rendered = renderModalHost();
+    let result = Promise.resolve<CreaseExportOptions | null>({
+      viewMode: 'mvf',
+      includeUnassigned: true,
+      showBackgroundColor: true,
+    });
+
+    act(() => {
+      result = requestCreasePatternExportOptions({
+        title: 'Export SVG',
+        format: 'svg',
+        project: createSampleProject(),
+        initialOptions: { viewMode: 'mvf', includeUnassigned: true, showBackgroundColor: true },
+        confirmLabel: 'Export SVG',
+      });
+    });
+
+    expect(rendered.querySelector('.export-modal__preview img')).not.toBeNull();
+    await act(async () => {
+      findButton('Crease roles').click();
+      (
+        rendered.querySelector(
+          '[aria-label="Include flat / unassigned creases"]'
+        ) as HTMLButtonElement
+      ).click();
+      (rendered.querySelector('[aria-label="Show background color"]') as HTMLButtonElement).click();
+    });
+    await act(async () => {
+      findButton('Export SVG').click();
+      await result;
+    });
+
+    await expect(result).resolves.toEqual({
+      viewMode: 'agrh',
+      includeUnassigned: false,
+      showBackgroundColor: false,
+    });
   });
 
   it('cancels requests on Escape', async () => {

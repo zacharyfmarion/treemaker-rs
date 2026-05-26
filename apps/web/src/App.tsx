@@ -23,6 +23,7 @@ import { StartScreen } from './components/StartScreen';
 import { TooltipProvider } from './components/ui/Tooltip';
 import { IconButton } from './components/ui/IconButton';
 import { Button } from './components/ui/Button';
+import { CamvDiagnosticsSettingsBridge } from './components/CamvDiagnosticsSettingsBridge';
 import { panelComponents } from './components/panels/PanelComponents';
 import { handleMenuAction } from './commands/menuActions';
 import { registerStartScreenRequestHandler } from './commands/startScreenController';
@@ -360,6 +361,7 @@ export default function App() {
       <HelpModal />
       <SelectByIndexModal />
       <SettingsModal />
+      <CamvDiagnosticsSettingsBridge />
       <CommandDialogModal />
       <GlobalToasts />
       <Toaster

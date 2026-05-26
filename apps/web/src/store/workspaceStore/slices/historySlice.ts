@@ -12,6 +12,7 @@ import {
   oristudioCpError,
   restoreOristudioCpDocument,
 } from '../oristudioCpRuntime';
+import { withCamvAngleTolerancePayload } from '../camvDiagnostics';
 import type {
   HistoryEntry,
   HistorySlice,
@@ -73,7 +74,10 @@ async function refreshAlwaysOnCamvDiagnostics(
   camvResult: OristudioCpCommandResult | null;
 }> {
   try {
-    const checkedDocument = await executeRuntimeOristudioCpCommand('CheckCamv');
+    const checkedDocument = await executeRuntimeOristudioCpCommand(
+      'CheckCamv',
+      withCamvAngleTolerancePayload()
+    );
     return {
       restored: {
         ...checkedDocument,

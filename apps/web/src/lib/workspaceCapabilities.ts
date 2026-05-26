@@ -93,6 +93,8 @@ export interface WorkspaceCapabilityInput {
   hasImportedCreasePattern: boolean;
   hasSimulationModel: boolean;
   oristudioCpSelectedLineCount: number;
+  oristudioCpSelectedVertexCount: number;
+  oristudioCpSelectedPointCount: number;
   oristudioCpSelectedCircleCount: number;
   historyPastCount: number;
   historyFutureCount: number;
@@ -120,6 +122,8 @@ export function getWorkspaceCapabilities(input: WorkspaceCapabilityInput): Works
   const canExportCreasePattern = hasCreasePattern && !isBusy;
   const canEditCp = creasePatternMode && input.hasEditableCreasePattern && !isBusy;
   const hasSelectedCpLines = input.oristudioCpSelectedLineCount > 0;
+  const hasSelectedCpPoints =
+    input.oristudioCpSelectedVertexCount > 0 || input.oristudioCpSelectedPointCount > 0;
   const hasSelectedCpCircles = input.oristudioCpSelectedCircleCount > 0;
   const hasSelectedCpLinesOrCircles = hasSelectedCpLines || hasSelectedCpCircles;
   const hasSelection = selectionHasEditableParts(input.selection);
@@ -220,14 +224,16 @@ export function getWorkspaceCapabilities(input: WorkspaceCapabilityInput): Works
       treeMode ? 'Paste copied tree parts' : 'Imported crease patterns are read-only'
     ),
     'edit.delete': capability(
-      (treeMode && hasSelection && !isBusy) || (canEditCp && hasSelectedCpLines),
+      (treeMode && hasSelection && !isBusy) || (canEditCp && (hasSelectedCpLines || hasSelectedCpPoints)),
       'Delete Selected',
       treeMode
         ? 'Delete selected tree parts'
         : canEditCp
           ? hasSelectedCpLines
             ? 'Delete selected crease-pattern lines'
-            : 'Select one or more crease-pattern lines first'
+            : hasSelectedCpPoints
+              ? 'Delete selected crease-pattern points'
+              : 'Select one or more crease-pattern lines or points first'
           : 'Imported crease patterns are read-only'
     ),
     'edit.selectAll': capability(true, 'Select All', 'Select visible document parts'),

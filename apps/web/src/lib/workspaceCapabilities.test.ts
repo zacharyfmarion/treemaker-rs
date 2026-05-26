@@ -14,6 +14,8 @@ function capabilities({
   hasEditableCreasePattern = false,
   hasImportedCreasePattern = false,
   oristudioCpSelectedLineCount = 0,
+  oristudioCpSelectedVertexCount = 0,
+  oristudioCpSelectedPointCount = 0,
   oristudioCpSelectedCircleCount = 0,
   historyPastCount = 0,
   historyFutureCount = 0,
@@ -28,6 +30,8 @@ function capabilities({
   hasEditableCreasePattern?: boolean;
   hasImportedCreasePattern?: boolean;
   oristudioCpSelectedLineCount?: number;
+  oristudioCpSelectedVertexCount?: number;
+  oristudioCpSelectedPointCount?: number;
   oristudioCpSelectedCircleCount?: number;
   historyPastCount?: number;
   historyFutureCount?: number;
@@ -44,6 +48,8 @@ function capabilities({
     hasImportedCreasePattern,
     hasSimulationModel: false,
     oristudioCpSelectedLineCount,
+    oristudioCpSelectedVertexCount,
+    oristudioCpSelectedPointCount,
     oristudioCpSelectedCircleCount,
     historyPastCount,
     historyFutureCount,
@@ -200,6 +206,22 @@ describe('workspace capabilities', () => {
       enabled: true,
       reason: 'Open line-type replacement settings for selected lines',
     });
+  });
+
+  it('enables Delete Selected when editable CP points are selected', () => {
+    const state = capabilities({
+      documentMode: 'crease-pattern',
+      status: 'crease_pattern_ready',
+      hasEditableCreasePattern: true,
+      hasImportedCreasePattern: true,
+      oristudioCpSelectedVertexCount: 1,
+    });
+
+    expect(state['edit.delete']).toMatchObject({
+      enabled: true,
+      reason: 'Delete selected crease-pattern points',
+    });
+    expect(state['cp.deleteSelectedLines'].enabled).toBe(false);
   });
 
   it('enables selected-circle CP actions only when circle or auxiliary selections exist', () => {

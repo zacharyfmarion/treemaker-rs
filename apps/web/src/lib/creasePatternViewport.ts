@@ -16,10 +16,10 @@ export const CP_EDITABLE_CANVAS_RECT: PlotRect = {
   height: 6000,
 };
 export const CP_EDITABLE_FIT_RECT: PlotRect = {
-  x: CP_PAPER_RECT.x + CP_PAPER_RECT.width / 2 - 700,
-  y: CP_PAPER_RECT.y + CP_PAPER_RECT.height / 2 - 700,
-  width: 1400,
-  height: 1400,
+  x: CP_PAPER_RECT.x - 32,
+  y: CP_PAPER_RECT.y - 32,
+  width: CP_PAPER_RECT.width + 64,
+  height: CP_PAPER_RECT.height + 64,
 };
 export const ORIEDITA_PAPER_MIN = -200;
 export const ORIEDITA_PAPER_MAX = 200;

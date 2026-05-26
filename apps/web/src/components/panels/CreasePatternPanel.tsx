@@ -519,15 +519,6 @@ function contextApplyDisabledForCommand(
   }
 }
 
-function keepContextCommandActive(operationId: OristudioCpCommandDefinition['operationId']): boolean {
-  return (
-    operationId === 'VoronoiCreate' ||
-    operationId === 'Text' ||
-    operationId === 'CircleChangeColor' ||
-    isSelectionCircleApplyOperation(operationId)
-  );
-}
-
 function isCpLineEventTarget(target: EventTarget | null): boolean {
   return (
     target instanceof Element &&
@@ -896,12 +887,12 @@ export function CreasePatternPanel() {
       defaultCpToolDocumentRef.current = null;
       return;
     }
-    if (defaultCpToolDocumentRef.current === documentKey) return;
+    const isNewDocument = defaultCpToolDocumentRef.current !== documentKey;
     defaultCpToolDocumentRef.current = documentKey;
     const defaultAction = cpActionById(DEFAULT_ORISTUDIO_CP_ACTION_ID);
     if (!defaultAction) return;
     setCpToolState((state) =>
-      state.phase === 'idle'
+      isNewDocument || state.phase === 'idle'
         ? transitionOristudioCpToolState(state, {
             type: 'selectAction',
             action: defaultAction,
@@ -909,7 +900,7 @@ export function CreasePatternPanel() {
           })
         : state
     );
-  }, [editableCp, editableCpHandle, projectLoadId]);
+  }, [cpToolState.phase, editableCp, editableCpHandle, projectLoadId]);
 
   useEffect(() => {
     if (
@@ -999,7 +990,7 @@ export function CreasePatternPanel() {
             ? transitionOristudioCpToolState(
                 state,
                 succeeded
-                  ? { type: 'commit' }
+                  ? { type: 'commit', keepActive: true }
                   : {
                       type: 'commandError',
                       message: useWorkspaceStore.getState().oristudioCpError ?? 'Command failed',
@@ -1071,10 +1062,7 @@ export function CreasePatternPanel() {
           ? transitionOristudioCpToolState(
               state,
               succeeded
-                ? {
-                    type: 'commit',
-                    keepActive: keepContextCommandActive(activeCpCommand.operationId),
-                  }
+                  ? { type: 'commit', keepActive: true }
                 : {
                     type: 'commandError',
                     message: useWorkspaceStore.getState().oristudioCpError ?? 'Command failed',
@@ -1524,7 +1512,7 @@ export function CreasePatternPanel() {
             ? transitionOristudioCpToolState(
                 state,
                 succeeded
-                  ? { type: 'commit' }
+                  ? { type: 'commit', keepActive: true }
                   : {
                       type: 'commandError',
                       message: useWorkspaceStore.getState().oristudioCpError ?? 'Command failed',
@@ -1691,7 +1679,6 @@ export function CreasePatternPanel() {
       }
 
       void (async () => {
-        const action = drag.actionId ? cpActionById(drag.actionId) : undefined;
         const succeeded = await executeOristudioCpCommand(
           command.operationId,
           buildCpCommandPayload(command, {
@@ -1709,7 +1696,7 @@ export function CreasePatternPanel() {
                 succeeded
                   ? {
                       type: 'commit',
-                      keepActive: action?.kind === 'command' ? action.repeatable : false,
+                      keepActive: true,
                     }
                   : {
                       type: 'commandError',
@@ -1773,7 +1760,7 @@ export function CreasePatternPanel() {
               ? transitionOristudioCpToolState(
                   state,
                   succeeded
-                    ? { type: 'commit' }
+                    ? { type: 'commit', keepActive: true }
                     : {
                         type: 'commandError',
                         message: useWorkspaceStore.getState().oristudioCpError ?? 'Command failed',
@@ -1782,6 +1769,21 @@ export function CreasePatternPanel() {
               : state
           );
         })();
+        return;
+      }
+
+      if (
+        activeCpCommand?.operationId === 'CreaseSelect' &&
+        isDefaultSelectionMode(
+          {
+            activeOperationId: activeCpCommand.operationId,
+            phase: cpToolState.phase,
+          },
+          cpToolPoints.length,
+          cpToolPath.length
+        )
+      ) {
+        toggleOristudioCpLineSelection(id, additive);
         return;
       }
 
@@ -1853,7 +1855,7 @@ export function CreasePatternPanel() {
               ? transitionOristudioCpToolState(
                   state,
                   succeeded
-                    ? { type: 'commit' }
+                    ? { type: 'commit', keepActive: true }
                     : {
                         type: 'commandError',
                         message: useWorkspaceStore.getState().oristudioCpError ?? 'Command failed',
@@ -1872,6 +1874,7 @@ export function CreasePatternPanel() {
       activeCpCommand,
       buildCpCommandPayload,
       cpToolPoints.length,
+      cpToolPath.length,
       cpToolState.phase,
       executeOristudioCpCommand,
       pendingLengthenLineId,
@@ -2001,8 +2004,10 @@ export function CreasePatternPanel() {
 
   const creasePatternFitKey = useMemo(
     () =>
-      `${projectLoadId}:${project.creases.length}:${project.facets.length}:${editableCpSummary?.line_segments ?? 0}`,
-    [editableCpSummary?.line_segments, project.creases.length, project.facets.length, projectLoadId]
+      editableCp
+        ? `editable:${projectLoadId}:${editableCpHandle ?? 'unhandled'}`
+        : `generated:${projectLoadId}:${project.creases.length}:${project.facets.length}`,
+    [editableCp, editableCpHandle, project.creases.length, project.facets.length, projectLoadId]
   );
   const lastFittedCreasePatternRef = useRef<string | null>(null);
 

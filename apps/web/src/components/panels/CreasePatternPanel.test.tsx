@@ -759,7 +759,7 @@ describe('CreasePatternPanel', () => {
         new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
       );
     });
-    expect(container.textContent).toContain('Tool Select');
+    expect(container.textContent).toContain('Box Select: Drag selection box');
     expect(useWorkspaceStore.getState().oristudioCpSelection.lines).toEqual([1]);
 
     act(() => {
@@ -846,7 +846,50 @@ describe('CreasePatternPanel', () => {
       container.querySelector<HTMLButtonElement>('button[aria-label="Fit"]')?.click();
     });
     const fitScale = transformMocks.centerView.mock.calls.at(-1)?.[0];
-    expect(fitScale).toBeLessThan(0.5);
+    expect(fitScale).toBeGreaterThan(0.9);
+  });
+
+  it('does not auto-fit the editable CP viewport after geometry edits', () => {
+    renderPanel(createSampleProject(), 'crease_pattern_ready', {
+      documentMode: 'crease-pattern',
+      importedCreasePattern: importedCpDocument(),
+      oristudioCpDocument: editableCpState(),
+    });
+    transformMocks.centerView.mockClear();
+
+    act(() => {
+      const current = useWorkspaceStore.getState().oristudioCpDocument;
+      if (!current) throw new Error('expected editable CP document');
+      useWorkspaceStore.setState({
+        oristudioCpDocument: {
+          ...current,
+          summary: {
+            ...current.summary,
+            line_segments: current.summary.line_segments + 1,
+          },
+          document: {
+            ...current.document,
+            crease_pattern: {
+              ...current.document.crease_pattern,
+              line_segments: [
+                ...current.document.crease_pattern.line_segments,
+                {
+                  a: { x: 1, y: 1 },
+                  b: { x: 2, y: 2 },
+                  active: 'Inactive0',
+                  color: 'Red1',
+                  selected: 0,
+                  customized: 0,
+                  customized_color: { red: 0, green: 0, blue: 0 },
+                },
+              ],
+            },
+          },
+        },
+      });
+    });
+
+    expect(transformMocks.centerView).not.toHaveBeenCalled();
   });
 
   it('renders a newly created CP as an editable uniform canvas with a square border', () => {
@@ -1046,6 +1089,35 @@ describe('CreasePatternPanel', () => {
 
     expect(useWorkspaceStore.getState().oristudioCpSelection.lines).toEqual([]);
     expect(selectButton?.hasAttribute('data-active')).toBe(true);
+    expect(container.textContent).toContain('Box Select: Drag selection box');
+  });
+
+  it('returns to box select when Escape cancels the active CP tool', async () => {
+    const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
+      documentMode: 'crease-pattern',
+      importedCreasePattern: importedCpDocument(),
+      oristudioCpDocument: editableCpState(),
+    });
+    const body = container.querySelector<HTMLElement>('.cp-panel__body');
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('button[aria-label="Angle Bisector"]')?.click();
+      await Promise.resolve();
+    });
+    expect(container.textContent).toContain('Angle Bisector: Select 2 segments or 3 points');
+
+    await act(async () => {
+      body?.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+      );
+      await Promise.resolve();
+    });
+
+    expect(
+      container
+        .querySelector<HTMLButtonElement>('button[aria-label="Box Select"]')
+        ?.hasAttribute('data-active')
+    ).toBe(true);
     expect(container.textContent).toContain('Box Select: Drag selection box');
   });
 
@@ -2544,6 +2616,7 @@ describe('CreasePatternPanel', () => {
     expect(payload?.points).toBeUndefined();
     expect(payload?.line_color).toBe('Red1');
     expect(payload?.selection_distance).toBeGreaterThan(0);
+    expect(container.textContent).toContain('Angle Bisector: Select 2 segments or 3 points');
   });
 
   it('runs draw crease as a line-type-aware drag action with synchronous preview', async () => {

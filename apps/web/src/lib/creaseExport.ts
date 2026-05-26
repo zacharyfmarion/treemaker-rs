@@ -3,11 +3,24 @@ import type { CreaseColorMode, CreaseLine, TreeProject } from './sampleProject';
 const SIZE = 1024;
 const MARGIN = 48;
 
+export type CreaseExportFormat = 'svg' | 'png';
+
+export interface CreaseExportOptions {
+  viewMode: CreaseColorMode;
+  includeUnassigned: boolean;
+}
+
+export const DEFAULT_CREASE_EXPORT_OPTIONS: CreaseExportOptions = {
+  viewMode: 'mvf',
+  includeUnassigned: true,
+};
+
 const FOLD_STYLES: Record<CreaseLine['fold'], string> = {
   mountain: 'stroke:#111417;stroke-width:3',
   valley: 'stroke:#8b2fc6;stroke-width:3;stroke-dasharray:12 8',
   flat: 'stroke:#85919a;stroke-width:1.5',
   border: 'stroke:#111417;stroke-width:4',
+  unassigned: 'stroke:#a6b0b8;stroke-width:1.5;stroke-dasharray:4 7',
 };
 
 const KIND_STYLES: Record<CreaseLine['kind'], string> = {
@@ -26,10 +39,27 @@ function esc(value: string): string {
     .replaceAll('"', '&quot;');
 }
 
+function normalizeExportOptions(
+  options: CreaseColorMode | Partial<CreaseExportOptions> = DEFAULT_CREASE_EXPORT_OPTIONS
+): CreaseExportOptions {
+  if (typeof options === 'string') {
+    return { ...DEFAULT_CREASE_EXPORT_OPTIONS, viewMode: options };
+  }
+  return {
+    ...DEFAULT_CREASE_EXPORT_OPTIONS,
+    ...options,
+  };
+}
+
+function isUnassignedCrease(crease: CreaseLine): boolean {
+  return crease.fold === 'flat' || crease.fold === 'unassigned';
+}
+
 export function serializeCreasePatternSvg(
   project: TreeProject,
-  mode: CreaseColorMode = 'agrh'
+  options: CreaseColorMode | Partial<CreaseExportOptions> = DEFAULT_CREASE_EXPORT_OPTIONS
 ): string {
+  const exportOptions = normalizeExportOptions(options);
   const paperWidth = project.paper.width || 1;
   const paperHeight = project.paper.height || 1;
   const span = SIZE - MARGIN * 2;
@@ -61,10 +91,12 @@ export function serializeCreasePatternSvg(
     .join('\n');
 
   const creases = project.creases
+    .filter((crease) => exportOptions.includeUnassigned || !isUnassignedCrease(crease))
     .map((crease) => {
       const a = point(crease.vertices[0]);
       const b = point(crease.vertices[1]);
-      const style = mode === 'mvf' ? KIND_STYLES[crease.kind] : FOLD_STYLES[crease.fold];
+      const style =
+        exportOptions.viewMode === 'mvf' ? FOLD_STYLES[crease.fold] : KIND_STYLES[crease.kind];
       return `  <line x1="${a.x.toFixed(3)}" y1="${a.y.toFixed(3)}" x2="${b.x.toFixed(3)}" y2="${b.y.toFixed(3)}" style="${style};fill:none;stroke-linecap:round"/>`;
     })
     .join('\n');
@@ -85,9 +117,9 @@ export function serializeCreasePatternSvg(
 
 export async function renderCreasePatternPng(
   project: TreeProject,
-  mode: CreaseColorMode = 'agrh'
+  options: CreaseColorMode | Partial<CreaseExportOptions> = DEFAULT_CREASE_EXPORT_OPTIONS
 ): Promise<Uint8Array> {
-  const svg = serializeCreasePatternSvg(project, mode);
+  const svg = serializeCreasePatternSvg(project, options);
   const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   try {

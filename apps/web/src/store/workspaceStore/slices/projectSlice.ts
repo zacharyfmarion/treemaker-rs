@@ -1,5 +1,10 @@
 import { getExampleProject } from '../../../examples/catalog';
-import { serializeCreasePatternSvg, renderCreasePatternPng } from '../../../lib/creaseExport';
+import {
+  serializeCreasePatternSvg,
+  renderCreasePatternPng,
+  type CreaseExportFormat,
+  type CreaseExportOptions,
+} from '../../../lib/creaseExport';
 import {
   importedCreasePatternFormat,
   isCreasePatternFilename,
@@ -19,7 +24,7 @@ import {
   type WorkspaceCapabilityId,
 } from '../../../lib/workspaceCapabilities';
 import { ensureExtension, getFileService, type FileService } from '../../../platform/fileService';
-import { requestConfirmation } from '../../commandDialogStore';
+import { requestConfirmation, requestCreasePatternExportOptions } from '../../commandDialogStore';
 import { useLayoutStore } from '../../layoutStore';
 import {
   emptyFoldArtifactResourceState,
@@ -206,6 +211,13 @@ async function confirmDiscardDirty(dirty: boolean): Promise<boolean> {
   });
 }
 
+function defaultCreaseExportOptions(viewMode: CreaseExportOptions['viewMode']): CreaseExportOptions {
+  return {
+    viewMode,
+    includeUnassigned: true,
+  };
+}
+
 export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get) => {
   const rememberRecent = (recent: RecentProject) => {
     const existing = get().recentProjects;
@@ -251,6 +263,21 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
       projectMessage: null,
     });
     return true;
+  };
+
+  const resolveCreaseExportOptions = (
+    format: CreaseExportFormat,
+    options?: CreaseExportOptions
+  ): Promise<CreaseExportOptions | null> => {
+    if (options) return Promise.resolve(options);
+    const label = format.toUpperCase();
+    return requestCreasePatternExportOptions({
+      title: `Export ${label}`,
+      format,
+      project: get().project,
+      initialOptions: defaultCreaseExportOptions(get().creaseColorMode),
+      confirmLabel: `Export ${label}`,
+    });
   };
 
   const loadText = async (
@@ -925,10 +952,12 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
       }
     },
 
-    exportSvg: async (fileService = getFileService()) => {
+    exportSvg: async (fileService = getFileService(), options) => {
       try {
         if (rejectDisabled('file.exportSvg')) return false;
-        const contents = serializeCreasePatternSvg(get().project, get().creaseColorMode);
+        const exportOptions = await resolveCreaseExportOptions('svg', options);
+        if (!exportOptions) return false;
+        const contents = serializeCreasePatternSvg(get().project, exportOptions);
         const result = await fileService.saveTextFile({
           title: 'Export Crease Pattern SVG',
           contents,
@@ -945,10 +974,12 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
       }
     },
 
-    exportPng: async (fileService = getFileService()) => {
+    exportPng: async (fileService = getFileService(), options) => {
       try {
         if (rejectDisabled('file.exportPng')) return false;
-        const bytes = await renderCreasePatternPng(get().project, get().creaseColorMode);
+        const exportOptions = await resolveCreaseExportOptions('png', options);
+        if (!exportOptions) return false;
+        const bytes = await renderCreasePatternPng(get().project, exportOptions);
         const result = await fileService.saveBinaryFile({
           title: 'Export Crease Pattern PNG',
           bytes,

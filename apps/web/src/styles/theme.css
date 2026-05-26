@@ -1035,6 +1035,10 @@
   box-shadow: var(--shadow-context-menu);
 }
 
+.simple-modal__document--export {
+  width: min(720px, calc(100vw - var(--space-6)));
+}
+
 .simple-modal__header,
 .simple-modal__footer {
   display: flex;
@@ -1087,6 +1091,97 @@
 .simple-modal__footer {
   justify-content: flex-end;
   padding: 0;
+}
+
+.export-modal {
+  grid-template-columns: minmax(220px, 1fr) minmax(220px, 280px);
+  align-items: start;
+}
+
+.export-modal__preview {
+  display: grid;
+  min-height: 280px;
+  overflow: hidden;
+  place-items: center;
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+}
+
+.export-modal__preview img {
+  display: block;
+  width: min(100%, 360px);
+  aspect-ratio: 1;
+  object-fit: contain;
+}
+
+.export-modal__controls {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.export-modal__control-group {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.export-modal__label {
+  color: var(--text-tertiary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.export-modal__segmented {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  overflow: hidden;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+}
+
+.export-modal__segmented button {
+  min-width: 0;
+  height: 32px;
+  border: 0;
+  border-right: 1px solid var(--border-muted);
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.export-modal__segmented button:last-child {
+  border-right: 0;
+}
+
+.export-modal__segmented button:hover,
+.export-modal__segmented button[data-active='true'] {
+  background: var(--accent-primary-muted);
+  color: var(--text-primary);
+}
+
+.export-modal__checkbox {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-secondary);
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+.export-modal__checkbox input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--accent-primary);
+}
+
+.export-modal .simple-modal__footer {
+  grid-column: 1 / -1;
 }
 
 .field-row {
@@ -1223,6 +1318,18 @@
   .settings-modal {
     place-items: stretch;
     padding: var(--space-2);
+  }
+
+  .simple-modal__document--export {
+    width: min(100%, calc(100vw - var(--space-4)));
+  }
+
+  .export-modal {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .export-modal__preview {
+    min-height: 210px;
   }
 
   .settings-modal__document {

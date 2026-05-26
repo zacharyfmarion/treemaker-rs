@@ -15,6 +15,7 @@ import type {
 import type { OristudioCpSelection } from '../lib/creasePatternViewport';
 import type { OristudioCpOperationId } from '../lib/oristudioCpCommands';
 import type { DocumentMode } from '../lib/sampleProject';
+import type { CreaseExportOptions } from '../lib/creaseExport';
 
 export const MENU_ACTION_IDS = [
   'app.about',
@@ -103,8 +104,8 @@ export interface WorkspaceCommands {
   exportV4(fileService?: FileService): Promise<boolean>;
   exportCp(fileService?: FileService): Promise<boolean>;
   exportFold(fileService?: FileService): Promise<boolean>;
-  exportSvg(fileService?: FileService): Promise<boolean>;
-  exportPng(fileService?: FileService): Promise<boolean>;
+  exportSvg(fileService?: FileService, options?: CreaseExportOptions): Promise<boolean>;
+  exportPng(fileService?: FileService, options?: CreaseExportOptions): Promise<boolean>;
   undo(): Promise<void>;
   redo(): Promise<void>;
   cutSelection(): Promise<void>;

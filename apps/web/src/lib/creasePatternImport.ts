@@ -680,6 +680,7 @@ function foldName(assignment: FoldAssignment): CreaseLine['fold'] {
   if (assignment === 'M') return 'mountain';
   if (assignment === 'V') return 'valley';
   if (assignment === 'B') return 'border';
+  if (assignment === 'U' || assignment === 'C' || assignment === 'J') return 'unassigned';
   return 'flat';
 }
 

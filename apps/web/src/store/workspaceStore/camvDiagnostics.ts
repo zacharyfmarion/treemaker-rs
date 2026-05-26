@@ -7,12 +7,16 @@ export const CAMV_ANGLE_TOLERANCE_OPERATIONS = new Set<OristudioCpOperationId>([
   'CheckCamv',
 ]);
 
+export function currentCamvAngleTolerance(): number {
+  return useSettingsStore.getState().camvAngleTolerance;
+}
+
 export function withCamvAngleTolerancePayload(
-  payload: OristudioCpCommandPayload = {}
+  payload: OristudioCpCommandPayload = {},
+  angleTolerance = currentCamvAngleTolerance()
 ): OristudioCpCommandPayload {
   return {
     ...payload,
-    camv_angle_tolerance:
-      payload.camv_angle_tolerance ?? useSettingsStore.getState().camvAngleTolerance,
+    camv_angle_tolerance: payload.camv_angle_tolerance ?? angleTolerance,
   };
 }

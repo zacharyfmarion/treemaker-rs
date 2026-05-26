@@ -98,6 +98,7 @@ export interface ProjectSliceActions {
     operationId: OristudioCpOperationId,
     payload?: OristudioCpCommandPayload
   ) => Promise<boolean>;
+  refreshOristudioCpCamvDiagnostics: () => Promise<boolean>;
   previewOristudioCpCommand: (
     operationId: OristudioCpOperationId,
     payload?: OristudioCpCommandPayload

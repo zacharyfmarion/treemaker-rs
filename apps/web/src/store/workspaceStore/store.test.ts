@@ -1775,6 +1775,109 @@ describe('workspace store slices', () => {
     expect(useWorkspaceStore.getState().dirty).toBe(false);
   });
 
+  it('refreshes always-on CAMV diagnostics from the current settings tolerance', async () => {
+    resetStores(seedSnapshot());
+    await useWorkspaceStore.getState().loadCreasePatternText('1 0 0 1 0\n2 0 0 0 1', {
+      filename: 'lines.cp',
+      path: '/tmp/lines.cp',
+    });
+    const currentDocument = useWorkspaceStore.getState().oristudioCpDocument;
+    if (!currentDocument) throw new Error('expected editable CP document');
+    const priorCommandResult: OristudioCpCommandResult = {
+      operation: 'Check1',
+      status: 'OracleTested',
+      diagnostics: ['Check1 found 1 issue(s)'],
+      diagnostic_entries: [
+        {
+          id: 'Check1-1',
+          kind: 'Check1',
+          severity: 'error',
+          message: 'Overlapping or contained non-auxiliary creases',
+          segments: [],
+          rule: 'Check1',
+        },
+      ],
+    };
+    const oldCamvResult = camvErrorResult('CheckCamv-old');
+    const nextCamvResult = camvErrorResult('CheckCamv-new');
+    useWorkspaceStore.setState({
+      dirty: false,
+      oristudioCpDocument: {
+        ...currentDocument,
+        lastCommandResult: priorCommandResult,
+      },
+      oristudioCpCamvResult: oldCamvResult,
+      oristudioCpActiveDiagnosticId: 'CheckCamv-old',
+    });
+    useSettingsStore.getState().setCamvAngleTolerance(0.5);
+    oristudioCpMocks.executeOristudioCpCommand.mockClear();
+    oristudioCpMocks.executeOristudioCpCommand.mockResolvedValueOnce({
+      ...currentDocument,
+      lastCommandResult: nextCamvResult,
+    });
+
+    await expect(
+      useWorkspaceStore.getState().refreshOristudioCpCamvDiagnostics()
+    ).resolves.toBe(true);
+
+    expect(oristudioCpMocks.executeOristudioCpCommand).toHaveBeenCalledWith('CheckCamv', {
+      camv_angle_tolerance: 0.5,
+    });
+    expect(useWorkspaceStore.getState().oristudioCpDocument?.lastCommandResult).toEqual(
+      priorCommandResult
+    );
+    expect(useWorkspaceStore.getState().oristudioCpCamvResult).toEqual(nextCamvResult);
+    expect(useWorkspaceStore.getState().oristudioCpActiveDiagnosticId).toBeNull();
+    expect(useWorkspaceStore.getState().oristudioCpHistoryPast).toHaveLength(0);
+    expect(useWorkspaceStore.getState().dirty).toBe(false);
+  });
+
+  it('recomputes visible Check CAMV diagnostics when the settings tolerance changes', async () => {
+    resetStores(seedSnapshot());
+    await useWorkspaceStore.getState().loadCreasePatternText('1 0 0 1 0\n2 0 0 0 1', {
+      filename: 'lines.cp',
+      path: '/tmp/lines.cp',
+    });
+    const currentDocument = useWorkspaceStore.getState().oristudioCpDocument;
+    if (!currentDocument) throw new Error('expected editable CP document');
+    const oldCamvResult = camvErrorResult('CheckCamv-old');
+    const cleanCamvResult: OristudioCpCommandResult = {
+      operation: 'CheckCamv',
+      status: 'OracleTested',
+      diagnostics: ['Check CAMV passed'],
+      diagnostic_entries: [],
+    };
+    useWorkspaceStore.setState({
+      dirty: false,
+      oristudioCpDocument: {
+        ...currentDocument,
+        lastCommandResult: oldCamvResult,
+      },
+      oristudioCpCamvResult: oldCamvResult,
+      oristudioCpActiveDiagnosticId: 'CheckCamv-old',
+    });
+    useSettingsStore.getState().setCamvAngleTolerance(10);
+    oristudioCpMocks.executeOristudioCpCommand.mockClear();
+    oristudioCpMocks.executeOristudioCpCommand.mockResolvedValueOnce({
+      ...currentDocument,
+      lastCommandResult: cleanCamvResult,
+    });
+
+    await expect(
+      useWorkspaceStore.getState().refreshOristudioCpCamvDiagnostics()
+    ).resolves.toBe(true);
+
+    expect(oristudioCpMocks.executeOristudioCpCommand).toHaveBeenCalledWith('CheckCamv', {
+      camv_angle_tolerance: 10,
+    });
+    expect(useWorkspaceStore.getState().oristudioCpDocument?.lastCommandResult).toEqual(
+      cleanCamvResult
+    );
+    expect(useWorkspaceStore.getState().oristudioCpCamvResult).toEqual(cleanCamvResult);
+    expect(useWorkspaceStore.getState().oristudioCpActiveDiagnosticId).toBeNull();
+    expect(useWorkspaceStore.getState().dirty).toBe(false);
+  });
+
   it('clears editable CP selection after destructive kernel commands', async () => {
     resetStores(seedSnapshot());
     await useWorkspaceStore.getState().loadCreasePatternText('1 0 0 1 0\n2 0 0 0 1', {

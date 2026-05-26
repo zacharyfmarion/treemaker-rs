@@ -39,6 +39,7 @@ import { requestConfirmation, requestCreasePatternExportOptions } from '../../co
 import { useLayoutStore } from '../../layoutStore';
 import {
   CAMV_ANGLE_TOLERANCE_OPERATIONS,
+  currentCamvAngleTolerance,
   withCamvAngleTolerancePayload,
 } from '../camvDiagnostics';
 import {
@@ -100,7 +101,8 @@ function cpHistoryEntry(
 }
 
 async function refreshAlwaysOnCamvDiagnostics(
-  documentState: OristudioCpDocumentState
+  documentState: OristudioCpDocumentState,
+  angleTolerance = currentCamvAngleTolerance()
 ): Promise<{
   documentState: OristudioCpDocumentState;
   camvResult: OristudioCpCommandResult | null;
@@ -108,7 +110,7 @@ async function refreshAlwaysOnCamvDiagnostics(
   try {
     const checkedDocument = await executeRuntimeOristudioCpCommand(
       'CheckCamv',
-      withCamvAngleTolerancePayload()
+      withCamvAngleTolerancePayload({}, angleTolerance)
     );
     return {
       documentState: {
@@ -123,6 +125,10 @@ async function refreshAlwaysOnCamvDiagnostics(
   } catch {
     return { documentState, camvResult: null };
   }
+}
+
+function firstDiagnosticEntryId(result: OristudioCpCommandResult | null | undefined): string | null {
+  return result?.diagnostic_entries?.[0]?.id ?? null;
 }
 
 const CLEAR_CP_SELECTION_AFTER_OPERATIONS = new Set<OristudioCpOperationId>([
@@ -923,6 +929,82 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
         await loadCreasePattern(text, source);
       } catch (error) {
         set({ status: 'error', error: engineError(error), projectMessage: null });
+      }
+    },
+
+    refreshOristudioCpCamvDiagnostics: async () => {
+      const currentDocument = get().oristudioCpDocument;
+      if (!currentDocument) return false;
+
+      const initialHandle = currentDocument.handle;
+      const angleTolerance = currentCamvAngleTolerance();
+      const visibleDiagnosticOperation = currentDocument.lastCommandResult?.operation;
+      const refreshVisibleDiagnostic =
+        visibleDiagnosticOperation !== undefined &&
+        CAMV_ANGLE_TOLERANCE_OPERATIONS.has(visibleDiagnosticOperation);
+
+      try {
+        let documentForCamv = currentDocument;
+        if (refreshVisibleDiagnostic && visibleDiagnosticOperation) {
+          documentForCamv = await executeRuntimeOristudioCpCommand(
+            visibleDiagnosticOperation,
+            withCamvAngleTolerancePayload({}, angleTolerance)
+          );
+        }
+
+        const checked =
+          visibleDiagnosticOperation === 'CheckCamv'
+            ? {
+                documentState: documentForCamv,
+                camvResult:
+                  documentForCamv.lastCommandResult?.operation === 'CheckCamv'
+                    ? documentForCamv.lastCommandResult
+                    : null,
+              }
+            : await refreshAlwaysOnCamvDiagnostics(documentForCamv, angleTolerance);
+
+        const latestDocument = get().oristudioCpDocument;
+        if (
+          !latestDocument ||
+          latestDocument.handle !== initialHandle ||
+          currentCamvAngleTolerance() !== angleTolerance
+        ) {
+          return false;
+        }
+
+        const currentActiveDiagnosticId = get().oristudioCpActiveDiagnosticId;
+        const camvDiagnosticEntries = checked.camvResult?.diagnostic_entries ?? [];
+        const canPreserveActiveCamvDiagnostic =
+          currentActiveDiagnosticId !== null &&
+          camvDiagnosticEntries.some((entry) => entry.id === currentActiveDiagnosticId);
+        const nextActiveDiagnosticId = refreshVisibleDiagnostic
+          ? firstDiagnosticEntryId(checked.documentState.lastCommandResult)
+          : canPreserveActiveCamvDiagnostic
+            ? currentActiveDiagnosticId
+            : null;
+
+        set({
+          oristudioCpDocument: checked.documentState,
+          oristudioCpCamvResult: checked.camvResult,
+          oristudioCpOperationDescriptors: checked.documentState.operationDescriptors,
+          oristudioCpError: null,
+          oristudioCpActiveDiagnosticId: nextActiveDiagnosticId,
+          error: null,
+        });
+        return true;
+      } catch (error) {
+        const latestDocument = get().oristudioCpDocument;
+        if (
+          latestDocument?.handle === initialHandle &&
+          currentCamvAngleTolerance() === angleTolerance
+        ) {
+          const normalized = oristudioCpError(error);
+          set({
+            oristudioCpError: normalized.message,
+            error: normalized,
+          });
+        }
+        return false;
       }
     },
 

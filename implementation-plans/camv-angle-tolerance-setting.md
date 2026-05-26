@@ -14,6 +14,9 @@ flat-foldability check while preserving Oriedita-compatible defaults.
   expose it in the settings modal.
 - Pass the setting into explicit Check4/CAMV commands and into always-on CAMV
   refreshes after load, mutation, undo, and redo.
+- Treat tolerance changes as diagnostic input invalidation: when the preference
+  changes, refresh the editable CP CAMV diagnostics and replace any visible
+  tolerance-sensitive Check4/CAMV command result.
 - Add focused kernel and web tests for the tolerance behavior and settings
   wiring.
 
@@ -25,6 +28,7 @@ flat-foldability check while preserving Oriedita-compatible defaults.
 - `apps/web/src/store/settingsStore.ts`
 - `apps/web/src/store/workspaceStore/slices/projectSlice.ts`
 - `apps/web/src/store/workspaceStore/slices/historySlice.ts`
+- `apps/web/src/components/CamvDiagnosticsSettingsBridge.tsx`
 - `apps/web/src/components/SettingsModal.tsx`
 - `apps/web/src/styles/theme.css`
 - Focused Rust and web tests
@@ -37,3 +41,4 @@ flat-foldability check while preserving Oriedita-compatible defaults.
 - [x] Add focused regression tests.
 - [x] Regenerate generated wasm artifacts as needed.
 - [x] Run local validation and prepare PR handoff.
+- [x] Refresh cached CAMV diagnostics immediately after settings changes.

@@ -27,6 +27,13 @@ import {
   DEFAULT_ORISTUDIO_CP_VIEWPORT_OPTIONS,
   emptyOristudioCpSelection,
 } from '../../lib/creasePatternViewport';
+import {
+  activeNativeDocument,
+  createNativeCreasePatternProjectFile,
+  createNativeTreeProjectFile,
+  parseNativeProjectFile,
+  serializeNativeProjectFile,
+} from '../../lib/nativeProjectFile';
 import { createStarterOristudioCpDocument } from '../../lib/oristudioCpStarterDocument';
 import { useLayoutStore } from '../layoutStore';
 
@@ -992,28 +999,28 @@ function resetStores(snapshot = makeSnapshot()) {
         document: OristudioCpDocumentSnapshot,
         source: OristudioCpDocumentState['source']
       ) => ({
-      handle: 3,
-      document,
-      summary: {
-        title: document.title ?? 'square',
-        line_segments: document.crease_pattern.line_segments.length,
-        circles: document.crease_pattern.circles.length,
-        points: document.crease_pattern.points.length,
-        aux_line_segments: document.crease_pattern.aux_line_segments.length,
-        texts: document.crease_pattern.texts.length,
-        can_save_as_cp: true,
-        is_empty:
-          document.crease_pattern.line_segments.length +
-            document.crease_pattern.circles.length +
-            document.crease_pattern.points.length +
-            document.crease_pattern.aux_line_segments.length +
-            document.crease_pattern.texts.length ===
-          0,
-      },
-      source,
-      operationDescriptors: cpOperationDescriptors,
-      lastCommandResult: null,
-    })
+        handle: 3,
+        document,
+        summary: {
+          title: document.title ?? 'square',
+          line_segments: document.crease_pattern.line_segments.length,
+          circles: document.crease_pattern.circles.length,
+          points: document.crease_pattern.points.length,
+          aux_line_segments: document.crease_pattern.aux_line_segments.length,
+          texts: document.crease_pattern.texts.length,
+          can_save_as_cp: true,
+          is_empty:
+            document.crease_pattern.line_segments.length +
+              document.crease_pattern.circles.length +
+              document.crease_pattern.points.length +
+              document.crease_pattern.aux_line_segments.length +
+              document.crease_pattern.texts.length ===
+            0,
+        },
+        source,
+        operationDescriptors: cpOperationDescriptors,
+        lastCommandResult: null,
+      })
     );
   oristudioCpMocks.executeOristudioCpCommand.mockReset().mockRejectedValue({
     code: 'not_implemented',
@@ -1104,7 +1111,7 @@ describe('workspace store slices', () => {
     expect(state.historyPast).toEqual([]);
     expect(state.clipboard).toBeNull();
     expect(state.projectLoadId).toBe(0);
-    expect(state.currentFileName).toBe('Untitled.tmd5');
+    expect(state.currentFileName).toBe('Untitled.osf');
     expect(state.createNewProject).toBeTypeOf('function');
     expect(state.createNewCreasePattern).toBeTypeOf('function');
     expect(state.openProject).toBeTypeOf('function');
@@ -1159,17 +1166,25 @@ describe('workspace store slices', () => {
     await expect(useWorkspaceStore.getState().openProject(fileService)).resolves.toBe(true);
     expect(fileService.openTextFile).toHaveBeenCalledWith({
       title: 'Open Ori Studio Project or Crease Pattern',
-      extensions: ['tmd', 'tmd4', 'tmd5', 'fold', 'cp'],
+      extensions: ['osf', 'tmd', 'tmd4', 'tmd5', 'fold', 'cp'],
     });
 
     await expect(useWorkspaceStore.getState().saveProject(fileService)).resolves.toBe(true);
     expect(fileService.saveTextFile).toHaveBeenCalledWith(
       expect.objectContaining({
         title: 'Save Ori Studio Project',
-        path: '/tmp/opened.tmd5',
-        extensions: ['tmd5'],
+        path: null,
+        extensions: ['osf'],
       })
     );
+    const savedNativeTreeOptions = fileService.saveTextFile.mock.calls.at(-1)?.[0] as
+      | SaveTextFileOptions
+      | undefined;
+    const savedNativeTree = parseNativeProjectFile(savedNativeTreeOptions?.contents ?? '');
+    expect(activeNativeDocument(savedNativeTree)).toMatchObject({
+      kind: 'treemaker-tree',
+      tree: { format: 'tmd5' },
+    });
     expect(useWorkspaceStore.getState().dirty).toBe(false);
 
     await expect(useWorkspaceStore.getState().saveProjectAs(fileService)).resolves.toBe(true);
@@ -1178,6 +1193,11 @@ describe('workspace store slices', () => {
         title: 'Save Ori Studio Project As',
         path: null,
       })
+    );
+
+    await expect(useWorkspaceStore.getState().exportV5(fileService)).resolves.toBe(true);
+    expect(fileService.saveTextFile).toHaveBeenLastCalledWith(
+      expect.objectContaining({ title: 'Export TreeMaker 5 Project', extensions: ['tmd5'] })
     );
 
     await expect(useWorkspaceStore.getState().exportV4(fileService)).resolves.toBe(true);
@@ -1228,7 +1248,7 @@ describe('workspace store slices', () => {
     expect(oristudioCpMocks.createBlankOristudioCpDocument).toHaveBeenCalledOnce();
     expect(useWorkspaceStore.getState()).toMatchObject({
       documentMode: 'crease-pattern',
-      currentFileName: 'Untitled.cp',
+      currentFileName: 'Untitled-CP.osf',
       currentFilePath: null,
       status: 'crease_pattern_ready',
       dirty: false,
@@ -1250,6 +1270,98 @@ describe('workspace store slices', () => {
     expect(useWorkspaceStore.getState().importedCreasePattern).toBeNull();
     expect(useWorkspaceStore.getState().oristudioCpSelection).toEqual(emptyOristudioCpSelection());
     expect(activatePanel).toHaveBeenCalledWith('crease-pattern');
+  });
+
+  it('opens native tree projects and keeps Save on the native file path', async () => {
+    const api = resetStores(seedSnapshot());
+    loadSnapshotIntoStore(seedSnapshot());
+    const nativeText = serializeNativeProjectFile(
+      createNativeTreeProjectFile({
+        title: 'Native tree',
+        filename: 'legacy.tmd5',
+        path: '/tmp/legacy.tmd5',
+        tmd5Text: 'native tree tmd5',
+        appVersion: '0.1.1',
+        now: new Date('2026-05-26T12:00:00.000Z'),
+      })
+    );
+    const fileService = createFileService({
+      text: nativeText,
+      name: 'native-tree.osf',
+      path: '/tmp/native-tree.osf',
+    });
+
+    await expect(useWorkspaceStore.getState().openProject(fileService)).resolves.toBe(true);
+
+    expect(engineMocks.loadTreeFromText).toHaveBeenCalledWith(api, 'native tree tmd5');
+    expect(useWorkspaceStore.getState()).toMatchObject({
+      documentMode: 'tree',
+      currentFileName: 'native-tree.osf',
+      currentFilePath: '/tmp/native-tree.osf',
+      dirty: false,
+    });
+    expect(useWorkspaceStore.getState().recentProjects[0]).toMatchObject({
+      id: '/tmp/native-tree.osf',
+      filename: 'native-tree.osf',
+      text: nativeText,
+    });
+
+    await expect(useWorkspaceStore.getState().saveProject(fileService)).resolves.toBe(true);
+    expect(fileService.saveTextFile).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        title: 'Save Ori Studio Project',
+        suggestedName: 'native-tree.osf',
+        path: '/tmp/native-tree.osf',
+        extensions: ['osf'],
+      })
+    );
+  });
+
+  it('opens native editable CP projects through the CP runtime', async () => {
+    resetStores(seedSnapshot());
+    loadSnapshotIntoStore(seedSnapshot());
+    const document = blankCpDocumentState().document;
+    const nativeText = serializeNativeProjectFile(
+      createNativeCreasePatternProjectFile({
+        title: 'Native CP',
+        filename: 'source.cp',
+        path: '/tmp/source.cp',
+        document,
+        source: { format: 'cp', filename: 'source.cp', path: '/tmp/source.cp' },
+        foldProjection: JSON.parse(editableCpFoldText) as FoldDocument,
+        foldArtifacts: null,
+        creaseColorMode: 'agrh',
+        selection: { ...emptyOristudioCpSelection(), lines: [1] },
+        viewport: DEFAULT_ORISTUDIO_CP_VIEWPORT_OPTIONS,
+        appVersion: '0.1.1',
+        now: new Date('2026-05-26T12:00:00.000Z'),
+      })
+    );
+    const fileService = createFileService({
+      text: nativeText,
+      name: 'native-cp.osf',
+      path: '/tmp/native-cp.osf',
+    });
+
+    await expect(useWorkspaceStore.getState().openProject(fileService)).resolves.toBe(true);
+
+    expect(oristudioCpMocks.restoreOristudioCpDocument).toHaveBeenCalledWith(
+      document,
+      {
+        format: 'osf',
+        filename: 'native-cp.osf',
+        path: '/tmp/native-cp.osf',
+      }
+    );
+    expect(useWorkspaceStore.getState()).toMatchObject({
+      documentMode: 'crease-pattern',
+      currentFileName: 'native-cp.osf',
+      currentFilePath: '/tmp/native-cp.osf',
+      creaseColorMode: 'agrh',
+      dirty: false,
+    });
+    expect(useWorkspaceStore.getState().oristudioCpSelection.lines).toEqual([1]);
+    expect(useWorkspaceStore.getState().foldArtifacts?.simulation_model).not.toBeNull();
   });
 
   it('loads CP-only documents and gates tree-only persistence', async () => {
@@ -1313,29 +1425,39 @@ describe('workspace store slices', () => {
 
     useWorkspaceStore.setState({ dirty: true });
     await expect(useWorkspaceStore.getState().saveProject(fileService)).resolves.toBe(true);
-    expect(oristudioCpMocks.exportOristudioCpDocumentAsCp).toHaveBeenCalledOnce();
+    expect(oristudioCpMocks.exportOristudioCpDocumentAsCp).not.toHaveBeenCalled();
     expect(fileService.saveTextFile).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        title: 'Save Crease Pattern',
-        contents: '1 0 0 1 0\n',
-        suggestedName: 'square.cp',
-        path: '/tmp/square.cp',
-        extensions: ['cp'],
+        title: 'Save Ori Studio Project',
+        suggestedName: 'square.osf',
+        path: null,
+        extensions: ['osf'],
       })
     );
+    const savedNativeCpOptions = fileService.saveTextFile.mock.calls.at(-1)?.[0] as
+      | SaveTextFileOptions
+      | undefined;
+    const savedNativeCp = parseNativeProjectFile(savedNativeCpOptions?.contents ?? '');
+    expect(activeNativeDocument(savedNativeCp)).toMatchObject({
+      kind: 'crease-pattern',
+      creasePattern: {
+        engine: 'oristudio-cp',
+        foldProjection: expect.objectContaining({ frame_classes: ['creasePattern'] }),
+      },
+    });
     expect(oristudioCpMocks.setOristudioCpDocumentSource).toHaveBeenCalledWith({
-      format: 'cp',
-      filename: 'square.cp',
-      path: '/tmp/square.cp',
+      format: 'osf',
+      filename: 'square.osf',
+      path: '/tmp/square.osf',
     });
     expect(useWorkspaceStore.getState()).toMatchObject({
-      currentFileName: 'square.cp',
-      currentFilePath: '/tmp/square.cp',
+      currentFileName: 'square.osf',
+      currentFilePath: '/tmp/square.osf',
       dirty: false,
     });
 
     await expect(useWorkspaceStore.getState().exportCp(fileService)).resolves.toBe(true);
-    expect(oristudioCpMocks.exportOristudioCpDocumentAsCp).toHaveBeenCalledTimes(2);
+    expect(oristudioCpMocks.exportOristudioCpDocumentAsCp).toHaveBeenCalledOnce();
     expect(fileService.saveTextFile).toHaveBeenLastCalledWith(
       expect.objectContaining({
         title: 'Export CP Document',
@@ -1347,7 +1469,7 @@ describe('workspace store slices', () => {
     );
 
     await expect(useWorkspaceStore.getState().exportFold(fileService)).resolves.toBe(true);
-    expect(oristudioCpMocks.exportOristudioCpDocumentAsFold).toHaveBeenCalledOnce();
+    expect(oristudioCpMocks.exportOristudioCpDocumentAsFold).toHaveBeenCalledTimes(2);
     expect(fileService.saveTextFile).toHaveBeenLastCalledWith(
       expect.objectContaining({
         title: 'Export FOLD Document',
@@ -1833,7 +1955,7 @@ describe('workspace store slices', () => {
     expect(useWorkspaceStore.getState().foldArtifactStatus).toBe('ready');
   });
 
-  it('saves imported FOLD documents as CP without overwriting the source FOLD path', async () => {
+  it('saves imported FOLD documents as native projects without overwriting the source FOLD path', async () => {
     resetStores(seedSnapshot());
     await useWorkspaceStore.getState().loadCreasePatternText(
       JSON.stringify({
@@ -1856,20 +1978,20 @@ describe('workspace store slices', () => {
 
     expect(fileService.saveTextFile).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        title: 'Save Crease Pattern',
-        suggestedName: 'line.cp',
+        title: 'Save Ori Studio Project',
+        suggestedName: 'line.osf',
         path: null,
-        extensions: ['cp'],
+        extensions: ['osf'],
       })
     );
     expect(useWorkspaceStore.getState()).toMatchObject({
-      currentFileName: 'line.cp',
-      currentFilePath: '/tmp/line.cp',
+      currentFileName: 'line.osf',
+      currentFilePath: '/tmp/line.osf',
     });
     expect(useWorkspaceStore.getState().oristudioCpDocument?.source).toEqual({
-      format: 'cp',
-      filename: 'line.cp',
-      path: '/tmp/line.cp',
+      format: 'osf',
+      filename: 'line.osf',
+      path: '/tmp/line.osf',
     });
   });
 

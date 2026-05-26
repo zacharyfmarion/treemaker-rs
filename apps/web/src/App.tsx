@@ -27,10 +27,12 @@ import { panelComponents } from './components/panels/PanelComponents';
 import { handleMenuAction } from './commands/menuActions';
 import { registerStartScreenRequestHandler } from './commands/startScreenController';
 import { useMacDownloadUrl } from './hooks/useMacDownloadUrl';
+import { useTauriOpenedFiles } from './hooks/useTauriOpenedFiles';
 import { handleAppKeyDown } from './lib/appKeyboard';
 import { cpSelectionSize } from './lib/creasePatternViewport';
 import { useTauriMenuListener } from './menus/tauriMenuListener';
 import { isFeatureVisible } from './platform/features';
+import { createOpenedPathFileService } from './platform/fileService';
 import { getRuntimeSurface } from './platform/runtime';
 import { applyWindowTitle, formatWindowTitle } from './platform/windowTitle';
 import { requestConfirmation } from './store/commandDialogStore';
@@ -149,6 +151,7 @@ export default function App() {
   const project = useWorkspaceStore((state) => state.project);
   const dirty = useWorkspaceStore((state) => state.dirty);
   const status = useWorkspaceStore((state) => state.status);
+  const engineReady = useWorkspaceStore((state) => state.engineReady);
   const error = useWorkspaceStore((state) => state.error);
   const toasterTheme = useThemeStore((state) => state.currentTheme.type);
   const setDockviewApi = useLayoutStore((state) => state.setDockviewApi);
@@ -292,6 +295,21 @@ export default function App() {
     setWorkspaceInitialPanel(panelId);
     setWorkspaceStarted(true);
   }, []);
+
+  const handleOpenedFilePath = useCallback(
+    async (path: string) => {
+      const opened = await openProject(createOpenedPathFileService(path));
+      if (!opened) return;
+      enterWorkspace(
+        useWorkspaceStore.getState().documentMode === 'crease-pattern'
+          ? 'crease-pattern'
+          : 'design'
+      );
+    },
+    [enterWorkspace, openProject]
+  );
+
+  useTauriOpenedFiles(engineReady, handleOpenedFilePath);
 
   const handleCreateCreasePattern = useCallback(async () => {
     await createNewCreasePattern();

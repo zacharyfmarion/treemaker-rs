@@ -24,6 +24,8 @@ pub fn setup_menu(app: &App) -> Result<(), Box<dyn std::error::Error>> {
     let file_save_as = MenuItemBuilder::with_id("file.saveAs", "Save As...")
         .accelerator("CmdOrCtrl+Shift+S")
         .build(app)?;
+    let file_export_v5 =
+        MenuItemBuilder::with_id("file.exportV5", "Export TreeMaker 5...").build(app)?;
     let file_export_v4 =
         MenuItemBuilder::with_id("file.exportV4", "Export TreeMaker 4...").build(app)?;
     let file_export_cp = MenuItemBuilder::with_id("file.exportCp", "Export CP...").build(app)?;
@@ -42,6 +44,7 @@ pub fn setup_menu(app: &App) -> Result<(), Box<dyn std::error::Error>> {
         .item(&file_save)
         .item(&file_save_as)
         .separator()
+        .item(&file_export_v5)
         .item(&file_export_v4)
         .item(&file_export_cp)
         .item(&file_export_fold)

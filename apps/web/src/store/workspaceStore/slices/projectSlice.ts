@@ -1,4 +1,5 @@
 import { getExampleProject } from '../../../examples/catalog';
+import { APP_VERSION } from '../../../constants/release';
 import {
   serializeCreasePatternSvg,
   renderCreasePatternPng,
@@ -13,9 +14,19 @@ import {
   withFlatFoldError,
 } from '../../../lib/creasePatternImport';
 import {
+  DEFAULT_ORISTUDIO_CP_VIEWPORT_OPTIONS,
   emptyOristudioCpSelection,
   getCpVertices,
 } from '../../../lib/creasePatternViewport';
+import {
+  activeNativeDocument,
+  createNativeCreasePatternProjectFile,
+  createNativeTreeProjectFile,
+  isNativeProjectFilename,
+  NATIVE_PROJECT_EXTENSION,
+  parseNativeProjectFile,
+  serializeNativeProjectFile,
+} from '../../../lib/nativeProjectFile';
 import type { OristudioCpSelection } from '../../../lib/creasePatternViewport';
 import type { OristudioCpOperationId } from '../../../lib/oristudioCpCommands';
 import { createEmptyProject, DEFAULT_CREASE_COLOR_MODE } from '../../../lib/sampleProject';
@@ -52,9 +63,11 @@ import {
   oristudioCpError,
   previewOristudioCpCommand as previewRuntimeOristudioCpCommand,
   releaseOristudioCpDocument,
+  restoreOristudioCpDocument,
   setOristudioCpDocumentSource,
 } from '../oristudioCpRuntime';
 import type { ProjectSlice, RecentProject, WorkspaceSliceCreator } from '../types';
+import type { FoldDocument } from '../../../engine/types';
 import type {
   OristudioCpCommandResult,
   OristudioCpDocumentSnapshot,
@@ -171,14 +184,18 @@ function oristudioCpSelectionAfterCommand(
   };
 }
 
-function basenameWithoutTreeMakerExtension(filename: string): string {
-  return filename.replace(/\.(tmd5?|tmd4)$/i, '') || 'Untitled';
+function basenameWithoutProjectExtension(filename: string): string {
+  return filename.replace(/\.(osf|tmd5?|tmd4)$/i, '') || 'Untitled';
 }
 
 function defaultFilename(title: string, extension: string): string {
   const base = title.trim() || 'Untitled';
   const safe = base.replace(/[^a-z0-9._-]+/gi, '-').replace(/^-+|-+$/g, '') || 'Untitled';
   return ensureExtension(safe, extension);
+}
+
+function defaultNativeFilename(title: string): string {
+  return defaultFilename(title, NATIVE_PROJECT_EXTENSION);
 }
 
 function loadRecentProjects(): RecentProject[] {
@@ -285,14 +302,20 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
 
   const loadText = async (
     text: string,
-    source: { title?: string; filename?: string; path?: string | null; dirty?: boolean } = {}
+    source: {
+      title?: string;
+      filename?: string;
+      path?: string | null;
+      dirty?: boolean;
+      recentText?: string | null;
+    } = {}
   ) => {
     set({ status: 'loading_engine', error: null, projectMessage: null });
     await releaseOristudioCpDocument();
     const api = await getEngine();
     const snapshot = await loadTreeFromText(api, text);
-    const filename = source.filename ?? 'Untitled.tmd5';
-    const title = source.title ?? basenameWithoutTreeMakerExtension(filename);
+    const filename = source.filename ?? defaultNativeFilename('Untitled');
+    const title = source.title ?? basenameWithoutProjectExtension(filename);
     set({
       ...projectStateFromSnapshot(snapshot, title),
       documentMode: 'tree',
@@ -320,13 +343,15 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
       historyFuture: [],
       clipboardPasteCount: 0,
     });
-    rememberRecent({
-      id: source.path ?? filename,
-      title,
-      filename,
-      savedAt: nowIso(),
-      text,
-    });
+    if (source.recentText !== null) {
+      rememberRecent({
+        id: source.path ?? filename,
+        title,
+        filename,
+        savedAt: nowIso(),
+        text: source.recentText ?? text,
+      });
+    }
     useLayoutStore.getState().activatePanel('design');
   };
 
@@ -434,19 +459,178 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
     useLayoutStore.getState().activatePanel('crease-pattern');
   };
 
-  const saveTmd5 = async (fileService: FileService, forceSaveAs: boolean) => {
+  const parseFoldProjection = (text: string): FoldDocument | null => {
+    try {
+      return JSON.parse(text) as FoldDocument;
+    } catch {
+      return null;
+    }
+  };
+
+  const exportedEditableFoldProjection = async (): Promise<FoldDocument | null> => {
+    try {
+      return parseFoldProjection(await exportOristudioCpDocumentAsFold());
+    } catch {
+      return null;
+    }
+  };
+
+  const loadNativeCreasePattern = async (
+    nativeDocument: Extract<ReturnType<typeof activeNativeDocument>, { kind: 'crease-pattern' }>,
+    nativeText: string,
+    source: { filename: string; path?: string | null }
+  ) => {
+    set({
+      status: 'loading_engine',
+      error: null,
+      projectMessage: null,
+      oristudioCpCamvResult: null,
+    });
+    const nativeSource = {
+      format: 'osf' as const,
+      filename: source.filename,
+      path: source.path ?? null,
+    };
+    const restoredDocument = await restoreOristudioCpDocument(
+      nativeDocument.creasePattern.document,
+      nativeSource
+    );
+    const checked = await refreshAlwaysOnCamvDiagnostics(restoredDocument);
+    const documentState = checked.documentState;
+    const fold =
+      nativeDocument.creasePattern.foldProjection ?? (await exportedEditableFoldProjection());
+    if (!fold) throw new Error('Native crease-pattern project does not contain a FOLD projection');
+
+    const parsed = parseImportedCreasePattern(JSON.stringify(fold), {
+      format: 'fold',
+      filename: `${nativeDocument.title || source.filename}.fold`,
+      path: null,
+    });
+    const result = await (async () => {
+      try {
+        const api = await getEngine();
+        const foldArtifacts = await api.flatFoldArtifacts(JSON.stringify(parsed.document.fold), {
+          solution_limit: 10,
+        });
+        return withFlatFoldArtifacts(parsed, foldArtifacts);
+      } catch (error) {
+        return withFlatFoldError(parsed, engineError(error).message);
+      }
+    })();
+    const artifactRevision = get().foldArtifactRevision + 1;
+    const artifactState =
+      result.foldArtifacts.folded_base_error && !result.foldArtifacts.folded_base
+        ? {
+            foldArtifacts: result.foldArtifacts,
+            foldArtifactError: result.foldArtifacts.folded_base_error,
+            foldArtifactStatus: 'error' as const,
+            foldArtifactRevision: artifactRevision,
+            foldArtifactResolvedRevision: artifactRevision,
+          }
+        : readyFoldArtifactResourceState(result.foldArtifacts, artifactRevision);
+    set({
+      project: { ...result.project, title: nativeDocument.title || result.project.title },
+      documentMode: 'crease-pattern',
+      importedCreasePattern: result.document,
+      oristudioCpDocument: documentState,
+      oristudioCpCamvResult: checked.camvResult,
+      oristudioCpOperationDescriptors: documentState.operationDescriptors,
+      oristudioCpError: null,
+      oristudioCpHistoryPast: [],
+      oristudioCpHistoryFuture: [],
+      projectLoadId: get().projectLoadId + 1,
+      currentFileName: source.filename,
+      currentFilePath: source.path ?? null,
+      projectMessage: `Loaded ${source.filename}`,
+      selection: { kind: 'tree' },
+      oristudioCpSelection: nativeDocument.viewState.selection ?? emptyOristudioCpSelection(),
+      oristudioCpActiveDiagnosticId: null,
+      toolMode: 'select',
+      creaseColorMode: nativeDocument.viewState.creaseColorMode ?? DEFAULT_CREASE_COLOR_MODE,
+      oristudioCpViewport: {
+        ...DEFAULT_ORISTUDIO_CP_VIEWPORT_OPTIONS,
+        ...nativeDocument.viewState.viewport,
+      },
+      ...artifactState,
+      sequenceTarget: null,
+      sequencePlan: null,
+      sequenceSimulationFocus: { kind: 'whole' },
+      sequencePlanning: false,
+      sequenceError: null,
+      status: 'crease_pattern_ready',
+      dirty: false,
+      error: null,
+      engineReady: true,
+      lastOptimization: null,
+      historyPast: [],
+      historyFuture: [],
+      clipboardPasteCount: 0,
+    });
+    rememberRecent({
+      id: source.path ?? source.filename,
+      title: nativeDocument.title,
+      filename: source.filename,
+      savedAt: nowIso(),
+      text: nativeText,
+    });
+    useLayoutStore.getState().activatePanel('crease-pattern');
+  };
+
+  const loadNativeProject = async (
+    text: string,
+    source: { filename: string; path?: string | null }
+  ) => {
+    const nativeProject = parseNativeProjectFile(text);
+    const nativeDocument = activeNativeDocument(nativeProject);
+    if (nativeDocument.kind === 'treemaker-tree') {
+      await loadText(nativeDocument.tree.text, {
+        title: nativeDocument.title || nativeProject.workspace.title,
+        filename: source.filename,
+        path: source.path ?? null,
+        recentText: text,
+      });
+      return;
+    }
+    await loadNativeCreasePattern(nativeDocument, text, source);
+  };
+
+  const currentTreeTmd5Text = async () => {
     const { api, treeHandle, initializedSnapshot } = await ensureTreeHandle();
     if (initializedSnapshot) {
       set(projectStateFromSnapshot(initializedSnapshot, get().project.title));
     }
-    const contents = await api.saveTmd5(treeHandle);
-    const suggestedName = defaultFilename(get().project.title, 'tmd5');
+    return api.saveTmd5(treeHandle);
+  };
+
+  const nativeSaveTarget = () => {
+    const canOverwriteNative = isNativeProjectFilename(get().currentFileName);
+    const suggestedName = canOverwriteNative
+      ? get().currentFileName
+      : defaultNativeFilename(get().project.title);
+    return {
+      suggestedName,
+      path: canOverwriteNative ? get().currentFilePath : null,
+    };
+  };
+
+  const saveNativeTreeProject = async (fileService: FileService, forceSaveAs: boolean) => {
+    const tmd5Text = await currentTreeTmd5Text();
+    const contents = serializeNativeProjectFile(
+      createNativeTreeProjectFile({
+        title: get().project.title,
+        filename: get().currentFileName,
+        path: get().currentFilePath,
+        tmd5Text,
+        appVersion: APP_VERSION,
+      })
+    );
+    const target = nativeSaveTarget();
     const result = await fileService.saveTextFile({
       title: forceSaveAs ? 'Save Ori Studio Project As' : 'Save Ori Studio Project',
       contents,
-      suggestedName: get().currentFileName || suggestedName,
-      path: forceSaveAs ? null : get().currentFilePath,
-      extensions: ['tmd5'],
+      suggestedName: target.suggestedName,
+      path: forceSaveAs ? null : target.path,
+      extensions: [NATIVE_PROJECT_EXTENSION],
     });
     if (!result) return false;
     set({
@@ -481,27 +665,37 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
       return false;
     }
 
-    const contents = await exportOristudioCpDocumentAsCp();
-    const suggestedName = defaultFilename(
-      documentState.summary.title || get().importedCreasePattern?.title || get().project.title,
-      'cp'
+    const foldProjection = await exportedEditableFoldProjection();
+    const contents = serializeNativeProjectFile(
+      createNativeCreasePatternProjectFile({
+        title: documentState.summary.title || get().importedCreasePattern?.title || get().project.title,
+        filename: get().currentFileName,
+        path: get().currentFilePath,
+        document: documentState.document,
+        source: get().importedCreasePattern?.source ?? documentState.source,
+        foldProjection,
+        foldArtifacts: get().foldArtifacts,
+        creaseColorMode: get().creaseColorMode,
+        selection: get().oristudioCpSelection,
+        viewport: get().oristudioCpViewport,
+        appVersion: APP_VERSION,
+      })
     );
-    const canOverwriteCurrentCp = /\.cp$/i.test(get().currentFileName);
+    const target = nativeSaveTarget();
     const result = await fileService.saveTextFile({
-      title: forceSaveAs ? 'Save Crease Pattern As' : 'Save Crease Pattern',
+      title: forceSaveAs ? 'Save Ori Studio Project As' : 'Save Ori Studio Project',
       contents,
-      suggestedName: canOverwriteCurrentCp ? get().currentFileName : suggestedName,
-      path: forceSaveAs || !canOverwriteCurrentCp ? null : get().currentFilePath,
-      extensions: ['cp'],
+      suggestedName: target.suggestedName,
+      path: forceSaveAs ? null : target.path,
+      extensions: [NATIVE_PROJECT_EXTENSION],
     });
     if (!result) return false;
 
     const source = {
-      format: 'cp' as const,
+      format: 'osf' as const,
       filename: result.name,
       path: result.path,
     };
-    const importedCreasePattern = get().importedCreasePattern;
     setOristudioCpDocumentSource(source);
     set({
       currentFileName: result.name,
@@ -512,12 +706,6 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
         ...documentState,
         source,
       },
-      importedCreasePattern: importedCreasePattern
-        ? {
-            ...importedCreasePattern,
-            source,
-          }
-        : importedCreasePattern,
     });
     rememberRecent({
       id: result.path ?? result.name,
@@ -541,7 +729,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
     oristudioCpHistoryFuture: [],
     projectLoadId: 0,
     currentFilePath: null,
-    currentFileName: 'Untitled.tmd5',
+    currentFileName: defaultNativeFilename('Untitled'),
     projectMessage: null,
     recentProjects: loadRecentProjects(),
     status: 'loading_engine',
@@ -607,7 +795,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
           oristudioCpHistoryPast: [],
           oristudioCpHistoryFuture: [],
           projectLoadId: get().projectLoadId + 1,
-          currentFileName: 'Untitled.tmd5',
+          currentFileName: defaultNativeFilename('Untitled'),
           currentFilePath: null,
           projectMessage: null,
           selection: { kind: 'tree' },
@@ -646,7 +834,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
           oristudioCpHistoryPast: [],
           oristudioCpHistoryFuture: [],
           projectLoadId: get().projectLoadId + 1,
-          currentFileName: 'three-terminal-flaps.tmd5',
+          currentFileName: defaultNativeFilename('three-terminal-flaps'),
           currentFilePath: null,
           projectMessage: 'Loaded starter project',
           selection: { kind: 'tree' },
@@ -686,8 +874,8 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
           oristudioCpHistoryPast: [],
           oristudioCpHistoryFuture: [],
           projectLoadId: get().projectLoadId + 1,
-          currentFileName: documentState.source.filename,
-          currentFilePath: documentState.source.path,
+          currentFileName: defaultNativeFilename(documentState.summary.title ?? 'Untitled CP'),
+          currentFilePath: null,
           projectMessage: null,
           selection: { kind: 'tree' },
           oristudioCpSelection: emptyOristudioCpSelection(),
@@ -776,9 +964,9 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
           oristudioCpHistoryPast: previousDocument
             ? mutatesDocument
               ? [
-                ...get().oristudioCpHistoryPast,
-                cpHistoryEntry(previousDocument, String(operationId), previousSelection),
-              ]
+                  ...get().oristudioCpHistoryPast,
+                  cpHistoryEntry(previousDocument, String(operationId), previousSelection),
+                ]
               : get().oristudioCpHistoryPast
             : get().oristudioCpHistoryPast,
           oristudioCpHistoryFuture: mutatesDocument ? [] : get().oristudioCpHistoryFuture,
@@ -842,10 +1030,12 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
       try {
         const file = await fileService.openTextFile({
           title: 'Open Ori Studio Project or Crease Pattern',
-          extensions: ['tmd', 'tmd4', 'tmd5', 'fold', 'cp'],
+          extensions: [NATIVE_PROJECT_EXTENSION, 'tmd', 'tmd4', 'tmd5', 'fold', 'cp'],
         });
         if (!file) return false;
-        if (isCreasePatternFilename(file.name)) {
+        if (isNativeProjectFilename(file.name)) {
+          await loadNativeProject(file.text, { filename: file.name, path: file.path });
+        } else if (isCreasePatternFilename(file.name)) {
           await loadCreasePattern(file.text, { filename: file.name, path: file.path });
         } else {
           await loadText(file.text, { filename: file.name, path: file.path });
@@ -863,7 +1053,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
         if (get().documentMode === 'crease-pattern') {
           return await saveEditableCreasePattern(fileService, false);
         }
-        return await saveTmd5(fileService, false);
+        return await saveNativeTreeProject(fileService, false);
       } catch (error) {
         set({ status: 'error', error: engineError(error) });
         return false;
@@ -876,7 +1066,27 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
         if (get().documentMode === 'crease-pattern') {
           return await saveEditableCreasePattern(fileService, true);
         }
-        return await saveTmd5(fileService, true);
+        return await saveNativeTreeProject(fileService, true);
+      } catch (error) {
+        set({ status: 'error', error: engineError(error) });
+        return false;
+      }
+    },
+
+    exportV5: async (fileService = getFileService()) => {
+      try {
+        if (rejectDisabled('file.exportV5')) return false;
+        const contents = await currentTreeTmd5Text();
+        const result = await fileService.saveTextFile({
+          title: 'Export TreeMaker 5 Project',
+          contents,
+          suggestedName: defaultFilename(get().project.title, 'tmd5'),
+          path: null,
+          extensions: ['tmd5'],
+        });
+        if (!result) return false;
+        set({ projectMessage: `Exported ${result.name}` });
+        return true;
       } catch (error) {
         set({ status: 'error', error: engineError(error) });
         return false;
@@ -1014,7 +1224,12 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
       if (!(await confirmDiscardDirty(get().dirty))) return;
       const recent = get().recentProjects.find((item) => item.id === id);
       if (!recent) return;
-      if (isCreasePatternFilename(recent.filename)) {
+      if (isNativeProjectFilename(recent.filename)) {
+        await loadNativeProject(recent.text, {
+          filename: recent.filename,
+          path: recent.id === AUTOSAVE_STORAGE_KEY ? null : recent.id,
+        });
+      } else if (isCreasePatternFilename(recent.filename)) {
         await get().loadCreasePatternText(recent.text, {
           filename: recent.filename,
           path: recent.id,
@@ -1028,15 +1243,50 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
     },
 
     autosaveProject: async () => {
-      if (get().documentMode !== 'tree') return;
       if (!get().dirty) return;
       try {
-        const { api, treeHandle } = await ensureTreeHandle();
-        const text = await api.saveTmd5(treeHandle);
+        const filename = isNativeProjectFilename(get().currentFileName)
+          ? get().currentFileName
+          : defaultNativeFilename(get().project.title);
+        const text =
+          get().documentMode === 'crease-pattern'
+            ? await (async () => {
+                const documentState = get().oristudioCpDocument;
+                if (!documentState) return null;
+                const foldProjection = await exportedEditableFoldProjection();
+                return serializeNativeProjectFile(
+                  createNativeCreasePatternProjectFile({
+                    title:
+                      documentState.summary.title ||
+                      get().importedCreasePattern?.title ||
+                      get().project.title,
+                    filename,
+                    path: null,
+                    document: documentState.document,
+                    source: get().importedCreasePattern?.source ?? documentState.source,
+                    foldProjection,
+                    foldArtifacts: get().foldArtifacts,
+                    creaseColorMode: get().creaseColorMode,
+                    selection: get().oristudioCpSelection,
+                    viewport: get().oristudioCpViewport,
+                    appVersion: APP_VERSION,
+                  })
+                );
+              })()
+            : serializeNativeProjectFile(
+                createNativeTreeProjectFile({
+                  title: get().project.title,
+                  filename,
+                  path: null,
+                  tmd5Text: await currentTreeTmd5Text(),
+                  appVersion: APP_VERSION,
+                })
+              );
+        if (!text) return;
         rememberRecent({
           id: AUTOSAVE_STORAGE_KEY,
           title: get().project.title,
-          filename: get().currentFileName,
+          filename,
           savedAt: nowIso(),
           text,
         });

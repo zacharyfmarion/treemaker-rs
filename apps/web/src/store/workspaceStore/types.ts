@@ -106,6 +106,7 @@ export interface ProjectSliceActions {
   openProject: (fileService?: FileService) => Promise<boolean>;
   saveProject: (fileService?: FileService) => Promise<boolean>;
   saveProjectAs: (fileService?: FileService) => Promise<boolean>;
+  exportV5: (fileService?: FileService) => Promise<boolean>;
   exportV4: (fileService?: FileService) => Promise<boolean>;
   exportCp: (fileService?: FileService) => Promise<boolean>;
   exportFold: (fileService?: FileService) => Promise<boolean>;

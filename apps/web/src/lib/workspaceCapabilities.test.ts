@@ -86,6 +86,7 @@ describe('workspace capabilities', () => {
 
     expect(state['cp.build'].enabled).toBe(true);
     expect(state['cp.build'].label).toBe('Rebuild CP');
+    expect(state['file.exportV5'].enabled).toBe(true);
     expect(state['file.exportFold'].enabled).toBe(true);
   });
 
@@ -159,15 +160,19 @@ describe('workspace capabilities', () => {
 
     expect(state['file.save']).toMatchObject({
       enabled: true,
-      reason: 'Save editable crease pattern as CP',
+      reason: 'Save editable crease pattern as an Ori Studio project',
     });
     expect(state['file.saveAs']).toMatchObject({
       enabled: true,
-      reason: 'Save editable crease pattern as a new CP file',
+      reason: 'Save editable crease pattern as a new Ori Studio project',
     });
     expect(state['file.exportCp']).toMatchObject({
       enabled: true,
       reason: 'Export editable crease pattern as CP',
+    });
+    expect(state['file.exportFold']).toMatchObject({
+      enabled: true,
+      reason: 'Export FOLD document',
     });
     expect(state['cp.checkCamv'].enabled).toBe(true);
     expect(state['cp.deleteSelectedLines'].enabled).toBe(false);
@@ -175,6 +180,19 @@ describe('workspace capabilities', () => {
     expect(state['cp.makeMountain'].enabled).toBe(false);
     expect(state['cp.changeCircleColor'].enabled).toBe(false);
     expect(state['cp.organizeCircles'].enabled).toBe(true);
+  });
+
+  it('enables FOLD export for new editable CP documents without an imported source', () => {
+    const state = capabilities({
+      documentMode: 'crease-pattern',
+      status: 'crease_pattern_ready',
+      hasEditableCreasePattern: true,
+    });
+
+    expect(state['file.exportFold']).toMatchObject({
+      enabled: true,
+      reason: 'Export FOLD document',
+    });
   });
 
   it('enables selected-line CP commands only when editable CP lines are selected', () => {

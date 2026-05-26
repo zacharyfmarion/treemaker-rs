@@ -220,11 +220,7 @@ async function replaceHandle(api: OristudioCpClient, nextHandle: number) {
 async function buildDocumentState(
   api: OristudioCpClient,
   documentHandle: number,
-  source: {
-    format: ImportedCreasePatternFormat;
-    filename: string;
-    path?: string | null;
-  },
+  source: OristudioCpDocumentState['source'],
   lastCommandResult: OristudioCpCommandResult | null
 ): Promise<OristudioCpDocumentState> {
   const [document, summary, operationDescriptors] = await Promise.all([
@@ -247,7 +243,7 @@ async function buildDocumentState(
 }
 
 function titleFromFilename(filename: string): string {
-  return filename.replace(/\.(cp|fold)$/i, '') || 'Untitled';
+  return filename.replace(/\.(cp|fold|osf)$/i, '') || 'Untitled';
 }
 
 export type { OristudioCpDocumentSnapshot, OristudioCpDocumentSummary };

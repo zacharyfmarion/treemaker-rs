@@ -12,6 +12,7 @@ function createDeps() {
       openProject: vi.fn().mockResolvedValue(true),
       saveProject: vi.fn().mockResolvedValue(true),
       saveProjectAs: vi.fn().mockResolvedValue(true),
+      exportV5: vi.fn().mockResolvedValue(true),
       exportV4: vi.fn().mockResolvedValue(true),
       exportCp: vi.fn().mockResolvedValue(true),
       exportFold: vi.fn().mockResolvedValue(true),
@@ -437,8 +438,10 @@ describe('menu actions', () => {
     expect(deps.workspace.saveProjectAs).toHaveBeenCalledWith(deps.fileService);
 
     await expect(createMenuActionHandler(deps)('file.exportFold')).resolves.toBe(true);
+    await expect(createMenuActionHandler(deps)('file.exportV5')).resolves.toBe(true);
     await expect(createMenuActionHandler(deps)('file.exportCp')).resolves.toBe(true);
     expect(deps.workspace.exportFold).toHaveBeenCalledWith(deps.fileService);
+    expect(deps.workspace.exportV5).toHaveBeenCalledWith(deps.fileService);
     expect(deps.workspace.exportCp).toHaveBeenCalledWith(deps.fileService);
   });
 

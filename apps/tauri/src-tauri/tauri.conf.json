@@ -33,8 +33,27 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "fileAssociations": [
+      {
+        "ext": ["osf"],
+        "name": "Ori Studio Project",
+        "description": "Ori Studio Project",
+        "mimeType": "application/vnd.oristudio.project+json",
+        "role": "Editor",
+        "rank": "Owner",
+        "contentTypes": ["com.zacharymarion.oristudio.project"],
+        "exportedType": {
+          "identifier": "com.zacharymarion.oristudio.project",
+          "conformsTo": ["public.json"]
+        }
+      }
+    ],
+    "resources": {
+      "icons/osf.icns": "osf.icns"
+    },
     "macOS": {
       "minimumSystemVersion": "10.15",
+      "infoPlist": "Info.plist",
       "entitlements": "entitlements.plist"
     },
     "icon": [

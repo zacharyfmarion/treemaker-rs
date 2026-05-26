@@ -188,7 +188,7 @@ export interface OristudioCpDocumentState {
   document: OristudioCpDocumentSnapshot;
   summary: OristudioCpDocumentSummary;
   source: {
-    format: 'cp' | 'fold';
+    format: 'cp' | 'fold' | 'osf';
     filename: string;
     path: string | null;
   };

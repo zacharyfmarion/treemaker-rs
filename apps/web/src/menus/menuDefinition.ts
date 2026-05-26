@@ -43,6 +43,7 @@ export function getMenuBarDef(): MenuDef[] {
         { type: 'action', id: 'file.save', label: 'Save', shortcut: `${mod}+S` },
         { type: 'action', id: 'file.saveAs', label: 'Save As...', shortcut: `${mod}+Shift+S` },
         { type: 'separator' },
+        { type: 'action', id: 'file.exportV5', label: 'Export TreeMaker 5...' },
         { type: 'action', id: 'file.exportV4', label: 'Export TreeMaker 4...' },
         { type: 'action', id: 'file.exportCp', label: 'Export CP...' },
         { type: 'action', id: 'file.exportFold', label: 'Export FOLD...' },

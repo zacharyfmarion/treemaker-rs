@@ -5,6 +5,7 @@ export type FileCommand =
   | 'openProject'
   | 'saveProject'
   | 'saveProjectAs'
+  | 'exportV5'
   | 'exportV4'
   | 'exportCp'
   | 'exportFold'
@@ -177,6 +178,20 @@ class TauriFileService implements FileService {
 
 export function createFileService(surface: RuntimeSurface): FileService {
   return surface === 'desktop' ? new TauriFileService() : new BrowserFileService();
+}
+
+export function createOpenedPathFileService(path: string): FileService {
+  const desktopService = createFileService('desktop');
+  return {
+    surface: desktopService.surface,
+    supportsNativeDialogs: desktopService.supportsNativeDialogs,
+    async openTextFile(): Promise<OpenTextFileResult | null> {
+      const text = await invoke<string>('read_text_file', { path });
+      return { text, name: filenameFromPath(path), path };
+    },
+    saveTextFile: (options) => desktopService.saveTextFile(options),
+    saveBinaryFile: (options) => desktopService.saveBinaryFile(options),
+  };
 }
 
 export function getFileService(): FileService {

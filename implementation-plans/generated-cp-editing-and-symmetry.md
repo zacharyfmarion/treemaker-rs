@@ -178,6 +178,8 @@ change.
       CP tools.
 - [x] Add generic symmetry payload routing for ready mutating CP commands,
       including point payloads and mirrored line/circle selection IDs.
+- [x] Harden CP symmetry routing with explicit per-command policies so
+      fixed-arity tools keep their operand contracts under mirroring.
 - [x] Execute mirrored command batches as one history entry and de-duplicate
       on-axis geometry.
 - [x] Bump `.osf` to schema v2 and add v1-to-v2 migration tests.

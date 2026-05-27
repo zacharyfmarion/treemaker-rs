@@ -1582,6 +1582,93 @@ describe('workspace store slices', () => {
     expect(useWorkspaceStore.getState().foldArtifacts?.folded_base?.facets).toHaveLength(2);
   });
 
+  it('preserves fixed-arity CP command operands when mirroring through the store', async () => {
+    resetStores(seedSnapshot());
+    const line = (ax: number, ay: number, bx: number, by: number) => ({
+      a: { x: ax, y: ay },
+      b: { x: bx, y: by },
+      active: 'Inactive0',
+      color: 'Red1',
+      selected: 0,
+      customized: 0,
+      customized_color: { red: 100, green: 200, blue: 200 },
+    });
+    const documentState: OristudioCpDocumentState = {
+      ...blankCpDocumentState(),
+      document: {
+        title: 'symmetric-lines',
+        metadata: {},
+        crease_pattern: {
+          ...createStarterOristudioCpDocument().crease_pattern,
+          line_segments: [
+            line(1, 0, 1, 2),
+            line(-1, 0, -1, 2),
+            line(1, 0, 2, 1),
+            line(-1, 0, -2, 1),
+            line(1, 3, 2, 3),
+            line(-1, 3, -2, 3),
+          ],
+        },
+      },
+      summary: {
+        ...blankCpDocumentState().summary,
+        title: 'symmetric-lines',
+        line_segments: 6,
+      },
+    };
+    useWorkspaceStore.setState({
+      oristudioCpDocument: documentState,
+      oristudioCpSymmetry: {
+        ...defaultOristudioCpSymmetry(),
+        enabled: true,
+        preset: 'book',
+        axis: { loc: { x: 0, y: 0 }, angle: 90 },
+      },
+    });
+    oristudioCpMocks.executeOristudioCpCommand
+      .mockResolvedValueOnce({
+        ...documentState,
+        lastCommandResult: {
+          operation: 'SquareBisector',
+          status: 'OracleTested',
+          diagnostics: ['Changed 1 line'],
+        },
+      })
+      .mockResolvedValueOnce({
+        ...documentState,
+        lastCommandResult: {
+          operation: 'SquareBisector',
+          status: 'OracleTested',
+          diagnostics: ['Changed 1 line'],
+        },
+      });
+
+    await expect(
+      useWorkspaceStore.getState().executeOristudioCpCommand('SquareBisector', {
+        line_ids: [1, 3, 5],
+        line_color: 'Red1',
+      })
+    ).resolves.toBe(true);
+
+    expect(oristudioCpMocks.executeOristudioCpCommand).toHaveBeenNthCalledWith(
+      1,
+      'SquareBisector',
+      { line_ids: [1, 3, 5], line_color: 'Red1' }
+    );
+    expect(oristudioCpMocks.executeOristudioCpCommand).toHaveBeenNthCalledWith(
+      2,
+      'SquareBisector',
+      { line_ids: [2, 4, 6], line_color: 'Red1' }
+    );
+    const squareBisectorPayloads = oristudioCpMocks.executeOristudioCpCommand.mock.calls
+      .filter(([operation]) => operation === 'SquareBisector')
+      .map(([, payload]) => payload);
+    expect(squareBisectorPayloads.map((payload) => payload?.line_ids)).toEqual([
+      [1, 3, 5],
+      [2, 4, 6],
+    ]);
+  });
+
   it('surfaces demand-refresh flat-folder errors without leaving artifacts loading', async () => {
     const api = resetStores(seedSnapshot());
     await useWorkspaceStore.getState().loadCreasePatternText('1 0 0 1 0\n2 0 0 0 1', {

@@ -1024,7 +1024,12 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
           mutatesDocument && !SYNC_CP_LINE_SELECTION_AFTER_OPERATIONS.has(operationId);
         const payloads =
           previousDocument && mutatesDocument
-            ? reflectedCpCommandPayloads(previousDocument, payload, get().oristudioCpSymmetry)
+            ? reflectedCpCommandPayloads(
+                operationId,
+                previousDocument,
+                payload,
+                get().oristudioCpSymmetry
+              )
             : [payload];
         let commandDocument: OristudioCpDocumentState | null = null;
         for (const commandPayload of payloads) {

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { OristudioCpDocumentSnapshot } from '../engine/oristudioCpTypes';
+import { ORISTUDIO_CP_COMMANDS } from './oristudioCpCommands';
 import {
+  ORISTUDIO_CP_SYMMETRY_POLICIES,
   reflectedCpCommandPayloads,
   type OristudioCpSymmetryState,
 } from './oristudioCpSymmetry';
@@ -39,6 +41,42 @@ function cpDocument(): OristudioCpDocumentSnapshot {
           customized: 0,
           customized_color: { red: 0, green: 0, blue: 0 },
         },
+        {
+          a: { x: 1, y: 0 },
+          b: { x: 2, y: 1 },
+          color: 'Red1',
+          active: 'Inactive0',
+          selected: 0,
+          customized: 0,
+          customized_color: { red: 0, green: 0, blue: 0 },
+        },
+        {
+          a: { x: -1, y: 0 },
+          b: { x: -2, y: 1 },
+          color: 'Red1',
+          active: 'Inactive0',
+          selected: 0,
+          customized: 0,
+          customized_color: { red: 0, green: 0, blue: 0 },
+        },
+        {
+          a: { x: 1, y: 3 },
+          b: { x: 2, y: 3 },
+          color: 'Red1',
+          active: 'Inactive0',
+          selected: 0,
+          customized: 0,
+          customized_color: { red: 0, green: 0, blue: 0 },
+        },
+        {
+          a: { x: -1, y: 3 },
+          b: { x: -2, y: 3 },
+          color: 'Red1',
+          active: 'Inactive0',
+          selected: 0,
+          customized: 0,
+          customized_color: { red: 0, green: 0, blue: 0 },
+        },
       ],
       circles: [
         {
@@ -60,7 +98,10 @@ function cpDocument(): OristudioCpDocumentSnapshot {
       ],
       points: [],
       aux_line_segments: [],
-      texts: [],
+      texts: [
+        { x: 3, y: 0, text: 'note' },
+        { x: -3, y: 0, text: 'note' },
+      ],
       grid: {
         interval_grid_size: 4,
         grid_size: 8,
@@ -81,8 +122,19 @@ function cpDocument(): OristudioCpDocumentSnapshot {
 }
 
 describe('oristudio CP symmetry', () => {
+  it('documents symmetry behavior for every ready CP command', () => {
+    const missingPolicies = ORISTUDIO_CP_COMMANDS.filter(
+      (command) => command.uiStatus === 'ready'
+    )
+      .map((command) => command.operationId)
+      .filter((operationId) => !(operationId in ORISTUDIO_CP_SYMMETRY_POLICIES));
+
+    expect(missingPolicies).toEqual([]);
+  });
+
   it('adds reflected point payloads for geometric commands', () => {
     const payloads = reflectedCpCommandPayloads(
+      'DrawCreaseFree',
       cpDocument(),
       {
         points: [
@@ -103,6 +155,7 @@ describe('oristudio CP symmetry', () => {
 
   it('expands selected line ids to their reflected partners', () => {
     const payloads = reflectedCpCommandPayloads(
+      'CreaseMakeMountain',
       cpDocument(),
       {
         line_ids: [1],
@@ -115,6 +168,7 @@ describe('oristudio CP symmetry', () => {
 
   it('expands selected circle ids to their reflected partners', () => {
     const payloads = reflectedCpCommandPayloads(
+      'CircleChangeColor',
       cpDocument(),
       {
         circle_ids: [1],
@@ -127,6 +181,7 @@ describe('oristudio CP symmetry', () => {
 
   it('keeps mirrored selection-box commands additive after the primary command', () => {
     const payloads = reflectedCpCommandPayloads(
+      'CreaseSelect',
       cpDocument(),
       {
         points: [
@@ -141,5 +196,69 @@ describe('oristudio CP symmetry', () => {
     expect(payloads).toHaveLength(2);
     expect(payloads[0]?.replace_selection).toBe(true);
     expect(payloads[1]?.replace_selection).toBe(false);
+  });
+
+  it('mirrors ordered line operands without changing command arity', () => {
+    const payloads = reflectedCpCommandPayloads(
+      'SquareBisector',
+      cpDocument(),
+      {
+        line_ids: [1, 3, 5],
+        line_color: 'Red1',
+      },
+      verticalSymmetry
+    );
+
+    expect(payloads).toEqual([
+      { line_ids: [1, 3, 5], line_color: 'Red1' },
+      { line_ids: [2, 4, 6], line_color: 'Red1' },
+    ]);
+  });
+
+  it('does not mirror ordered line operands when the mirrored set is incomplete', () => {
+    const document = cpDocument();
+    document.crease_pattern.line_segments = document.crease_pattern.line_segments.slice(0, 5);
+
+    const payloads = reflectedCpCommandPayloads(
+      'SquareBisector',
+      document,
+      {
+        line_ids: [1, 3, 5],
+        line_color: 'Red1',
+      },
+      verticalSymmetry
+    );
+
+    expect(payloads).toEqual([{ line_ids: [1, 3, 5], line_color: 'Red1' }]);
+  });
+
+  it('mirrors ordered circle operands without expanding them into one payload', () => {
+    const payloads = reflectedCpCommandPayloads(
+      'CircleDrawConcentricTwoCircleSelect',
+      cpDocument(),
+      {
+        circle_ids: [1, 2],
+      },
+      verticalSymmetry
+    );
+
+    expect(payloads).toEqual([{ circle_ids: [1, 2] }, { circle_ids: [2, 1] }]);
+  });
+
+  it('expands selected text ids to their reflected partners for text edits', () => {
+    const payloads = reflectedCpCommandPayloads(
+      'Text',
+      cpDocument(),
+      {
+        text_action: 'SetContent',
+        text_ids: [1],
+        text_content: 'updated',
+      },
+      verticalSymmetry
+    );
+
+    expect(payloads).toEqual([
+      { text_action: 'SetContent', text_ids: [1, 2], text_content: 'updated' },
+    ]);
   });
 });

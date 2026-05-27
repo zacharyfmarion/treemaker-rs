@@ -237,8 +237,6 @@ pub fn setup_menu(app: &App) -> Result<(), Box<dyn std::error::Error>> {
         MenuItemBuilder::with_id("cp.transformRotateLeft", "Rotate Left 90").build(app)?;
     let cp_transform_rotate_right =
         MenuItemBuilder::with_id("cp.transformRotateRight", "Rotate Right 90").build(app)?;
-    let cp_transform_rotate_180 =
-        MenuItemBuilder::with_id("cp.transformRotate180", "Rotate 180").build(app)?;
     let cp_replace_line_type =
         MenuItemBuilder::with_id("cp.replaceLineType", "Replace Selected Line Type...")
             .build(app)?;
@@ -280,7 +278,6 @@ pub fn setup_menu(app: &App) -> Result<(), Box<dyn std::error::Error>> {
         .separator()
         .item(&cp_transform_rotate_left)
         .item(&cp_transform_rotate_right)
-        .item(&cp_transform_rotate_180)
         .build()?;
     let cp_diagnostics_menu = SubmenuBuilder::new(app, "Diagnostics")
         .item(&cp_check_camv)

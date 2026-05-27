@@ -63,7 +63,6 @@ export type WorkspaceCapabilityId =
   | 'cp.transformFlipVertical'
   | 'cp.transformRotateLeft'
   | 'cp.transformRotateRight'
-  | 'cp.transformRotate180'
   | 'cp.replaceLineType'
   | 'cp.deleteLineType'
   | 'cp.checkCamv'
@@ -489,12 +488,6 @@ export function getWorkspaceCapabilities(input: WorkspaceCapabilityInput): Works
       hasSelectedCpLines,
       'Rotate Right 90',
       'Rotate selected crease-pattern lines right'
-    ),
-    'cp.transformRotate180': selectedCpLineCapability(
-      canEditCp,
-      hasSelectedCpLines,
-      'Rotate 180',
-      'Rotate selected crease-pattern lines 180 degrees'
     ),
     'cp.replaceLineType': selectedCpLineCapability(
       canEditCp,

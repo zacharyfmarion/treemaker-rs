@@ -28,7 +28,6 @@ targets editable Oristudio CP documents loaded in `documentMode ===
   - flip vertical
   - rotate left 90 degrees
   - rotate right 90 degrees
-  - rotate 180 degrees
 - A small square corner handle sits on the dotted rectangle, with a curved
   rotate arrow just outside the corner. Dragging it free-rotates the selected
   geometry around the selection center. Holding Shift snaps rotation to 22.5
@@ -132,8 +131,8 @@ targets editable Oristudio CP documents loaded in `documentMode ===
 - [x] Add the Rust kernel insert-lines command and wasm payload typing.
 - [x] Paste copied CP lines with a default offset and select the newly inserted
       lines.
-- [x] Add selected CP transform commands for rotate left, rotate right,
-      rotate 180, mirror horizontal, mirror vertical, and arbitrary angle.
+- [x] Add selected CP transform commands for rotate left, rotate right, mirror
+      horizontal, mirror vertical, and arbitrary angle.
 - [x] Add web and Tauri menu entries for the transform actions.
 - [x] Render a dotted transform bounds rectangle for editable CP selections.
 - [x] Add a compact contextual transform menu that appears whenever the CP
@@ -161,3 +160,6 @@ targets editable Oristudio CP documents loaded in `documentMode ===
       oristudio-cp`, and `wasm-pack test --node crates/oristudio-cp-wasm`.
 - [x] Run follow-up validation for the transform-handle and move-drag UX:
       web lint, web typecheck, focused clipboard/store tests, and browser smoke.
+- [x] Run follow-up validation for the reduced transform menu: web lint, web
+      typecheck, focused menu/capability tests, desktop check, and browser
+      smoke.

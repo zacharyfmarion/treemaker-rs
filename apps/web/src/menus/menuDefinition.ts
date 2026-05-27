@@ -179,7 +179,6 @@ export function getMenuBarDef(): MenuDef[] {
             { type: 'separator' },
             { type: 'action', id: 'cp.transformRotateLeft', label: 'Rotate Left 90' },
             { type: 'action', id: 'cp.transformRotateRight', label: 'Rotate Right 90' },
-            { type: 'action', id: 'cp.transformRotate180', label: 'Rotate 180' },
           ],
         },
         {

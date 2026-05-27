@@ -61,7 +61,6 @@ describe('web menu definition', () => {
       'cp.transformFlipVertical',
       'cp.transformRotateLeft',
       'cp.transformRotateRight',
-      'cp.transformRotate180',
       'cp.checkCamv',
       'cp.check1',
       'cp.check2',

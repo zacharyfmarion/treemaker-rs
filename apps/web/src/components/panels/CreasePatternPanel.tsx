@@ -3710,7 +3710,20 @@ function SelectionTransformBox({
   const height = Math.max(rawHeight, minSize);
   const x = rawX - (width - rawWidth) / 2;
   const y = rawY - (height - rawHeight) / 2;
-  const menuWidth = 198;
+  const menuButtonCount = 4;
+  const menuSeparatorCount = 1;
+  const menuChildCount = menuButtonCount + menuSeparatorCount;
+  const menuButtonSize = 25;
+  const menuGap = 3;
+  const menuPadding = 4;
+  const menuBorderWidth = 1;
+  const menuSeparatorWidth = 1;
+  const menuWidth =
+    menuButtonCount * menuButtonSize +
+    menuSeparatorCount * menuSeparatorWidth +
+    (menuChildCount - 1) * menuGap +
+    menuPadding * 2 +
+    menuBorderWidth * 2;
   const menuHeight = 34;
   const canvasPadding = 10 * uiScale;
   const menuSvgWidth = menuWidth * uiScale;
@@ -3805,15 +3818,6 @@ function SelectionTransformBox({
             onClick={() => onTransform({ kind: 'rotate', angleDegrees: -90 })}
           >
             <RotateCw size={14} />
-          </button>
-          <button
-            type="button"
-            title="Rotate 180"
-            aria-label="Rotate 180"
-            onPointerDown={(event) => event.stopPropagation()}
-            onClick={() => onTransform({ kind: 'rotate', angleDegrees: 180 })}
-          >
-            180
           </button>
         </div>
       </foreignObject>

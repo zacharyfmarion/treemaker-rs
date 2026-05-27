@@ -170,7 +170,6 @@ describe('menu actions', () => {
     await expect(handle('cp.transformFlipVertical')).resolves.toBe(true);
     await expect(handle('cp.transformRotateLeft')).resolves.toBe(true);
     await expect(handle('cp.transformRotateRight')).resolves.toBe(true);
-    await expect(handle('cp.transformRotate180')).resolves.toBe(true);
 
     expect(deps.workspace.transformOristudioCpSelection).toHaveBeenNthCalledWith(1, {
       kind: 'flip-horizontal',
@@ -185,10 +184,6 @@ describe('menu actions', () => {
     expect(deps.workspace.transformOristudioCpSelection).toHaveBeenNthCalledWith(4, {
       kind: 'rotate',
       angleDegrees: -90,
-    });
-    expect(deps.workspace.transformOristudioCpSelection).toHaveBeenNthCalledWith(5, {
-      kind: 'rotate',
-      angleDegrees: 180,
     });
   });
 

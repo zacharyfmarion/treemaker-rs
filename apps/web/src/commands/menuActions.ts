@@ -85,7 +85,6 @@ export const MENU_ACTION_IDS = [
   'cp.transformFlipVertical',
   'cp.transformRotateLeft',
   'cp.transformRotateRight',
-  'cp.transformRotate180',
   'cp.replaceLineType',
   'cp.deleteLineType',
   'cp.checkCamv',
@@ -254,7 +253,6 @@ const CP_SELECTION_TRANSFORM_ACTIONS: Partial<Record<MenuActionId, CpSelectionTr
   'cp.transformFlipVertical': { kind: 'flip-vertical' },
   'cp.transformRotateLeft': { kind: 'rotate', angleDegrees: 90 },
   'cp.transformRotateRight': { kind: 'rotate', angleDegrees: -90 },
-  'cp.transformRotate180': { kind: 'rotate', angleDegrees: 180 },
 };
 
 export function isMenuActionId(id: string): id is MenuActionId {

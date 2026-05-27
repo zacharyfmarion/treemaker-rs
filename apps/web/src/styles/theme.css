@@ -2301,26 +2301,37 @@
   background: var(--border-subtle);
 }
 
-.cp-selection-transform__rotate-handle {
-  pointer-events: all;
-  cursor: grab;
-}
-
-.cp-selection-transform__rotate-handle:active {
-  cursor: grabbing;
-}
-
 .cp-selection-transform__rotate-hit-area {
   fill: transparent;
   pointer-events: all;
+  cursor:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M17 5v5h-5' fill='none' stroke='%230d1114' stroke-width='2.3' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M17 10a6.5 6.5 0 1 0 1.6 4.3' fill='none' stroke='%230d1114' stroke-width='2.3' stroke-linecap='round'/%3E%3C/svg%3E")
+      12 12,
+    grab;
 }
 
-.cp-selection-transform__corner-handle {
+.cp-selection-transform__resize-handle {
   fill: var(--bg-paper);
   stroke: var(--accent-primary);
   stroke-width: 1.5;
-  pointer-events: none;
+  pointer-events: all;
   vector-effect: non-scaling-stroke;
+}
+
+.cp-selection-transform__resize-handle[data-cp-resize-cursor='ew'] {
+  cursor: ew-resize;
+}
+
+.cp-selection-transform__resize-handle[data-cp-resize-cursor='ns'] {
+  cursor: ns-resize;
+}
+
+.cp-selection-transform__resize-handle[data-cp-resize-cursor='nwse'] {
+  cursor: nwse-resize;
+}
+
+.cp-selection-transform__resize-handle[data-cp-resize-cursor='nesw'] {
+  cursor: nesw-resize;
 }
 
 .cp-selection-transform-preview {

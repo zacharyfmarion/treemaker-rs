@@ -18,6 +18,21 @@ export interface CpLineSelectionBounds {
   center: Point;
 }
 
+export interface CpLineSelectionFrame {
+  center: Point;
+  axisX: Point;
+  axisY: Point;
+  width: number;
+  height: number;
+  angleDegrees: number;
+  corners: {
+    topLeft: Point;
+    topRight: Point;
+    bottomRight: Point;
+    bottomLeft: Point;
+  };
+}
+
 export interface CpLineClipboardPayload {
   kind: 'cp-lines';
   lines: OristudioCpLineSegment[];
@@ -26,6 +41,13 @@ export interface CpLineClipboardPayload {
 
 export type CpSelectionTransform =
   | { kind: 'translate'; delta: Point }
+  | {
+      kind: 'scale';
+      frame: CpLineSelectionFrame;
+      anchor: Point;
+      scaleX: number;
+      scaleY: number;
+    }
   | { kind: 'rotate'; angleDegrees: number; center?: Point }
   | { kind: 'flip-horizontal'; center?: Point; swapMountainValley?: boolean }
   | { kind: 'flip-vertical'; center?: Point; swapMountainValley?: boolean };
@@ -76,15 +98,49 @@ export function cpLineSelectionBounds(
 export function cpLineSelectionMoveAnchorPoints(
   lines: readonly OristudioCpLineSegment[]
 ): Point[] {
-  const bounds = cpLineSelectionBounds(lines);
-  if (!bounds) return [];
+  const frame = cpLineSelectionFrame(lines);
+  if (!frame) return [];
   return [
     ...lines.flatMap((line) => [line.a, line.b]),
-    { x: bounds.minX, y: bounds.minY },
-    { x: bounds.minX, y: bounds.maxY },
-    { x: bounds.maxX, y: bounds.minY },
-    { x: bounds.maxX, y: bounds.maxY },
+    frame.corners.topLeft,
+    frame.corners.topRight,
+    frame.corners.bottomRight,
+    frame.corners.bottomLeft,
   ];
+}
+
+export function cpLineSelectionFrame(
+  lines: readonly OristudioCpLineSegment[]
+): CpLineSelectionFrame | null {
+  const points = uniquePoints(lines.flatMap((line) => [line.a, line.b]));
+  if (points.length === 0) return null;
+  if (points.length === 1) return frameForAngle(points, 0);
+
+  const hull = convexHull(points);
+  const candidateAngles = new Set<number>([0]);
+  for (let index = 0; index < hull.length; index += 1) {
+    const current = hull[index];
+    const next = hull[(index + 1) % hull.length];
+    const dx = next.x - current.x;
+    const dy = next.y - current.y;
+    if (Math.hypot(dx, dy) <= 1e-9) continue;
+    candidateAngles.add(normalizeFrameAngle(Math.atan2(dy, dx)));
+  }
+
+  let best: { frame: CpLineSelectionFrame; score: number; perimeter: number } | null = null;
+  for (const angle of candidateAngles) {
+    const frame = frameForAngle(points, angle);
+    const score = frame.width * frame.height;
+    const perimeter = frame.width + frame.height;
+    if (
+      !best ||
+      score < best.score - 1e-9 ||
+      (Math.abs(score - best.score) <= 1e-9 && perimeter < best.perimeter)
+    ) {
+      best = { frame, score, perimeter };
+    }
+  }
+  return best?.frame ?? null;
 }
 
 export function offsetCpLineSegmentsForPaste(
@@ -106,6 +162,16 @@ export function transformCpLineSegments(
 
   if (transform.kind === 'translate') {
     return translateCpLineSegments(lines, transform.delta);
+  }
+
+  if (transform.kind === 'scale') {
+    return scaleCpLineSegments(
+      lines,
+      transform.frame,
+      transform.anchor,
+      transform.scaleX,
+      transform.scaleY
+    );
   }
 
   const center = transform.center ?? bounds.center;
@@ -146,6 +212,46 @@ export function translateCpLineSegments(
   );
 }
 
+export function scaleCpLineSegments(
+  lines: readonly OristudioCpLineSegment[],
+  frame: CpLineSelectionFrame,
+  anchor: Point,
+  scaleX: number,
+  scaleY: number
+): OristudioCpLineSegment[] {
+  return lines.map((line) =>
+    transformLinePoints(line, (point) => {
+      const local = cpFramePointToLocal(frame, point);
+      return cpFrameLocalToPoint(frame, {
+        x: anchor.x + (local.x - anchor.x) * scaleX,
+        y: anchor.y + (local.y - anchor.y) * scaleY,
+      });
+    })
+  );
+}
+
+export function cpFramePointToLocal(
+  frame: Pick<CpLineSelectionFrame, 'axisX' | 'axisY' | 'center'>,
+  point: Point
+): Point {
+  const dx = point.x - frame.center.x;
+  const dy = point.y - frame.center.y;
+  return {
+    x: dx * frame.axisX.x + dy * frame.axisX.y,
+    y: dx * frame.axisY.x + dy * frame.axisY.y,
+  };
+}
+
+export function cpFrameLocalToPoint(
+  frame: Pick<CpLineSelectionFrame, 'axisX' | 'axisY' | 'center'>,
+  local: Point
+): Point {
+  return {
+    x: frame.center.x + frame.axisX.x * local.x + frame.axisY.x * local.y,
+    y: frame.center.y + frame.axisX.y * local.x + frame.axisY.y * local.y,
+  };
+}
+
 export function snapRotationDegrees(angleDegrees: number): number {
   return Math.round(angleDegrees / ROTATION_SNAP_DEGREES) * ROTATION_SNAP_DEGREES;
 }
@@ -158,6 +264,8 @@ export function cpSelectionTransformLabel(transform: CpSelectionTransform): stri
   switch (transform.kind) {
     case 'translate':
       return 'Move CP selection';
+    case 'scale':
+      return 'Scale CP selection';
     case 'flip-horizontal':
       return 'Flip CP selection horizontal';
     case 'flip-vertical':
@@ -165,6 +273,110 @@ export function cpSelectionTransformLabel(transform: CpSelectionTransform): stri
     case 'rotate':
       return `Rotate CP selection ${formatAngle(transform.angleDegrees)}`;
   }
+}
+
+function uniquePoints(points: readonly Point[]): Point[] {
+  const seen = new Set<string>();
+  const unique: Point[] = [];
+  for (const point of points) {
+    const key = `${Math.round(point.x * 1e9)}:${Math.round(point.y * 1e9)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(point);
+  }
+  return unique;
+}
+
+function normalizeFrameAngle(angleRadians: number): number {
+  const quarterTurn = Math.PI / 2;
+  const normalized = angleRadians % quarterTurn;
+  return normalized < 0 ? normalized + quarterTurn : normalized;
+}
+
+function frameForAngle(points: readonly Point[], angleRadians: number): CpLineSelectionFrame {
+  const axisX = { x: Math.cos(angleRadians), y: Math.sin(angleRadians) };
+  const axisY = { x: -Math.sin(angleRadians), y: Math.cos(angleRadians) };
+  const localPoints = points.map((point) => ({
+    x: point.x * axisX.x + point.y * axisX.y,
+    y: point.x * axisY.x + point.y * axisY.y,
+  }));
+  const minX = Math.min(...localPoints.map((point) => point.x));
+  const maxX = Math.max(...localPoints.map((point) => point.x));
+  const minY = Math.min(...localPoints.map((point) => point.y));
+  const maxY = Math.max(...localPoints.map((point) => point.y));
+  const centerLocal = {
+    x: (minX + maxX) / 2,
+    y: (minY + maxY) / 2,
+  };
+  const center = {
+    x: axisX.x * centerLocal.x + axisY.x * centerLocal.y,
+    y: axisX.y * centerLocal.x + axisY.y * centerLocal.y,
+  };
+  const frameBase = {
+    center,
+    axisX,
+    axisY,
+    width: maxX - minX,
+    height: maxY - minY,
+    angleDegrees: (angleRadians * 180) / Math.PI,
+  };
+  return {
+    ...frameBase,
+    corners: {
+      topLeft: cpFrameLocalToPoint(frameBase, {
+        x: minX - centerLocal.x,
+        y: maxY - centerLocal.y,
+      }),
+      topRight: cpFrameLocalToPoint(frameBase, {
+        x: maxX - centerLocal.x,
+        y: maxY - centerLocal.y,
+      }),
+      bottomRight: cpFrameLocalToPoint(frameBase, {
+        x: maxX - centerLocal.x,
+        y: minY - centerLocal.y,
+      }),
+      bottomLeft: cpFrameLocalToPoint(frameBase, {
+        x: minX - centerLocal.x,
+        y: minY - centerLocal.y,
+      }),
+    },
+  };
+}
+
+function convexHull(points: readonly Point[]): Point[] {
+  const sorted = [...points].sort((a, b) => (a.x === b.x ? a.y - b.y : a.x - b.x));
+  if (sorted.length <= 1) return sorted;
+
+  const lower: Point[] = [];
+  for (const point of sorted) {
+    while (
+      lower.length >= 2 &&
+      cross(lower[lower.length - 2], lower[lower.length - 1], point) <= 0
+    ) {
+      lower.pop();
+    }
+    lower.push(point);
+  }
+
+  const upper: Point[] = [];
+  for (let index = sorted.length - 1; index >= 0; index -= 1) {
+    const point = sorted[index];
+    while (
+      upper.length >= 2 &&
+      cross(upper[upper.length - 2], upper[upper.length - 1], point) <= 0
+    ) {
+      upper.pop();
+    }
+    upper.push(point);
+  }
+
+  lower.pop();
+  upper.pop();
+  return [...lower, ...upper];
+}
+
+function cross(origin: Point, a: Point, b: Point): number {
+  return (a.x - origin.x) * (b.y - origin.y) - (a.y - origin.y) * (b.x - origin.x);
 }
 
 function formatAngle(angleDegrees: number): string {

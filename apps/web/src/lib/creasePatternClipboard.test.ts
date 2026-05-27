@@ -3,6 +3,7 @@ import type { OristudioCpDocumentSnapshot, OristudioCpLineSegment } from '../eng
 import {
   buildCpLineClipboardPayload,
   cpLineSelectionBounds,
+  cpLineSelectionFrame,
   cpLineSelectionMoveAnchorPoints,
   offsetCpLineSegmentsForPaste,
   rotationAngleFromCenter,
@@ -114,6 +115,42 @@ describe('crease-pattern clipboard geometry', () => {
     expect(anchors).toContainEqual({ x: 6, y: -10 });
     expect(anchors).toContainEqual({ x: 0, y: 10 });
     expect(anchors).toContainEqual({ x: 0, y: -10 });
+  });
+
+  it('derives an oriented frame from rotated selected geometry', () => {
+    const source = [
+      cpLine({ x: -2, y: -1 }, { x: 2, y: -1 }),
+      cpLine({ x: 2, y: -1 }, { x: 2, y: 1 }),
+      cpLine({ x: 2, y: 1 }, { x: -2, y: 1 }),
+      cpLine({ x: -2, y: 1 }, { x: -2, y: -1 }),
+    ];
+    const rotated = transformCpLineSegments(source, { kind: 'rotate', angleDegrees: 30 });
+    const frame = cpLineSelectionFrame(rotated);
+
+    expect(frame?.width).toBeCloseTo(4);
+    expect(frame?.height).toBeCloseTo(2);
+    expect(frame?.angleDegrees).toBeCloseTo(30);
+  });
+
+  it('scales selected lines in the oriented selection frame', () => {
+    const frame = cpLineSelectionFrame([cpLine({ x: -2, y: -1 }, { x: 2, y: 1 })]);
+    expect(frame).not.toBeNull();
+
+    const scaled = transformCpLineSegments(
+      [cpLine({ x: -2, y: -1 }, { x: 2, y: 1 })],
+      {
+        kind: 'scale',
+        frame: frame!,
+        anchor: { x: -frame!.width / 2, y: 0 },
+        scaleX: 1.5,
+        scaleY: 1,
+      }
+    );
+
+    expect(scaled[0].a.x).toBeCloseTo(-2);
+    expect(scaled[0].a.y).toBeCloseTo(-1);
+    expect(scaled[0].b.x).toBeCloseTo(4);
+    expect(scaled[0].b.y).toBeCloseTo(2);
   });
 
   it('rotates and flips selected lines around their content center', () => {

@@ -3519,7 +3519,7 @@
   position: absolute;
   left: 50%;
   bottom: var(--space-3);
-  z-index: 14;
+  z-index: 17;
   display: flex;
   align-items: center;
   gap: 2px;
@@ -3533,29 +3533,6 @@
   box-shadow: 0 8px 24px var(--shadow-overlay);
   color: var(--text-secondary);
   white-space: nowrap;
-}
-
-.cp-symmetry-controls {
-  position: absolute;
-  left: var(--space-3);
-  bottom: calc(var(--space-3) + 44px);
-  z-index: 15;
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  max-width: min(560px, calc(100% - var(--space-6)));
-  min-height: 32px;
-  padding: 2px 4px;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
-  background: var(--domain-overlay-bg);
-  box-shadow: 0 8px 24px var(--shadow-overlay);
-  color: var(--text-secondary);
-  white-space: nowrap;
-}
-
-.cp-symmetry-controls__toggle {
-  gap: 5px;
 }
 
 .viewport-toolbar__separator {
@@ -3622,6 +3599,7 @@
 
 .viewport-toolbar__zoom-button,
 .viewport-toolbar__actual,
+.viewport-toolbar__symmetry-button,
 .viewport-toolbar__dropdown-item {
   border: 0;
   border-radius: var(--radius-sm);
@@ -3633,6 +3611,7 @@
 }
 
 .viewport-toolbar__zoom-button,
+.viewport-toolbar__symmetry-button,
 .viewport-toolbar__actual {
   display: inline-flex;
   align-items: center;
@@ -3652,8 +3631,21 @@
   font-weight: 700;
 }
 
+.viewport-toolbar__symmetry-button {
+  gap: 5px;
+  min-width: 54px;
+  padding: 0 8px;
+  font-weight: 760;
+}
+
+.viewport-toolbar__symmetry-button[data-active] {
+  background: color-mix(in srgb, var(--accent-primary) 20%, transparent);
+  color: var(--text-primary);
+}
+
 .viewport-toolbar__zoom-button:hover,
 .viewport-toolbar__actual:hover,
+.viewport-toolbar__symmetry-button:hover,
 .viewport-toolbar__dropdown-item:hover {
   background: var(--bg-surface);
   color: var(--text-primary);
@@ -3681,6 +3673,122 @@
   min-height: 26px;
   padding: 0 10px;
   text-align: center;
+}
+
+.cp-symmetry-menu__panel {
+  width: 236px;
+  padding: 8px;
+  gap: 5px;
+  color: var(--text-secondary);
+}
+
+.cp-symmetry-menu__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: 0 2px 4px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  font-size: 0.75rem;
+  font-weight: 760;
+}
+
+.cp-symmetry-menu__header span:last-child {
+  color: var(--text-tertiary);
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.cp-symmetry-menu__toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 42px;
+  padding: 6px 2px;
+}
+
+.cp-symmetry-menu__toggle-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.cp-symmetry-menu__toggle-copy span {
+  color: var(--text-primary);
+  font-size: 0.74rem;
+  font-weight: 740;
+}
+
+.cp-symmetry-menu__toggle-copy small {
+  color: var(--text-tertiary);
+  font-size: 0.66rem;
+  font-weight: 650;
+}
+
+.cp-symmetry-menu__item,
+.cp-symmetry-menu__preset {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 7px;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.cp-symmetry-menu__item {
+  width: 100%;
+}
+
+.cp-symmetry-menu__item:hover,
+.cp-symmetry-menu__preset:hover {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.cp-symmetry-menu__item[data-active],
+.cp-symmetry-menu__preset[data-active] {
+  border-color: color-mix(in srgb, var(--accent-primary) 42%, transparent);
+  background: color-mix(in srgb, var(--accent-primary) 18%, transparent);
+  color: var(--text-primary);
+}
+
+.cp-symmetry-menu__item:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.cp-symmetry-menu__item:disabled:hover {
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.cp-symmetry-menu__section-label {
+  margin-top: 3px;
+  padding: 0 2px;
+  color: var(--text-tertiary);
+  font-size: 0.65rem;
+  font-weight: 760;
+  text-transform: uppercase;
+}
+
+.cp-symmetry-menu__preset-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+
+.cp-symmetry-menu__preset {
+  justify-content: center;
 }
 
 .design-layer-menu {
@@ -3740,11 +3848,6 @@
     height: 32px;
   }
 
-  .cp-symmetry-controls {
-    right: var(--space-3);
-    flex-wrap: wrap;
-    white-space: normal;
-  }
 }
 
 .facet {

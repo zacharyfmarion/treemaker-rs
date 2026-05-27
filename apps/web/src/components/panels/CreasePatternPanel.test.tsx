@@ -785,7 +785,7 @@ describe('CreasePatternPanel', () => {
     expect(useWorkspaceStore.getState().oristudioCpViewport.snapToLines).toBe(false);
   });
 
-  it('renders generated CP companions as editable with bottom symmetry controls', () => {
+  it('renders generated CP companions as editable with compact toolbar symmetry controls', () => {
     const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
       documentMode: 'tree',
       oristudioCpDocument: editableCpState(),
@@ -797,13 +797,16 @@ describe('CreasePatternPanel', () => {
 
     expect(container.textContent).toContain('Generated from design');
     expect(container.querySelector('.cp-tool-rail')).not.toBeNull();
-    expect(container.querySelector('.cp-symmetry-controls')).not.toBeNull();
+    expect(container.querySelector('.cp-symmetry-controls')).toBeNull();
+    expect(container.querySelector('.cp-symmetry-menu')).not.toBeNull();
 
-    const symmetryButton = Array.from(container.querySelectorAll('button')).find(
-      (button) => button.textContent === 'Symmetry'
-    );
     act(() => {
-      symmetryButton?.click();
+      container.querySelector<HTMLButtonElement>('button[aria-label="Crease pattern symmetry"]')?.click();
+    });
+    act(() => {
+      container
+        .querySelector<HTMLButtonElement>('button[aria-label="Enable crease pattern symmetry"]')
+        ?.click();
     });
 
     expect(useWorkspaceStore.getState().activeEditingSurface).toBe('crease-pattern');

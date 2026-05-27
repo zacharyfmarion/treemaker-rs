@@ -83,17 +83,16 @@ change.
   the Oriedita paper center. When a generated CP comes from a symmetric tree,
   seed the CP axis from the transformed tree symmetry line, but do not reflect
   commands until the user turns CP symmetry on.
-- Add compact controls in a bottom-of-pane CP symmetry strip, matching the tree
-  pane's symmetry control placement instead of putting them in the viewport
-  toolbar:
-  - symmetry enable toggle
-  - preset select matching the tree symmetry controls (`None`, `Book`,
-    `Diagonal`, `Custom`)
-  - flip button for preset orientation
-  - advanced X/Y/Angle inputs
-  - `Set Axis` canvas action: pick two snapped points to define a custom axis.
-- Keep the floating viewport toolbar focused on zoom, grid/snap, and active line
-  type controls.
+- Add compact controls to the existing CP viewport toolbar/settings strip as a
+  single symmetry menu button, so symmetry is colocated with grid, snap, and
+  active line type without consuming the full width:
+  - toolbar chip showing `Sym`, `Book`, `Diag`, `Custom`, or axis-pick progress.
+  - popover toggle switches for symmetry enable and axis visibility.
+  - preset actions for `Book` and `Diagonal`, plus flip preset orientation.
+  - `Set custom axis` canvas action: pick two snapped points to define a custom
+    axis.
+- Keep the toolbar narrow by moving secondary symmetry choices into the popover
+  rather than adding a persistent row of buttons.
 - Render the axis, snap lane, and reflected live preview. Preview should show
   both the original candidate geometry and the mirrored candidate before commit.
 - Preserve mountain/valley assignment when reflecting. Add a future advanced
@@ -172,8 +171,8 @@ change.
 - [x] Route undo/redo, menu capabilities, exports, and fold artifacts through
       the active editing surface and CP lineage.
 - [x] Add CP symmetry state, helpers, and tests.
-- [x] Add bottom-of-pane CP symmetry controls, axis rendering, and the
-      two-point `Set Axis` interaction.
+- [x] Add compact CP toolbar symmetry controls, axis rendering, and the
+      two-point `Set custom axis` interaction.
 - [x] Add reflected live preview for point, drag-line, drag-box, and drag-path
       CP tools.
 - [x] Add generic symmetry payload routing for ready mutating CP commands,

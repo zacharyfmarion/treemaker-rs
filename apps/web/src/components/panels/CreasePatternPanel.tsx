@@ -9,7 +9,7 @@ import {
   type SetStateAction,
 } from 'react';
 import { TransformComponent, TransformWrapper, type ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
-import { Axis3d, ChevronDown, ChevronRight, FlipHorizontal2, GitBranch, Grid2X2, Magnet, ScanLine } from 'lucide-react';
+import { ChevronDown, ChevronRight, FlipHorizontal2, GitBranch, Grid2X2, Magnet, ScanLine } from 'lucide-react';
 import type {
   OristudioCpCommandPayload,
   OristudioCpCommandPreview,
@@ -111,9 +111,9 @@ import {
   toggleFacetSelection,
 } from '../../lib/selection';
 import { useWorkspaceStore } from '../../store/workspaceStore';
-import { Button } from '../ui/Button';
 import { IconButton } from '../ui/IconButton';
 import { SegmentedControl } from '../ui/SegmentedControl';
+import { Toggle } from '../ui/Toggle';
 import { CpToolRail } from './CpToolRail';
 import { NextDocumentAction } from './NextDocumentAction';
 import {
@@ -456,7 +456,27 @@ function CpLineTypeToolbar({
   );
 }
 
-function CpSymmetryControls({
+function cpSymmetryToolbarLabel(
+  symmetry: OristudioCpSymmetryState,
+  axisPicking: boolean,
+  axisPickCount: number
+) {
+  if (axisPicking) return axisPickCount === 0 ? 'Pick 1' : 'Pick 2';
+  if (!symmetry.enabled) return 'Sym';
+  if (symmetry.preset === 'book') return 'Book';
+  if (symmetry.preset === 'diagonal') return 'Diag';
+  return 'Custom';
+}
+
+function cpSymmetryStatusLabel(symmetry: OristudioCpSymmetryState, axisPicking: boolean) {
+  if (axisPicking) return 'Picking';
+  if (!symmetry.enabled) return 'Off';
+  if (symmetry.preset === 'book') return 'Book';
+  if (symmetry.preset === 'diagonal') return 'Diagonal';
+  return 'Custom axis';
+}
+
+function CpSymmetryMenuButton({
   symmetry,
   axisPicking,
   axisPickCount,
@@ -471,58 +491,123 @@ function CpSymmetryControls({
   onPickAxis: () => void;
   onUpdate: (update: Partial<OristudioCpSymmetryState>) => void;
 }) {
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
   const customLabel = axisPicking
     ? axisPickCount === 0
       ? 'Pick first'
       : 'Pick second'
-    : 'Set Axis';
+    : 'Set custom axis';
+  const toolbarLabel = cpSymmetryToolbarLabel(symmetry, axisPicking, axisPickCount);
+  const statusLabel = cpSymmetryStatusLabel(symmetry, axisPicking);
+  const canFlipPreset = symmetry.preset === 'book' || symmetry.preset === 'diagonal';
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onPointerDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (menuRef.current?.contains(target)) return;
+      setOpen(false);
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    return () => document.removeEventListener('mousedown', onPointerDown);
+  }, [open]);
+
+  const choosePreset = (preset: 'book' | 'diagonal') => {
+    onPreset(preset);
+    setOpen(false);
+  };
+
+  const pickAxis = () => {
+    onPickAxis();
+    setOpen(false);
+  };
 
   return (
-    <div className="cp-symmetry-controls" aria-label="Crease pattern symmetry controls">
-      <Button
-        size="sm"
-        variant="secondary"
-        className="cp-symmetry-controls__toggle"
-        isActive={symmetry.enabled}
-        aria-pressed={symmetry.enabled}
-        onClick={() => onUpdate({ enabled: !symmetry.enabled, showAxis: true })}
+    <div className="viewport-toolbar__menu-anchor cp-symmetry-menu" ref={menuRef}>
+      <button
+        type="button"
+        className="viewport-toolbar__symmetry-button"
+        data-active={symmetry.enabled || axisPicking ? true : undefined}
+        aria-label="Crease pattern symmetry"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
       >
         <FlipHorizontal2 size={14} />
-        Symmetry
-      </Button>
-      <IconButton
-        size="sm"
-        variant="toolbar"
-        title="Show symmetry axis"
-        isActive={symmetry.showAxis}
-        onClick={() => onUpdate({ showAxis: !symmetry.showAxis })}
-      >
-        <Axis3d size={14} />
-      </IconButton>
-      <Button
-        size="sm"
-        variant="secondary"
-        isActive={symmetry.preset === 'book' && symmetry.enabled}
-        onClick={() => onPreset('book')}
-      >
-        Book
-      </Button>
-      <Button
-        size="sm"
-        variant="secondary"
-        isActive={symmetry.preset === 'diagonal' && symmetry.enabled}
-        onClick={() => onPreset('diagonal')}
-      >
-        Diag
-      </Button>
-      <Button
-        size="sm"
-        variant="secondary"
-        isActive={axisPicking || (symmetry.preset === 'custom' && symmetry.enabled)}
-        onClick={onPickAxis}
-      >
-        {customLabel}
-      </Button>
+        <span>{toolbarLabel}</span>
+      </button>
+      {open && (
+        <div
+          className="viewport-toolbar__dropdown cp-symmetry-menu__panel"
+          role="menu"
+          aria-label="Crease pattern symmetry controls"
+        >
+          <div className="cp-symmetry-menu__header">
+            <span>Symmetry</span>
+            <span>{statusLabel}</span>
+          </div>
+          <div className="cp-symmetry-menu__toggle-row">
+            <div className="cp-symmetry-menu__toggle-copy">
+              <span>Enable symmetry</span>
+              <small>Mirror new CP edits</small>
+            </div>
+            <Toggle
+              checked={symmetry.enabled}
+              onChange={(enabled) => onUpdate({ enabled, showAxis: true })}
+              aria-label="Enable crease pattern symmetry"
+            />
+          </div>
+          <div className="cp-symmetry-menu__toggle-row">
+            <div className="cp-symmetry-menu__toggle-copy">
+              <span>Show axis</span>
+              <small>Display the mirror line</small>
+            </div>
+            <Toggle
+              checked={symmetry.showAxis}
+              onChange={(showAxis) => onUpdate({ showAxis })}
+              aria-label="Show crease pattern symmetry axis"
+            />
+          </div>
+          <div className="cp-symmetry-menu__section-label">Preset</div>
+          <div className="cp-symmetry-menu__preset-grid">
+            <button
+              type="button"
+              className="cp-symmetry-menu__preset"
+              data-active={symmetry.preset === 'book' && symmetry.enabled ? true : undefined}
+              onClick={() => choosePreset('book')}
+            >
+              Book
+            </button>
+            <button
+              type="button"
+              className="cp-symmetry-menu__preset"
+              data-active={symmetry.preset === 'diagonal' && symmetry.enabled ? true : undefined}
+              onClick={() => choosePreset('diagonal')}
+            >
+              Diag
+            </button>
+          </div>
+          <button
+            type="button"
+            className="cp-symmetry-menu__item"
+            disabled={!canFlipPreset}
+            onClick={() => {
+              if (canFlipPreset) choosePreset(symmetry.preset === 'book' ? 'book' : 'diagonal');
+            }}
+          >
+            <span>Flip preset axis</span>
+          </button>
+          <button
+            type="button"
+            className="cp-symmetry-menu__item"
+            data-active={axisPicking || (symmetry.preset === 'custom' && symmetry.enabled) ? true : undefined}
+            onClick={pickAxis}
+          >
+            <span>{customLabel}</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -2721,6 +2806,17 @@ export function CreasePatternPanel() {
                     >
                       <Magnet size={14} />
                     </IconButton>
+                    <CpSymmetryMenuButton
+                      symmetry={oristudioCpSymmetry}
+                      axisPicking={cpSymmetryAxisPickPoints !== null}
+                      axisPickCount={cpSymmetryAxisPickPoints?.length ?? 0}
+                      onPreset={handleCpSymmetryPreset}
+                      onPickAxis={handleStartCpSymmetryAxisPick}
+                      onUpdate={(update) => {
+                        setOristudioCpSymmetry(update);
+                        setActiveEditingSurface('crease-pattern');
+                      }}
+                    />
                     <ViewportToolbarSeparator />
                     <CpLineTypeToolbar
                       activeLineColor={activeCpLineColor}
@@ -2755,19 +2851,6 @@ export function CreasePatternPanel() {
                       ? handleDeleteSelectedText
                       : undefined
                   }
-                />
-              )}
-              {editableCp && (
-                <CpSymmetryControls
-                  symmetry={oristudioCpSymmetry}
-                  axisPicking={cpSymmetryAxisPickPoints !== null}
-                  axisPickCount={cpSymmetryAxisPickPoints?.length ?? 0}
-                  onPreset={handleCpSymmetryPreset}
-                  onPickAxis={handleStartCpSymmetryAxisPick}
-                  onUpdate={(update) => {
-                    setOristudioCpSymmetry(update);
-                    setActiveEditingSurface('crease-pattern');
-                  }}
                 />
               )}
               <div className="viewport-status-readout">

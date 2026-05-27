@@ -1669,6 +1669,118 @@ describe('workspace store slices', () => {
     ]);
   });
 
+  it('expands selected-line CP edit commands through the store symmetry gateway', async () => {
+    resetStores(seedSnapshot());
+    const line = (ax: number, ay: number, bx: number, by: number) => ({
+      a: { x: ax, y: ay },
+      b: { x: bx, y: by },
+      active: 'Inactive0',
+      color: 'Red1',
+      selected: 0,
+      customized: 0,
+      customized_color: { red: 100, green: 200, blue: 200 },
+    });
+    const documentState: OristudioCpDocumentState = {
+      ...blankCpDocumentState(),
+      document: {
+        title: 'symmetric-selected-lines',
+        metadata: {},
+        crease_pattern: {
+          ...createStarterOristudioCpDocument().crease_pattern,
+          line_segments: [line(1, 0, 1, 2), line(-1, 0, -1, 2)],
+        },
+      },
+      summary: {
+        ...blankCpDocumentState().summary,
+        title: 'symmetric-selected-lines',
+        line_segments: 2,
+      },
+    };
+    useWorkspaceStore.setState({
+      oristudioCpDocument: documentState,
+      oristudioCpSelection: {
+        ...emptyOristudioCpSelection(),
+        lines: [1],
+      },
+      oristudioCpSymmetry: {
+        ...defaultOristudioCpSymmetry(),
+        enabled: true,
+        preset: 'book',
+        axis: { loc: { x: 0, y: 0 }, angle: 90 },
+      },
+    });
+    oristudioCpMocks.executeOristudioCpCommand.mockImplementation(
+      async (operation: string) => ({
+        ...documentState,
+        lastCommandResult: {
+          operation,
+          status: 'OracleTested',
+          diagnostics: ['Changed line(s)'],
+        },
+      })
+    );
+
+    await expect(
+      useWorkspaceStore.getState().executeOristudioCpCommand('ChangeCreaseType', {
+        line_ids: [1],
+      })
+    ).resolves.toBe(true);
+    await expect(
+      useWorkspaceStore.getState().executeOristudioCpCommand('LineSegmentDelete', {
+        line_ids: [1],
+      })
+    ).resolves.toBe(true);
+
+    const selectedLinePayloads = oristudioCpMocks.executeOristudioCpCommand.mock.calls
+      .filter(([operation]) => operation === 'ChangeCreaseType' || operation === 'LineSegmentDelete')
+      .map(([operation, payload]) => [operation, payload]);
+    expect(selectedLinePayloads).toEqual([
+      ['ChangeCreaseType', { line_ids: [1, 2] }],
+      ['LineSegmentDelete', { line_ids: [1, 2] }],
+    ]);
+  });
+
+  it('normalizes nullable CP command payloads and rejects invalid payload shapes before runtime', async () => {
+    resetStores(seedSnapshot());
+    await useWorkspaceStore.getState().loadCreasePatternText('1 0 0 1 0', {
+      filename: 'line.cp',
+      path: '/tmp/line.cp',
+    });
+    const currentDocument = useWorkspaceStore.getState().oristudioCpDocument;
+    if (!currentDocument) throw new Error('expected editable CP document');
+    oristudioCpMocks.executeOristudioCpCommand.mockResolvedValueOnce({
+      ...currentDocument,
+      lastCommandResult: {
+        operation: 'CreaseMakeMountain',
+        status: 'OracleTested',
+        diagnostics: [],
+      },
+    });
+
+    await expect(
+      useWorkspaceStore
+        .getState()
+        .executeOristudioCpCommand('CreaseMakeMountain', null as never)
+    ).resolves.toBe(true);
+
+    expect(oristudioCpMocks.executeOristudioCpCommand).toHaveBeenCalledWith(
+      'CreaseMakeMountain',
+      {}
+    );
+
+    oristudioCpMocks.executeOristudioCpCommand.mockClear();
+    await expect(
+      useWorkspaceStore
+        .getState()
+        .executeOristudioCpCommand('CreaseMakeMountain', ['bad'] as never)
+    ).resolves.toBe(false);
+
+    expect(oristudioCpMocks.executeOristudioCpCommand).not.toHaveBeenCalled();
+    expect(useWorkspaceStore.getState().oristudioCpError).toContain(
+      'Invalid crease-pattern command payload'
+    );
+  });
+
   it('surfaces demand-refresh flat-folder errors without leaving artifacts loading', async () => {
     const api = resetStores(seedSnapshot());
     await useWorkspaceStore.getState().loadCreasePatternText('1 0 0 1 0\n2 0 0 0 1', {

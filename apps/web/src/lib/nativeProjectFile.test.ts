@@ -162,6 +162,41 @@ describe('native project file', () => {
     expect(parsed.workspace.activeDocumentId).toBe('tree');
   });
 
+  it('round-trips CP symmetry mirror-selection state', () => {
+    const file = createNativeCreasePatternProjectFile({
+      title: 'Mirrored CP',
+      filename: 'mirror.osf',
+      path: '/tmp/mirror.osf',
+      document: cpDocument(),
+      source: null,
+      foldProjection: null,
+      foldArtifacts: null,
+      creaseColorMode: 'mvf',
+      selection: emptyOristudioCpSelection(),
+      viewport: DEFAULT_ORISTUDIO_CP_VIEWPORT_OPTIONS,
+      symmetry: {
+        ...defaultOristudioCpSymmetry(),
+        enabled: true,
+        mirrorSelection: true,
+        preset: 'book',
+      },
+      lineage: importedCpLineage(),
+      appVersion: '0.1.1',
+      now,
+    });
+
+    const parsed = parseNativeProjectFile(serializeNativeProjectFile(file));
+    const document = activeNativeDocument(parsed);
+
+    expect(document.kind).toBe('crease-pattern');
+    if (document.kind !== 'crease-pattern') throw new Error('expected CP document');
+    expect(document.viewState.symmetry).toMatchObject({
+      enabled: true,
+      mirrorSelection: true,
+      preset: 'book',
+    });
+  });
+
   it('defaults missing schema-1 CP lineage and symmetry during migration', () => {
     const file = createNativeCreasePatternProjectFile({
       title: 'Legacy CP',
@@ -191,7 +226,11 @@ describe('native project file', () => {
     expect(document.kind).toBe('crease-pattern');
     if (document.kind !== 'crease-pattern') throw new Error('expected CP document');
     expect(document.creasePattern.lineage).toMatchObject({ kind: 'imported', stale: false });
-    expect(document.viewState.symmetry).toMatchObject({ enabled: false, preset: 'none' });
+    expect(document.viewState.symmetry).toMatchObject({
+      enabled: false,
+      mirrorSelection: false,
+      preset: 'none',
+    });
   });
 
   it('rejects non-project and newer required schema files', () => {

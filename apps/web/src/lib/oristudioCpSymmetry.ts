@@ -15,19 +15,28 @@ import {
 
 export type OristudioCpSymmetryPreset = 'none' | 'book' | 'diagonal' | 'custom';
 export type OristudioCpSymmetryPolicy =
-  | 'point-payloads'
-  | 'selection-payloads'
-  | 'unordered-entity-selection'
-  | 'ordered-entity-payloads'
-  | 'text-payloads'
+  | 'geometry-points'
+  | 'selection-tool'
+  | 'selection-scoped-edit'
+  | 'fixed-arity-entity'
+  | 'text'
   | 'run-once';
 
 export interface OristudioCpSymmetryState {
   enabled: boolean;
   showAxis: boolean;
+  mirrorSelection: boolean;
   preset: OristudioCpSymmetryPreset;
   axis: SymmetryAxis;
 }
+
+export type OristudioCpCommandPayloadValidation =
+  | { ok: true; payload: OristudioCpCommandPayload }
+  | { ok: false; error: string };
+
+export type PreparedOristudioCpCommandPayloads =
+  | { ok: true; payloads: OristudioCpCommandPayload[] }
+  | { ok: false; error: string };
 
 const DEFAULT_CP_AXIS: SymmetryAxis = {
   loc: { x: 0, y: 0 },
@@ -39,6 +48,7 @@ const POINT_TOLERANCE = 1e-7;
 export const DEFAULT_ORISTUDIO_CP_SYMMETRY: OristudioCpSymmetryState = {
   enabled: false,
   showAxis: true,
+  mirrorSelection: false,
   preset: 'none',
   axis: DEFAULT_CP_AXIS,
 };
@@ -46,86 +56,86 @@ export const DEFAULT_ORISTUDIO_CP_SYMMETRY: OristudioCpSymmetryState = {
 export const ORISTUDIO_CP_SYMMETRY_POLICIES: Partial<
   Record<OristudioCpOperationId, OristudioCpSymmetryPolicy>
 > = {
-  DrawCreaseFree: 'point-payloads',
-  LineSegmentDelete: 'unordered-entity-selection',
-  ChangeCreaseType: 'unordered-entity-selection',
-  LengthenCrease: 'ordered-entity-payloads',
-  SquareBisector: 'ordered-entity-payloads',
-  Inward: 'point-payloads',
-  PerpendicularDraw: 'point-payloads',
-  SymmetricDraw: 'point-payloads',
-  DrawCreaseRestricted: 'point-payloads',
-  DrawCreaseSymmetric: 'point-payloads',
-  DrawCreaseAngleRestricted: 'point-payloads',
-  DrawPoint: 'point-payloads',
-  DeletePoint: 'point-payloads',
-  AngleSystem: 'point-payloads',
-  DrawCreaseAngleRestricted3: 'point-payloads',
-  CreaseSelect: 'selection-payloads',
-  CreaseUnselect: 'selection-payloads',
-  CreaseMove: 'point-payloads',
-  CreaseCopy: 'point-payloads',
-  CreaseMakeMountain: 'unordered-entity-selection',
-  CreaseMakeValley: 'unordered-entity-selection',
-  CreaseMakeEdge: 'unordered-entity-selection',
-  LineSegmentDivision: 'ordered-entity-payloads',
-  LineSegmentRatioSet: 'ordered-entity-payloads',
-  PolygonSetNoCorners: 'point-payloads',
-  CreaseAdvanceType: 'unordered-entity-selection',
-  CreaseMove4p: 'point-payloads',
-  CreaseCopy4p: 'point-payloads',
-  FishBoneDraw: 'point-payloads',
-  CreaseMakeMv: 'point-payloads',
-  DoubleSymmetricDraw: 'point-payloads',
-  CreasesAlternateMv: 'point-payloads',
-  DrawCreaseAngleRestricted5: 'point-payloads',
-  VertexMakeAngularlyFlatFoldable: 'point-payloads',
-  FoldableLineInput: 'point-payloads',
-  ParallelDraw: 'point-payloads',
-  VertexDeleteOnCrease: 'point-payloads',
-  CircleDraw: 'point-payloads',
-  CircleDrawThreePoint: 'point-payloads',
-  CircleDrawSeparate: 'point-payloads',
-  CircleDrawTangentLine: 'ordered-entity-payloads',
-  CircleDrawInverted: 'ordered-entity-payloads',
-  CircleDrawFree: 'point-payloads',
-  CircleDrawConcentric: 'ordered-entity-payloads',
-  CircleDrawConcentricSelect: 'ordered-entity-payloads',
-  CircleDrawConcentricTwoCircleSelect: 'ordered-entity-payloads',
-  ParallelDrawWidth: 'ordered-entity-payloads',
-  ContinuousSymmetricDraw: 'point-payloads',
+  DrawCreaseFree: 'geometry-points',
+  LineSegmentDelete: 'selection-scoped-edit',
+  ChangeCreaseType: 'selection-scoped-edit',
+  LengthenCrease: 'fixed-arity-entity',
+  SquareBisector: 'fixed-arity-entity',
+  Inward: 'geometry-points',
+  PerpendicularDraw: 'geometry-points',
+  SymmetricDraw: 'geometry-points',
+  DrawCreaseRestricted: 'geometry-points',
+  DrawCreaseSymmetric: 'geometry-points',
+  DrawCreaseAngleRestricted: 'geometry-points',
+  DrawPoint: 'geometry-points',
+  DeletePoint: 'geometry-points',
+  AngleSystem: 'geometry-points',
+  DrawCreaseAngleRestricted3: 'geometry-points',
+  CreaseSelect: 'selection-tool',
+  CreaseUnselect: 'selection-tool',
+  CreaseMove: 'geometry-points',
+  CreaseCopy: 'geometry-points',
+  CreaseMakeMountain: 'selection-scoped-edit',
+  CreaseMakeValley: 'selection-scoped-edit',
+  CreaseMakeEdge: 'selection-scoped-edit',
+  LineSegmentDivision: 'fixed-arity-entity',
+  LineSegmentRatioSet: 'fixed-arity-entity',
+  PolygonSetNoCorners: 'geometry-points',
+  CreaseAdvanceType: 'selection-scoped-edit',
+  CreaseMove4p: 'geometry-points',
+  CreaseCopy4p: 'geometry-points',
+  FishBoneDraw: 'geometry-points',
+  CreaseMakeMv: 'geometry-points',
+  DoubleSymmetricDraw: 'geometry-points',
+  CreasesAlternateMv: 'geometry-points',
+  DrawCreaseAngleRestricted5: 'geometry-points',
+  VertexMakeAngularlyFlatFoldable: 'geometry-points',
+  FoldableLineInput: 'geometry-points',
+  ParallelDraw: 'geometry-points',
+  VertexDeleteOnCrease: 'geometry-points',
+  CircleDraw: 'geometry-points',
+  CircleDrawThreePoint: 'geometry-points',
+  CircleDrawSeparate: 'geometry-points',
+  CircleDrawTangentLine: 'fixed-arity-entity',
+  CircleDrawInverted: 'fixed-arity-entity',
+  CircleDrawFree: 'geometry-points',
+  CircleDrawConcentric: 'fixed-arity-entity',
+  CircleDrawConcentricSelect: 'fixed-arity-entity',
+  CircleDrawConcentricTwoCircleSelect: 'fixed-arity-entity',
+  ParallelDrawWidth: 'fixed-arity-entity',
+  ContinuousSymmetricDraw: 'geometry-points',
   DisplayLengthBetweenPoints1: 'run-once',
   DisplayLengthBetweenPoints2: 'run-once',
   DisplayAngleBetweenThreePoints1: 'run-once',
   DisplayAngleBetweenThreePoints2: 'run-once',
   DisplayAngleBetweenThreePoints3: 'run-once',
-  CreaseToggleMv: 'unordered-entity-selection',
-  CircleChangeColor: 'unordered-entity-selection',
-  CreaseMakeAux: 'unordered-entity-selection',
+  CreaseToggleMv: 'selection-scoped-edit',
+  CircleChangeColor: 'selection-scoped-edit',
+  CreaseMakeAux: 'selection-scoped-edit',
   OperationFrameCreate: 'run-once',
-  VoronoiCreate: 'point-payloads',
+  VoronoiCreate: 'geometry-points',
   FlatFoldableCheck: 'run-once',
-  CreaseDeleteOverlapping: 'point-payloads',
-  CreaseDeleteIntersecting: 'point-payloads',
-  SelectPolygon: 'selection-payloads',
-  UnselectPolygon: 'selection-payloads',
-  SelectLineIntersecting: 'selection-payloads',
-  UnselectLineIntersecting: 'selection-payloads',
-  LengthenCreaseSameColor: 'ordered-entity-payloads',
-  FoldableLineDraw: 'point-payloads',
-  ReplaceLineTypeSelect: 'unordered-entity-selection',
-  DeleteLineTypeSelect: 'unordered-entity-selection',
-  SelectLasso: 'selection-payloads',
-  UnselectLasso: 'selection-payloads',
-  Text: 'text-payloads',
-  DrawBlintz: 'point-payloads',
-  DrawFishBase: 'point-payloads',
-  DrawDoveBase: 'point-payloads',
-  DrawBirdBase: 'point-payloads',
-  DrawFrogBase: 'point-payloads',
-  Axiom5: 'point-payloads',
-  Axiom7: 'point-payloads',
-  FixInaccurate: 'unordered-entity-selection',
+  CreaseDeleteOverlapping: 'geometry-points',
+  CreaseDeleteIntersecting: 'geometry-points',
+  SelectPolygon: 'selection-tool',
+  UnselectPolygon: 'selection-tool',
+  SelectLineIntersecting: 'selection-tool',
+  UnselectLineIntersecting: 'selection-tool',
+  LengthenCreaseSameColor: 'fixed-arity-entity',
+  FoldableLineDraw: 'geometry-points',
+  ReplaceLineTypeSelect: 'selection-scoped-edit',
+  DeleteLineTypeSelect: 'selection-scoped-edit',
+  SelectLasso: 'selection-tool',
+  UnselectLasso: 'selection-tool',
+  Text: 'text',
+  DrawBlintz: 'geometry-points',
+  DrawFishBase: 'geometry-points',
+  DrawDoveBase: 'geometry-points',
+  DrawBirdBase: 'geometry-points',
+  DrawFrogBase: 'geometry-points',
+  Axiom5: 'geometry-points',
+  Axiom7: 'geometry-points',
+  FixInaccurate: 'selection-scoped-edit',
   CheckCamv: 'run-once',
   Check1: 'run-once',
   Check2: 'run-once',
@@ -151,6 +161,7 @@ export function normalizeOristudioCpSymmetry(value: unknown): OristudioCpSymmetr
   return {
     enabled: value.enabled === true,
     showAxis: value.showAxis !== false,
+    mirrorSelection: value.mirrorSelection === true,
     preset:
       preset === 'none' || preset === 'book' || preset === 'diagonal' || preset === 'custom'
         ? preset
@@ -235,23 +246,63 @@ export function reflectedCpCommandPayloads(
   payload: OristudioCpCommandPayload,
   symmetry: OristudioCpSymmetryState
 ): OristudioCpCommandPayload[] {
-  if (!symmetry.enabled) return [payload];
+  const prepared = prepareOristudioCpCommandPayloads(operationId, document, payload, symmetry);
+  return prepared.ok ? prepared.payloads : [];
+}
+
+export function prepareOristudioCpCommandPayloads(
+  operationId: OristudioCpOperationId,
+  document: OristudioCpDocumentSnapshot,
+  rawPayload: unknown,
+  symmetry: OristudioCpSymmetryState
+): PreparedOristudioCpCommandPayloads {
+  const validation = normalizeOristudioCpCommandPayload(rawPayload);
+  if (!validation.ok) return { ok: false, error: validation.error };
+
+  const payload = validation.payload;
+  if (!symmetry.enabled) return preparedPayloads([payload]);
 
   switch (ORISTUDIO_CP_SYMMETRY_POLICIES[operationId] ?? 'run-once') {
-    case 'selection-payloads':
-      return reflectedSelectionPayloads(document, payload, symmetry);
-    case 'unordered-entity-selection':
-      return [expandedEntitySelectionPayload(document, payload, symmetry.axis)];
-    case 'ordered-entity-payloads':
-      return reflectedOrderedEntityPayloads(document, payload, symmetry);
-    case 'point-payloads':
-      return reflectedPointPayloads(document, payload, symmetry);
-    case 'text-payloads':
-      return reflectedTextPayloads(document, payload, symmetry);
+    case 'selection-tool':
+      return preparedPayloads(
+        symmetry.mirrorSelection ? reflectedSelectionPayloads(document, payload, symmetry) : [payload]
+      );
+    case 'selection-scoped-edit':
+      return preparedPayloads([expandedEntitySelectionPayload(document, payload, symmetry.axis)]);
+    case 'fixed-arity-entity':
+      return preparedPayloads(reflectedOrderedEntityPayloads(document, payload, symmetry));
+    case 'geometry-points':
+      return preparedPayloads(reflectedPointPayloads(document, payload, symmetry));
+    case 'text':
+      return preparedPayloads(reflectedTextPayloads(document, payload, symmetry));
     case 'run-once':
-      return [payload];
+      return preparedPayloads([payload]);
   }
-  return [payload];
+  return preparedPayloads([payload]);
+}
+
+export function normalizeOristudioCpCommandPayload(
+  rawPayload: unknown
+): OristudioCpCommandPayloadValidation {
+  if (rawPayload === null || rawPayload === undefined) return { ok: true, payload: {} };
+  if (!isRecord(rawPayload)) {
+    const kind = Array.isArray(rawPayload) ? 'array' : typeof rawPayload;
+    return {
+      ok: false,
+      error: `Invalid crease-pattern command payload: expected an object, null, or undefined, received ${kind}.`,
+    };
+  }
+  return { ok: true, payload: compactOristudioCpCommandPayload(rawPayload) };
+}
+
+export function shouldMirrorOristudioCpCommandPreview(
+  operationId: OristudioCpOperationId | null | undefined,
+  symmetry: OristudioCpSymmetryState
+): boolean {
+  if (!operationId || !symmetry.enabled) return false;
+  const policy = ORISTUDIO_CP_SYMMETRY_POLICIES[operationId] ?? 'run-once';
+  if (policy === 'run-once') return false;
+  return policy !== 'selection-tool' || symmetry.mirrorSelection;
 }
 
 export function reflectedPreviewSegments(
@@ -591,6 +642,21 @@ function samePoint(a: Point, b: Point): boolean {
 
 function sortedUniqueNumbers(values: number[]): number[] {
   return Array.from(new Set(values)).sort((a, b) => a - b);
+}
+
+function preparedPayloads(payloads: OristudioCpCommandPayload[]): PreparedOristudioCpCommandPayloads {
+  return {
+    ok: true,
+    payloads: payloads.map(compactOristudioCpCommandPayload),
+  };
+}
+
+function compactOristudioCpCommandPayload(
+  payload: object
+): OristudioCpCommandPayload {
+  return Object.fromEntries(
+    Object.entries(payload).filter(([, value]) => value !== undefined)
+  ) as OristudioCpCommandPayload;
 }
 
 function uniquePayloads(payloads: OristudioCpCommandPayload[]): OristudioCpCommandPayload[] {

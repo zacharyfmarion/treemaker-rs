@@ -2,14 +2,18 @@ import { describe, expect, it } from 'vitest';
 import type { OristudioCpDocumentSnapshot } from '../engine/oristudioCpTypes';
 import { ORISTUDIO_CP_COMMANDS } from './oristudioCpCommands';
 import {
+  normalizeOristudioCpCommandPayload,
   ORISTUDIO_CP_SYMMETRY_POLICIES,
+  prepareOristudioCpCommandPayloads,
   reflectedCpCommandPayloads,
+  shouldMirrorOristudioCpCommandPreview,
   type OristudioCpSymmetryState,
 } from './oristudioCpSymmetry';
 
 const verticalSymmetry: OristudioCpSymmetryState = {
   enabled: true,
   showAxis: true,
+  mirrorSelection: false,
   preset: 'book',
   axis: {
     loc: { x: 0, y: 0 },
@@ -166,6 +170,26 @@ describe('oristudio CP symmetry', () => {
     expect(payloads).toEqual([{ line_ids: [1, 2] }]);
   });
 
+  it('expands selected-line edit commands even when selection mirroring is off', () => {
+    expect(
+      reflectedCpCommandPayloads(
+        'ChangeCreaseType',
+        cpDocument(),
+        { line_ids: [1] },
+        verticalSymmetry
+      )
+    ).toEqual([{ line_ids: [1, 2] }]);
+
+    expect(
+      reflectedCpCommandPayloads(
+        'LineSegmentDelete',
+        cpDocument(),
+        { line_ids: [1] },
+        verticalSymmetry
+      )
+    ).toEqual([{ line_ids: [1, 2] }]);
+  });
+
   it('expands selected circle ids to their reflected partners', () => {
     const payloads = reflectedCpCommandPayloads(
       'CircleChangeColor',
@@ -179,7 +203,7 @@ describe('oristudio CP symmetry', () => {
     expect(payloads).toEqual([{ circle_ids: [1, 2] }]);
   });
 
-  it('keeps mirrored selection-box commands additive after the primary command', () => {
+  it('does not mirror selection-tool commands by default', () => {
     const payloads = reflectedCpCommandPayloads(
       'CreaseSelect',
       cpDocument(),
@@ -193,9 +217,66 @@ describe('oristudio CP symmetry', () => {
       verticalSymmetry
     );
 
+    expect(payloads).toEqual([
+      {
+        points: [
+          { x: 3, y: 0 },
+          { x: 5, y: 2 },
+        ],
+        replace_selection: true,
+      },
+    ]);
+    expect(shouldMirrorOristudioCpCommandPreview('CreaseSelect', verticalSymmetry)).toBe(false);
+  });
+
+  it('keeps mirrored selection-tool commands additive when mirror selection is enabled', () => {
+    const selectionMirroringSymmetry = { ...verticalSymmetry, mirrorSelection: true };
+    const payloads = reflectedCpCommandPayloads(
+      'CreaseSelect',
+      cpDocument(),
+      {
+        points: [
+          { x: 3, y: 0 },
+          { x: 5, y: 2 },
+        ],
+        replace_selection: true,
+      },
+      selectionMirroringSymmetry
+    );
+
     expect(payloads).toHaveLength(2);
     expect(payloads[0]?.replace_selection).toBe(true);
     expect(payloads[1]?.replace_selection).toBe(false);
+    expect(shouldMirrorOristudioCpCommandPreview('CreaseSelect', selectionMirroringSymmetry)).toBe(
+      true
+    );
+  });
+
+  it('normalizes command payloads before symmetry preparation', () => {
+    expect(normalizeOristudioCpCommandPayload(null)).toEqual({ ok: true, payload: {} });
+    expect(normalizeOristudioCpCommandPayload(undefined)).toEqual({ ok: true, payload: {} });
+    expect(
+      normalizeOristudioCpCommandPayload({
+        line_ids: [1],
+        line_color: undefined,
+      })
+    ).toEqual({ ok: true, payload: { line_ids: [1] } });
+    expect(normalizeOristudioCpCommandPayload(['line_ids'])).toMatchObject({
+      ok: false,
+      error: expect.stringContaining('Invalid crease-pattern command payload'),
+    });
+
+    expect(
+      prepareOristudioCpCommandPayloads(
+        'DrawCreaseFree',
+        cpDocument(),
+        ['line_ids'],
+        verticalSymmetry
+      )
+    ).toMatchObject({
+      ok: false,
+      error: expect.stringContaining('Invalid crease-pattern command payload'),
+    });
   });
 
   it('mirrors ordered line operands without changing command arity', () => {

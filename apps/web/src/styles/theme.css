@@ -3640,10 +3640,12 @@
 }
 
 .symmetry-menu__panel {
-  width: 236px;
+  width: min(260px, calc(100vw - var(--space-6)));
+  max-width: calc(100vw - var(--space-6));
   padding: 8px;
   gap: 5px;
   color: var(--text-secondary);
+  white-space: normal;
 }
 
 .symmetry-menu__header {
@@ -3689,6 +3691,8 @@
   color: var(--text-tertiary);
   font-size: 0.66rem;
   font-weight: 650;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
 .symmetry-menu__item,

@@ -25,7 +25,8 @@ import {
 } from '../../../lib/oristudioCpLineage';
 import {
   defaultOristudioCpSymmetry,
-  reflectedCpCommandPayloads,
+  normalizeOristudioCpCommandPayload,
+  prepareOristudioCpCommandPayloads,
 } from '../../../lib/oristudioCpSymmetry';
 import {
   activeNativeDocument,
@@ -1022,15 +1023,28 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
         const mutatesDocument = !NON_MUTATING_CP_OPERATIONS.has(operationId);
         const editsCreasePattern =
           mutatesDocument && !SYNC_CP_LINE_SELECTION_AFTER_OPERATIONS.has(operationId);
+        const preparedPayloads = previousDocument
+          ? prepareOristudioCpCommandPayloads(
+              operationId,
+              previousDocument,
+              payload,
+              get().oristudioCpSymmetry
+            )
+          : normalizeOristudioCpCommandPayload(payload);
+        if (!preparedPayloads.ok) {
+          set({
+            oristudioCpError: preparedPayloads.error,
+            error: {
+              code: 'invalid_operation',
+              message: preparedPayloads.error,
+            },
+          });
+          return false;
+        }
         const payloads =
-          previousDocument && mutatesDocument
-            ? reflectedCpCommandPayloads(
-                operationId,
-                previousDocument,
-                payload,
-                get().oristudioCpSymmetry
-              )
-            : [payload];
+          'payloads' in preparedPayloads
+            ? preparedPayloads.payloads
+            : [preparedPayloads.payload];
         let commandDocument: OristudioCpDocumentState | null = null;
         for (const commandPayload of payloads) {
           commandDocument = await executeRuntimeOristudioCpCommand(operationId, commandPayload);
@@ -1107,7 +1121,12 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
     previewOristudioCpCommand: async (operationId, payload = {}) => {
       if (!get().oristudioCpDocument) return null;
       try {
-        const preview = await previewRuntimeOristudioCpCommand(operationId, payload);
+        const validation = normalizeOristudioCpCommandPayload(payload);
+        if (!validation.ok) {
+          set({ oristudioCpError: validation.error });
+          return null;
+        }
+        const preview = await previewRuntimeOristudioCpCommand(operationId, validation.payload);
         set({ oristudioCpError: null });
         return preview;
       } catch (error) {

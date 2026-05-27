@@ -180,3 +180,5 @@ targets editable Oristudio CP documents loaded in `documentMode ===
 - [x] Run follow-up validation for default axis-aligned selection frames and
       rotate-only frame orientation: web lint, web typecheck, focused
       geometry/panel tests, and browser smoke.
+- [x] Allow modifier-click line selection through the transform move overlay
+      and validate with focused panel coverage plus browser smoke.

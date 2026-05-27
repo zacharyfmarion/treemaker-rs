@@ -391,6 +391,40 @@ function pointDistanceSquared(a: Point, b: Point): number {
   return dx * dx + dy * dy;
 }
 
+function pointToLineSegmentDistanceSquared(point: Point, segment: OristudioCpLineSegment): number {
+  const dx = segment.b.x - segment.a.x;
+  const dy = segment.b.y - segment.a.y;
+  const lengthSquared = dx * dx + dy * dy;
+  if (lengthSquared === 0) return pointDistanceSquared(point, segment.a);
+  const t = Math.max(
+    0,
+    Math.min(1, ((point.x - segment.a.x) * dx + (point.y - segment.a.y) * dy) / lengthSquared)
+  );
+  return pointDistanceSquared(point, {
+    x: segment.a.x + dx * t,
+    y: segment.a.y + dy * t,
+  });
+}
+
+function nearestEditableCpLineId(
+  document: OristudioCpDocumentSnapshot,
+  point: Point,
+  maxDistance: number
+): number | null {
+  const maxDistanceSquared = maxDistance * maxDistance;
+  let nearestId: number | null = null;
+  let nearestDistanceSquared = Number.POSITIVE_INFINITY;
+  document.crease_pattern.line_segments.forEach((segment, index) => {
+    const distanceSquared = pointToLineSegmentDistanceSquared(point, segment);
+    if (distanceSquared > maxDistanceSquared) return;
+    if (distanceSquared < nearestDistanceSquared) {
+      nearestId = index + 1;
+      nearestDistanceSquared = distanceSquared;
+    }
+  });
+  return nearestId;
+}
+
 function isLineClickSelectionOperation(operationId: string | null | undefined): boolean {
   return operationId === 'CreaseSelect' || operationId === 'CreaseUnselect';
 }
@@ -1882,6 +1916,19 @@ export function CreasePatternPanel() {
       const frame = selectionTransformFrame;
       const point = eventToEditableModelPoint(event);
       if (!frame || !point) return;
+      if (event.shiftKey || event.metaKey || event.ctrlKey) {
+        const lineId = nearestEditableCpLineId(
+          editableCp,
+          point,
+          modelSelectionDistance(editableCpBounds, zoomPercent / 100)
+        );
+        if (lineId !== null) {
+          event.preventDefault();
+          event.stopPropagation();
+          toggleOristudioCpLineSelection(lineId, true);
+        }
+        return;
+      }
       event.preventDefault();
       event.stopPropagation();
       selectionMoveDragRef.current = {
@@ -1899,7 +1946,16 @@ export function CreasePatternPanel() {
         frame,
       });
     },
-    [editableCp, eventToEditableModelPoint, selectedEditableCpLines, selectionTransformFrame, spacePressed]
+    [
+      editableCp,
+      editableCpBounds,
+      eventToEditableModelPoint,
+      selectedEditableCpLines,
+      selectionTransformFrame,
+      spacePressed,
+      toggleOristudioCpLineSelection,
+      zoomPercent,
+    ]
   );
 
   const handleSelectionResizePointerDown = useCallback(

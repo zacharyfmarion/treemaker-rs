@@ -272,6 +272,24 @@ function blankEditableCpState(): OristudioCpDocumentState {
   };
 }
 
+function editableCpStateWithInteriorLine(): OristudioCpDocumentState {
+  const state = editableCpState();
+  state.summary.line_segments = 3;
+  state.document.crease_pattern.line_segments = [
+    ...state.document.crease_pattern.line_segments,
+    {
+      a: { x: 0.25, y: 0.5 },
+      b: { x: 0.75, y: 0.5 },
+      active: 'Inactive0',
+      color: 'Black0',
+      selected: 0,
+      customized: 0,
+      customized_color: { red: 100, green: 200, blue: 200 },
+    },
+  ];
+  return state;
+}
+
 function editableCpStateWithCircleSet(): OristudioCpDocumentState {
   const state = editableCpState();
   state.summary.circles = 4;
@@ -862,6 +880,46 @@ describe('CreasePatternPanel', () => {
 
     expect(panel?.textContent).toContain('Delete Point');
     expect(panel?.textContent).toContain('Delete a vertex on a straight line of uniform color.');
+  });
+
+  it('allows additive line selection through the transform move hit area', () => {
+    const editableCp = editableCpStateWithInteriorLine();
+    const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
+      documentMode: 'crease-pattern',
+      importedCreasePattern: importedCpDocument(),
+      oristudioCpDocument: editableCp,
+      oristudioCpSelection: {
+        lines: [1, 2],
+        vertices: [],
+        points: [],
+        circles: [],
+        texts: [],
+        faces: [],
+      },
+    });
+    setCanvasClientRect(container);
+    const svgPoint = modelPointToCpSvg(
+      { x: 0.5, y: 0.5 },
+      getEditableCpModelBounds(editableCp.document)
+    );
+    const moveHitArea = container.querySelector<SVGPolygonElement>(
+      '.cp-selection-transform__move-hit-area'
+    );
+    expect(moveHitArea).not.toBeNull();
+
+    act(() => {
+      moveHitArea?.dispatchEvent(
+        new MouseEvent('pointerdown', {
+          bubbles: true,
+          button: 0,
+          shiftKey: true,
+          clientX: svgPoint.x,
+          clientY: svgPoint.y,
+        })
+      );
+    });
+
+    expect(useWorkspaceStore.getState().oristudioCpSelection.lines).toEqual([1, 2, 3]);
   });
 
   it('uses an expanded canvas for imported editable CP documents', () => {

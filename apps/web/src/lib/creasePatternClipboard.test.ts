@@ -117,7 +117,7 @@ describe('crease-pattern clipboard geometry', () => {
     expect(anchors).toContainEqual({ x: 0, y: -10 });
   });
 
-  it('derives an oriented frame from rotated selected geometry', () => {
+  it('uses an axis-aligned frame until an explicit transform angle is provided', () => {
     const source = [
       cpLine({ x: -2, y: -1 }, { x: 2, y: -1 }),
       cpLine({ x: 2, y: -1 }, { x: 2, y: 1 }),
@@ -125,14 +125,17 @@ describe('crease-pattern clipboard geometry', () => {
       cpLine({ x: -2, y: 1 }, { x: -2, y: -1 }),
     ];
     const rotated = transformCpLineSegments(source, { kind: 'rotate', angleDegrees: 30 });
-    const frame = cpLineSelectionFrame(rotated);
+    const defaultFrame = cpLineSelectionFrame(rotated);
+    const transformFrame = cpLineSelectionFrame(rotated, 30);
 
-    expect(frame?.width).toBeCloseTo(4);
-    expect(frame?.height).toBeCloseTo(2);
-    expect(frame?.angleDegrees).toBeCloseTo(30);
+    expect(defaultFrame?.angleDegrees).toBeCloseTo(0);
+    expect(defaultFrame?.width).toBeGreaterThan(4);
+    expect(transformFrame?.width).toBeCloseTo(4);
+    expect(transformFrame?.height).toBeCloseTo(2);
+    expect(transformFrame?.angleDegrees).toBeCloseTo(30);
   });
 
-  it('scales selected lines in the oriented selection frame', () => {
+  it('scales selected lines in the selection frame', () => {
     const frame = cpLineSelectionFrame([cpLine({ x: -2, y: -1 }, { x: 2, y: 1 })]);
     expect(frame).not.toBeNull();
 
@@ -150,7 +153,7 @@ describe('crease-pattern clipboard geometry', () => {
     expect(scaled[0].a.x).toBeCloseTo(-2);
     expect(scaled[0].a.y).toBeCloseTo(-1);
     expect(scaled[0].b.x).toBeCloseTo(4);
-    expect(scaled[0].b.y).toBeCloseTo(2);
+    expect(scaled[0].b.y).toBeCloseTo(1);
   });
 
   it('rotates and flips selected lines around their content center', () => {

@@ -983,6 +983,11 @@ function resizeTransformForPoint(
   };
 }
 
+function normalizeSelectionTransformAngle(angleDegrees: number): number {
+  const normalized = angleDegrees % 360;
+  return normalized < 0 ? normalized + 360 : normalized;
+}
+
 export function CreasePatternPanel() {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -1007,6 +1012,7 @@ export function CreasePatternPanel() {
   const [cpSymmetryAxisPickPoints, setCpSymmetryAxisPickPoints] = useState<Point[] | null>(null);
   const [selectionRotationPreview, setSelectionRotationPreview] =
     useState<CpSelectionTransformPreview | null>(null);
+  const [selectionTransformAngleDegrees, setSelectionTransformAngleDegrees] = useState(0);
   const [diagnosticHudExpanded, setDiagnosticHudExpanded] = useState(false);
   const cpPreviewRequestRef = useRef(0);
   const lastFocusedDiagnosticRef = useRef<string | null>(null);
@@ -1119,6 +1125,7 @@ export function CreasePatternPanel() {
   const hasCreasePattern =
     hasEditableCreasePattern || project.creases.length > 0 || project.facets.length > 0;
   const editableSelectionSize = cpSelectionSize(oristudioCpSelection);
+  const editableSelectionLineKey = oristudioCpSelection.lines.join(',');
   const selectedEditableCpLines = useMemo(
     () => selectedCpLineSegments(editableCp, oristudioCpSelection),
     [editableCp, oristudioCpSelection]
@@ -1126,8 +1133,8 @@ export function CreasePatternPanel() {
   const selectionTransformFrame = useMemo(
     () =>
       selectionRotationPreview?.frame ??
-      cpLineSelectionFrame(selectedEditableCpLines),
-    [selectedEditableCpLines, selectionRotationPreview]
+      cpLineSelectionFrame(selectedEditableCpLines, selectionTransformAngleDegrees),
+    [selectedEditableCpLines, selectionRotationPreview, selectionTransformAngleDegrees]
   );
   const cpUiScale = 100 / Math.max(zoomPercent, 1);
   const activeCpAction = useMemo(
@@ -1684,11 +1691,17 @@ export function CreasePatternPanel() {
 
   const handleSelectionTransform = useCallback(
     (transform: CpSelectionTransform) => {
-      void transformOristudioCpSelection(
+      const resolvedTransform =
         transform.kind === 'rotate' && !transform.center && selectionTransformFrame
           ? { ...transform, center: selectionTransformFrame.center }
-          : transform
-      );
+          : transform;
+      void transformOristudioCpSelection(resolvedTransform).then((succeeded) => {
+        if (succeeded && resolvedTransform.kind === 'rotate') {
+          setSelectionTransformAngleDegrees((current) =>
+            normalizeSelectionTransformAngle(current + resolvedTransform.angleDegrees)
+          );
+        }
+      });
     },
     [selectionTransformFrame, transformOristudioCpSelection]
   );
@@ -1703,13 +1716,16 @@ export function CreasePatternPanel() {
         angleDegrees,
         center: drag.center,
       });
-      const frame = cpLineSelectionFrame(segments);
+      const frame = cpLineSelectionFrame(
+        segments,
+        selectionTransformAngleDegrees + angleDegrees
+      );
       drag.currentAngleDegrees = angleDegrees;
       if (frame) {
         setSelectionRotationPreview({ kind: 'rotate', angleDegrees, segments, frame });
       }
     },
-    []
+    [selectionTransformAngleDegrees]
   );
 
   const selectionMoveSnapDocument = useMemo<OristudioCpDocumentSnapshot | null>(() => {
@@ -1741,7 +1757,10 @@ export function CreasePatternPanel() {
 
       if (selectionMoveSnapDocument && snappingEnabled) {
         const translated = translateCpLineSegments(drag.sourceLines, rawDelta);
-        const anchorPoints = cpLineSelectionMoveAnchorPoints(translated);
+        const anchorPoints = cpLineSelectionMoveAnchorPoints(
+          translated,
+          selectionTransformAngleDegrees
+        );
         const maxDistance = modelSelectionDistance(editableCpBounds, zoomPercent / 100);
         let best:
           | {
@@ -1772,7 +1791,7 @@ export function CreasePatternPanel() {
       }
 
       const segments = translateCpLineSegments(drag.sourceLines, delta);
-      const frame = cpLineSelectionFrame(segments);
+      const frame = cpLineSelectionFrame(segments, selectionTransformAngleDegrees);
       drag.currentDelta = delta;
       setCursorModelPoint(point);
       setSnapTarget(snappedTarget);
@@ -1790,6 +1809,7 @@ export function CreasePatternPanel() {
       editableCpBounds,
       oristudioCpViewport,
       selectionMoveSnapDocument,
+      selectionTransformAngleDegrees,
       zoomPercent,
     ]
   );
@@ -1809,7 +1829,7 @@ export function CreasePatternPanel() {
         transform.scaleX,
         transform.scaleY
       );
-      const frame = cpLineSelectionFrame(segments);
+      const frame = cpLineSelectionFrame(segments, drag.frame.angleDegrees);
       drag.currentTransform = transform;
       setCursorModelPoint(point);
       setSnapTarget(null);
@@ -1831,7 +1851,7 @@ export function CreasePatternPanel() {
       if (event.button !== 0 || spacePressed || !editableCp || selectedEditableCpLines.length === 0) {
         return;
       }
-      const frame = cpLineSelectionFrame(selectedEditableCpLines);
+      const frame = selectionTransformFrame;
       const point = eventToEditableModelPoint(event);
       if (!frame || !point) return;
       event.preventDefault();
@@ -1851,7 +1871,7 @@ export function CreasePatternPanel() {
         frame,
       });
     },
-    [editableCp, eventToEditableModelPoint, selectedEditableCpLines, spacePressed]
+    [editableCp, eventToEditableModelPoint, selectedEditableCpLines, selectionTransformFrame, spacePressed]
   );
 
   const handleSelectionMovePointerDown = useCallback(
@@ -1859,7 +1879,7 @@ export function CreasePatternPanel() {
       if (event.button !== 0 || spacePressed || !editableCp || selectedEditableCpLines.length === 0) {
         return;
       }
-      const frame = cpLineSelectionFrame(selectedEditableCpLines);
+      const frame = selectionTransformFrame;
       const point = eventToEditableModelPoint(event);
       if (!frame || !point) return;
       event.preventDefault();
@@ -1879,7 +1899,7 @@ export function CreasePatternPanel() {
         frame,
       });
     },
-    [editableCp, eventToEditableModelPoint, selectedEditableCpLines, spacePressed]
+    [editableCp, eventToEditableModelPoint, selectedEditableCpLines, selectionTransformFrame, spacePressed]
   );
 
   const handleSelectionResizePointerDown = useCallback(
@@ -1887,7 +1907,7 @@ export function CreasePatternPanel() {
       if (event.button !== 0 || spacePressed || !editableCp || selectedEditableCpLines.length === 0) {
         return;
       }
-      const frame = cpLineSelectionFrame(selectedEditableCpLines);
+      const frame = selectionTransformFrame;
       const point = eventToEditableModelPoint(event);
       if (!frame || !point) return;
       event.preventDefault();
@@ -1919,6 +1939,7 @@ export function CreasePatternPanel() {
       editableCpBounds,
       eventToEditableModelPoint,
       selectedEditableCpLines,
+      selectionTransformFrame,
       spacePressed,
       zoomPercent,
     ]
@@ -2411,6 +2432,12 @@ export function CreasePatternPanel() {
             kind: 'rotate',
             angleDegrees,
             center: selectionRotateDrag.center,
+          }).then((succeeded) => {
+            if (succeeded) {
+              setSelectionTransformAngleDegrees((current) =>
+                normalizeSelectionTransformAngle(current + angleDegrees)
+              );
+            }
           });
         }
         return;
@@ -2903,6 +2930,10 @@ export function CreasePatternPanel() {
     [editableCp, editableCpHandle, project.creases.length, project.facets.length, projectLoadId]
   );
   const lastFittedCreasePatternRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    setSelectionTransformAngleDegrees(0);
+  }, [editableCpHandle, editableSelectionLineKey]);
 
   const fitLoadedCreasePattern = useCallback(
     (animationTime = 0) => {

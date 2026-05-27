@@ -30,7 +30,9 @@ targets editable Oristudio CP documents loaded in `documentMode ===
 - Corner-adjacent rotate zones free-rotate the selected geometry around the
   selection center. Holding Shift snaps rotation to 22.5 degree increments.
 - The transform rectangle follows the selection orientation instead of snapping
-  back to viewport axes after arbitrary rotation.
+  back to viewport axes after arbitrary rotation, but a freshly selected shape
+  starts with an axis-aligned rectangle until the user rotates it through the
+  transform control.
 - Edge and corner handles appear on the transform rectangle. Midpoint handles
   resize one axis, corner handles resize both axes, and corner-adjacent rotate
   zones show a rotate cursor.
@@ -175,3 +177,6 @@ targets editable Oristudio CP documents loaded in `documentMode ===
 - [x] Run follow-up validation for oriented transform frames and resize handles:
       web lint, web typecheck, focused geometry/store/panel tests, and browser
       smoke.
+- [x] Run follow-up validation for default axis-aligned selection frames and
+      rotate-only frame orientation: web lint, web typecheck, focused
+      geometry/panel tests, and browser smoke.

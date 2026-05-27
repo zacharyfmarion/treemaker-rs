@@ -96,9 +96,10 @@ export function cpLineSelectionBounds(
 }
 
 export function cpLineSelectionMoveAnchorPoints(
-  lines: readonly OristudioCpLineSegment[]
+  lines: readonly OristudioCpLineSegment[],
+  angleDegrees = 0
 ): Point[] {
-  const frame = cpLineSelectionFrame(lines);
+  const frame = cpLineSelectionFrame(lines, angleDegrees);
   if (!frame) return [];
   return [
     ...lines.flatMap((line) => [line.a, line.b]),
@@ -110,37 +111,12 @@ export function cpLineSelectionMoveAnchorPoints(
 }
 
 export function cpLineSelectionFrame(
-  lines: readonly OristudioCpLineSegment[]
+  lines: readonly OristudioCpLineSegment[],
+  angleDegrees = 0
 ): CpLineSelectionFrame | null {
   const points = uniquePoints(lines.flatMap((line) => [line.a, line.b]));
   if (points.length === 0) return null;
-  if (points.length === 1) return frameForAngle(points, 0);
-
-  const hull = convexHull(points);
-  const candidateAngles = new Set<number>([0]);
-  for (let index = 0; index < hull.length; index += 1) {
-    const current = hull[index];
-    const next = hull[(index + 1) % hull.length];
-    const dx = next.x - current.x;
-    const dy = next.y - current.y;
-    if (Math.hypot(dx, dy) <= 1e-9) continue;
-    candidateAngles.add(normalizeFrameAngle(Math.atan2(dy, dx)));
-  }
-
-  let best: { frame: CpLineSelectionFrame; score: number; perimeter: number } | null = null;
-  for (const angle of candidateAngles) {
-    const frame = frameForAngle(points, angle);
-    const score = frame.width * frame.height;
-    const perimeter = frame.width + frame.height;
-    if (
-      !best ||
-      score < best.score - 1e-9 ||
-      (Math.abs(score - best.score) <= 1e-9 && perimeter < best.perimeter)
-    ) {
-      best = { frame, score, perimeter };
-    }
-  }
-  return best?.frame ?? null;
+  return frameForAngle(points, (angleDegrees * Math.PI) / 180);
 }
 
 export function offsetCpLineSegmentsForPaste(
@@ -287,12 +263,6 @@ function uniquePoints(points: readonly Point[]): Point[] {
   return unique;
 }
 
-function normalizeFrameAngle(angleRadians: number): number {
-  const quarterTurn = Math.PI / 2;
-  const normalized = angleRadians % quarterTurn;
-  return normalized < 0 ? normalized + quarterTurn : normalized;
-}
-
 function frameForAngle(points: readonly Point[], angleRadians: number): CpLineSelectionFrame {
   const axisX = { x: Math.cos(angleRadians), y: Math.sin(angleRadians) };
   const axisY = { x: -Math.sin(angleRadians), y: Math.cos(angleRadians) };
@@ -341,42 +311,6 @@ function frameForAngle(points: readonly Point[], angleRadians: number): CpLineSe
       }),
     },
   };
-}
-
-function convexHull(points: readonly Point[]): Point[] {
-  const sorted = [...points].sort((a, b) => (a.x === b.x ? a.y - b.y : a.x - b.x));
-  if (sorted.length <= 1) return sorted;
-
-  const lower: Point[] = [];
-  for (const point of sorted) {
-    while (
-      lower.length >= 2 &&
-      cross(lower[lower.length - 2], lower[lower.length - 1], point) <= 0
-    ) {
-      lower.pop();
-    }
-    lower.push(point);
-  }
-
-  const upper: Point[] = [];
-  for (let index = sorted.length - 1; index >= 0; index -= 1) {
-    const point = sorted[index];
-    while (
-      upper.length >= 2 &&
-      cross(upper[upper.length - 2], upper[upper.length - 1], point) <= 0
-    ) {
-      upper.pop();
-    }
-    upper.push(point);
-  }
-
-  lower.pop();
-  upper.pop();
-  return [...lower, ...upper];
-}
-
-function cross(origin: Point, a: Point, b: Point): number {
-  return (a.x - origin.x) * (b.y - origin.y) - (a.y - origin.y) * (b.x - origin.x);
 }
 
 function formatAngle(angleDegrees: number): string {

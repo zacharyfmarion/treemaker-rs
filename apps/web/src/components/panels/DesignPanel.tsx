@@ -15,6 +15,7 @@ import {
   CircleDot,
   FileQuestionMark,
   FileText,
+  FlipHorizontal2,
   FolderOpen,
   Layers,
   Plus,
@@ -46,7 +47,14 @@ import {
   toggleEdgeSelection,
   toggleNodeSelection,
 } from '../../lib/selection';
-import { paperCenter } from '../../lib/symmetryPresets';
+import {
+  nextSymmetryOption,
+  paperCenter,
+  symmetryOptionForPreset,
+  symmetrySelectValueForState,
+  type SymmetryPreset,
+  type SymmetrySelectValue,
+} from '../../lib/symmetryPresets';
 import {
   findMirrorNodeId,
   reflectPointAcrossSymmetryAxis,
@@ -57,6 +65,7 @@ import {
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { Button } from '../ui/Button';
 import { IconButton } from '../ui/IconButton';
+import { Toggle } from '../ui/Toggle';
 import {
   isViewportInteractiveTarget,
   ViewportToolbar,
@@ -78,12 +87,97 @@ function viewBox(rect: { x: number; y: number; width: number; height: number }):
   return `${rect.x} ${rect.y} ${rect.width} ${rect.height}`;
 }
 
+function designSymmetryToolbarLabel(mode: SymmetrySelectValue, mirrorMode: boolean) {
+  if (mirrorMode) return 'Mirror';
+  if (mode === 'none') return 'Sym';
+  if (mode === 'book') return 'Book';
+  if (mode === 'diagonal') return 'Diag';
+  return 'Custom';
+}
+
+function designSymmetryStatusLabel(mode: SymmetrySelectValue, mirrorMode: boolean) {
+  if (mirrorMode) return 'Mirroring';
+  if (mode === 'none') return 'Off';
+  if (mode === 'book') return 'Book';
+  if (mode === 'diagonal') return 'Diagonal';
+  return 'Custom axis';
+}
+
+function SymmetryNumberField({
+  label,
+  value,
+  min,
+  max,
+  step,
+  ariaLabel,
+  onCommit,
+}: {
+  label: string;
+  value: number;
+  min?: number;
+  max?: number;
+  step: number;
+  ariaLabel: string;
+  onCommit: (value: number) => void;
+}) {
+  const [draft, setDraft] = useState(String(value));
+
+  useEffect(() => {
+    setDraft(String(value));
+  }, [value]);
+
+  const commit = () => {
+    const parsed = Number.parseFloat(draft);
+    if (!Number.isFinite(parsed)) {
+      setDraft(String(value));
+      return;
+    }
+    const lowerBounded = min === undefined ? parsed : Math.max(min, parsed);
+    const next = max === undefined ? lowerBounded : Math.min(max, lowerBounded);
+    if (Math.abs(next - value) > 0.000_001) onCommit(next);
+    setDraft(String(next));
+  };
+
+  return (
+    <label className="symmetry-menu__field">
+      <span>{label}</span>
+      <input
+        aria-label={ariaLabel}
+        type="number"
+        min={min}
+        max={max}
+        step={step}
+        value={draft}
+        onChange={(event) => setDraft(event.currentTarget.value)}
+        onBlur={commit}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') event.currentTarget.blur();
+          if (event.key === 'Escape') {
+            setDraft(String(value));
+            event.currentTarget.blur();
+          }
+        }}
+      />
+    </label>
+  );
+}
+
 interface DesignViewportToolbarProps {
   zoomPercent: number;
   layers: DesignViewLayers;
+  symmetryMode: SymmetrySelectValue;
+  symmetryAngle: number;
+  symmetryLoc: Point;
+  paperWidth: number;
+  paperHeight: number;
+  nextSymmetryPresetLabel: string | null;
   mirrorMode: boolean;
   onLayerChange: (layer: DesignViewLayerKey, visible: boolean) => void;
-  onToggleMirror: () => void;
+  onSymmetryEnabledChange: (enabled: boolean) => void;
+  onSymmetryPreset: (preset: SymmetryPreset) => void;
+  onFlipSymmetryPreset: () => void;
+  onMirrorModeChange: (enabled: boolean) => void;
+  onCustomSymmetryChange: (update: { symAngle?: number; symLoc?: Point }) => void;
   zoomIn: () => void;
   zoomOut: () => void;
   fitToView: () => void;
@@ -91,12 +185,186 @@ interface DesignViewportToolbarProps {
   setZoomLevel: (scale: number) => void;
 }
 
+function DesignSymmetryMenuButton({
+  symmetryMode,
+  symmetryAngle,
+  symmetryLoc,
+  paperWidth,
+  paperHeight,
+  showAxis,
+  mirrorMode,
+  nextSymmetryPresetLabel,
+  onSymmetryEnabledChange,
+  onShowAxisChange,
+  onSymmetryPreset,
+  onFlipSymmetryPreset,
+  onMirrorModeChange,
+  onCustomSymmetryChange,
+}: {
+  symmetryMode: SymmetrySelectValue;
+  symmetryAngle: number;
+  symmetryLoc: Point;
+  paperWidth: number;
+  paperHeight: number;
+  showAxis: boolean;
+  mirrorMode: boolean;
+  nextSymmetryPresetLabel: string | null;
+  onSymmetryEnabledChange: (enabled: boolean) => void;
+  onShowAxisChange: (visible: boolean) => void;
+  onSymmetryPreset: (preset: SymmetryPreset) => void;
+  onFlipSymmetryPreset: () => void;
+  onMirrorModeChange: (enabled: boolean) => void;
+  onCustomSymmetryChange: (update: { symAngle?: number; symLoc?: Point }) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const toolbarLabel = designSymmetryToolbarLabel(symmetryMode, mirrorMode);
+  const statusLabel = designSymmetryStatusLabel(symmetryMode, mirrorMode);
+  const canFlipPreset = symmetryMode === 'book' || symmetryMode === 'diagonal';
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onPointerDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (menuRef.current?.contains(target)) return;
+      setOpen(false);
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    return () => document.removeEventListener('mousedown', onPointerDown);
+  }, [open]);
+
+  return (
+    <div className="viewport-toolbar__menu-anchor design-symmetry-menu" ref={menuRef}>
+      <button
+        type="button"
+        className="viewport-toolbar__symmetry-button"
+        data-active={symmetryMode !== 'none' || mirrorMode ? true : undefined}
+        aria-label="Design symmetry"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+      >
+        <FlipHorizontal2 size={14} />
+        <span>{toolbarLabel}</span>
+      </button>
+      {open && (
+        <div
+          className="viewport-toolbar__dropdown symmetry-menu__panel"
+          role="menu"
+          aria-label="Design symmetry controls"
+        >
+          <div className="symmetry-menu__header">
+            <span>Symmetry</span>
+            <span>{statusLabel}</span>
+          </div>
+          <div className="symmetry-menu__toggle-row">
+            <div className="symmetry-menu__toggle-copy">
+              <span>Enable symmetry</span>
+              <small>Define the tree mirror line</small>
+            </div>
+            <Toggle
+              checked={symmetryMode !== 'none'}
+              onChange={onSymmetryEnabledChange}
+              aria-label="Enable design symmetry"
+            />
+          </div>
+          <div className="symmetry-menu__toggle-row">
+            <div className="symmetry-menu__toggle-copy">
+              <span>Show axis</span>
+              <small>Display the mirror line</small>
+            </div>
+            <Toggle
+              checked={showAxis}
+              onChange={onShowAxisChange}
+              aria-label="Show design symmetry axis"
+            />
+          </div>
+          <div className="symmetry-menu__toggle-row">
+            <div className="symmetry-menu__toggle-copy">
+              <span>Mirror nodes</span>
+              <small>Reflect new node edits</small>
+            </div>
+            <Toggle
+              checked={mirrorMode}
+              onChange={onMirrorModeChange}
+              aria-label="Mirror design node edits"
+            />
+          </div>
+          <div className="symmetry-menu__section-label">Preset</div>
+          <div className="symmetry-menu__preset-grid">
+            <button
+              type="button"
+              className="symmetry-menu__preset"
+              data-active={symmetryMode === 'book' ? true : undefined}
+              onClick={() => onSymmetryPreset('book')}
+            >
+              Book
+            </button>
+            <button
+              type="button"
+              className="symmetry-menu__preset"
+              data-active={symmetryMode === 'diagonal' ? true : undefined}
+              onClick={() => onSymmetryPreset('diagonal')}
+            >
+              Diag
+            </button>
+          </div>
+          <button
+            type="button"
+            className="symmetry-menu__item"
+            disabled={!canFlipPreset}
+            onClick={onFlipSymmetryPreset}
+          >
+            <span>{nextSymmetryPresetLabel ? `Flip to ${nextSymmetryPresetLabel}` : 'Flip preset axis'}</span>
+          </button>
+          <div className="symmetry-menu__section-label">Axis</div>
+          <SymmetryNumberField
+            label="Angle"
+            value={symmetryAngle}
+            step={1}
+            ariaLabel="Design symmetry angle"
+            onCommit={(symAngle) => onCustomSymmetryChange({ symAngle })}
+          />
+          <SymmetryNumberField
+            label="X"
+            value={symmetryLoc.x}
+            min={0}
+            max={paperWidth}
+            step={0.01}
+            ariaLabel="Design symmetry axis X"
+            onCommit={(x) => onCustomSymmetryChange({ symLoc: { ...symmetryLoc, x } })}
+          />
+          <SymmetryNumberField
+            label="Y"
+            value={symmetryLoc.y}
+            min={0}
+            max={paperHeight}
+            step={0.01}
+            ariaLabel="Design symmetry axis Y"
+            onCommit={(y) => onCustomSymmetryChange({ symLoc: { ...symmetryLoc, y } })}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DesignViewportToolbar({
   zoomPercent,
   layers,
+  symmetryMode,
+  symmetryAngle,
+  symmetryLoc,
+  paperWidth,
+  paperHeight,
+  nextSymmetryPresetLabel,
   mirrorMode,
   onLayerChange,
-  onToggleMirror,
+  onSymmetryEnabledChange,
+  onSymmetryPreset,
+  onFlipSymmetryPreset,
+  onMirrorModeChange,
+  onCustomSymmetryChange,
   zoomIn,
   zoomOut,
   fitToView,
@@ -128,16 +396,22 @@ function DesignViewportToolbar({
       setZoomLevel={setZoomLevel}
     >
       <ViewportToolbarSeparator />
-      <Button
-        size="sm"
-        variant="secondary"
-        className="viewport-toolbar__mirror"
-        isActive={mirrorMode}
-        aria-pressed={mirrorMode}
-        onClick={onToggleMirror}
-      >
-        Mirror Nodes
-      </Button>
+      <DesignSymmetryMenuButton
+        symmetryMode={symmetryMode}
+        symmetryAngle={symmetryAngle}
+        symmetryLoc={symmetryLoc}
+        paperWidth={paperWidth}
+        paperHeight={paperHeight}
+        showAxis={layers.symmetry}
+        mirrorMode={mirrorMode}
+        nextSymmetryPresetLabel={nextSymmetryPresetLabel}
+        onSymmetryEnabledChange={onSymmetryEnabledChange}
+        onShowAxisChange={(visible) => onLayerChange('symmetry', visible)}
+        onSymmetryPreset={onSymmetryPreset}
+        onFlipSymmetryPreset={onFlipSymmetryPreset}
+        onMirrorModeChange={onMirrorModeChange}
+        onCustomSymmetryChange={onCustomSymmetryChange}
+      />
       <ViewportToolbarSeparator />
       <div className="viewport-toolbar__menu-anchor" ref={layersMenuRef}>
         <IconButton
@@ -183,6 +457,7 @@ export function DesignPanel() {
   const [layers, setLayers] = useState<DesignViewLayers>(DEFAULT_DESIGN_VIEW_LAYERS);
   const [spacePressed, setSpacePressed] = useState(false);
   const [hoverPoint, setHoverPoint] = useState<Point | null>(null);
+  const [symmetryModeOverride, setSymmetryModeOverride] = useState<SymmetrySelectValue | null>(null);
   const project = useWorkspaceStore((state) => state.project);
   const engineReady = useWorkspaceStore((state) => state.engineReady);
   const documentMode = useWorkspaceStore((state) => state.documentMode);
@@ -203,8 +478,25 @@ export function DesignPanel() {
     (state) => state.designViewportFitRequestId
   );
   const mirrorMode = toolMode === 'symmetry';
+  const inferredSymmetryMode = symmetrySelectValueForState({
+    hasSymmetry: project.hasSymmetry,
+    symAngle: project.paper.symAngle,
+    symLoc: project.paper.symLoc,
+    paperWidth: project.paper.width,
+    paperHeight: project.paper.height,
+  });
+  const symmetryMode = project.hasSymmetry ? (symmetryModeOverride ?? inferredSymmetryMode) : 'none';
+  const presetSymmetryMode = symmetryMode === 'book' || symmetryMode === 'diagonal' ? symmetryMode : null;
+  const activePresetOption = presetSymmetryMode
+    ? symmetryOptionForPreset(presetSymmetryMode, project.paper.symAngle)
+    : null;
+  const nextSymmetryPresetOption = activePresetOption ? nextSymmetryOption(activePresetOption) : null;
   const symmetryAxis = useMemo(() => symmetryAxisForProject(project), [project]);
   const showEmptyState = engineReady && project.nodes.length === 0 && project.edges.length === 0;
+
+  useEffect(() => {
+    setSymmetryModeOverride(null);
+  }, [projectLoadId]);
 
   const nodeLocations = useMemo(() => {
     if (!dragging) return undefined;
@@ -378,21 +670,115 @@ export function DesignPanel() {
     setLayers((current) => setDesignLayerVisibility(current, layer, visible));
   }, []);
 
-  const toggleMirrorMode = useCallback(() => {
-    if (mirrorMode) {
-      setToolMode('select');
-      return;
-    }
-    if (!project.hasSymmetry) {
+  const setDesignSymmetryEnabled = useCallback(
+    (enabled: boolean) => {
+      setActiveEditingSurface('tree');
+      if (!enabled) {
+        setSymmetryModeOverride(null);
+        if (mirrorMode) setToolMode('select');
+        void setSymmetry({ hasSymmetry: false });
+        return;
+      }
+      setSymmetryModeOverride(null);
+      setLayers((current) => setDesignLayerVisibility(current, 'symmetry', true));
       void setSymmetry({
         hasSymmetry: true,
-        symAngle: 90,
+        symAngle: project.hasSymmetry ? project.paper.symAngle : 90,
+        symLoc: project.hasSymmetry
+          ? project.paper.symLoc
+          : paperCenter(project.paper.width, project.paper.height),
+      });
+    },
+    [
+      mirrorMode,
+      project.hasSymmetry,
+      project.paper.height,
+      project.paper.symAngle,
+      project.paper.symLoc,
+      project.paper.width,
+      setActiveEditingSurface,
+      setSymmetry,
+      setToolMode,
+    ]
+  );
+
+  const applyDesignSymmetryPreset = useCallback(
+    (preset: SymmetryPreset) => {
+      const option = symmetryOptionForPreset(preset, project.paper.symAngle);
+      setActiveEditingSurface('tree');
+      setSymmetryModeOverride(preset);
+      setLayers((current) => setDesignLayerVisibility(current, 'symmetry', true));
+      void setSymmetry({
+        hasSymmetry: true,
+        symAngle: option.angle,
         symLoc: paperCenter(project.paper.width, project.paper.height),
       });
-    }
+    },
+    [
+      project.paper.height,
+      project.paper.symAngle,
+      project.paper.width,
+      setActiveEditingSurface,
+      setSymmetry,
+    ]
+  );
+
+  const flipDesignSymmetryPreset = useCallback(() => {
+    if (!nextSymmetryPresetOption || !presetSymmetryMode) return;
+    setActiveEditingSurface('tree');
+    setSymmetryModeOverride(presetSymmetryMode);
     setLayers((current) => setDesignLayerVisibility(current, 'symmetry', true));
-    setToolMode('symmetry');
-  }, [mirrorMode, project.hasSymmetry, project.paper.height, project.paper.width, setSymmetry, setToolMode]);
+    void setSymmetry({
+      hasSymmetry: true,
+      symAngle: nextSymmetryPresetOption.angle,
+      symLoc: paperCenter(project.paper.width, project.paper.height),
+    });
+  }, [
+    nextSymmetryPresetOption,
+    presetSymmetryMode,
+    project.paper.height,
+    project.paper.width,
+    setActiveEditingSurface,
+    setSymmetry,
+  ]);
+
+  const setDesignMirrorMode = useCallback(
+    (enabled: boolean) => {
+      setActiveEditingSurface('tree');
+      if (!enabled) {
+        setToolMode('select');
+        return;
+      }
+      if (!project.hasSymmetry) {
+        setSymmetryModeOverride(null);
+        void setSymmetry({
+          hasSymmetry: true,
+          symAngle: 90,
+          symLoc: paperCenter(project.paper.width, project.paper.height),
+        });
+      }
+      setLayers((current) => setDesignLayerVisibility(current, 'symmetry', true));
+      setToolMode('symmetry');
+    },
+    [
+      project.hasSymmetry,
+      project.paper.height,
+      project.paper.width,
+      setActiveEditingSurface,
+      setSymmetry,
+      setToolMode,
+    ]
+  );
+
+  const updateDesignCustomSymmetry = useCallback(
+    (update: { symAngle?: number; symLoc?: Point }) => {
+      setActiveEditingSurface('tree');
+      setSymmetryModeOverride('custom');
+      setLayers((current) => setDesignLayerVisibility(current, 'symmetry', true));
+      void setSymmetry({ hasSymmetry: true, ...update });
+    },
+    [setActiveEditingSurface, setSymmetry]
+  );
 
   useEffect(() => {
     const container = containerRef.current;
@@ -817,9 +1203,19 @@ export function DesignPanel() {
         <DesignViewportToolbar
           zoomPercent={zoomPercent}
           layers={layers}
+          symmetryMode={symmetryMode}
+          symmetryAngle={project.paper.symAngle}
+          symmetryLoc={project.paper.symLoc}
+          paperWidth={project.paper.width}
+          paperHeight={project.paper.height}
+          nextSymmetryPresetLabel={nextSymmetryPresetOption?.label ?? null}
           mirrorMode={mirrorMode}
           onLayerChange={setLayer}
-          onToggleMirror={toggleMirrorMode}
+          onSymmetryEnabledChange={setDesignSymmetryEnabled}
+          onSymmetryPreset={applyDesignSymmetryPreset}
+          onFlipSymmetryPreset={flipDesignSymmetryPreset}
+          onMirrorModeChange={setDesignMirrorMode}
+          onCustomSymmetryChange={updateDesignCustomSymmetry}
           zoomIn={() => transformRef.current?.zoomIn(0.35, 120)}
           zoomOut={() => transformRef.current?.zoomOut(0.35, 120)}
           fitToView={() => fitToView()}

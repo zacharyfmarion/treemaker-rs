@@ -539,16 +539,16 @@ function CpSymmetryMenuButton({
       </button>
       {open && (
         <div
-          className="viewport-toolbar__dropdown cp-symmetry-menu__panel"
+          className="viewport-toolbar__dropdown symmetry-menu__panel"
           role="menu"
           aria-label="Crease pattern symmetry controls"
         >
-          <div className="cp-symmetry-menu__header">
+          <div className="symmetry-menu__header">
             <span>Symmetry</span>
             <span>{statusLabel}</span>
           </div>
-          <div className="cp-symmetry-menu__toggle-row">
-            <div className="cp-symmetry-menu__toggle-copy">
+          <div className="symmetry-menu__toggle-row">
+            <div className="symmetry-menu__toggle-copy">
               <span>Enable symmetry</span>
               <small>Mirror new CP edits</small>
             </div>
@@ -558,8 +558,8 @@ function CpSymmetryMenuButton({
               aria-label="Enable crease pattern symmetry"
             />
           </div>
-          <div className="cp-symmetry-menu__toggle-row">
-            <div className="cp-symmetry-menu__toggle-copy">
+          <div className="symmetry-menu__toggle-row">
+            <div className="symmetry-menu__toggle-copy">
               <span>Show axis</span>
               <small>Display the mirror line</small>
             </div>
@@ -569,11 +569,11 @@ function CpSymmetryMenuButton({
               aria-label="Show crease pattern symmetry axis"
             />
           </div>
-          <div className="cp-symmetry-menu__section-label">Preset</div>
-          <div className="cp-symmetry-menu__preset-grid">
+          <div className="symmetry-menu__section-label">Preset</div>
+          <div className="symmetry-menu__preset-grid">
             <button
               type="button"
-              className="cp-symmetry-menu__preset"
+              className="symmetry-menu__preset"
               data-active={symmetry.preset === 'book' && symmetry.enabled ? true : undefined}
               onClick={() => choosePreset('book')}
             >
@@ -581,7 +581,7 @@ function CpSymmetryMenuButton({
             </button>
             <button
               type="button"
-              className="cp-symmetry-menu__preset"
+              className="symmetry-menu__preset"
               data-active={symmetry.preset === 'diagonal' && symmetry.enabled ? true : undefined}
               onClick={() => choosePreset('diagonal')}
             >
@@ -590,7 +590,7 @@ function CpSymmetryMenuButton({
           </div>
           <button
             type="button"
-            className="cp-symmetry-menu__item"
+            className="symmetry-menu__item"
             disabled={!canFlipPreset}
             onClick={() => {
               if (canFlipPreset) choosePreset(symmetry.preset === 'book' ? 'book' : 'diagonal');
@@ -600,7 +600,7 @@ function CpSymmetryMenuButton({
           </button>
           <button
             type="button"
-            className="cp-symmetry-menu__item"
+            className="symmetry-menu__item"
             data-active={axisPicking || (symmetry.preset === 'custom' && symmetry.enabled) ? true : undefined}
             onClick={pickAxis}
           >

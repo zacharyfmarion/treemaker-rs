@@ -2893,37 +2893,6 @@
   grid-template-columns: auto 1fr;
 }
 
-.condition-control-row {
-  display: grid;
-  grid-template-columns: minmax(88px, 1fr) minmax(0, 1.2fr);
-  align-items: start;
-  gap: var(--space-2);
-  color: var(--text-secondary);
-  font-size: 12px;
-}
-
-.condition-control-row__field {
-  display: grid;
-  gap: 5px;
-  min-width: 0;
-}
-
-.symmetry-preset-controls {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--space-1);
-  min-width: 0;
-}
-
-.symmetry-preset-label {
-  overflow: hidden;
-  color: var(--text-tertiary);
-  font-size: 11px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .condition-number input {
   min-width: 0;
   border: 1px solid var(--border-default);
@@ -3586,11 +3555,6 @@
   color: var(--fold-flat);
 }
 
-.viewport-toolbar__mirror {
-  min-width: 92px;
-  padding-inline: 10px;
-}
-
 .viewport-toolbar__menu-anchor {
   position: relative;
   display: inline-flex;
@@ -3675,14 +3639,14 @@
   text-align: center;
 }
 
-.cp-symmetry-menu__panel {
+.symmetry-menu__panel {
   width: 236px;
   padding: 8px;
   gap: 5px;
   color: var(--text-secondary);
 }
 
-.cp-symmetry-menu__header {
+.symmetry-menu__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -3694,13 +3658,13 @@
   font-weight: 760;
 }
 
-.cp-symmetry-menu__header span:last-child {
+.symmetry-menu__header span:last-child {
   color: var(--text-tertiary);
   font-size: 0.68rem;
   font-weight: 700;
 }
 
-.cp-symmetry-menu__toggle-row {
+.symmetry-menu__toggle-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -3709,26 +3673,26 @@
   padding: 6px 2px;
 }
 
-.cp-symmetry-menu__toggle-copy {
+.symmetry-menu__toggle-copy {
   display: grid;
   gap: 2px;
   min-width: 0;
 }
 
-.cp-symmetry-menu__toggle-copy span {
+.symmetry-menu__toggle-copy span {
   color: var(--text-primary);
   font-size: 0.74rem;
   font-weight: 740;
 }
 
-.cp-symmetry-menu__toggle-copy small {
+.symmetry-menu__toggle-copy small {
   color: var(--text-tertiary);
   font-size: 0.66rem;
   font-weight: 650;
 }
 
-.cp-symmetry-menu__item,
-.cp-symmetry-menu__preset {
+.symmetry-menu__item,
+.symmetry-menu__preset {
   display: inline-flex;
   align-items: center;
   justify-content: flex-start;
@@ -3745,34 +3709,34 @@
   font-weight: 700;
 }
 
-.cp-symmetry-menu__item {
+.symmetry-menu__item {
   width: 100%;
 }
 
-.cp-symmetry-menu__item:hover,
-.cp-symmetry-menu__preset:hover {
+.symmetry-menu__item:hover,
+.symmetry-menu__preset:hover {
   background: var(--bg-surface);
   color: var(--text-primary);
 }
 
-.cp-symmetry-menu__item[data-active],
-.cp-symmetry-menu__preset[data-active] {
+.symmetry-menu__item[data-active],
+.symmetry-menu__preset[data-active] {
   border-color: color-mix(in srgb, var(--accent-primary) 42%, transparent);
   background: color-mix(in srgb, var(--accent-primary) 18%, transparent);
   color: var(--text-primary);
 }
 
-.cp-symmetry-menu__item:disabled {
+.symmetry-menu__item:disabled {
   opacity: 0.45;
   cursor: default;
 }
 
-.cp-symmetry-menu__item:disabled:hover {
+.symmetry-menu__item:disabled:hover {
   background: transparent;
   color: var(--text-secondary);
 }
 
-.cp-symmetry-menu__section-label {
+.symmetry-menu__section-label {
   margin-top: 3px;
   padding: 0 2px;
   color: var(--text-tertiary);
@@ -3781,14 +3745,42 @@
   text-transform: uppercase;
 }
 
-.cp-symmetry-menu__preset-grid {
+.symmetry-menu__preset-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 4px;
 }
 
-.cp-symmetry-menu__preset {
+.symmetry-menu__preset {
   justify-content: center;
+}
+
+.symmetry-menu__field {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.symmetry-menu__field input {
+  min-width: 0;
+  height: 26px;
+  padding: 0 7px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.72rem;
+}
+
+.symmetry-menu__field input:focus-visible {
+  border-color: var(--accent-primary);
+  outline: none;
 }
 
 .design-layer-menu {

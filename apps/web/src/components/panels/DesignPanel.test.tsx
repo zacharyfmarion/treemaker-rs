@@ -174,22 +174,65 @@ describe('DesignPanel', () => {
     expect(transformMocks.setTransform).not.toHaveBeenCalled();
   });
 
-  it('toggles mirror mode from the design toolbar when symmetry is already enabled', () => {
+  it('controls design symmetry from the compact toolbar menu', async () => {
     renderPanel({ ...createSampleProject(), hasSymmetry: true });
 
-    const mirrorButton = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? [])
-      .find((button) => button.textContent?.trim() === 'Mirror Nodes');
-    expect(mirrorButton).toBeTruthy();
+    expect(container?.textContent).not.toContain('Mirror Nodes');
+    const symmetryButton = container?.querySelector<HTMLButtonElement>('button[aria-label="Design symmetry"]');
+    expect(symmetryButton).toBeTruthy();
 
     act(() => {
-      mirrorButton?.click();
+      symmetryButton?.click();
+    });
+
+    expect(container?.textContent).toContain('Enable symmetry');
+    expect(container?.textContent).toContain('Mirror nodes');
+    expect(container?.textContent).toContain('Book');
+
+    await act(async () => {
+      container?.querySelector<HTMLButtonElement>('button[aria-label="Mirror design node edits"]')?.click();
+      await Promise.resolve();
     });
 
     expect(useWorkspaceStore.getState().toolMode).toBe('symmetry');
-    const activeMirrorButton = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? [])
-      .find((button) => button.textContent?.trim() === 'Mirror Nodes');
-    expect(activeMirrorButton?.getAttribute('aria-pressed')).toBe('true');
+    expect(container?.querySelector<HTMLButtonElement>('button[aria-label="Design symmetry"]')?.textContent).toContain('Mirror');
     expect(container?.querySelector('button[aria-label="Pair Leaves"]')).toBeNull();
+  });
+
+  it('enables design symmetry from the toolbar menu and renders the axis', async () => {
+    const setSymmetry = vi.fn(async (update: Parameters<ReturnType<typeof useWorkspaceStore.getState>['setSymmetry']>[0]) => {
+      const project = useWorkspaceStore.getState().project;
+      useWorkspaceStore.setState({
+        project: {
+          ...project,
+          hasSymmetry: update.hasSymmetry ?? project.hasSymmetry,
+          paper: {
+            ...project.paper,
+            symAngle: update.symAngle ?? project.paper.symAngle,
+            symLoc: update.symLoc ?? project.paper.symLoc,
+          },
+        },
+      });
+    });
+    renderPanel({ ...createSampleProject(), hasSymmetry: false }, { setSymmetry });
+
+    act(() => {
+      container?.querySelector<HTMLButtonElement>('button[aria-label="Design symmetry"]')?.click();
+    });
+
+    await act(async () => {
+      container?.querySelector<HTMLButtonElement>('button[aria-label="Enable design symmetry"]')?.click();
+      await Promise.resolve();
+    });
+
+    expect(setSymmetry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        hasSymmetry: true,
+      })
+    );
+    expect(useWorkspaceStore.getState().project.hasSymmetry).toBe(true);
+    expect(container?.querySelector('.symmetry-line')).not.toBeNull();
+    expect(container?.querySelector<HTMLButtonElement>('button[aria-label="Design symmetry"]')?.textContent).toContain('Book');
   });
 
   it('clears a Select All selection when the user clicks blank paper', () => {

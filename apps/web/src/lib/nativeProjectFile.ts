@@ -268,7 +268,7 @@ function createNativeCreasePatternDocument(
       creaseColorMode: input.creaseColorMode,
       selection: input.selection,
       viewport: input.viewport,
-      symmetry: input.symmetry,
+      symmetry: normalizeOristudioCpSymmetry(input.symmetry),
     },
     extensions: {},
   };

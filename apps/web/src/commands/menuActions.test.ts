@@ -127,6 +127,7 @@ describe('menu actions', () => {
     await expect(handle('cp.check1')).resolves.toBe(true);
     await expect(handle('cp.fix2')).resolves.toBe(true);
     await expect(handle('cp.deleteSelectedLines')).resolves.toBe(true);
+    await expect(handle('cp.changeCreaseType')).resolves.toBe(true);
     await expect(handle('cp.makeMountain')).resolves.toBe(true);
     await expect(handle('cp.makeAuxiliary')).resolves.toBe(true);
     await expect(handle('cp.toggleMountainValley')).resolves.toBe(true);
@@ -142,6 +143,9 @@ describe('menu actions', () => {
       'LineSegmentDelete',
       { line_ids: [1, 2] }
     );
+    expect(deps.workspace.executeOristudioCpCommand).toHaveBeenCalledWith('ChangeCreaseType', {
+      line_ids: [1, 2],
+    });
     expect(deps.workspace.executeOristudioCpCommand).toHaveBeenCalledWith('CreaseMakeMountain', {
       line_ids: [1, 2],
     });

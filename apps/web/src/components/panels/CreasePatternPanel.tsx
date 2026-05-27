@@ -75,6 +75,7 @@ import {
   reflectedPreviewCircles,
   reflectedPreviewPoints,
   reflectedPreviewSegments,
+  shouldMirrorOristudioCpCommandPreview,
   type OristudioCpSymmetryState,
 } from '../../lib/oristudioCpSymmetry';
 import {
@@ -569,6 +570,17 @@ function CpSymmetryMenuButton({
               aria-label="Show crease pattern symmetry axis"
             />
           </div>
+          <div className="symmetry-menu__toggle-row">
+            <div className="symmetry-menu__toggle-copy">
+              <span>Mirror selection</span>
+              <small>Selection tools include mirrored matches</small>
+            </div>
+            <Toggle
+              checked={symmetry.mirrorSelection}
+              onChange={(mirrorSelection) => onUpdate({ mirrorSelection })}
+              aria-label="Mirror crease pattern selection"
+            />
+          </div>
           <div className="symmetry-menu__section-label">Preset</div>
           <div className="symmetry-menu__preset-grid">
             <button
@@ -1013,9 +1025,13 @@ export function CreasePatternPanel() {
         : null,
     [activeCpInputMode, liveCommandPreviewPoints]
   );
+  const mirrorCommandPreview = shouldMirrorOristudioCpCommandPreview(
+    activeCpCommand?.operationId,
+    oristudioCpSymmetry
+  );
   const renderedCommandPreviewBoxes = useMemo(() => {
     if (!renderedCommandPreviewBox) return [];
-    if (!oristudioCpSymmetry.enabled) return [renderedCommandPreviewBox];
+    if (!mirrorCommandPreview) return [renderedCommandPreviewBox];
     const reflectedPoints = reflectedPreviewPoints(
       [renderedCommandPreviewBox[0], renderedCommandPreviewBox[1]],
       oristudioCpSymmetry
@@ -1024,22 +1040,34 @@ export function CreasePatternPanel() {
     const reflectedB = reflectedPoints[3];
     if (!reflectedA || !reflectedB) return [renderedCommandPreviewBox];
     return [renderedCommandPreviewBox, [reflectedA, reflectedB] as const];
-  }, [oristudioCpSymmetry, renderedCommandPreviewBox]);
+  }, [mirrorCommandPreview, oristudioCpSymmetry, renderedCommandPreviewBox]);
   const renderedCommandPreviewPoints = useMemo(
-    () => reflectedPreviewPoints(baseRenderedCommandPreviewPoints, oristudioCpSymmetry),
-    [baseRenderedCommandPreviewPoints, oristudioCpSymmetry]
+    () =>
+      mirrorCommandPreview
+        ? reflectedPreviewPoints(baseRenderedCommandPreviewPoints, oristudioCpSymmetry)
+        : baseRenderedCommandPreviewPoints,
+    [baseRenderedCommandPreviewPoints, mirrorCommandPreview, oristudioCpSymmetry]
   );
   const renderedCommandPreviewSegments = useMemo(
-    () => reflectedPreviewSegments(baseRenderedCommandPreviewSegments, oristudioCpSymmetry),
-    [baseRenderedCommandPreviewSegments, oristudioCpSymmetry]
+    () =>
+      mirrorCommandPreview
+        ? reflectedPreviewSegments(baseRenderedCommandPreviewSegments, oristudioCpSymmetry)
+        : baseRenderedCommandPreviewSegments,
+    [baseRenderedCommandPreviewSegments, mirrorCommandPreview, oristudioCpSymmetry]
   );
   const renderedCommandPreviewCircles = useMemo(
-    () => reflectedPreviewCircles(cpCommandPreview?.circles ?? [], oristudioCpSymmetry),
-    [cpCommandPreview?.circles, oristudioCpSymmetry]
+    () =>
+      mirrorCommandPreview
+        ? reflectedPreviewCircles(cpCommandPreview?.circles ?? [], oristudioCpSymmetry)
+        : (cpCommandPreview?.circles ?? []),
+    [cpCommandPreview?.circles, mirrorCommandPreview, oristudioCpSymmetry]
   );
   const renderedCommandCandidatePoints = useMemo(
-    () => reflectedPreviewPoints(cpCommandPreview?.points ?? [], oristudioCpSymmetry),
-    [cpCommandPreview?.points, oristudioCpSymmetry]
+    () =>
+      mirrorCommandPreview
+        ? reflectedPreviewPoints(cpCommandPreview?.points ?? [], oristudioCpSymmetry)
+        : (cpCommandPreview?.points ?? []),
+    [cpCommandPreview?.points, mirrorCommandPreview, oristudioCpSymmetry]
   );
   const squareBisectorToolPrompt =
     isSquareBisectorOperation(activeCpCommand?.operationId) &&

@@ -803,14 +803,21 @@ describe('CreasePatternPanel', () => {
     act(() => {
       container.querySelector<HTMLButtonElement>('button[aria-label="Crease pattern symmetry"]')?.click();
     });
+    expect(useWorkspaceStore.getState().oristudioCpSymmetry.mirrorSelection).toBe(false);
     act(() => {
       container
         .querySelector<HTMLButtonElement>('button[aria-label="Enable crease pattern symmetry"]')
         ?.click();
     });
+    act(() => {
+      container
+        .querySelector<HTMLButtonElement>('button[aria-label="Mirror crease pattern selection"]')
+        ?.click();
+    });
 
     expect(useWorkspaceStore.getState().activeEditingSurface).toBe('crease-pattern');
     expect(useWorkspaceStore.getState().oristudioCpSymmetry.enabled).toBe(true);
+    expect(useWorkspaceStore.getState().oristudioCpSymmetry.mirrorSelection).toBe(true);
     expect(container.querySelector('.cp-symmetry-line')).not.toBeNull();
   });
 

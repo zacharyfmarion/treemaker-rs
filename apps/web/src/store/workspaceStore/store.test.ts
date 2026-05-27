@@ -104,6 +104,7 @@ vi.mock('./oristudioCpRuntime', async (importOriginal) => {
 });
 
 import type { EngineClient } from './engineRuntime';
+import { selectWorkspaceCapabilities } from './capabilities';
 import { useWorkspaceStore } from './store';
 
 type SnapshotOptions = Partial<
@@ -2158,6 +2159,11 @@ describe('workspace store slices', () => {
       label: 'CreaseMakeMountain',
     });
 
+    useWorkspaceStore.setState({ activeEditingSurface: 'tree' });
+    expect(selectWorkspaceCapabilities(useWorkspaceStore.getState())['edit.undo'].enabled).toBe(
+      true
+    );
+
     const undoCamvResult = camvErrorResult('CheckCamv-undo');
     oristudioCpMocks.executeOristudioCpCommand.mockResolvedValueOnce({
       ...loadedDocument,
@@ -2182,6 +2188,11 @@ describe('workspace store slices', () => {
     await expect(useWorkspaceStore.getState().ensureFoldArtifacts()).resolves.toBeTruthy();
     expect(api.flatFoldArtifacts).toHaveBeenCalledTimes(2);
     expect(useWorkspaceStore.getState().foldArtifactStatus).toBe('ready');
+
+    useWorkspaceStore.setState({ activeEditingSurface: 'tree' });
+    expect(selectWorkspaceCapabilities(useWorkspaceStore.getState())['edit.redo'].enabled).toBe(
+      true
+    );
 
     const redoCamvResult = camvErrorResult('CheckCamv-redo');
     oristudioCpMocks.executeOristudioCpCommand.mockResolvedValueOnce({

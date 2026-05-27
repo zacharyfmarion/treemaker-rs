@@ -5,7 +5,26 @@ import {
 } from '../../lib/workspaceCapabilities';
 import type { WorkspaceState } from './types';
 
+export function activeOrFallbackHistoryCount(
+  activeSurface: WorkspaceState['activeEditingSurface'],
+  treeCount: number,
+  cpCount: number
+): number {
+  const activeCount = activeSurface === 'crease-pattern' ? cpCount : treeCount;
+  if (activeCount > 0) return activeCount;
+  return activeSurface === 'crease-pattern' ? treeCount : cpCount;
+}
+
 export function workspaceCapabilityInput(state: WorkspaceState): WorkspaceCapabilityInput {
+  const treeHistoryPastCount = state.documentMode === 'tree' ? state.historyPast.length : 0;
+  const treeHistoryFutureCount = state.documentMode === 'tree' ? state.historyFuture.length : 0;
+  const cpHistoryPastCount = state.oristudioCpDocument
+    ? state.oristudioCpHistoryPast.length
+    : 0;
+  const cpHistoryFutureCount = state.oristudioCpDocument
+    ? state.oristudioCpHistoryFuture.length
+    : 0;
+
   return {
     documentMode: state.documentMode,
     activeEditingSurface: state.activeEditingSurface,
@@ -21,14 +40,16 @@ export function workspaceCapabilityInput(state: WorkspaceState): WorkspaceCapabi
     oristudioCpSelectedVertexCount: state.oristudioCpSelection.vertices?.length ?? 0,
     oristudioCpSelectedPointCount: state.oristudioCpSelection.points.length,
     oristudioCpSelectedCircleCount: state.oristudioCpSelection.circles.length,
-    historyPastCount:
-      state.activeEditingSurface === 'crease-pattern'
-        ? state.oristudioCpHistoryPast.length
-        : state.historyPast.length,
-    historyFutureCount:
-      state.activeEditingSurface === 'crease-pattern'
-        ? state.oristudioCpHistoryFuture.length
-        : state.historyFuture.length,
+    historyPastCount: activeOrFallbackHistoryCount(
+      state.activeEditingSurface,
+      treeHistoryPastCount,
+      cpHistoryPastCount
+    ),
+    historyFutureCount: activeOrFallbackHistoryCount(
+      state.activeEditingSurface,
+      treeHistoryFutureCount,
+      cpHistoryFutureCount
+    ),
     clipboard: state.clipboard,
     selection: state.selection,
   };

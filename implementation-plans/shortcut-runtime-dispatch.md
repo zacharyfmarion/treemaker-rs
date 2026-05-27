@@ -38,5 +38,7 @@ as a menu-only follow-up.
 - [x] Move viewport and CP action dispatch out of panel-local keydown listeners.
 - [x] Add capture-phase active-surface tracking for design and CP panels.
 - [x] Update settings/menu/tooltips/tests for multiple shortcut labels.
+- [x] Make undo/redo resolve to a fallback editable history stack when the
+  active surface is stale.
 - [x] Clarify the native Tauri accelerator sync plan.
 - [x] Validate with web checks and browser smoke tests.

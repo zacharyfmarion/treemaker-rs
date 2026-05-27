@@ -121,7 +121,7 @@ fn insert_line_segments_preserves_metadata_and_selects_inserted_lines() {
     let pasted = segment(2.0, 0.0, 3.0, 0.0, LineColor::Red1)
         .with_customized_color(oristudio_cp::geometry::RgbColor::new(10, 20, 30));
 
-    let inserted = insert_line_segments(&mut model, &[pasted.clone()], true);
+    let inserted = insert_line_segments(&mut model, std::slice::from_ref(&pasted), true);
 
     assert_eq!(inserted, 1);
     assert_eq!(model.line_segments.len(), 2);

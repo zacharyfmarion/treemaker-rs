@@ -263,7 +263,7 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
   }),
   ready('DrawCreaseSymmetric', 'Reflect selection over line', 'transform', 'flip-horizontal', 'MouseHandlerDrawCreaseSymmetric', {
     selectionRequirement: 'selected creases',
-    toolSteps: ['Pick reflection line start', 'Pick reflection line end'],
+    toolSteps: ['Select 2 points or select a line', 'Pick reflection line end'],
     tooltip: 'Reflect selected creases across a line drawn with two points',
   }),
   ready('DrawCreaseAngleRestricted', 'Angle restricted crease', 'construct', 'drafting-compass', 'MouseHandlerDrawCreaseAngleRestricted', {

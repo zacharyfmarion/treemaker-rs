@@ -186,3 +186,5 @@ targets editable Oristudio CP documents loaded in `documentMode ===
       selected-line tools can capture their own source/destination input.
 - [x] Surface Oriedita's selected-crease reflection command as "Reflect
       selection over line" in the Transform tools.
+- [x] Make Reflect selection over line accept either two snapped points or a
+      clicked existing line for the reflection axis.

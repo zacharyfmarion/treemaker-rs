@@ -2953,6 +2953,117 @@ describe('CreasePatternPanel', () => {
     expect(payload?.points?.[3]?.y).toBeCloseTo(0);
   });
 
+  it('snaps reflect-selection point picks to Oriedita draw targets', async () => {
+    const executeOristudioCpCommand = vi.fn(
+      async (_operationId: string, _payload?: OristudioCpCommandPayload) => true
+    );
+    const editableCp = editableCpState();
+    const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
+      documentMode: 'crease-pattern',
+      importedCreasePattern: importedCpDocument(),
+      oristudioCpDocument: editableCp,
+      oristudioCpSelection: {
+        lines: [2],
+        vertices: [],
+        points: [],
+        circles: [],
+        texts: [],
+        faces: [],
+      },
+      oristudioCpViewport: {
+        gridVisible: false,
+        snapToGrid: false,
+        snapToVertices: true,
+        snapToLines: true,
+      },
+      executeOristudioCpCommand,
+    });
+    const canvas = setCanvasClientRect(container);
+    const bounds = getEditableCpModelBounds(editableCp.document);
+    const pointerDownAtModelPoint = (point: { x: number; y: number }) => {
+      const svgPoint = modelPointToCpSvg(point, bounds);
+      canvas.dispatchEvent(
+        new MouseEvent('pointerdown', {
+          bubbles: true,
+          button: 0,
+          clientX: svgPoint.x,
+          clientY: svgPoint.y,
+        })
+      );
+    };
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>('button[aria-label="Reflect selection over line"]')
+        ?.click();
+      await Promise.resolve();
+    });
+    expect(container.textContent).toContain(
+      'Reflect selection over line: Select 2 points or select a line'
+    );
+
+    act(() => {
+      pointerDownAtModelPoint({ x: 0.02, y: 0.02 });
+    });
+    await act(async () => {
+      pointerDownAtModelPoint({ x: 0.98, y: 0.02 });
+      await Promise.resolve();
+    });
+
+    expect(executeOristudioCpCommand).toHaveBeenCalledOnce();
+    const [operation, payload] = executeOristudioCpCommand.mock.calls[0] ?? [];
+    expect(operation).toBe('DrawCreaseSymmetric');
+    expect(payload?.line_ids).toEqual([2]);
+    expect(payload?.points).toEqual([
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+    ]);
+  });
+
+  it('uses a clicked line as the reflect-selection axis', async () => {
+    const executeOristudioCpCommand = vi.fn(
+      async (_operationId: string, _payload?: OristudioCpCommandPayload) => true
+    );
+    const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
+      documentMode: 'crease-pattern',
+      importedCreasePattern: importedCpDocument(),
+      oristudioCpDocument: editableCpState(),
+      oristudioCpSelection: {
+        lines: [2],
+        vertices: [],
+        points: [],
+        circles: [],
+        texts: [],
+        faces: [],
+      },
+      executeOristudioCpCommand,
+    });
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>('button[aria-label="Reflect selection over line"]')
+        ?.click();
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      const axisLine = container.querySelector<SVGLineElement>('[data-cp-line-id="1"]');
+      axisLine?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
+      axisLine?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    expect(executeOristudioCpCommand).toHaveBeenCalledOnce();
+    const [operation, payload] = executeOristudioCpCommand.mock.calls[0] ?? [];
+    expect(operation).toBe('DrawCreaseSymmetric');
+    expect(payload?.line_ids).toEqual([2]);
+    expect(payload?.points).toEqual([
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+    ]);
+    expect(useWorkspaceStore.getState().oristudioCpSelection.lines).toEqual([2]);
+  });
+
   it('runs ready lasso commands from a freehand drag path', async () => {
     const executeOristudioCpCommand = vi.fn(
       async (_operationId: string, _payload?: OristudioCpCommandPayload) => true

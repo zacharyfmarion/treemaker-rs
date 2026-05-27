@@ -47,7 +47,7 @@ describe('oristudio CP command registry', () => {
       label: 'Reflect selection over line',
       group: 'transform',
       selectionRequirement: 'selected creases',
-      toolSteps: ['Pick reflection line start', 'Pick reflection line end'],
+      toolSteps: ['Select 2 points or select a line', 'Pick reflection line end'],
     });
     expect(cpCommandByOperation('CreaseMove4p')).toMatchObject({
       uiStatus: 'ready',

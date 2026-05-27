@@ -152,7 +152,7 @@ describe('oristudio CP action registry', () => {
       operationId: 'DrawCreaseSymmetric',
       label: 'Reflect selection over line',
       group: 'transform',
-      toolSteps: ['Pick reflection line start', 'Pick reflection line end'],
+      toolSteps: ['Select 2 points or select a line', 'Pick reflection line end'],
     });
   });
 });

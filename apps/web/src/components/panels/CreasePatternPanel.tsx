@@ -445,6 +445,8 @@ function shouldPreferPointSnapForStep(
   command: OristudioCpCommandDefinition | null | undefined,
   stepIndex: number
 ): boolean {
+  if (command?.operationId === 'DrawCreaseSymmetric') return true;
+  if (command?.operationId === 'DoubleSymmetricDraw') return true;
   const step = command?.toolSteps?.[stepIndex]?.toLowerCase();
   if (!step) return false;
   if (step.includes('crease') || step.includes('line')) return false;
@@ -472,6 +474,10 @@ function isDefaultSelectionMode(
 
 function isRestrictedDrawOperation(operationId: string | null | undefined): boolean {
   return operationId === 'DrawCreaseRestricted';
+}
+
+function isReflectSelectionOperation(operationId: string | null | undefined): boolean {
+  return operationId === 'DrawCreaseSymmetric';
 }
 
 function cpLineTypeStatusLabel(lineColor: OristudioCpLineColor): string {
@@ -2138,6 +2144,13 @@ export function CreasePatternPanel() {
       ) {
         return;
       }
+      if (
+        isReflectSelectionOperation(activeCpCommand.operationId) &&
+        cpToolPoints.length === 0 &&
+        isCpLineEventTarget(event.target)
+      ) {
+        return;
+      }
       if (isLengthenCreaseOperation(activeCpCommand.operationId)) {
         if (isCpLineEventTarget(event.target)) return;
         event.preventDefault();
@@ -2707,6 +2720,42 @@ export function CreasePatternPanel() {
       if (
         activeCpCommand?.uiStatus === 'ready' &&
         cpToolState.phase === 'active' &&
+        isReflectSelectionOperation(activeCpCommand.operationId) &&
+        cpToolPoints.length === 0
+      ) {
+        const axis = editableCp?.crease_pattern.line_segments[id - 1];
+        if (!axis) return;
+        setCpToolPoints([]);
+        setCpToolPath([]);
+        void (async () => {
+          const succeeded = await executeOristudioCpCommand(
+            activeCpCommand.operationId,
+            buildCpCommandPayload(activeCpCommand, {
+              line_ids: oristudioCpSelection.lines,
+              points: [axis.a, axis.b],
+            })
+          );
+          setCpToolState((state) =>
+            state.activeOperationId === activeCpCommand.operationId
+              ? transitionOristudioCpToolState(
+                  state,
+                  succeeded
+                    ? { type: 'commit', keepActive: true }
+                    : {
+                        type: 'commandError',
+                        message:
+                          useWorkspaceStore.getState().oristudioCpError ?? 'Command failed',
+                      }
+                )
+              : state
+          );
+        })();
+        return;
+      }
+
+      if (
+        activeCpCommand?.uiStatus === 'ready' &&
+        cpToolState.phase === 'active' &&
         isLengthenCreaseOperation(activeCpCommand.operationId)
       ) {
         setCpToolPoints([]);
@@ -2851,7 +2900,9 @@ export function CreasePatternPanel() {
       cpToolPoints.length,
       cpToolPath.length,
       cpToolState.phase,
+      editableCp,
       executeOristudioCpCommand,
+      oristudioCpSelection.lines,
       pendingLengthenLineId,
       pendingSquareBisectorLineIds,
       toggleOristudioCpLineSelection,

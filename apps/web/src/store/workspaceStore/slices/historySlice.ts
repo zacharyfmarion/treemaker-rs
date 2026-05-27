@@ -24,6 +24,7 @@ import type {
   OristudioCpDocumentState,
 } from '../../../engine/oristudioCpTypes';
 import type { OristudioCpSelection } from '../../../lib/creasePatternViewport';
+import { markGeneratedCpLineageStale } from '../../../lib/oristudioCpLineage';
 
 const MAX_HISTORY = 100;
 
@@ -128,7 +129,7 @@ export const createHistorySlice: WorkspaceSliceCreator<HistorySlice> = (set, get
     }),
 
   undo: async () => {
-    if (get().documentMode === 'crease-pattern') {
+    if (get().activeEditingSurface === 'crease-pattern') {
       const past = get().oristudioCpHistoryPast;
       const previous = past.at(-1);
       const current = get().oristudioCpDocument;
@@ -150,6 +151,7 @@ export const createHistorySlice: WorkspaceSliceCreator<HistorySlice> = (set, get
             ...get().oristudioCpHistoryFuture,
           ].slice(0, MAX_HISTORY),
           ...staleFoldArtifactResourceState(get().foldArtifactRevision),
+          activeEditingSurface: 'crease-pattern',
           historyBusy: false,
           projectMessage: `Undid ${previous.label}`,
         });
@@ -190,6 +192,8 @@ export const createHistorySlice: WorkspaceSliceCreator<HistorySlice> = (set, get
         projectMessage: `Undid ${previous.label}`,
         lastOptimization: null,
         ...staleFoldArtifactResourceState(get().foldArtifactRevision),
+        activeEditingSurface: 'tree',
+        oristudioCpLineage: markGeneratedCpLineageStale(get().oristudioCpLineage),
       });
       void get().autosaveProject();
     } catch (error) {
@@ -198,7 +202,7 @@ export const createHistorySlice: WorkspaceSliceCreator<HistorySlice> = (set, get
   },
 
   redo: async () => {
-    if (get().documentMode === 'crease-pattern') {
+    if (get().activeEditingSurface === 'crease-pattern') {
       const future = get().oristudioCpHistoryFuture;
       const next = future[0];
       const current = get().oristudioCpDocument;
@@ -216,6 +220,7 @@ export const createHistorySlice: WorkspaceSliceCreator<HistorySlice> = (set, get
           ].slice(-MAX_HISTORY),
           oristudioCpHistoryFuture: future.slice(1),
           ...staleFoldArtifactResourceState(get().foldArtifactRevision),
+          activeEditingSurface: 'crease-pattern',
           historyBusy: false,
           projectMessage: `Redid ${next.label}`,
         });
@@ -253,6 +258,8 @@ export const createHistorySlice: WorkspaceSliceCreator<HistorySlice> = (set, get
         projectMessage: `Redid ${next.label}`,
         lastOptimization: null,
         ...staleFoldArtifactResourceState(get().foldArtifactRevision),
+        activeEditingSurface: 'tree',
+        oristudioCpLineage: markGeneratedCpLineageStale(get().oristudioCpLineage),
       });
       void get().autosaveProject();
     } catch (error) {

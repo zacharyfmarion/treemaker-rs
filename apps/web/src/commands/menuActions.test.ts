@@ -52,6 +52,8 @@ function createDeps() {
       addLargestStubForSelectedPoly: vi.fn().mockResolvedValue(undefined),
       triangulateTree: vi.fn().mockResolvedValue(undefined),
       documentMode: 'tree' as 'tree' | 'crease-pattern',
+      activeEditingSurface: 'tree' as 'tree' | 'crease-pattern',
+      setActiveEditingSurface: vi.fn(),
       oristudioCpDocument: null as OristudioCpDocumentState | null,
       oristudioCpSelection: {
         lines: [1, 2],
@@ -230,6 +232,7 @@ describe('menu actions', () => {
   it('routes generic selection commands to editable CP state in CP mode', async () => {
     const deps = createDeps();
     deps.workspace.documentMode = 'crease-pattern';
+    deps.workspace.activeEditingSurface = 'crease-pattern';
     deps.workspace.oristudioCpDocument = {
       handle: 1,
       source: { format: 'cp', filename: 'lines.cp', path: null },
@@ -318,6 +321,7 @@ describe('menu actions', () => {
   it('routes Delete to selected editable CP vertices and points', async () => {
     const deps = createDeps();
     deps.workspace.documentMode = 'crease-pattern';
+    deps.workspace.activeEditingSurface = 'crease-pattern';
     deps.workspace.oristudioCpSelection = {
       lines: [],
       vertices: ['1000000000:0'],
@@ -451,6 +455,7 @@ describe('menu actions', () => {
       capabilities: () =>
         getWorkspaceCapabilities({
         documentMode: 'crease-pattern',
+        activeEditingSurface: 'crease-pattern',
         engineReady: true,
         status: 'crease_pattern_ready',
         edgeCount: 0,

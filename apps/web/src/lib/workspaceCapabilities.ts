@@ -85,6 +85,7 @@ export type WorkspaceCapabilities = Record<WorkspaceCapabilityId, WorkspaceCapab
 
 export interface WorkspaceCapabilityInput {
   documentMode: DocumentMode;
+  activeEditingSurface: DocumentMode;
   engineReady: boolean;
   status: AppStatus;
   edgeCount: number;
@@ -106,9 +107,14 @@ export interface WorkspaceCapabilityInput {
 export function getWorkspaceCapabilities(input: WorkspaceCapabilityInput): WorkspaceCapabilities {
   const treeMode = input.documentMode === 'tree';
   const creasePatternMode = input.documentMode === 'crease-pattern';
+  const activeCpSurface = input.activeEditingSurface === 'crease-pattern' && input.hasEditableCreasePattern;
   const isBusy = isWorkspaceBusy(input.status);
   const hasTreeEdges = input.edgeCount > 0;
-  const hasCreasePattern = input.creaseCount > 0 || input.facetCount > 0;
+  const hasCreasePattern =
+    input.hasEditableCreasePattern ||
+    input.hasImportedCreasePattern ||
+    input.creaseCount > 0 ||
+    input.facetCount > 0;
   const canOptimize =
     treeMode && input.engineReady && hasTreeEdges && !isBusy && input.status !== 'error';
   const canBuild =
@@ -118,11 +124,15 @@ export function getWorkspaceCapabilities(input: WorkspaceCapabilityInput): Works
     (input.status === 'optimized' || input.status === 'crease_pattern_ready');
   const canExportTreeFold = treeMode && hasCreasePattern && !isBusy;
   const canExportEditableOrImportedFold =
-    creasePatternMode && (input.hasEditableCreasePattern || input.hasImportedCreasePattern);
+    input.hasEditableCreasePattern || (creasePatternMode && input.hasImportedCreasePattern);
   const canSaveEditableCreasePattern = creasePatternMode && input.hasEditableCreasePattern;
-  const canExportEditableCp = creasePatternMode && input.hasEditableCreasePattern;
+  const canExportEditableCp = input.hasEditableCreasePattern;
   const canExportCreasePattern = hasCreasePattern && !isBusy;
-  const canEditCp = creasePatternMode && input.hasEditableCreasePattern && !isBusy;
+  const canEditCp = input.hasEditableCreasePattern && !isBusy;
+  const canRefreshFoldArtifacts =
+    !isBusy &&
+    (input.hasEditableCreasePattern ||
+      (treeMode && (input.creaseCount > 0 || input.facetCount > 0)));
   const hasSelectedCpLines = input.oristudioCpSelectedLineCount > 0;
   const hasSelectedCpPoints =
     input.oristudioCpSelectedVertexCount > 0 || input.oristudioCpSelectedPointCount > 0;
@@ -194,26 +204,18 @@ export function getWorkspaceCapabilities(input: WorkspaceCapabilityInput): Works
       hasCreasePattern ? busyOr('Export crease pattern PNG', input.status) : 'No crease pattern to export'
     ),
     'edit.undo': capability(
-      ((treeMode && input.historyPastCount > 0) ||
-        (creasePatternMode && input.hasEditableCreasePattern && input.historyPastCount > 0)) &&
-        !isBusy,
+      input.historyPastCount > 0 && !isBusy,
       'Undo',
-      treeMode
-        ? 'Undo the last tree edit'
-        : creasePatternMode && input.hasEditableCreasePattern
+      activeCpSurface
           ? 'Undo the last crease-pattern edit'
-          : 'Imported crease patterns are read-only'
+          : 'Undo the last tree edit'
     ),
     'edit.redo': capability(
-      ((treeMode && input.historyFutureCount > 0) ||
-        (creasePatternMode && input.hasEditableCreasePattern && input.historyFutureCount > 0)) &&
-        !isBusy,
+      input.historyFutureCount > 0 && !isBusy,
       'Redo',
-      treeMode
-        ? 'Redo the next tree edit'
-        : creasePatternMode && input.hasEditableCreasePattern
+      activeCpSurface
           ? 'Redo the next crease-pattern edit'
-          : 'Imported crease patterns are read-only'
+          : 'Redo the next tree edit'
     ),
     'edit.cut': capability(
       treeMode && hasSelection && !isBusy,
@@ -231,9 +233,10 @@ export function getWorkspaceCapabilities(input: WorkspaceCapabilityInput): Works
       treeMode ? 'Paste copied tree parts' : 'Imported crease patterns are read-only'
     ),
     'edit.delete': capability(
-      (treeMode && hasSelection && !isBusy) || (canEditCp && (hasSelectedCpLines || hasSelectedCpPoints)),
+      (treeMode && !activeCpSurface && hasSelection && !isBusy) ||
+        (canEditCp && activeCpSurface && (hasSelectedCpLines || hasSelectedCpPoints)),
       'Delete Selected',
-      treeMode
+      treeMode && !activeCpSurface
         ? 'Delete selected tree parts'
         : canEditCp
           ? hasSelectedCpLines
@@ -517,14 +520,18 @@ export function getWorkspaceCapabilities(input: WorkspaceCapabilityInput): Works
       canEditCp ? 'Prune invalid zero-radius circles' : 'Open an editable crease pattern first'
     ),
     'simulator.refresh': capability(
-      treeMode && hasCreasePattern && !isBusy,
+      canRefreshFoldArtifacts,
       'Refresh',
-      treeMode ? busyOr('Refresh simulator model', input.status) : 'Imported crease patterns are prepared on import'
+      canRefreshFoldArtifacts
+        ? busyOr('Refresh simulator model', input.status)
+        : 'Build or edit a crease pattern before refreshing the simulator'
     ),
     'foldedBase.refresh': capability(
-      treeMode && hasCreasePattern && !isBusy,
+      canRefreshFoldArtifacts,
       'Refresh',
-      treeMode ? busyOr('Refresh folded base', input.status) : 'Imported crease patterns are solved on import'
+      canRefreshFoldArtifacts
+        ? busyOr('Refresh folded base', input.status)
+        : 'Build or edit a crease pattern before refreshing the folded base'
     ),
   };
 }

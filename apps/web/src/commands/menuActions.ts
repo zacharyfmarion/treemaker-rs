@@ -143,6 +143,8 @@ export interface WorkspaceCommands {
   addLargestStubForSelectedPoly(): Promise<void>;
   triangulateTree(): Promise<void>;
   documentMode: DocumentMode;
+  activeEditingSurface: DocumentMode;
+  setActiveEditingSurface(surface: DocumentMode): void;
   oristudioCpDocument: OristudioCpDocumentState | null;
   oristudioCpSelection: OristudioCpSelection;
   setOristudioCpSelection(selection: OristudioCpSelection): void;
@@ -345,7 +347,10 @@ export function createMenuActionHandler(deps: MenuActionDependencies) {
         await deps.workspace.pasteClipboard();
         return true;
       case 'edit.delete':
-        if (deps.workspace.documentMode === 'crease-pattern') {
+        if (
+          deps.workspace.activeEditingSurface === 'crease-pattern' &&
+          deps.workspace.oristudioCpDocument
+        ) {
           const lineIds = deps.workspace.oristudioCpSelection.lines;
           const points = selectedCpDeletePoints(
             deps.workspace.oristudioCpSelection,
@@ -371,7 +376,10 @@ export function createMenuActionHandler(deps: MenuActionDependencies) {
           return true;
         }
       case 'edit.selectAll':
-        if (deps.workspace.documentMode === 'crease-pattern') {
+        if (
+          deps.workspace.activeEditingSurface === 'crease-pattern' &&
+          deps.workspace.oristudioCpDocument
+        ) {
           const lineCount =
             deps.workspace.oristudioCpDocument?.document.crease_pattern.line_segments.length ?? 0;
           deps.workspace.setOristudioCpSelection({
@@ -387,7 +395,10 @@ export function createMenuActionHandler(deps: MenuActionDependencies) {
         }
         return true;
       case 'edit.deselectAll':
-        if (deps.workspace.documentMode === 'crease-pattern') {
+        if (
+          deps.workspace.activeEditingSurface === 'crease-pattern' &&
+          deps.workspace.oristudioCpDocument
+        ) {
           deps.workspace.clearOristudioCpSelection();
         } else {
           deps.workspace.selectNone();
@@ -487,9 +498,11 @@ export function createMenuActionHandler(deps: MenuActionDependencies) {
         await deps.workspace.triangulateTree();
         return true;
       case 'view.design':
+        deps.workspace.setActiveEditingSurface('tree');
         deps.layout.activatePanel('design');
         return true;
       case 'view.creasePattern':
+        if (deps.workspace.oristudioCpDocument) deps.workspace.setActiveEditingSurface('crease-pattern');
         deps.layout.activatePanel('crease-pattern');
         return true;
       case 'view.simulator':

@@ -20,6 +20,7 @@ import {
   symmetryAxisForProject,
   symmetrySide,
 } from '../../../lib/symmetryAuthoring';
+import { markGeneratedCpLineageStale } from '../../../lib/oristudioCpLineage';
 import {
   createBlankTree,
   engineError,
@@ -32,6 +33,14 @@ import { staleFoldArtifactResourceState } from '../foldArtifactResource';
 import type { EditingSlice, WorkspaceSliceCreator } from '../types';
 
 export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get) => {
+  function staleTreeDerivedArtifacts() {
+    return {
+      ...staleFoldArtifactResourceState(get().foldArtifactRevision),
+      activeEditingSurface: 'tree' as const,
+      oristudioCpLineage: markGeneratedCpLineageStale(get().oristudioCpLineage),
+    };
+  }
+
   function rejectReadOnly() {
     if (get().documentMode === 'tree') return false;
     set({
@@ -69,7 +78,7 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
         dirty: true,
         error: null,
         lastOptimization: null,
-        ...staleFoldArtifactResourceState(get().foldArtifactRevision),
+        ...staleTreeDerivedArtifacts(),
         projectMessage: null,
       });
       get().commitHistoryCheckpoint(checkpoint, label);
@@ -120,7 +129,7 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
           dirty: true,
           error: null,
           lastOptimization: null,
-          ...staleFoldArtifactResourceState(get().foldArtifactRevision),
+          ...staleTreeDerivedArtifacts(),
         });
         get().commitHistoryCheckpoint(checkpoint, 'Add node');
         void get().autosaveProject();
@@ -218,7 +227,7 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
           dirty: true,
           error: null,
           lastOptimization: null,
-          ...staleFoldArtifactResourceState(get().foldArtifactRevision),
+          ...staleTreeDerivedArtifacts(),
           projectMessage: addedPair ? 'Added mirrored branch' : snapped.snapped ? 'Added axial node' : null,
         });
         get().commitHistoryCheckpoint(checkpoint, addedPair ? 'Add mirrored branch' : 'Add node');
@@ -243,7 +252,7 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
           dirty: true,
           error: null,
           lastOptimization: null,
-          ...staleFoldArtifactResourceState(get().foldArtifactRevision),
+          ...staleTreeDerivedArtifacts(),
         });
         get().commitHistoryCheckpoint(checkpoint, 'Move node');
         void get().autosaveProject();
@@ -281,7 +290,7 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
           dirty: true,
           error: null,
           lastOptimization: null,
-          ...staleFoldArtifactResourceState(get().foldArtifactRevision),
+          ...staleTreeDerivedArtifacts(),
         });
         get().commitHistoryCheckpoint(checkpoint, 'Move mirrored nodes');
         void get().autosaveProject();
@@ -312,7 +321,7 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
           dirty: true,
           error: null,
           lastOptimization: null,
-          ...staleFoldArtifactResourceState(get().foldArtifactRevision),
+          ...staleTreeDerivedArtifacts(),
         });
         get().commitHistoryCheckpoint(checkpoint, 'Add edge');
         void get().autosaveProject();
@@ -334,7 +343,7 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
           selection: nextSelectionForEdit(edit, report.snapshot),
           dirty: true,
           error: null,
-          ...staleFoldArtifactResourceState(get().foldArtifactRevision),
+          ...staleTreeDerivedArtifacts(),
         });
         get().commitHistoryCheckpoint(checkpoint, 'Rename node');
         void get().autosaveProject();
@@ -373,7 +382,7 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
           dirty: true,
           error: null,
           lastOptimization: null,
-          ...staleFoldArtifactResourceState(get().foldArtifactRevision),
+          ...staleTreeDerivedArtifacts(),
         });
         get().commitHistoryCheckpoint(checkpoint, shouldUpdateMirror ? 'Edit mirrored edges' : 'Edit edge');
         void get().autosaveProject();
@@ -509,7 +518,7 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
             dirty: true,
             error: null,
             lastOptimization: null,
-            ...staleFoldArtifactResourceState(get().foldArtifactRevision),
+            ...staleTreeDerivedArtifacts(),
             projectMessage: 'Cleared design',
           });
           get().commitHistoryCheckpoint(checkpoint, 'Clear design');
@@ -534,7 +543,7 @@ export const createEditingSlice: WorkspaceSliceCreator<EditingSlice> = (set, get
           dirty: true,
           error: null,
           lastOptimization: null,
-          ...staleFoldArtifactResourceState(get().foldArtifactRevision),
+          ...staleTreeDerivedArtifacts(),
         });
         get().commitHistoryCheckpoint(checkpoint, 'Delete selection');
         void get().autosaveProject();

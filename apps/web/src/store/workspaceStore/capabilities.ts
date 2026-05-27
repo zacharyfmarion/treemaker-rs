@@ -8,6 +8,7 @@ import type { WorkspaceState } from './types';
 export function workspaceCapabilityInput(state: WorkspaceState): WorkspaceCapabilityInput {
   return {
     documentMode: state.documentMode,
+    activeEditingSurface: state.activeEditingSurface,
     engineReady: state.engineReady,
     status: state.status,
     edgeCount: state.project.edges.length,
@@ -21,11 +22,11 @@ export function workspaceCapabilityInput(state: WorkspaceState): WorkspaceCapabi
     oristudioCpSelectedPointCount: state.oristudioCpSelection.points.length,
     oristudioCpSelectedCircleCount: state.oristudioCpSelection.circles.length,
     historyPastCount:
-      state.documentMode === 'crease-pattern'
+      state.activeEditingSurface === 'crease-pattern'
         ? state.oristudioCpHistoryPast.length
         : state.historyPast.length,
     historyFutureCount:
-      state.documentMode === 'crease-pattern'
+      state.activeEditingSurface === 'crease-pattern'
         ? state.oristudioCpHistoryFuture.length
         : state.historyFuture.length,
     clipboard: state.clipboard,

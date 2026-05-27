@@ -19,6 +19,15 @@ import {
   getCpVertices,
 } from '../../../lib/creasePatternViewport';
 import {
+  blankCpLineage,
+  importedCpLineage,
+  markCpLineageEdited,
+} from '../../../lib/oristudioCpLineage';
+import {
+  defaultOristudioCpSymmetry,
+  reflectedCpCommandPayloads,
+} from '../../../lib/oristudioCpSymmetry';
+import {
   activeNativeDocument,
   createNativeCreasePatternProjectFile,
   createNativeTreeProjectFile,
@@ -251,6 +260,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
   const capabilities = () =>
     getWorkspaceCapabilities({
       documentMode: get().documentMode,
+      activeEditingSurface: get().activeEditingSurface,
       engineReady: get().engineReady,
       status: get().status,
       edgeCount: get().project.edges.length,
@@ -264,11 +274,11 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
       oristudioCpSelectedPointCount: get().oristudioCpSelection.points.length,
       oristudioCpSelectedCircleCount: get().oristudioCpSelection.circles.length,
       historyPastCount:
-        get().documentMode === 'crease-pattern'
+        get().activeEditingSurface === 'crease-pattern'
           ? get().oristudioCpHistoryPast.length
           : get().historyPast.length,
       historyFutureCount:
-        get().documentMode === 'crease-pattern'
+        get().activeEditingSurface === 'crease-pattern'
           ? get().oristudioCpHistoryFuture.length
           : get().historyFuture.length,
       clipboard: get().clipboard,
@@ -319,8 +329,10 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
     set({
       ...projectStateFromSnapshot(snapshot, title),
       documentMode: 'tree',
+      activeEditingSurface: 'tree',
       importedCreasePattern: null,
       oristudioCpDocument: null,
+      oristudioCpLineage: null,
       oristudioCpError: null,
       oristudioCpCamvResult: null,
       oristudioCpHistoryPast: [],
@@ -416,8 +428,10 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
     set({
       project: result.project,
       documentMode: 'crease-pattern',
+      activeEditingSurface: 'crease-pattern',
       importedCreasePattern: result.document,
       oristudioCpDocument,
+      oristudioCpLineage: importedCpLineage(),
       oristudioCpCamvResult,
       oristudioCpOperationDescriptors: oristudioCpDocument
         ? oristudioCpDocument.operationDescriptors
@@ -432,6 +446,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
       selection: { kind: 'tree' },
       oristudioCpSelection: emptyOristudioCpSelection(),
       oristudioCpActiveDiagnosticId: null,
+      oristudioCpSymmetry: defaultOristudioCpSymmetry(),
       toolMode: 'select',
       creaseColorMode: DEFAULT_CREASE_COLOR_MODE,
       ...artifactState,
@@ -531,8 +546,10 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
     set({
       project: { ...result.project, title: nativeDocument.title || result.project.title },
       documentMode: 'crease-pattern',
+      activeEditingSurface: 'crease-pattern',
       importedCreasePattern: result.document,
       oristudioCpDocument: documentState,
+      oristudioCpLineage: nativeDocument.creasePattern.lineage,
       oristudioCpCamvResult: checked.camvResult,
       oristudioCpOperationDescriptors: documentState.operationDescriptors,
       oristudioCpError: null,
@@ -545,6 +562,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
       selection: { kind: 'tree' },
       oristudioCpSelection: nativeDocument.viewState.selection ?? emptyOristudioCpSelection(),
       oristudioCpActiveDiagnosticId: null,
+      oristudioCpSymmetry: nativeDocument.viewState.symmetry ?? defaultOristudioCpSymmetry(),
       toolMode: 'select',
       creaseColorMode: nativeDocument.viewState.creaseColorMode ?? DEFAULT_CREASE_COLOR_MODE,
       oristudioCpViewport: {
@@ -576,6 +594,34 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
     useLayoutStore.getState().activatePanel('crease-pattern');
   };
 
+  const restoreNativeCreasePatternCompanion = async (
+    nativeDocument: Extract<ReturnType<typeof activeNativeDocument>, { kind: 'crease-pattern' }>,
+    source: { filename: string; path?: string | null }
+  ) => {
+    const nativeSource = {
+      format: 'osf' as const,
+      filename: source.filename,
+      path: source.path ?? null,
+    };
+    const restoredDocument = await restoreOristudioCpDocument(
+      nativeDocument.creasePattern.document,
+      nativeSource
+    );
+    const checked = await refreshAlwaysOnCamvDiagnostics(restoredDocument);
+    set({
+      oristudioCpDocument: checked.documentState,
+      oristudioCpLineage: nativeDocument.creasePattern.lineage,
+      oristudioCpCamvResult: checked.camvResult,
+      oristudioCpOperationDescriptors: checked.documentState.operationDescriptors,
+      oristudioCpError: null,
+      oristudioCpHistoryPast: [],
+      oristudioCpHistoryFuture: [],
+      oristudioCpSelection: nativeDocument.viewState.selection ?? emptyOristudioCpSelection(),
+      oristudioCpActiveDiagnosticId: null,
+      oristudioCpSymmetry: nativeDocument.viewState.symmetry ?? defaultOristudioCpSymmetry(),
+    });
+  };
+
   const loadNativeProject = async (
     text: string,
     source: { filename: string; path?: string | null }
@@ -589,6 +635,12 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
         path: source.path ?? null,
         recentText: text,
       });
+      const companion = nativeProject.workspace.documents.find(
+        (document) => document.kind === 'crease-pattern'
+      );
+      if (companion?.kind === 'crease-pattern') {
+        await restoreNativeCreasePatternCompanion(companion, source);
+      }
       return;
     }
     await loadNativeCreasePattern(nativeDocument, text, source);
@@ -615,12 +667,16 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
 
   const saveNativeTreeProject = async (fileService: FileService, forceSaveAs: boolean) => {
     const tmd5Text = await currentTreeTmd5Text();
+    const creasePatternCompanion = get().oristudioCpDocument
+      ? await currentEditableCreasePatternProjectInput(get().currentFileName, get().currentFilePath)
+      : null;
     const contents = serializeNativeProjectFile(
       createNativeTreeProjectFile({
         title: get().project.title,
         filename: get().currentFileName,
         path: get().currentFilePath,
         tmd5Text,
+        creasePatternCompanion,
         appVersion: APP_VERSION,
       })
     );
@@ -649,6 +705,33 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
     return true;
   };
 
+  const currentEditableCreasePatternProjectInput = async (
+    filename: string,
+    path: string | null
+  ) => {
+    const documentState = get().oristudioCpDocument;
+    if (!documentState) return null;
+    const foldProjection = await exportedEditableFoldProjection();
+    return {
+      title:
+        documentState.summary.title ||
+        get().importedCreasePattern?.title ||
+        get().project.title,
+      filename,
+      path,
+      document: documentState.document,
+      source: get().importedCreasePattern?.source ?? documentState.source,
+      foldProjection,
+      foldArtifacts: get().foldArtifacts,
+      creaseColorMode: get().creaseColorMode,
+      selection: get().oristudioCpSelection,
+      viewport: get().oristudioCpViewport,
+      symmetry: get().oristudioCpSymmetry,
+      lineage: get().oristudioCpLineage ?? importedCpLineage(),
+      appVersion: APP_VERSION,
+    };
+  };
+
   const saveEditableCreasePattern = async (
     fileService: FileService,
     forceSaveAs: boolean
@@ -665,21 +748,13 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
       return false;
     }
 
-    const foldProjection = await exportedEditableFoldProjection();
+    const input = await currentEditableCreasePatternProjectInput(
+      get().currentFileName,
+      get().currentFilePath
+    );
+    if (!input) return false;
     const contents = serializeNativeProjectFile(
-      createNativeCreasePatternProjectFile({
-        title: documentState.summary.title || get().importedCreasePattern?.title || get().project.title,
-        filename: get().currentFileName,
-        path: get().currentFilePath,
-        document: documentState.document,
-        source: get().importedCreasePattern?.source ?? documentState.source,
-        foldProjection,
-        foldArtifacts: get().foldArtifacts,
-        creaseColorMode: get().creaseColorMode,
-        selection: get().oristudioCpSelection,
-        viewport: get().oristudioCpViewport,
-        appVersion: APP_VERSION,
-      })
+      createNativeCreasePatternProjectFile(input)
     );
     const target = nativeSaveTarget();
     const result = await fileService.saveTextFile({
@@ -720,8 +795,10 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
   return {
     project: createEmptyProject(),
     documentMode: 'tree',
+    activeEditingSurface: 'tree',
     importedCreasePattern: null,
     oristudioCpDocument: null,
+    oristudioCpLineage: null,
     oristudioCpOperationDescriptors: [],
     oristudioCpError: null,
     oristudioCpCamvResult: null,
@@ -754,8 +831,10 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
         set({
           ...projectStateFromSnapshot(snapshot, get().project.title),
           documentMode: 'tree',
+          activeEditingSurface: 'tree',
           importedCreasePattern: null,
           oristudioCpDocument: null,
+          oristudioCpLineage: null,
           oristudioCpOperationDescriptors: operationDescriptors,
           oristudioCpError: null,
           oristudioCpCamvResult: null,
@@ -788,8 +867,10 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
         set({
           ...projectStateFromSnapshot(snapshot, 'Untitled'),
           documentMode: 'tree',
+          activeEditingSurface: 'tree',
           importedCreasePattern: null,
           oristudioCpDocument: null,
+          oristudioCpLineage: null,
           oristudioCpError: null,
           oristudioCpCamvResult: null,
           oristudioCpHistoryPast: [],
@@ -827,8 +908,10 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
         set({
           ...projectStateFromSnapshot(snapshot, 'Three terminal flaps'),
           documentMode: 'tree',
+          activeEditingSurface: 'tree',
           importedCreasePattern: null,
           oristudioCpDocument: null,
+          oristudioCpLineage: null,
           oristudioCpError: null,
           oristudioCpCamvResult: null,
           oristudioCpHistoryPast: [],
@@ -866,8 +949,10 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
         set({
           project: { ...createEmptyProject(), title: documentState.summary.title ?? 'Untitled CP' },
           documentMode: 'crease-pattern',
+          activeEditingSurface: 'crease-pattern',
           importedCreasePattern: null,
           oristudioCpDocument: documentState,
+          oristudioCpLineage: blankCpLineage(),
           oristudioCpOperationDescriptors: documentState.operationDescriptors,
           oristudioCpError: null,
           oristudioCpCamvResult: null,
@@ -880,6 +965,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
           selection: { kind: 'tree' },
           oristudioCpSelection: emptyOristudioCpSelection(),
           oristudioCpActiveDiagnosticId: null,
+          oristudioCpSymmetry: defaultOristudioCpSymmetry(),
           toolMode: 'select',
           symmetryAuthoringPairs: [],
           creaseColorMode: DEFAULT_CREASE_COLOR_MODE,
@@ -933,8 +1019,23 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
       try {
         const previousDocument = get().oristudioCpDocument?.document ?? null;
         const previousSelection = get().oristudioCpSelection;
-        const commandDocument = await executeRuntimeOristudioCpCommand(operationId, payload);
         const mutatesDocument = !NON_MUTATING_CP_OPERATIONS.has(operationId);
+        const editsCreasePattern =
+          mutatesDocument && !SYNC_CP_LINE_SELECTION_AFTER_OPERATIONS.has(operationId);
+        const payloads =
+          previousDocument && mutatesDocument
+            ? reflectedCpCommandPayloads(
+                operationId,
+                previousDocument,
+                payload,
+                get().oristudioCpSymmetry
+              )
+            : [payload];
+        let commandDocument: OristudioCpDocumentState | null = null;
+        for (const commandPayload of payloads) {
+          commandDocument = await executeRuntimeOristudioCpCommand(operationId, commandPayload);
+        }
+        if (!commandDocument) throw new Error('Crease-pattern command did not return a document');
         const checked =
           mutatesDocument
             ? await refreshAlwaysOnCamvDiagnostics(commandDocument)
@@ -950,6 +1051,10 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
         const diagnosticEntries = nextDocument.lastCommandResult?.diagnostic_entries ?? [];
         set({
           oristudioCpDocument: nextDocument,
+          activeEditingSurface: 'crease-pattern',
+          oristudioCpLineage: editsCreasePattern
+            ? markCpLineageEdited(get().oristudioCpLineage)
+            : get().oristudioCpLineage,
           oristudioCpCamvResult: checked.camvResult,
           oristudioCpOperationDescriptors: nextDocument.operationDescriptors,
           oristudioCpError: null,
@@ -1016,11 +1121,13 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
       await releaseOristudioCpDocument();
       set({
         oristudioCpDocument: null,
+        oristudioCpLineage: null,
         oristudioCpError: null,
         oristudioCpHistoryPast: [],
         oristudioCpHistoryFuture: [],
         oristudioCpActiveDiagnosticId: null,
         oristudioCpCamvResult: null,
+        oristudioCpSymmetry: defaultOristudioCpSymmetry(),
       });
     },
 
@@ -1141,7 +1248,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
       try {
         if (rejectDisabled('file.exportFold')) return false;
         const contents =
-          get().documentMode === 'crease-pattern' && get().oristudioCpDocument
+          get().oristudioCpDocument
             ? await exportOristudioCpDocumentAsFold()
             : get().documentMode === 'crease-pattern' && get().importedCreasePattern
             ? JSON.stringify(get().importedCreasePattern?.fold, null, 2)
@@ -1251,26 +1358,10 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
         const text =
           get().documentMode === 'crease-pattern'
             ? await (async () => {
-                const documentState = get().oristudioCpDocument;
-                if (!documentState) return null;
-                const foldProjection = await exportedEditableFoldProjection();
+                const input = await currentEditableCreasePatternProjectInput(filename, null);
+                if (!input) return null;
                 return serializeNativeProjectFile(
-                  createNativeCreasePatternProjectFile({
-                    title:
-                      documentState.summary.title ||
-                      get().importedCreasePattern?.title ||
-                      get().project.title,
-                    filename,
-                    path: null,
-                    document: documentState.document,
-                    source: get().importedCreasePattern?.source ?? documentState.source,
-                    foldProjection,
-                    foldArtifacts: get().foldArtifacts,
-                    creaseColorMode: get().creaseColorMode,
-                    selection: get().oristudioCpSelection,
-                    viewport: get().oristudioCpViewport,
-                    appVersion: APP_VERSION,
-                  })
+                  createNativeCreasePatternProjectFile(input)
                 );
               })()
             : serializeNativeProjectFile(
@@ -1279,6 +1370,7 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
                   filename,
                   path: null,
                   tmd5Text: await currentTreeTmd5Text(),
+                  creasePatternCompanion: await currentEditableCreasePatternProjectInput(filename, null),
                   appVersion: APP_VERSION,
                 })
               );
@@ -1296,5 +1388,6 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
     },
 
     clearProjectMessage: () => set({ projectMessage: null }),
+    setActiveEditingSurface: (surface) => set({ activeEditingSurface: surface }),
   };
 };

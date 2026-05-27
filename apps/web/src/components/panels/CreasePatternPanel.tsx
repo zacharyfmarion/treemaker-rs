@@ -9,7 +9,7 @@ import {
   type SetStateAction,
 } from 'react';
 import { TransformComponent, TransformWrapper, type ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
-import { ChevronDown, ChevronRight, GitBranch, Grid2X2, Magnet, ScanLine } from 'lucide-react';
+import { ChevronDown, ChevronRight, FlipHorizontal2, GitBranch, Grid2X2, Magnet, ScanLine } from 'lucide-react';
 import type {
   OristudioCpCommandPayload,
   OristudioCpCommandPreview,
@@ -66,6 +66,17 @@ import {
   instructionsForCpTool,
   type OristudioCpToolInstructions,
 } from '../../lib/oristudioCpToolInstructions';
+import { cpLineageStatusLabel } from '../../lib/oristudioCpLineage';
+import {
+  axisFromTwoPoints,
+  cpSymmetryAxisLine,
+  cpSymmetryPresetAxis,
+  nextCpSymmetryPresetAxis,
+  reflectedPreviewCircles,
+  reflectedPreviewPoints,
+  reflectedPreviewSegments,
+  type OristudioCpSymmetryState,
+} from '../../lib/oristudioCpSymmetry';
 import {
   CP_EDITABLE_CANVAS_RECT,
   CP_EDITABLE_FIT_RECT,
@@ -102,6 +113,7 @@ import {
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { IconButton } from '../ui/IconButton';
 import { SegmentedControl } from '../ui/SegmentedControl';
+import { Toggle } from '../ui/Toggle';
 import { CpToolRail } from './CpToolRail';
 import { NextDocumentAction } from './NextDocumentAction';
 import {
@@ -444,6 +456,162 @@ function CpLineTypeToolbar({
   );
 }
 
+function cpSymmetryToolbarLabel(
+  symmetry: OristudioCpSymmetryState,
+  axisPicking: boolean,
+  axisPickCount: number
+) {
+  if (axisPicking) return axisPickCount === 0 ? 'Pick 1' : 'Pick 2';
+  if (!symmetry.enabled) return 'Sym';
+  if (symmetry.preset === 'book') return 'Book';
+  if (symmetry.preset === 'diagonal') return 'Diag';
+  return 'Custom';
+}
+
+function cpSymmetryStatusLabel(symmetry: OristudioCpSymmetryState, axisPicking: boolean) {
+  if (axisPicking) return 'Picking';
+  if (!symmetry.enabled) return 'Off';
+  if (symmetry.preset === 'book') return 'Book';
+  if (symmetry.preset === 'diagonal') return 'Diagonal';
+  return 'Custom axis';
+}
+
+function CpSymmetryMenuButton({
+  symmetry,
+  axisPicking,
+  axisPickCount,
+  onPreset,
+  onPickAxis,
+  onUpdate,
+}: {
+  symmetry: OristudioCpSymmetryState;
+  axisPicking: boolean;
+  axisPickCount: number;
+  onPreset: (preset: 'book' | 'diagonal') => void;
+  onPickAxis: () => void;
+  onUpdate: (update: Partial<OristudioCpSymmetryState>) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const customLabel = axisPicking
+    ? axisPickCount === 0
+      ? 'Pick first'
+      : 'Pick second'
+    : 'Set custom axis';
+  const toolbarLabel = cpSymmetryToolbarLabel(symmetry, axisPicking, axisPickCount);
+  const statusLabel = cpSymmetryStatusLabel(symmetry, axisPicking);
+  const canFlipPreset = symmetry.preset === 'book' || symmetry.preset === 'diagonal';
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onPointerDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (menuRef.current?.contains(target)) return;
+      setOpen(false);
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    return () => document.removeEventListener('mousedown', onPointerDown);
+  }, [open]);
+
+  const choosePreset = (preset: 'book' | 'diagonal') => {
+    onPreset(preset);
+    setOpen(false);
+  };
+
+  const pickAxis = () => {
+    onPickAxis();
+    setOpen(false);
+  };
+
+  return (
+    <div className="viewport-toolbar__menu-anchor cp-symmetry-menu" ref={menuRef}>
+      <button
+        type="button"
+        className="viewport-toolbar__symmetry-button"
+        data-active={symmetry.enabled || axisPicking ? true : undefined}
+        aria-label="Crease pattern symmetry"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+      >
+        <FlipHorizontal2 size={14} />
+        <span>{toolbarLabel}</span>
+      </button>
+      {open && (
+        <div
+          className="viewport-toolbar__dropdown symmetry-menu__panel"
+          role="menu"
+          aria-label="Crease pattern symmetry controls"
+        >
+          <div className="symmetry-menu__header">
+            <span>Symmetry</span>
+            <span>{statusLabel}</span>
+          </div>
+          <div className="symmetry-menu__toggle-row">
+            <div className="symmetry-menu__toggle-copy">
+              <span>Enable symmetry</span>
+              <small>Mirror new CP edits</small>
+            </div>
+            <Toggle
+              checked={symmetry.enabled}
+              onChange={(enabled) => onUpdate({ enabled, showAxis: true })}
+              aria-label="Enable crease pattern symmetry"
+            />
+          </div>
+          <div className="symmetry-menu__toggle-row">
+            <div className="symmetry-menu__toggle-copy">
+              <span>Show axis</span>
+              <small>Display the mirror line</small>
+            </div>
+            <Toggle
+              checked={symmetry.showAxis}
+              onChange={(showAxis) => onUpdate({ showAxis })}
+              aria-label="Show crease pattern symmetry axis"
+            />
+          </div>
+          <div className="symmetry-menu__section-label">Preset</div>
+          <div className="symmetry-menu__preset-grid">
+            <button
+              type="button"
+              className="symmetry-menu__preset"
+              data-active={symmetry.preset === 'book' && symmetry.enabled ? true : undefined}
+              onClick={() => choosePreset('book')}
+            >
+              Book
+            </button>
+            <button
+              type="button"
+              className="symmetry-menu__preset"
+              data-active={symmetry.preset === 'diagonal' && symmetry.enabled ? true : undefined}
+              onClick={() => choosePreset('diagonal')}
+            >
+              Diag
+            </button>
+          </div>
+          <button
+            type="button"
+            className="symmetry-menu__item"
+            disabled={!canFlipPreset}
+            onClick={() => {
+              if (canFlipPreset) choosePreset(symmetry.preset === 'book' ? 'book' : 'diagonal');
+            }}
+          >
+            <span>Flip preset axis</span>
+          </button>
+          <button
+            type="button"
+            className="symmetry-menu__item"
+            data-active={axisPicking || (symmetry.preset === 'custom' && symmetry.enabled) ? true : undefined}
+            onClick={pickAxis}
+          >
+            <span>{customLabel}</span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function activeActionInputMode(
   action: OristudioCpActionDefinition | undefined,
   command: OristudioCpCommandDefinition | undefined
@@ -670,6 +838,7 @@ export function CreasePatternPanel() {
     createEmptyCpMeasurementSlots
   );
   const [cpCommandPreview, setCpCommandPreview] = useState<OristudioCpCommandPreview | null>(null);
+  const [cpSymmetryAxisPickPoints, setCpSymmetryAxisPickPoints] = useState<Point[] | null>(null);
   const [diagnosticHudExpanded, setDiagnosticHudExpanded] = useState(false);
   const cpPreviewRequestRef = useRef(0);
   const lastFocusedDiagnosticRef = useRef<string | null>(null);
@@ -690,6 +859,8 @@ export function CreasePatternPanel() {
   const documentMode = useWorkspaceStore((state) => state.documentMode);
   const importedCreasePattern = useWorkspaceStore((state) => state.importedCreasePattern);
   const oristudioCpDocument = useWorkspaceStore((state) => state.oristudioCpDocument);
+  const oristudioCpLineage = useWorkspaceStore((state) => state.oristudioCpLineage);
+  const oristudioCpSymmetry = useWorkspaceStore((state) => state.oristudioCpSymmetry);
   const oristudioCpCamvResult = useWorkspaceStore((state) => state.oristudioCpCamvResult);
   const oristudioCpError = useWorkspaceStore((state) => state.oristudioCpError);
   const oristudioCpSelection = useWorkspaceStore((state) => state.oristudioCpSelection);
@@ -706,6 +877,8 @@ export function CreasePatternPanel() {
   const setOristudioCpViewportOption = useWorkspaceStore(
     (state) => state.setOristudioCpViewportOption
   );
+  const setOristudioCpSymmetry = useWorkspaceStore((state) => state.setOristudioCpSymmetry);
+  const setActiveEditingSurface = useWorkspaceStore((state) => state.setActiveEditingSurface);
   const toggleOristudioCpLineSelection = useWorkspaceStore(
     (state) => state.toggleOristudioCpLineSelection
   );
@@ -736,9 +909,8 @@ export function CreasePatternPanel() {
     (state) => state.previewOristudioCpCommand
   );
 
-  const editableCp = documentMode === 'crease-pattern' ? oristudioCpDocument?.document : null;
-  const editableCpHandle =
-    documentMode === 'crease-pattern' ? (oristudioCpDocument?.handle ?? null) : null;
+  const editableCp = oristudioCpDocument?.document ?? null;
+  const editableCpHandle = oristudioCpDocument?.handle ?? null;
   const editableCpSummary = oristudioCpDocument?.summary ?? null;
   const cpCanvasRect = editableCp ? CP_EDITABLE_CANVAS_RECT : CP_WORLD_RECT;
   const cpFitRect = editableCp ? CP_EDITABLE_FIT_RECT : CP_WORLD_RECT;
@@ -816,24 +988,60 @@ export function CreasePatternPanel() {
       },
     ];
   }, [activeCpInputMode, activeCpLineColor, liveCommandPreviewPoints]);
-  const renderedCommandPreviewPoints =
-    activeCpInputMode === 'drag-line' ||
-    activeCpInputMode === 'drag-box' ||
-    isVariablePointSequenceOperation(activeCpCommand?.operationId)
-      ? []
-      : liveCommandPreviewPoints;
-  const renderedCommandPreviewSegments =
-    localDragLinePreviewSegments.length > 0
-      ? localDragLinePreviewSegments
-      : (cpCommandPreview?.segments ?? []);
-  const renderedCommandPreviewBox =
-    activeCpInputMode === 'drag-box' &&
-    liveCommandPreviewPoints[0] &&
-    liveCommandPreviewPoints[1]
-      ? ([liveCommandPreviewPoints[0], liveCommandPreviewPoints[1]] as const)
-      : null;
-  const renderedCommandPreviewCircles = cpCommandPreview?.circles ?? [];
-  const activeCpToolPrompt =
+  const baseRenderedCommandPreviewPoints = useMemo(
+    () =>
+      activeCpInputMode === 'drag-line' ||
+      activeCpInputMode === 'drag-box' ||
+      isVariablePointSequenceOperation(activeCpCommand?.operationId)
+        ? []
+        : liveCommandPreviewPoints,
+    [activeCpCommand?.operationId, activeCpInputMode, liveCommandPreviewPoints]
+  );
+  const baseRenderedCommandPreviewSegments = useMemo(
+    () =>
+      localDragLinePreviewSegments.length > 0
+        ? localDragLinePreviewSegments
+        : (cpCommandPreview?.segments ?? []),
+    [cpCommandPreview?.segments, localDragLinePreviewSegments]
+  );
+  const renderedCommandPreviewBox = useMemo(
+    () =>
+      activeCpInputMode === 'drag-box' &&
+      liveCommandPreviewPoints[0] &&
+      liveCommandPreviewPoints[1]
+        ? ([liveCommandPreviewPoints[0], liveCommandPreviewPoints[1]] as const)
+        : null,
+    [activeCpInputMode, liveCommandPreviewPoints]
+  );
+  const renderedCommandPreviewBoxes = useMemo(() => {
+    if (!renderedCommandPreviewBox) return [];
+    if (!oristudioCpSymmetry.enabled) return [renderedCommandPreviewBox];
+    const reflectedPoints = reflectedPreviewPoints(
+      [renderedCommandPreviewBox[0], renderedCommandPreviewBox[1]],
+      oristudioCpSymmetry
+    );
+    const reflectedA = reflectedPoints[2];
+    const reflectedB = reflectedPoints[3];
+    if (!reflectedA || !reflectedB) return [renderedCommandPreviewBox];
+    return [renderedCommandPreviewBox, [reflectedA, reflectedB] as const];
+  }, [oristudioCpSymmetry, renderedCommandPreviewBox]);
+  const renderedCommandPreviewPoints = useMemo(
+    () => reflectedPreviewPoints(baseRenderedCommandPreviewPoints, oristudioCpSymmetry),
+    [baseRenderedCommandPreviewPoints, oristudioCpSymmetry]
+  );
+  const renderedCommandPreviewSegments = useMemo(
+    () => reflectedPreviewSegments(baseRenderedCommandPreviewSegments, oristudioCpSymmetry),
+    [baseRenderedCommandPreviewSegments, oristudioCpSymmetry]
+  );
+  const renderedCommandPreviewCircles = useMemo(
+    () => reflectedPreviewCircles(cpCommandPreview?.circles ?? [], oristudioCpSymmetry),
+    [cpCommandPreview?.circles, oristudioCpSymmetry]
+  );
+  const renderedCommandCandidatePoints = useMemo(
+    () => reflectedPreviewPoints(cpCommandPreview?.points ?? [], oristudioCpSymmetry),
+    [cpCommandPreview?.points, oristudioCpSymmetry]
+  );
+  const squareBisectorToolPrompt =
     isSquareBisectorOperation(activeCpCommand?.operationId) &&
     cpToolState.phase === 'active' &&
     cpToolPoints.length === 0
@@ -843,6 +1051,31 @@ export function CreasePatternPanel() {
           ? 'Angle Bisector: Select segment to end'
           : cpToolState.prompt
       : cpToolState.prompt;
+  const activeCpToolPrompt = cpSymmetryAxisPickPoints
+    ? cpSymmetryAxisPickPoints.length === 0
+      ? 'Set symmetry axis: first point'
+      : 'Set symmetry axis: second point'
+    : squareBisectorToolPrompt;
+  const visibleCpSymmetryAxisLine = useMemo(() => {
+    if (
+      !editableCp ||
+      !oristudioCpSymmetry.showAxis ||
+      (!oristudioCpSymmetry.enabled && oristudioCpSymmetry.preset === 'none')
+    ) {
+      return null;
+    }
+    return cpSymmetryAxisLine(oristudioCpSymmetry.axis, editableCpBounds);
+  }, [editableCp, editableCpBounds, oristudioCpSymmetry]);
+  const draftCpSymmetryAxisLine = useMemo(() => {
+    if (!editableCp || !cpSymmetryAxisPickPoints || cpSymmetryAxisPickPoints.length === 0) {
+      return null;
+    }
+    const start = cpSymmetryAxisPickPoints[0];
+    const end = snapTarget?.point ?? cursorModelPoint;
+    if (!start || !end) return null;
+    const axis = axisFromTwoPoints(start, end);
+    return axis ? cpSymmetryAxisLine(axis, editableCpBounds) : null;
+  }, [cpSymmetryAxisPickPoints, cursorModelPoint, editableCp, editableCpBounds, snapTarget]);
   const lastCommandResult = oristudioCpDocument?.lastCommandResult ?? null;
   const camvDiagnosticEntries =
     oristudioCpCamvResult?.diagnostic_entries ?? EMPTY_DIAGNOSTIC_ENTRIES;
@@ -894,6 +1127,31 @@ export function CreasePatternPanel() {
     }),
     [activeCpLineColor, cpToolOptions, editableCpBounds, editableCpGridWidth, zoomPercent]
   );
+
+  const handleCpSymmetryPreset = useCallback(
+    (preset: 'book' | 'diagonal') => {
+      const axis =
+        oristudioCpSymmetry.preset === preset
+          ? nextCpSymmetryPresetAxis(oristudioCpSymmetry)
+          : cpSymmetryPresetAxis(preset, oristudioCpSymmetry.axis.angle);
+      if (!axis) return;
+      setCpSymmetryAxisPickPoints(null);
+      setOristudioCpSymmetry({
+        enabled: true,
+        showAxis: true,
+        preset,
+        axis,
+      });
+      setActiveEditingSurface('crease-pattern');
+    },
+    [oristudioCpSymmetry, setActiveEditingSurface, setOristudioCpSymmetry]
+  );
+
+  const handleStartCpSymmetryAxisPick = useCallback(() => {
+    setCpSymmetryAxisPickPoints([]);
+    setOristudioCpSymmetry({ showAxis: true, preset: 'custom' });
+    setActiveEditingSurface('crease-pattern');
+  }, [setActiveEditingSurface, setOristudioCpSymmetry]);
 
   useEffect(() => {
     const documentKey = editableCp
@@ -1276,6 +1534,29 @@ export function CreasePatternPanel() {
 
   const handleEditableToolPointerDown = useCallback(
     (event: PointerEvent<SVGElement>) => {
+      if (event.button === 0 && !spacePressed && editableCp && cpSymmetryAxisPickPoints) {
+        const point = resolveEditableToolPoint(event, true);
+        if (!point) return;
+        event.preventDefault();
+        event.stopPropagation();
+        setActiveEditingSurface('crease-pattern');
+        if (cpSymmetryAxisPickPoints.length === 0) {
+          setCpSymmetryAxisPickPoints([point]);
+          setOristudioCpSymmetry({ showAxis: true, preset: 'custom' });
+          return;
+        }
+        const axis = axisFromTwoPoints(cpSymmetryAxisPickPoints[0], point);
+        if (!axis) return;
+        setCpSymmetryAxisPickPoints(null);
+        setOristudioCpSymmetry({
+          enabled: true,
+          showAxis: true,
+          preset: 'custom',
+          axis,
+        });
+        return;
+      }
+
       if (
         event.button !== 0 ||
         spacePressed ||
@@ -1566,6 +1847,7 @@ export function CreasePatternPanel() {
       activeCpCommand,
       activeCpInputMode,
       buildCpCommandPayload,
+      cpSymmetryAxisPickPoints,
       cpToolPoints,
       cpToolOptions.textContent,
       cpToolState.phase,
@@ -1577,6 +1859,8 @@ export function CreasePatternPanel() {
       pendingSquareBisectorLineIds.length,
       resolveEditableDrawPoint,
       resolveEditableToolPoint,
+      setActiveEditingSurface,
+      setOristudioCpSymmetry,
       setOristudioCpSelection,
       spacePressed,
     ]
@@ -1994,7 +2278,15 @@ export function CreasePatternPanel() {
             ? 'No imported crease pattern'
             : 'No crease pattern';
   const sourceLabel =
-    documentMode === 'crease-pattern' && importedCreasePattern
+    editableCp && oristudioCpLineage?.kind === 'generated-from-tree'
+      ? [
+          cpLineageStatusLabel(oristudioCpLineage),
+          editableCpSummary ? `${editableCpSummary.line_segments} lines` : null,
+          oristudioCpLineage.stale ? 'Rebuild CP to resync with design' : null,
+        ]
+          .filter(Boolean)
+          .join(' | ')
+      : documentMode === 'crease-pattern' && importedCreasePattern
       ? [
           importedCreasePattern.source.filename,
           importedCreasePattern.lineOnly ? 'View only' : 'Simulatable',
@@ -2146,6 +2438,11 @@ export function CreasePatternPanel() {
     const onKeyDown = (event: KeyboardEvent) => {
       const interactive = isViewportInteractiveTarget(event.target);
       if (event.key === 'Escape' && editableCp) {
+        if (cpSymmetryAxisPickPoints) {
+          event.preventDefault();
+          setCpSymmetryAxisPickPoints(null);
+          return;
+        }
         if (
           editableSelectionSize > 0 &&
           isDefaultSelectionMode(cpToolState, cpToolPoints.length, cpToolPath.length)
@@ -2219,6 +2516,7 @@ export function CreasePatternPanel() {
     };
   }, [
     clearOristudioCpSelection,
+    cpSymmetryAxisPickPoints,
     cpToolPath.length,
     cpToolPoints.length,
     cpToolState,
@@ -2235,6 +2533,7 @@ export function CreasePatternPanel() {
       setCpToolPath([]);
       setPendingLengthenLineId(null);
       setPendingSquareBisectorLineIds([]);
+      setCpSymmetryAxisPickPoints(null);
       cpToolDragRef.current = null;
       setCpToolState(IDLE_ORISTUDIO_CP_TOOL_STATE);
     }
@@ -2299,6 +2598,7 @@ export function CreasePatternPanel() {
         data-space-pan={spacePressed || undefined}
         tabIndex={-1}
         onPointerDown={(event) => {
+          if (editableCp) setActiveEditingSurface('crease-pattern');
           if (!isViewportInteractiveTarget(event.target)) containerRef.current?.focus();
         }}
       >
@@ -2427,8 +2727,11 @@ export function CreasePatternPanel() {
                         gridLines={editableCpGridLines}
                         gridVisible={oristudioCpViewport.gridVisible}
                         mode={mode}
-                        commandPreviewBox={renderedCommandPreviewBox}
-                        commandCandidatePoints={cpCommandPreview?.points ?? []}
+                        symmetryActive={oristudioCpSymmetry.enabled}
+                        symmetryAxisLine={visibleCpSymmetryAxisLine}
+                        symmetryDraftLine={draftCpSymmetryAxisLine}
+                        commandPreviewBoxes={renderedCommandPreviewBoxes}
+                        commandCandidatePoints={renderedCommandCandidatePoints}
                         commandPreviewCircles={renderedCommandPreviewCircles}
                         commandPreviewPoints={renderedCommandPreviewPoints}
                         commandPreviewSegments={renderedCommandPreviewSegments}
@@ -2503,6 +2806,17 @@ export function CreasePatternPanel() {
                     >
                       <Magnet size={14} />
                     </IconButton>
+                    <CpSymmetryMenuButton
+                      symmetry={oristudioCpSymmetry}
+                      axisPicking={cpSymmetryAxisPickPoints !== null}
+                      axisPickCount={cpSymmetryAxisPickPoints?.length ?? 0}
+                      onPreset={handleCpSymmetryPreset}
+                      onPickAxis={handleStartCpSymmetryAxisPick}
+                      onUpdate={(update) => {
+                        setOristudioCpSymmetry(update);
+                        setActiveEditingSurface('crease-pattern');
+                      }}
+                    />
                     <ViewportToolbarSeparator />
                     <CpLineTypeToolbar
                       activeLineColor={activeCpLineColor}
@@ -2577,7 +2891,10 @@ interface EditableCreasePatternProps {
   gridLines: ReturnType<typeof getCpGridLines>;
   gridVisible: boolean;
   mode: 'mvf' | 'agrh';
-  commandPreviewBox: readonly [Point, Point] | null;
+  symmetryActive: boolean;
+  symmetryAxisLine: readonly [Point, Point] | null;
+  symmetryDraftLine: readonly [Point, Point] | null;
+  commandPreviewBoxes: readonly (readonly [Point, Point])[];
   commandCandidatePoints: Point[];
   commandPreviewCircles: OristudioCpCircle[];
   commandPreviewPoints: Point[];
@@ -2604,7 +2921,10 @@ function EditableCreasePattern({
   gridLines,
   gridVisible,
   mode,
-  commandPreviewBox,
+  symmetryActive,
+  symmetryAxisLine,
+  symmetryDraftLine,
+  commandPreviewBoxes,
   commandCandidatePoints,
   commandPreviewCircles,
   commandPreviewPoints,
@@ -2639,6 +2959,16 @@ function EditableCreasePattern({
             />
           );
         })}
+      {symmetryAxisLine && (
+        <SymmetryAxisGuide
+          bounds={bounds}
+          points={symmetryAxisLine}
+          active={symmetryActive}
+        />
+      )}
+      {symmetryDraftLine && (
+        <SymmetryAxisGuide bounds={bounds} points={symmetryDraftLine} draft />
+      )}
       {document.crease_pattern.line_segments.map((line, index) => {
         const id = index + 1;
         const a = modelPointToCpSvg(line.a, bounds);
@@ -2743,9 +3073,13 @@ function EditableCreasePattern({
           />
         );
       })}
-      {commandPreviewBox && (
-        <SelectionBoxPreview bounds={bounds} points={commandPreviewBox} />
-      )}
+      {commandPreviewBoxes.map((box, index) => (
+        <SelectionBoxPreview
+          key={`${index}-${box[0].x}-${box[0].y}`}
+          bounds={bounds}
+          points={box}
+        />
+      ))}
       {diagnostics.flatMap((diagnostic) =>
         (diagnostic.segments ?? []).map((segment, index) => {
           const a = modelPointToCpSvg(segment.a, bounds);
@@ -2957,6 +3291,34 @@ function SelectionBoxPreview({
       y={y}
       width={width}
       height={height}
+    />
+  );
+}
+
+function SymmetryAxisGuide({
+  bounds,
+  points,
+  active = false,
+  draft = false,
+}: {
+  bounds: CpModelBounds;
+  points: readonly [Point, Point];
+  active?: boolean;
+  draft?: boolean;
+}) {
+  const a = modelPointToCpSvg(points[0], bounds);
+  const b = modelPointToCpSvg(points[1], bounds);
+  return (
+    <line
+      className={[
+        'cp-symmetry-line',
+        active ? 'cp-symmetry-line--active' : '',
+        draft ? 'cp-symmetry-line--draft' : '',
+      ].join(' ')}
+      x1={a.x}
+      y1={a.y}
+      x2={b.x}
+      y2={b.y}
     />
   );
 }

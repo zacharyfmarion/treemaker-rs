@@ -292,6 +292,7 @@ function ShortcutsTab() {
                   </span>
                   <IconButton
                     size="sm"
+                    title={`Clear ${definition.label} shortcut`}
                     aria-label={`Clear ${definition.label} shortcut`}
                     onClick={() => {
                       clearShortcut(definition.id);
@@ -303,6 +304,7 @@ function ShortcutsTab() {
                   </IconButton>
                   <IconButton
                     size="sm"
+                    title={`Reset ${definition.label} shortcut`}
                     aria-label={`Reset ${definition.label} shortcut`}
                     disabled={!hasOverride}
                     onClick={() => {

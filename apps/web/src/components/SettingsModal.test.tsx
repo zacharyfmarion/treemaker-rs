@@ -8,6 +8,7 @@ import { useThemeStore } from '../store/themeStore';
 import { applyTheme, DEFAULT_THEME, PRESET_THEMES } from '../themes';
 import { CommandDialogModal } from './CommandDialogModal';
 import { SettingsModal } from './SettingsModal';
+import { TooltipProvider } from './ui/Tooltip';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -60,10 +61,10 @@ function renderModal(tab?: SettingsTab) {
   root = createRoot(container);
   act(() => {
     root?.render(
-      <>
+      <TooltipProvider delayDuration={0}>
         <SettingsModal />
         <CommandDialogModal />
-      </>
+      </TooltipProvider>
     );
   });
   return container;
@@ -134,7 +135,7 @@ describe('SettingsModal', () => {
     expect(resetLayout).toHaveBeenCalledOnce();
   });
 
-  it('captures, clears, and resets shortcuts', () => {
+  it('captures, clears, and resets shortcuts', async () => {
     const rendered = renderModal('shortcuts');
 
     expect(rendered.textContent).toContain('Shortcuts');
@@ -174,6 +175,13 @@ describe('SettingsModal', () => {
     expect(rendered.textContent).toContain('Unassigned');
 
     const reset = saveRow?.querySelector('[aria-label="Reset Save shortcut"]') as HTMLButtonElement;
+    expect(reset.getAttribute('title')).toBeNull();
+    await act(async () => {
+      reset.focus();
+      await Promise.resolve();
+    });
+    expect(document.body.textContent).toContain('Reset Save shortcut');
+
     act(() => {
       reset.click();
     });

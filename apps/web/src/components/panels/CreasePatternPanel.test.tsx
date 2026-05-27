@@ -111,7 +111,7 @@ function renderPanel(
   root = createRoot(container);
   act(() => {
     root?.render(
-      <TooltipProvider>
+      <TooltipProvider delayDuration={0}>
         <CreasePatternPanel />
       </TooltipProvider>
     );
@@ -685,9 +685,16 @@ describe('CreasePatternPanel', () => {
     expect(container.querySelector('button[aria-label="Valley"]')?.textContent).toContain('V');
     expect(container.querySelector('button[aria-label="Edge"]')?.textContent).toContain('E');
     expect(container.querySelector('button[aria-label="Auxiliary"]')?.textContent).toContain('A');
-    expect(
-      container.querySelector<HTMLButtonElement>('button[aria-label="Rabbit Ear"]')?.title
-    ).toMatch(/(Ctrl|Cmd)\+B/u);
+    const rabbitEarButton = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Rabbit Ear"]'
+    );
+    expect(rabbitEarButton?.getAttribute('title')).toBeNull();
+
+    await act(async () => {
+      rabbitEarButton?.focus();
+      await Promise.resolve();
+    });
+    expect(document.body.textContent).toMatch(/Rabbit Ear \((Ctrl|Cmd)\+B\)/u);
 
     const drawCreaseButton = container.querySelector<HTMLButtonElement>(
       'button[aria-label="Line"]'
@@ -735,7 +742,12 @@ describe('CreasePatternPanel', () => {
     expect(selectLassoButton?.getAttribute('data-ui-status')).toBe('ready');
     expect(foldEstimateButton?.getAttribute('aria-disabled')).toBe('true');
     expect(foldEstimateButton?.getAttribute('data-ui-status')).toBe('porting');
-    expect(foldEstimateButton?.title).toContain('Kernel port is in progress');
+    expect(foldEstimateButton?.getAttribute('title')).toBeNull();
+    await act(async () => {
+      foldEstimateButton?.focus();
+      await Promise.resolve();
+    });
+    expect(document.body.textContent).toContain('Kernel port is in progress');
     expect(boxSelectButton?.hasAttribute('data-active')).toBe(true);
 
     act(() => {

@@ -84,6 +84,7 @@ import type { OristudioCpLineColor } from '../../engine/oristudioCpTypes';
 import { shortcutLabelForAction } from '../../keyboard/shortcuts';
 import type { OristudioCpOperationId } from '../../lib/oristudioCpCommands';
 import { useShortcutStore } from '../../store/shortcutStore';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/Tooltip';
 
 interface CpToolRailProps {
   activeActionId: OristudioCpActionId | null;
@@ -365,7 +366,7 @@ function CpToolButton({
     ? `${action.label} (${shortcutLabel}) - ${statusLabel}`
     : `${action.label} - ${statusLabel}`;
 
-  return (
+  const button = (
     <button
       type="button"
       className="cp-tool-rail__button"
@@ -375,7 +376,6 @@ function CpToolButton({
       data-action-kind={action.kind}
       data-line-color={action.kind === 'line-type' ? action.lineColor : undefined}
       data-ui-status={action.uiStatus}
-      title={title}
       onClick={() => {
         if (!available) return;
         onSelectAction(action);
@@ -393,6 +393,13 @@ function CpToolButton({
         <Icon size={20} aria-hidden="true" />
       )}
     </button>
+  );
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{button}</TooltipTrigger>
+      <TooltipContent side="right">{title}</TooltipContent>
+    </Tooltip>
   );
 }
 

@@ -195,6 +195,19 @@
   flex: 0 0 auto;
 }
 
+.ui-button-tooltip-trigger {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+.ui-button-tooltip-trigger[data-disabled] {
+  cursor: not-allowed;
+}
+
+.ui-button-tooltip-trigger > .ui-button:disabled {
+  pointer-events: none;
+}
+
 .select-trigger {
   display: inline-flex;
   align-items: center;

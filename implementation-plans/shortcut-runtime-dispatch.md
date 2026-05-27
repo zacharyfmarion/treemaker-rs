@@ -36,6 +36,8 @@ as a menu-only follow-up.
 - [x] Add central shortcut runtime and executor registration.
 - [x] Change shortcut definitions and store helpers to support chord aliases.
 - [x] Move viewport and CP action dispatch out of panel-local keydown listeners.
+- [x] Install app shortcut routing on document capture so focused panels cannot
+  strand platform editing chords.
 - [x] Add capture-phase active-surface tracking for design and CP panels.
 - [x] Update settings/menu/tooltips/tests for multiple shortcut labels.
 - [x] Make undo/redo resolve to a fallback editable history stack when the

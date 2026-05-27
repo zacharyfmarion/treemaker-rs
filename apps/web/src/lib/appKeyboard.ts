@@ -1,12 +1,10 @@
 import { selectionSize } from './selection';
 import type { DocumentMode, Selection } from './sampleProject';
-import {
-  isShortcutEditingTarget,
-} from '../keyboard/shortcutDispatcher';
+import { isShortcutEditingTarget } from '../keyboard/shortcutDispatcher';
 import { handleShortcutRuntimeKeyDown } from '../keyboard/shortcutRuntime';
 import type { ShortcutOverrides } from '../keyboard/shortcuts';
 
-interface AppKeyboardActions {
+export interface AppKeyboardActions {
   getDocumentMode: () => DocumentMode;
   getActiveEditingSurface: () => DocumentMode;
   getCpSelectionSize: () => number;
@@ -40,4 +38,15 @@ export function handleAppKeyDown(event: KeyboardEvent, actions: AppKeyboardActio
     overrides: actions.getShortcutOverrides?.(),
     menu: actions.handleMenuAction,
   });
+}
+
+export function installAppKeyboardListener(
+  actions: AppKeyboardActions,
+  target: Document = document
+): () => void {
+  const onKeyDown = (event: KeyboardEvent) => {
+    handleAppKeyDown(event, actions);
+  };
+  target.addEventListener('keydown', onKeyDown, true);
+  return () => target.removeEventListener('keydown', onKeyDown, true);
 }

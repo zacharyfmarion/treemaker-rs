@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { handleAppKeyDown } from './appKeyboard';
+import { handleAppKeyDown, installAppKeyboardListener } from './appKeyboard';
 import { createSampleProject, type Selection } from './sampleProject';
 import { selectEverything } from './selection';
 
@@ -184,5 +184,55 @@ describe('app keyboard shortcuts', () => {
     expect(handleAppKeyDown(rebound, actions)).toBe(true);
 
     expect(actions.handleMenuAction).toHaveBeenCalledWith('file.save');
+  });
+
+  it('captures app shortcuts before focused controls can stop propagation', () => {
+    const actions = createActions({ kind: 'tree' });
+    const target = document.createElement('button');
+    document.body.append(target);
+    target.addEventListener('keydown', (event) => event.stopPropagation());
+    const uninstall = installAppKeyboardListener(actions);
+
+    try {
+      target.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'z',
+          metaKey: true,
+          bubbles: true,
+          cancelable: true,
+        })
+      );
+
+      expect(actions.handleMenuAction).toHaveBeenCalledWith('edit.undo');
+    } finally {
+      uninstall();
+      target.remove();
+    }
+  });
+
+  it('lets window capture handlers preempt app shortcuts for modal capture flows', () => {
+    const actions = createActions({ kind: 'tree' });
+    const target = document.createElement('button');
+    document.body.append(target);
+    const stopAtWindow = (event: KeyboardEvent) => event.stopPropagation();
+    window.addEventListener('keydown', stopAtWindow, true);
+    const uninstall = installAppKeyboardListener(actions);
+
+    try {
+      target.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'z',
+          metaKey: true,
+          bubbles: true,
+          cancelable: true,
+        })
+      );
+
+      expect(actions.handleMenuAction).not.toHaveBeenCalled();
+    } finally {
+      uninstall();
+      window.removeEventListener('keydown', stopAtWindow, true);
+      target.remove();
+    }
   });
 });

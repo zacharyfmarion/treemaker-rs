@@ -28,7 +28,7 @@ import { handleMenuAction } from './commands/menuActions';
 import { registerStartScreenRequestHandler } from './commands/startScreenController';
 import { useMacDownloadUrl } from './hooks/useMacDownloadUrl';
 import { useTauriOpenedFiles } from './hooks/useTauriOpenedFiles';
-import { handleAppKeyDown } from './lib/appKeyboard';
+import { installAppKeyboardListener } from './lib/appKeyboard';
 import { cpSelectionSize } from './lib/creasePatternViewport';
 import { useTauriMenuListener } from './menus/tauriMenuListener';
 import { isFeatureVisible } from './platform/features';
@@ -240,8 +240,8 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      handleAppKeyDown(event, {
+    return installAppKeyboardListener(
+      {
         getDocumentMode: () => useWorkspaceStore.getState().documentMode,
         getActiveEditingSurface: () => useWorkspaceStore.getState().activeEditingSurface,
         getCpSelectionSize: () =>
@@ -250,10 +250,9 @@ export default function App() {
         handleMenuAction,
         selectNone,
         getShortcutOverrides: () => useShortcutStore.getState().overrides,
-      });
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+      },
+      document
+    );
   }, [selectNone]);
 
   const onReady = useCallback(

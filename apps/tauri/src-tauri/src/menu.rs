@@ -229,6 +229,16 @@ pub fn setup_menu(app: &App) -> Result<(), Box<dyn std::error::Error>> {
         MenuItemBuilder::with_id("cp.makeAuxiliary", "Make Auxiliary").build(app)?;
     let cp_toggle_mv =
         MenuItemBuilder::with_id("cp.toggleMountainValley", "Toggle Mountain/Valley").build(app)?;
+    let cp_transform_flip_horizontal =
+        MenuItemBuilder::with_id("cp.transformFlipHorizontal", "Flip Horizontal").build(app)?;
+    let cp_transform_flip_vertical =
+        MenuItemBuilder::with_id("cp.transformFlipVertical", "Flip Vertical").build(app)?;
+    let cp_transform_rotate_left =
+        MenuItemBuilder::with_id("cp.transformRotateLeft", "Rotate Left 90").build(app)?;
+    let cp_transform_rotate_right =
+        MenuItemBuilder::with_id("cp.transformRotateRight", "Rotate Right 90").build(app)?;
+    let cp_transform_rotate_180 =
+        MenuItemBuilder::with_id("cp.transformRotate180", "Rotate 180").build(app)?;
     let cp_replace_line_type =
         MenuItemBuilder::with_id("cp.replaceLineType", "Replace Selected Line Type...")
             .build(app)?;
@@ -264,6 +274,14 @@ pub fn setup_menu(app: &App) -> Result<(), Box<dyn std::error::Error>> {
         .item(&cp_replace_line_type)
         .item(&cp_delete_line_type)
         .build()?;
+    let cp_transform_selection_menu = SubmenuBuilder::new(app, "Transform Selection")
+        .item(&cp_transform_flip_horizontal)
+        .item(&cp_transform_flip_vertical)
+        .separator()
+        .item(&cp_transform_rotate_left)
+        .item(&cp_transform_rotate_right)
+        .item(&cp_transform_rotate_180)
+        .build()?;
     let cp_diagnostics_menu = SubmenuBuilder::new(app, "Diagnostics")
         .item(&cp_check_camv)
         .item(&cp_check1)
@@ -284,6 +302,7 @@ pub fn setup_menu(app: &App) -> Result<(), Box<dyn std::error::Error>> {
         .item(&cp_folded_preview)
         .separator()
         .item(&cp_selected_lines_menu)
+        .item(&cp_transform_selection_menu)
         .item(&cp_diagnostics_menu)
         .item(&cp_repair_menu)
         .item(&cp_annotations_menu)

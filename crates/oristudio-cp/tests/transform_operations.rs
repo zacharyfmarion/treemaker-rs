@@ -2,9 +2,10 @@ use oristudio_cp::geometry::{Circle, LineColor, LineSegment, Point};
 use oristudio_cp::model::CreasePatternModel;
 use oristudio_cp::operations::transform::{
     LengthenColorMode, OperationFrame, OperationFrameMode, copy_selected_lines,
-    copy_selected_lines_by_points, extend_to_intersection_point_2, lengthen_crease,
-    move_selected_lines, move_selected_lines_by_points, operation_frame_drag,
-    operation_frame_press, operation_frame_release, operation_frame_reset, translate_model,
+    copy_selected_lines_by_points, extend_to_intersection_point_2, insert_line_segments,
+    lengthen_crease, move_selected_lines, move_selected_lines_by_points, operation_frame_drag,
+    operation_frame_press, operation_frame_release, operation_frame_reset, replace_line_segments,
+    translate_model,
 };
 
 #[test]
@@ -111,6 +112,59 @@ fn four_point_selected_move_and_copy_apply_oriedita_scale_rotate_translate() {
         Point::new(-2.0, 2.0),
         LineColor::Red1,
     );
+}
+
+#[test]
+fn insert_line_segments_preserves_metadata_and_selects_inserted_lines() {
+    let mut model =
+        model_from_segments(&[segment(0.0, 0.0, 1.0, 0.0, LineColor::Blue2).with_selected(2)]);
+    let pasted = segment(2.0, 0.0, 3.0, 0.0, LineColor::Red1)
+        .with_customized_color(oristudio_cp::geometry::RgbColor::new(10, 20, 30));
+
+    let inserted = insert_line_segments(&mut model, &[pasted.clone()], true);
+
+    assert_eq!(inserted, 1);
+    assert_eq!(model.line_segments.len(), 2);
+    assert_eq!(model.line_segments[0].selected, 0);
+    assert_segment(
+        &model.line_segments[1],
+        Point::new(2.0, 0.0),
+        Point::new(3.0, 0.0),
+        LineColor::Red1,
+    );
+    assert_eq!(model.line_segments[1].selected, 2);
+    assert_eq!(model.line_segments[1].customized, pasted.customized);
+    assert_eq!(
+        model.line_segments[1].customized_color,
+        pasted.customized_color
+    );
+}
+
+#[test]
+fn replace_line_segments_deletes_resolved_lines_and_selects_replacements() {
+    let mut model = model_from_segments(&[
+        segment(0.0, 0.0, 1.0, 0.0, LineColor::Red1),
+        segment(0.0, 2.0, 1.0, 2.0, LineColor::Blue2),
+    ]);
+    let replacement = segment(3.0, 0.0, 4.0, 0.0, LineColor::Red1);
+
+    let inserted = replace_line_segments(&mut model, &[0], &[replacement]);
+
+    assert_eq!(inserted, 1);
+    assert_eq!(model.line_segments.len(), 2);
+    assert_segment(
+        &model.line_segments[0],
+        Point::new(0.0, 2.0),
+        Point::new(1.0, 2.0),
+        LineColor::Blue2,
+    );
+    assert_segment(
+        &model.line_segments[1],
+        Point::new(3.0, 0.0),
+        Point::new(4.0, 0.0),
+        LineColor::Red1,
+    );
+    assert_eq!(model.line_segments[1].selected, 2);
 }
 
 #[test]

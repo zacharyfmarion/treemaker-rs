@@ -126,6 +126,7 @@ export interface OristudioCpCommandPreview {
 
 export interface OristudioCpCommandPayload {
   line_ids?: number[];
+  line_segments?: OristudioCpLineSegment[];
   circle_ids?: number[];
   text_ids?: number[];
   points?: Point[];

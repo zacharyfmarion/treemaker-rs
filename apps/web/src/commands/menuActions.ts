@@ -13,6 +13,7 @@ import type {
   OristudioCpDocumentState,
 } from '../engine/oristudioCpTypes';
 import { getCpVertices, type OristudioCpSelection } from '../lib/creasePatternViewport';
+import type { CpSelectionTransform } from '../lib/creasePatternClipboard';
 import type { Point } from '../lib/geometry';
 import type { OristudioCpOperationId } from '../lib/oristudioCpCommands';
 import type { DocumentMode } from '../lib/sampleProject';
@@ -80,6 +81,11 @@ export const MENU_ACTION_IDS = [
   'cp.makeEdge',
   'cp.makeAuxiliary',
   'cp.toggleMountainValley',
+  'cp.transformFlipHorizontal',
+  'cp.transformFlipVertical',
+  'cp.transformRotateLeft',
+  'cp.transformRotateRight',
+  'cp.transformRotate180',
   'cp.replaceLineType',
   'cp.deleteLineType',
   'cp.checkCamv',
@@ -154,6 +160,7 @@ export interface WorkspaceCommands {
     operationId: OristudioCpOperationId,
     payload?: OristudioCpCommandPayload
   ): Promise<boolean>;
+  transformOristudioCpSelection(transform: CpSelectionTransform): Promise<boolean>;
 }
 
 function selectedCpDeletePoints(
@@ -242,6 +249,14 @@ const CP_CONTEXT_ACTIONS: Partial<Record<MenuActionId, OristudioCpOperationId>> 
   'cp.changeCircleColor': 'CircleChangeColor',
 };
 
+const CP_SELECTION_TRANSFORM_ACTIONS: Partial<Record<MenuActionId, CpSelectionTransform>> = {
+  'cp.transformFlipHorizontal': { kind: 'flip-horizontal' },
+  'cp.transformFlipVertical': { kind: 'flip-vertical' },
+  'cp.transformRotateLeft': { kind: 'rotate', angleDegrees: 90 },
+  'cp.transformRotateRight': { kind: 'rotate', angleDegrees: -90 },
+  'cp.transformRotate180': { kind: 'rotate', angleDegrees: 180 },
+};
+
 export function isMenuActionId(id: string): id is MenuActionId {
   return (MENU_ACTION_IDS as readonly string[]).includes(id);
 }
@@ -317,6 +332,11 @@ export function createMenuActionHandler(deps: MenuActionDependencies) {
       }
       deps.workspace.requestOristudioCpAction(cpContextOperation);
       return true;
+    }
+
+    const cpSelectionTransform = CP_SELECTION_TRANSFORM_ACTIONS[id];
+    if (cpSelectionTransform) {
+      return deps.workspace.transformOristudioCpSelection(cpSelectionTransform);
     }
 
     switch (id) {

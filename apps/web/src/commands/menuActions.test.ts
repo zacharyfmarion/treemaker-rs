@@ -67,6 +67,7 @@ function createDeps() {
       clearOristudioCpSelection: vi.fn(),
       requestOristudioCpAction: vi.fn(),
       executeOristudioCpCommand: vi.fn().mockResolvedValue(true),
+      transformOristudioCpSelection: vi.fn().mockResolvedValue(true),
     },
     layout: {
       activatePanel: vi.fn(),
@@ -159,6 +160,36 @@ describe('menu actions', () => {
     expect(deps.workspace.requestOristudioCpAction).toHaveBeenCalledWith('FixInaccurate');
     expect(deps.workspace.requestOristudioCpAction).toHaveBeenCalledWith('ReplaceLineTypeSelect');
     expect(deps.workspace.requestOristudioCpAction).toHaveBeenCalledWith('DeleteLineTypeSelect');
+  });
+
+  it('dispatches CP selection transform actions through the workspace transform command', async () => {
+    const deps = createDeps();
+    const handle = createMenuActionHandler(deps);
+
+    await expect(handle('cp.transformFlipHorizontal')).resolves.toBe(true);
+    await expect(handle('cp.transformFlipVertical')).resolves.toBe(true);
+    await expect(handle('cp.transformRotateLeft')).resolves.toBe(true);
+    await expect(handle('cp.transformRotateRight')).resolves.toBe(true);
+    await expect(handle('cp.transformRotate180')).resolves.toBe(true);
+
+    expect(deps.workspace.transformOristudioCpSelection).toHaveBeenNthCalledWith(1, {
+      kind: 'flip-horizontal',
+    });
+    expect(deps.workspace.transformOristudioCpSelection).toHaveBeenNthCalledWith(2, {
+      kind: 'flip-vertical',
+    });
+    expect(deps.workspace.transformOristudioCpSelection).toHaveBeenNthCalledWith(3, {
+      kind: 'rotate',
+      angleDegrees: 90,
+    });
+    expect(deps.workspace.transformOristudioCpSelection).toHaveBeenNthCalledWith(4, {
+      kind: 'rotate',
+      angleDegrees: -90,
+    });
+    expect(deps.workspace.transformOristudioCpSelection).toHaveBeenNthCalledWith(5, {
+      kind: 'rotate',
+      angleDegrees: 180,
+    });
   });
 
   it('does not dispatch selected-line CP commands without selected CP lines', async () => {

@@ -18,6 +18,7 @@ import type {
   OristudioCpCommandResult,
   OristudioCpDocumentSnapshot,
   OristudioCpDocumentState,
+  OristudioCpLineSegment,
   OristudioCpOperationDescriptor,
 } from '../../engine/oristudioCpTypes';
 import { projectFromSnapshot } from '../../engine/snapshotMapper';
@@ -54,9 +55,11 @@ const oristudioCpMocks = vi.hoisted(() => ({
   exportOristudioCpDocumentAsCp: vi.fn(),
   exportOristudioCpDocumentAsFold: vi.fn(),
   getOristudioCpOperationDescriptors: vi.fn(),
+  insertOristudioCpLineSegments: vi.fn(),
   loadOristudioCpDocumentFromText: vi.fn(),
   previewOristudioCpCommand: vi.fn(),
   releaseOristudioCpDocument: vi.fn(),
+  replaceOristudioCpLineSegments: vi.fn(),
   restoreOristudioCpDocument: vi.fn(),
   setOristudioCpDocumentSource: vi.fn(),
 }));
@@ -90,9 +93,11 @@ vi.mock('./oristudioCpRuntime', async (importOriginal) => {
     exportOristudioCpDocumentAsCp: oristudioCpMocks.exportOristudioCpDocumentAsCp,
     exportOristudioCpDocumentAsFold: oristudioCpMocks.exportOristudioCpDocumentAsFold,
     getOristudioCpOperationDescriptors: oristudioCpMocks.getOristudioCpOperationDescriptors,
+    insertOristudioCpLineSegments: oristudioCpMocks.insertOristudioCpLineSegments,
     loadOristudioCpDocumentFromText: oristudioCpMocks.loadOristudioCpDocumentFromText,
     previewOristudioCpCommand: oristudioCpMocks.previewOristudioCpCommand,
     releaseOristudioCpDocument: oristudioCpMocks.releaseOristudioCpDocument,
+    replaceOristudioCpLineSegments: oristudioCpMocks.replaceOristudioCpLineSegments,
     restoreOristudioCpDocument: oristudioCpMocks.restoreOristudioCpDocument,
     setOristudioCpDocumentSource: oristudioCpMocks.setOristudioCpDocumentSource,
   };
@@ -925,6 +930,42 @@ function blankCpDocumentState(): OristudioCpDocumentState {
   };
 }
 
+function cpLine(
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+  overrides: Partial<OristudioCpLineSegment> = {}
+): OristudioCpLineSegment {
+  return {
+    a,
+    b,
+    color: 'Red1',
+    active: 'Inactive0',
+    selected: 0,
+    customized: 0,
+    customized_color: { red: 0, green: 0, blue: 0 },
+    ...overrides,
+  };
+}
+
+function editableCpState(lines: OristudioCpLineSegment[]): OristudioCpDocumentState {
+  const base = blankCpDocumentState();
+  return {
+    ...base,
+    document: {
+      ...base.document,
+      crease_pattern: {
+        ...base.document.crease_pattern,
+        line_segments: lines,
+      },
+    },
+    summary: {
+      ...base.summary,
+      line_segments: lines.length,
+      is_empty: lines.length === 0,
+    },
+  };
+}
+
 function resetStores(snapshot = makeSnapshot()) {
   localStorage.clear();
   savedSnapshots.clear();
@@ -1028,6 +1069,12 @@ function resetStores(snapshot = makeSnapshot()) {
     code: 'not_implemented',
     message: 'Oriedita operation DrawCreaseFree is not implemented yet',
   });
+  oristudioCpMocks.insertOristudioCpLineSegments
+    .mockReset()
+    .mockImplementation(async () => blankCpDocumentState());
+  oristudioCpMocks.replaceOristudioCpLineSegments
+    .mockReset()
+    .mockImplementation(async () => blankCpDocumentState());
   oristudioCpMocks.previewOristudioCpCommand
     .mockReset()
     .mockResolvedValue({ segments: [], circles: [], points: [], diagnostics: [] });
@@ -1119,6 +1166,8 @@ describe('workspace store slices', () => {
     expect(state.openProject).toBeTypeOf('function');
     expect(state.loadCreasePatternText).toBeTypeOf('function');
     expect(state.executeOristudioCpCommand).toBeTypeOf('function');
+    expect(state.insertOristudioCpLineSegments).toBeTypeOf('function');
+    expect(state.replaceOristudioCpLineSegments).toBeTypeOf('function');
     expect(state.saveProject).toBeTypeOf('function');
     expect(state.exportCp).toBeTypeOf('function');
     expect(state.exportFold).toBeTypeOf('function');
@@ -1131,6 +1180,7 @@ describe('workspace store slices', () => {
     expect(state.optimizeEdges).toBeTypeOf('function');
     expect(state.buildCreasePattern).toBeTypeOf('function');
     expect(state.toggleOristudioCpLineSelection).toBeTypeOf('function');
+    expect(state.transformOristudioCpSelection).toBeTypeOf('function');
   });
 
   it('initializes projects, loads text, saves, exports, and maintains recents', async () => {
@@ -2647,8 +2697,94 @@ describe('workspace store slices', () => {
     expect(useWorkspaceStore.getState().clipboardPasteCount).toBe(1);
 
     await useWorkspaceStore.getState().cutSelection();
-    expect(useWorkspaceStore.getState().clipboard?.nodes.map((node) => node.sourceId)).toEqual([3, 4]);
+    const clipboard = useWorkspaceStore.getState().clipboard;
+    expect(clipboard?.kind).toBe('tree');
+    expect(clipboard?.kind === 'tree' ? clipboard.nodes.map((node) => node.sourceId) : []).toEqual([3, 4]);
     expect(useWorkspaceStore.getState().project.nodes.map((node) => node.id)).toEqual([1, 2]);
+  });
+
+  it('copies and pastes selected editable CP lines', async () => {
+    resetStores(seedSnapshot());
+    const sourceLine = cpLine({ x: 0, y: 0 }, { x: 2, y: 0 }, { color: 'Blue2' });
+    const documentState = editableCpState([
+      sourceLine,
+      cpLine({ x: 0, y: 1 }, { x: 2, y: 1 }),
+    ]);
+    useWorkspaceStore.setState({
+      documentMode: 'crease-pattern',
+      oristudioCpDocument: documentState,
+      oristudioCpSelection: { ...emptyOristudioCpSelection(), lines: [1] },
+      status: 'crease_pattern_ready',
+      engineReady: true,
+    });
+    oristudioCpMocks.insertOristudioCpLineSegments.mockImplementationOnce(
+      async (segments: OristudioCpLineSegment[]) =>
+        editableCpState([
+          ...documentState.document.crease_pattern.line_segments,
+          ...segments.map((segment) => ({ ...segment, selected: 2 })),
+        ])
+    );
+
+    useWorkspaceStore.getState().copySelection();
+
+    expect(useWorkspaceStore.getState().clipboard).toMatchObject({
+      kind: 'cp-lines',
+      lines: [{ color: 'Blue2' }],
+    });
+
+    await useWorkspaceStore.getState().pasteClipboard();
+
+    expect(oristudioCpMocks.insertOristudioCpLineSegments).toHaveBeenCalledWith([
+      expect.objectContaining({
+        a: { x: 8, y: -8 },
+        b: { x: 10, y: -8 },
+        color: 'Blue2',
+      }),
+    ]);
+    expect(useWorkspaceStore.getState().oristudioCpSelection.lines).toEqual([3]);
+    expect(useWorkspaceStore.getState().clipboardPasteCount).toBe(1);
+    expect(useWorkspaceStore.getState().projectMessage).toBe('Pasted 1 CP lines');
+  });
+
+  it('transforms selected editable CP lines through the CP mutation history', async () => {
+    resetStores(seedSnapshot());
+    const documentState = editableCpState([
+      cpLine({ x: 0, y: 0 }, { x: 2, y: 0 }),
+      cpLine({ x: 0, y: 1 }, { x: 2, y: 1 }, { color: 'Blue2' }),
+    ]);
+    useWorkspaceStore.setState({
+      documentMode: 'crease-pattern',
+      oristudioCpDocument: documentState,
+      oristudioCpSelection: { ...emptyOristudioCpSelection(), lines: [1] },
+      status: 'crease_pattern_ready',
+      engineReady: true,
+    });
+    oristudioCpMocks.replaceOristudioCpLineSegments.mockImplementationOnce(
+      async (_lineIds: number[], segments: OristudioCpLineSegment[]) =>
+        editableCpState([
+          { ...segments[0], selected: 2 },
+          documentState.document.crease_pattern.line_segments[1],
+        ])
+    );
+
+    await expect(
+      useWorkspaceStore
+        .getState()
+        .transformOristudioCpSelection({ kind: 'flip-horizontal' })
+    ).resolves.toBe(true);
+
+    expect(oristudioCpMocks.replaceOristudioCpLineSegments).toHaveBeenCalledWith(
+      [1],
+      [
+        expect.objectContaining({
+          a: { x: 2, y: 0 },
+          b: { x: 0, y: 0 },
+        }),
+      ]
+    );
+    expect(useWorkspaceStore.getState().oristudioCpSelection.lines).toEqual([1]);
+    expect(useWorkspaceStore.getState().oristudioCpHistoryPast).toHaveLength(1);
+    expect(useWorkspaceStore.getState().projectMessage).toBe('Flip CP selection horizontal');
   });
 
   it('records checkpoints and restores snapshots through undo and redo', async () => {

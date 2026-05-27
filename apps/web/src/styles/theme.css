@@ -2232,6 +2232,89 @@
   vector-effect: non-scaling-stroke;
 }
 
+.cp-selection-transform {
+  pointer-events: none;
+}
+
+.cp-selection-transform__box {
+  fill: color-mix(in srgb, var(--accent-primary) 8%, transparent);
+  stroke: color-mix(in srgb, var(--accent-primary) 86%, var(--text-primary));
+  stroke-width: 1.2;
+  stroke-dasharray: 4 4;
+  pointer-events: none;
+  vector-effect: non-scaling-stroke;
+}
+
+.cp-selection-transform__menu-foreign,
+.cp-selection-transform__handle-foreign {
+  overflow: visible;
+  pointer-events: all;
+}
+
+.cp-selection-transform__menu {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px;
+  border: 1px solid color-mix(in srgb, var(--border-default) 88%, transparent);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--bg-elevated) 94%, transparent);
+  box-shadow: 0 8px 22px var(--shadow-overlay);
+  pointer-events: all;
+}
+
+.cp-selection-transform__menu button,
+.cp-selection-transform__rotate-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 25px;
+  height: 25px;
+  border: 0;
+  border-radius: 5px;
+  color: var(--text-secondary);
+  background: transparent;
+  cursor: pointer;
+}
+
+.cp-selection-transform__menu button:hover,
+.cp-selection-transform__rotate-handle:hover {
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+}
+
+.cp-selection-transform__menu button:focus-visible,
+.cp-selection-transform__rotate-handle:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 1px;
+}
+
+.cp-selection-transform__menu button > svg,
+.cp-selection-transform__rotate-handle > svg {
+  pointer-events: none;
+}
+
+.cp-selection-transform__separator {
+  width: 1px;
+  height: 18px;
+  background: var(--border-subtle);
+}
+
+.cp-selection-transform__rotate-handle {
+  border: 1px solid color-mix(in srgb, var(--border-default) 90%, transparent);
+  border-radius: 50%;
+  background: var(--bg-elevated);
+  box-shadow: 0 7px 18px var(--shadow-overlay);
+  pointer-events: all;
+}
+
+.cp-selection-transform-preview {
+  opacity: 0.66;
+  stroke-dasharray: 7 4;
+  pointer-events: none;
+  vector-effect: non-scaling-stroke;
+}
+
 .cp-command-candidate-point {
   fill: var(--accent-primary);
   stroke: var(--bg-primary);

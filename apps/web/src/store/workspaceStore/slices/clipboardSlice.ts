@@ -1,5 +1,9 @@
 import { projectFromSnapshot } from '../../../engine/snapshotMapper';
 import { clampPaperPoint, type Point } from '../../../lib/geometry';
+import {
+  buildCpLineClipboardPayload,
+  offsetCpLineSegmentsForPaste,
+} from '../../../lib/creasePatternClipboard';
 import type { Selection, TreeProject } from '../../../lib/sampleProject';
 import { selectedEdgeIds, selectedNodeIds } from '../../../lib/selection';
 import {
@@ -58,7 +62,7 @@ function buildClipboardPayload(
       stiffness: edge.stiffness,
     }));
 
-  return nodes.length > 0 || edges.length > 0 ? { nodes, edges } : null;
+  return nodes.length > 0 || edges.length > 0 ? { kind: 'tree', nodes, edges } : null;
 }
 
 export const createClipboardSlice: WorkspaceSliceCreator<ClipboardSlice> = (set, get) => ({
@@ -66,11 +70,25 @@ export const createClipboardSlice: WorkspaceSliceCreator<ClipboardSlice> = (set,
   clipboardPasteCount: 0,
 
   copySelection: () => {
+    if (get().documentMode === 'crease-pattern') {
+      const clipboard = buildCpLineClipboardPayload(
+        get().oristudioCpDocument?.document,
+        get().oristudioCpSelection
+      );
+      if (!clipboard) return;
+      set({
+        clipboard,
+        clipboardPasteCount: 0,
+        error: null,
+        projectMessage: `Copied ${clipboard.lines.length} CP lines`,
+      });
+      return;
+    }
     if (get().documentMode !== 'tree') {
       set({
         error: {
           code: 'invalid_operation',
-          message: 'Imported crease patterns are read-only',
+          message: 'Copy is unavailable for this document',
         },
       });
       return;
@@ -89,28 +107,41 @@ export const createClipboardSlice: WorkspaceSliceCreator<ClipboardSlice> = (set,
       set({
         error: {
           code: 'invalid_operation',
-          message: 'Imported crease patterns are read-only',
+          message: 'Cut is only available for tree selections',
         },
       });
       return;
     }
     get().copySelection();
-    if (!get().clipboard) return;
+    if (get().clipboard?.kind !== 'tree') return;
     await get().deleteSelection();
   },
 
   pasteClipboard: async () => {
+    if (get().documentMode === 'crease-pattern') {
+      const clipboard = get().clipboard;
+      if (!clipboard || clipboard.kind !== 'cp-lines' || clipboard.lines.length === 0) return;
+      const segments = offsetCpLineSegmentsForPaste(clipboard.lines, get().clipboardPasteCount);
+      const pasted = await get().insertOristudioCpLineSegments(segments, 'Paste CP lines');
+      if (!pasted) return;
+      set({
+        clipboardPasteCount: get().clipboardPasteCount + 1,
+        error: null,
+        projectMessage: `Pasted ${segments.length} CP lines`,
+      });
+      return;
+    }
     if (get().documentMode !== 'tree') {
       set({
         error: {
           code: 'invalid_operation',
-          message: 'Imported crease patterns are read-only',
+          message: 'Paste is unavailable for this document',
         },
       });
       return;
     }
     const clipboard = get().clipboard;
-    if (!clipboard || clipboard.nodes.length === 0) return;
+    if (!clipboard || clipboard.kind !== 'tree' || clipboard.nodes.length === 0) return;
     set({ error: null });
 
     const checkpoint = await get().beginHistoryCheckpoint();

@@ -1,0 +1,121 @@
+import { describe, expect, it } from 'vitest';
+import type { OristudioCpDocumentSnapshot, OristudioCpLineSegment } from '../engine/oristudioCpTypes';
+import {
+  buildCpLineClipboardPayload,
+  cpLineSelectionBounds,
+  offsetCpLineSegmentsForPaste,
+  rotationAngleFromCenter,
+  snapRotationDegrees,
+  transformCpLineSegments,
+} from './creasePatternClipboard';
+import { emptyOristudioCpSelection } from './creasePatternViewport';
+
+function cpLine(
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+  overrides: Partial<OristudioCpLineSegment> = {}
+): OristudioCpLineSegment {
+  return {
+    a,
+    b,
+    active: 'Inactive0',
+    color: 'Red1',
+    selected: 0,
+    customized: 0,
+    customized_color: { red: 0, green: 0, blue: 0 },
+    ...overrides,
+  };
+}
+
+function documentWithLines(lines: OristudioCpLineSegment[]): OristudioCpDocumentSnapshot {
+  return {
+    title: 'selection',
+    metadata: {},
+    crease_pattern: {
+      line_segments: lines,
+      aux_line_segments: [],
+      circles: [],
+      points: [],
+      texts: [],
+      grid: {
+        interval_grid_size: 4,
+        grid_size: 8,
+        grid_xa: 1,
+        grid_xb: 0,
+        grid_xc: 1,
+        grid_ya: 1,
+        grid_yb: 0,
+        grid_yc: 1,
+        grid_angle: 90,
+        base_state: 'WithinPaper',
+        vertical_scale_position: 0,
+        horizontal_scale_position: 0,
+        draw_diagonal_gridlines: false,
+      },
+    },
+  };
+}
+
+describe('crease-pattern clipboard geometry', () => {
+  it('builds selected-line payloads with content bounds', () => {
+    const payload = buildCpLineClipboardPayload(documentWithLines([
+      cpLine({ x: 0, y: 0 }, { x: 2, y: 0 }),
+      cpLine({ x: -1, y: 3 }, { x: 1, y: 4 }),
+    ]), {
+      ...emptyOristudioCpSelection(),
+      lines: [2],
+    });
+
+    expect(payload).toMatchObject({
+      kind: 'cp-lines',
+      lines: [{ a: { x: -1, y: 3 }, b: { x: 1, y: 4 } }],
+      bounds: {
+        minX: -1,
+        minY: 3,
+        maxX: 1,
+        maxY: 4,
+        center: { x: 0, y: 3.5 },
+      },
+    });
+  });
+
+  it('offsets repeated pastes without mutating source lines', () => {
+    const source = [cpLine({ x: 1, y: 1 }, { x: 2, y: 2 })];
+    const pasted = offsetCpLineSegmentsForPaste(source, 1);
+
+    expect(pasted[0]).toMatchObject({
+      a: { x: 17, y: -15 },
+      b: { x: 18, y: -14 },
+    });
+    expect(source[0].a).toEqual({ x: 1, y: 1 });
+  });
+
+  it('rotates and flips selected lines around their content center', () => {
+    const lines = [cpLine({ x: 0, y: 0 }, { x: 2, y: 0 }, { color: 'Blue2' })];
+    const rotated = transformCpLineSegments(lines, { kind: 'rotate', angleDegrees: 90 });
+    const flipped = transformCpLineSegments(lines, {
+      kind: 'flip-horizontal',
+      swapMountainValley: true,
+    });
+
+    expect(rotated[0].a.x).toBeCloseTo(1);
+    expect(rotated[0].a.y).toBeCloseTo(-1);
+    expect(rotated[0].b.x).toBeCloseTo(1);
+    expect(rotated[0].b.y).toBeCloseTo(1);
+    expect(flipped[0]).toMatchObject({
+      a: { x: 2, y: 0 },
+      b: { x: 0, y: 0 },
+      color: 'Red1',
+    });
+  });
+
+  it('supports 22.5 degree rotation snapping helpers', () => {
+    expect(snapRotationDegrees(23.2)).toBe(22.5);
+    expect(snapRotationDegrees(34)).toBe(45);
+    expect(rotationAngleFromCenter({ x: 1, y: 1 }, { x: 1, y: 2 })).toBeCloseTo(90);
+  });
+
+  it('returns null bounds for empty selections', () => {
+    expect(cpLineSelectionBounds([])).toBeNull();
+  });
+});

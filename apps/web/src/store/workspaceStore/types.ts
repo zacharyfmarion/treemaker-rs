@@ -37,6 +37,8 @@ import type {
   OristudioCpOperationDescriptor,
 } from '../../engine/oristudioCpTypes';
 import type { OristudioCpOperationId } from '../../lib/oristudioCpCommands';
+import type { OristudioCpLineage } from '../../lib/oristudioCpLineage';
+import type { OristudioCpSymmetryState } from '../../lib/oristudioCpSymmetry';
 
 export interface RecentProject {
   id: string;
@@ -61,8 +63,10 @@ export interface OristudioCpActionRequest {
 export interface ProjectSliceState {
   project: TreeProject;
   documentMode: DocumentMode;
+  activeEditingSurface: DocumentMode;
   importedCreasePattern: ImportedCreasePatternDocument | null;
   oristudioCpDocument: OristudioCpDocumentState | null;
+  oristudioCpLineage: OristudioCpLineage | null;
   oristudioCpOperationDescriptors: OristudioCpOperationDescriptor[];
   oristudioCpError: string | null;
   oristudioCpCamvResult: OristudioCpCommandResult | null;
@@ -116,6 +120,7 @@ export interface ProjectSliceActions {
   loadRecentProject: (id: string) => Promise<void>;
   autosaveProject: () => Promise<void>;
   clearProjectMessage: () => void;
+  setActiveEditingSurface: (surface: DocumentMode) => void;
 }
 
 export type ProjectSlice = ProjectSliceState & ProjectSliceActions;
@@ -247,6 +252,7 @@ export interface CreasePatternSliceState {
   oristudioCpActionRequest: OristudioCpActionRequest | null;
   oristudioCpActiveDiagnosticId: string | null;
   oristudioCpViewport: OristudioCpViewportOptions;
+  oristudioCpSymmetry: OristudioCpSymmetryState;
   foldArtifacts: FoldArtifacts | null;
   foldArtifactError: string | null;
   foldArtifactStatus: FoldArtifactStatus;
@@ -280,6 +286,7 @@ export interface CreasePatternSliceActions {
     key: OristudioCpViewportOptionKey,
     value: boolean
   ) => void;
+  setOristudioCpSymmetry: (update: Partial<OristudioCpSymmetryState>) => void;
   setOristudioCpSelection: (selection: OristudioCpSelection) => void;
   requestOristudioCpAction: (operationId: OristudioCpOperationId) => void;
   clearOristudioCpActionRequest: (id: number) => void;

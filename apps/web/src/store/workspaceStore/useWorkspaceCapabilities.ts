@@ -4,6 +4,7 @@ import { useWorkspaceStore } from './store';
 
 export function useWorkspaceCapabilities() {
   const documentMode = useWorkspaceStore((state) => state.documentMode);
+  const activeEditingSurface = useWorkspaceStore((state) => state.activeEditingSurface);
   const engineReady = useWorkspaceStore((state) => state.engineReady);
   const status = useWorkspaceStore((state) => state.status);
   const edgeCount = useWorkspaceStore((state) => state.project.edges.length);
@@ -31,14 +32,15 @@ export function useWorkspaceCapabilities() {
   const clipboard = useWorkspaceStore((state) => state.clipboard);
   const selection = useWorkspaceStore((state) => state.selection);
   const historyPastCount =
-    documentMode === 'crease-pattern' ? cpHistoryPastCount : treeHistoryPastCount;
+    activeEditingSurface === 'crease-pattern' ? cpHistoryPastCount : treeHistoryPastCount;
   const historyFutureCount =
-    documentMode === 'crease-pattern' ? cpHistoryFutureCount : treeHistoryFutureCount;
+    activeEditingSurface === 'crease-pattern' ? cpHistoryFutureCount : treeHistoryFutureCount;
 
   return useMemo(
     () =>
       getWorkspaceCapabilities({
         documentMode,
+        activeEditingSurface,
         engineReady,
         status,
         edgeCount,
@@ -59,6 +61,7 @@ export function useWorkspaceCapabilities() {
     [
       clipboard,
       creaseCount,
+      activeEditingSurface,
       documentMode,
       edgeCount,
       engineReady,

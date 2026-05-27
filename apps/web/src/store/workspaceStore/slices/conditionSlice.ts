@@ -5,6 +5,7 @@ import {
   selectedNodeIds,
   selectedPathIds,
 } from '../../../lib/selection';
+import { markGeneratedCpLineageStale } from '../../../lib/oristudioCpLineage';
 import {
   engineError,
   ensureTreeHandle,
@@ -15,6 +16,14 @@ import { staleFoldArtifactResourceState } from '../foldArtifactResource';
 import type { ConditionSlice, WorkspaceSliceCreator } from '../types';
 
 export const createConditionSlice: WorkspaceSliceCreator<ConditionSlice> = (set, get) => {
+  function staleTreeDerivedArtifacts() {
+    return {
+      ...staleFoldArtifactResourceState(get().foldArtifactRevision),
+      activeEditingSurface: 'tree' as const,
+      oristudioCpLineage: markGeneratedCpLineageStale(get().oristudioCpLineage),
+    };
+  }
+
   function rejectReadOnly() {
     if (get().documentMode === 'tree') return false;
     set({
@@ -55,7 +64,7 @@ export const createConditionSlice: WorkspaceSliceCreator<ConditionSlice> = (set,
         dirty: true,
         error: null,
         lastOptimization: null,
-        ...staleFoldArtifactResourceState(get().foldArtifactRevision),
+        ...staleTreeDerivedArtifacts(),
         projectMessage: label,
       });
       get().commitHistoryCheckpoint(checkpoint, label);
@@ -89,7 +98,7 @@ export const createConditionSlice: WorkspaceSliceCreator<ConditionSlice> = (set,
         dirty: true,
         error: null,
         lastOptimization: null,
-        ...staleFoldArtifactResourceState(get().foldArtifactRevision),
+        ...staleTreeDerivedArtifacts(),
         projectMessage: label,
       });
       get().commitHistoryCheckpoint(checkpoint, label);

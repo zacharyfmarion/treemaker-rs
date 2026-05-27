@@ -1,11 +1,18 @@
 import { projectFromSnapshot } from '../../../engine/snapshotMapper';
-import type { FoldArtifacts, OptimizationReport } from '../../../engine/types';
+import type { FoldArtifacts, FoldDocument, OptimizationReport } from '../../../engine/types';
 import {
   DEFAULT_ORISTUDIO_CP_VIEWPORT_OPTIONS,
   emptyOristudioCpSelection,
   toggleCpSelectionList,
 } from '../../../lib/creasePatternViewport';
 import { DEFAULT_CREASE_COLOR_MODE } from '../../../lib/sampleProject';
+import {
+  generatedCpLineage,
+  markGeneratedCpLineageStale,
+  stableTextDigest,
+} from '../../../lib/oristudioCpLineage';
+import { defaultOristudioCpSymmetry } from '../../../lib/oristudioCpSymmetry';
+import { requestConfirmation } from '../../commandDialogStore';
 import { useLayoutStore } from '../../layoutStore';
 import { selectWorkspaceCapabilities } from '../capabilities';
 import {
@@ -20,7 +27,11 @@ import {
   projectStateFromSnapshot,
   type EngineClient,
 } from '../engineRuntime';
-import { exportOristudioCpDocumentAsFold } from '../oristudioCpRuntime';
+import {
+  exportOristudioCpDocumentAsFold,
+  loadOristudioCpDocumentFromText,
+  releaseOristudioCpDocument,
+} from '../oristudioCpRuntime';
 import type { CreasePatternSlice, WorkspaceSliceCreator } from '../types';
 import type { WorkspaceCapabilityId } from '../../../lib/workspaceCapabilities';
 
@@ -40,10 +51,38 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
     return result;
   }
 
+  function parseFoldProjection(text: string): FoldDocument | null {
+    try {
+      return JSON.parse(text) as FoldDocument;
+    } catch {
+      return null;
+    }
+  }
+
   function hasFoldArtifactSource() {
     const state = get();
-    if (state.documentMode === 'crease-pattern') return state.oristudioCpDocument !== null;
+    if (state.oristudioCpDocument) return true;
+    if (state.documentMode === 'crease-pattern') return false;
     return state.project.creases.length > 0 || state.project.facets.length > 0;
+  }
+
+  async function confirmReplaceCustomizedGeneratedCp(): Promise<boolean> {
+    const lineage = get().oristudioCpLineage;
+    if (
+      get().documentMode !== 'tree' ||
+      lineage?.kind !== 'generated-from-tree' ||
+      lineage.manualEditCount === 0
+    ) {
+      return true;
+    }
+    return requestConfirmation({
+      title: 'Replace Edited CP?',
+      message:
+        'Rebuilding from the design will replace the editable crease pattern generated earlier. The tree stays unchanged.',
+      confirmLabel: 'Replace CP',
+      cancelLabel: 'Keep Current CP',
+      tone: 'danger',
+    });
   }
 
   function clearFoldArtifactSource() {
@@ -58,8 +97,7 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
   }
 
   async function computeFoldArtifacts(): Promise<FoldArtifacts | null> {
-    if (get().documentMode === 'crease-pattern') {
-      if (!get().oristudioCpDocument) return null;
+    if (get().oristudioCpDocument) {
       const [api, foldJson] = await Promise.all([
         getEngine(),
         exportOristudioCpDocumentAsFold(),
@@ -200,6 +238,8 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
         error: null,
         lastOptimization: report,
         ...staleFoldArtifactResourceState(get().foldArtifactRevision),
+        activeEditingSurface: 'tree',
+        oristudioCpLineage: markGeneratedCpLineageStale(get().oristudioCpLineage),
         dirty: true,
         projectMessage: label,
         designViewportFitRequestId: options.fitPaperView
@@ -219,6 +259,7 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
     oristudioCpActionRequest: null,
     oristudioCpActiveDiagnosticId: null,
     oristudioCpViewport: DEFAULT_ORISTUDIO_CP_VIEWPORT_OPTIONS,
+    oristudioCpSymmetry: defaultOristudioCpSymmetry(),
     ...emptyFoldArtifactResourceState(),
     sequenceTarget: null,
     sequencePlan: null,
@@ -256,6 +297,7 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
         });
         return;
       }
+      if (!(await confirmReplaceCustomizedGeneratedCp())) return;
 
       set({ status: 'building_crease_pattern', error: null });
       const checkpoint = await get().beginHistoryCheckpoint();
@@ -284,8 +326,13 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
             sequenceSimulationFocus: wholeSimulationFocus,
             sequencePlanning: false,
             sequenceError: null,
+            oristudioCpDocument: null,
+            oristudioCpLineage: null,
+            oristudioCpSelection: emptyOristudioCpSelection(),
+            oristudioCpSymmetry: defaultOristudioCpSymmetry(),
             projectMessage: null,
           });
+          await releaseOristudioCpDocument();
           return;
         }
 
@@ -295,8 +342,28 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
           foldArtifactError = engineError(error).message;
           return null;
         });
+        const foldJson = await api.exportFold(treeHandle);
+        const foldProjection = parseFoldProjection(foldJson);
+        const treeText = await api.saveTmd5(treeHandle);
+        const editableDocument = await loadOristudioCpDocumentFromText(foldJson, {
+          format: 'fold',
+          filename: `${project.title || 'generated-crease-pattern'}.fold`,
+          title: `${project.title || 'Generated'} CP`,
+        });
         set({
           project,
+          activeEditingSurface: 'crease-pattern',
+          oristudioCpDocument: editableDocument,
+          oristudioCpLineage: generatedCpLineage({
+            sourceTreeDigest: stableTextDigest(treeText),
+            sourceGeneratedFold: foldProjection,
+          }),
+          oristudioCpOperationDescriptors: editableDocument.operationDescriptors,
+          oristudioCpError: null,
+          oristudioCpCamvResult: null,
+          oristudioCpHistoryPast: [],
+          oristudioCpHistoryFuture: [],
+          oristudioCpSelection: emptyOristudioCpSelection(),
           status: 'crease_pattern_ready',
           error: null,
           ...(foldArtifacts
@@ -393,6 +460,18 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
 
     setOristudioCpViewportOption: (key, value) =>
       set({ oristudioCpViewport: { ...get().oristudioCpViewport, [key]: value } }),
+
+    setOristudioCpSymmetry: (update) =>
+      set({
+        oristudioCpSymmetry: {
+          ...get().oristudioCpSymmetry,
+          ...update,
+          axis: update.axis
+            ? { ...update.axis, loc: { ...update.axis.loc } }
+            : get().oristudioCpSymmetry.axis,
+        },
+        dirty: get().oristudioCpDocument ? true : get().dirty,
+      }),
 
     setOristudioCpSelection: (oristudioCpSelection) => set({ oristudioCpSelection }),
 

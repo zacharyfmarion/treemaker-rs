@@ -9,6 +9,8 @@ import {
   serializeNativeProjectFile,
 } from './nativeProjectFile';
 import { DEFAULT_ORISTUDIO_CP_VIEWPORT_OPTIONS, emptyOristudioCpSelection } from './creasePatternViewport';
+import { importedCpLineage } from './oristudioCpLineage';
+import { defaultOristudioCpSymmetry } from './oristudioCpSymmetry';
 
 const now = new Date('2026-05-26T12:00:00.000Z');
 
@@ -108,6 +110,8 @@ describe('native project file', () => {
       creaseColorMode: 'agrh',
       selection,
       viewport: DEFAULT_ORISTUDIO_CP_VIEWPORT_OPTIONS,
+      symmetry: defaultOristudioCpSymmetry(),
+      lineage: importedCpLineage(),
       appVersion: '0.1.1',
       now,
     });
@@ -126,16 +130,80 @@ describe('native project file', () => {
     });
   });
 
+  it('stores generated CP companions inside tree projects', () => {
+    const file = createNativeTreeProjectFile({
+      title: 'Tree with CP',
+      filename: 'tree.osf',
+      path: '/tmp/tree.osf',
+      tmd5Text: 'tm text',
+      creasePatternCompanion: {
+        title: 'Generated CP',
+        document: cpDocument(),
+        source: null,
+        foldProjection: null,
+        foldArtifacts: null,
+        creaseColorMode: 'mvf',
+        selection: emptyOristudioCpSelection(),
+        viewport: DEFAULT_ORISTUDIO_CP_VIEWPORT_OPTIONS,
+        symmetry: defaultOristudioCpSymmetry(),
+        lineage: importedCpLineage(),
+      },
+      appVersion: '0.1.1',
+      now,
+    });
+
+    const parsed = parseNativeProjectFile(serializeNativeProjectFile(file));
+
+    expect(parsed.schemaVersion).toBe(2);
+    expect(parsed.workspace.documents.map((document) => document.kind)).toEqual([
+      'treemaker-tree',
+      'crease-pattern',
+    ]);
+    expect(parsed.workspace.activeDocumentId).toBe('tree');
+  });
+
+  it('defaults missing schema-1 CP lineage and symmetry during migration', () => {
+    const file = createNativeCreasePatternProjectFile({
+      title: 'Legacy CP',
+      filename: 'legacy.osf',
+      path: '/tmp/legacy.osf',
+      document: cpDocument(),
+      source: null,
+      foldProjection: null,
+      foldArtifacts: null,
+      creaseColorMode: 'mvf',
+      selection: emptyOristudioCpSelection(),
+      viewport: DEFAULT_ORISTUDIO_CP_VIEWPORT_OPTIONS,
+      symmetry: defaultOristudioCpSymmetry(),
+      lineage: importedCpLineage(),
+      appVersion: '0.1.1',
+      now,
+    });
+    const legacy = JSON.parse(serializeNativeProjectFile(file));
+    legacy.schemaVersion = 1;
+    delete legacy.workspace.documents[0].creasePattern.lineage;
+    delete legacy.workspace.documents[0].viewState.symmetry;
+
+    const parsed = parseNativeProjectFile(JSON.stringify(legacy));
+    const document = activeNativeDocument(parsed);
+
+    expect(parsed.schemaVersion).toBe(2);
+    expect(document.kind).toBe('crease-pattern');
+    if (document.kind !== 'crease-pattern') throw new Error('expected CP document');
+    expect(document.creasePattern.lineage).toMatchObject({ kind: 'imported', stale: false });
+    expect(document.viewState.symmetry).toMatchObject({ enabled: false, preset: 'none' });
+  });
+
   it('rejects non-project and newer required schema files', () => {
     expect(() => parseNativeProjectFile('{"format":"fold"}')).toThrow(/not an Ori Studio project/i);
     expect(() =>
       parseNativeProjectFile(
         JSON.stringify({
           format: 'oristudio.project',
-          schemaVersion: 2,
-          minimumReaderSchemaVersion: 2,
+          schemaVersion: 3,
+          minimumReaderSchemaVersion: 3,
         })
       )
-    ).toThrow(/requires reader schema 2/i);
+    ).toThrow(/requires reader schema 3/i);
   });
 });

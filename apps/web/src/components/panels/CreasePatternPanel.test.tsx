@@ -15,6 +15,7 @@ import {
   modelPointToCpSvg,
 } from '../../lib/creasePatternViewport';
 import type { ImportedCreasePatternDocument } from '../../lib/creasePatternImport';
+import { generatedCpLineage } from '../../lib/oristudioCpLineage';
 import { createStarterOristudioCpDocument } from '../../lib/oristudioCpStarterDocument';
 import type {
   OristudioCpCommandPayload,
@@ -782,6 +783,32 @@ describe('CreasePatternPanel', () => {
     expect(useWorkspaceStore.getState().oristudioCpViewport.snapToGrid).toBe(false);
     expect(useWorkspaceStore.getState().oristudioCpViewport.snapToVertices).toBe(false);
     expect(useWorkspaceStore.getState().oristudioCpViewport.snapToLines).toBe(false);
+  });
+
+  it('renders generated CP companions as editable with bottom symmetry controls', () => {
+    const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
+      documentMode: 'tree',
+      oristudioCpDocument: editableCpState(),
+      oristudioCpLineage: generatedCpLineage({
+        sourceTreeDigest: 'test:digest',
+        sourceGeneratedFold: null,
+      }),
+    });
+
+    expect(container.textContent).toContain('Generated from design');
+    expect(container.querySelector('.cp-tool-rail')).not.toBeNull();
+    expect(container.querySelector('.cp-symmetry-controls')).not.toBeNull();
+
+    const symmetryButton = Array.from(container.querySelectorAll('button')).find(
+      (button) => button.textContent === 'Symmetry'
+    );
+    act(() => {
+      symmetryButton?.click();
+    });
+
+    expect(useWorkspaceStore.getState().activeEditingSurface).toBe('crease-pattern');
+    expect(useWorkspaceStore.getState().oristudioCpSymmetry.enabled).toBe(true);
+    expect(container.querySelector('.cp-symmetry-line')).not.toBeNull();
   });
 
   it('renders Oriedita instructions in the CP context tool panel', () => {

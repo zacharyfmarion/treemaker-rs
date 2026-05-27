@@ -197,6 +197,7 @@ export function DesignPanel() {
   const moveNodeWithSymmetry = useWorkspaceStore((state) => state.moveNodeWithSymmetry);
   const setToolMode = useWorkspaceStore((state) => state.setToolMode);
   const setSymmetry = useWorkspaceStore((state) => state.setSymmetry);
+  const setActiveEditingSurface = useWorkspaceStore((state) => state.setActiveEditingSurface);
   const projectLoadId = useWorkspaceStore((state) => state.projectLoadId);
   const designViewportFitRequestId = useWorkspaceStore(
     (state) => state.designViewportFitRequestId
@@ -559,6 +560,7 @@ export function DesignPanel() {
         data-space-pan={spacePressed || undefined}
         tabIndex={-1}
         onPointerDown={(event) => {
+          setActiveEditingSurface('tree');
           if (!isViewportInteractiveTarget(event.target)) containerRef.current?.focus();
         }}
       >

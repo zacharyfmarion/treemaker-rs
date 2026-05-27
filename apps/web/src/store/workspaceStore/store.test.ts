@@ -34,6 +34,8 @@ import {
   parseNativeProjectFile,
   serializeNativeProjectFile,
 } from '../../lib/nativeProjectFile';
+import { importedCpLineage } from '../../lib/oristudioCpLineage';
+import { defaultOristudioCpSymmetry } from '../../lib/oristudioCpSymmetry';
 import { createStarterOristudioCpDocument } from '../../lib/oristudioCpStarterDocument';
 import { useLayoutStore } from '../layoutStore';
 
@@ -1333,6 +1335,8 @@ describe('workspace store slices', () => {
         creaseColorMode: 'agrh',
         selection: { ...emptyOristudioCpSelection(), lines: [1] },
         viewport: DEFAULT_ORISTUDIO_CP_VIEWPORT_OPTIONS,
+        symmetry: defaultOristudioCpSymmetry(),
+        lineage: importedCpLineage(),
         appVersion: '0.1.1',
         now: new Date('2026-05-26T12:00:00.000Z'),
       })

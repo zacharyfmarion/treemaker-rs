@@ -6,6 +6,7 @@ const treeSelection: Selection = { kind: 'tree' };
 
 function capabilities({
   documentMode = 'tree',
+  activeEditingSurface = documentMode,
   status = 'ready',
   edgeCount = 0,
   creaseCount = 0,
@@ -22,6 +23,7 @@ function capabilities({
   selection = treeSelection,
 }: {
   documentMode?: DocumentMode;
+  activeEditingSurface?: DocumentMode;
   status?: AppStatus;
   edgeCount?: number;
   creaseCount?: number;
@@ -39,6 +41,7 @@ function capabilities({
 } = {}) {
   return getWorkspaceCapabilities({
     documentMode,
+    activeEditingSurface,
     engineReady,
     status,
     edgeCount,

@@ -3,11 +3,21 @@ import type { OristudioCpDocumentSnapshot } from '../engine/oristudioCpTypes';
 import type { ImportedCreasePatternSource } from './creasePatternImport';
 import type { CreaseColorMode, DocumentMode } from './sampleProject';
 import type { OristudioCpSelection, OristudioCpViewportOptions } from './creasePatternViewport';
+import {
+  importedCpLineage,
+  normalizeCpLineage,
+  type OristudioCpLineage,
+} from './oristudioCpLineage';
+import {
+  defaultOristudioCpSymmetry,
+  normalizeOristudioCpSymmetry,
+  type OristudioCpSymmetryState,
+} from './oristudioCpSymmetry';
 
 export const NATIVE_PROJECT_FORMAT = 'oristudio.project';
 export const NATIVE_PROJECT_EXTENSION = 'osf';
 export const NATIVE_PROJECT_MIME_TYPE = 'application/vnd.oristudio.project+json';
-export const NATIVE_PROJECT_SCHEMA_VERSION = 1;
+export const NATIVE_PROJECT_SCHEMA_VERSION = 2;
 
 export type NativeProjectDocumentKind = 'treemaker-tree' | 'crease-pattern';
 
@@ -46,11 +56,13 @@ export interface NativeCreasePatternDocumentV1 extends NativeProjectBaseDocument
     document: OristudioCpDocumentSnapshot;
     source: ImportedCreasePatternSource | NativeProjectSource | null;
     foldProjection: FoldDocument | null;
+    lineage: OristudioCpLineage;
   };
   viewState: {
     creaseColorMode: CreaseColorMode;
     selection: OristudioCpSelection;
     viewport: OristudioCpViewportOptions;
+    symmetry: OristudioCpSymmetryState;
   };
 }
 
@@ -58,7 +70,7 @@ export type NativeProjectDocumentV1 = NativeTreeDocumentV1 | NativeCreasePattern
 
 export interface NativeProjectFileV1 {
   format: typeof NATIVE_PROJECT_FORMAT;
-  schemaVersion: 1;
+  schemaVersion: 1 | 2;
   minimumReaderSchemaVersion: 1;
   createdBy: NativeProjectActor;
   modifiedBy: NativeProjectActor;
@@ -86,6 +98,10 @@ export interface NativeTreeProjectInput {
   filename: string;
   path: string | null;
   tmd5Text: string;
+  creasePatternCompanion?: Omit<
+    NativeCreasePatternProjectInput,
+    'appVersion' | 'filename' | 'path' | 'now'
+  > | null;
   appVersion: string;
   now?: Date;
 }
@@ -101,6 +117,8 @@ export interface NativeCreasePatternProjectInput {
   creaseColorMode: CreaseColorMode;
   selection: OristudioCpSelection;
   viewport: OristudioCpViewportOptions;
+  symmetry: OristudioCpSymmetryState;
+  lineage: OristudioCpLineage;
   appVersion: string;
   now?: Date;
 }
@@ -142,7 +160,7 @@ export function migrateNativeProjectFile(value: unknown): NativeProjectFile {
   }
 
   const schemaVersion = numberField(value.schemaVersion);
-  if (schemaVersion === 1) return validateV1(value);
+  if (schemaVersion === 1 || schemaVersion === 2) return validateV1(value);
   if (schemaVersion === null) throw new Error('Ori Studio project is missing schemaVersion');
   throw new Error(`Unsupported Ori Studio project schemaVersion ${schemaVersion}`);
 }
@@ -152,7 +170,7 @@ export function createNativeTreeProjectFile(input: NativeTreeProjectInput): Nati
   const title = input.title.trim() || 'Untitled';
   return {
     format: NATIVE_PROJECT_FORMAT,
-    schemaVersion: 1,
+    schemaVersion: 2,
     minimumReaderSchemaVersion: 1,
     createdBy: actor,
     modifiedBy: actor,
@@ -173,6 +191,20 @@ export function createNativeTreeProjectFile(input: NativeTreeProjectInput): Nati
           },
           extensions: {},
         },
+        ...(input.creasePatternCompanion
+          ? [
+              createNativeCreasePatternDocument(
+                {
+                  ...input.creasePatternCompanion,
+                  filename: input.filename,
+                  path: input.path,
+                  appVersion: input.appVersion,
+                  now: input.now,
+                },
+                'generated-crease-pattern'
+              ),
+            ]
+          : []),
       ],
       viewState: {},
     },
@@ -188,7 +220,7 @@ export function createNativeCreasePatternProjectFile(
   const title = input.title.trim() || input.document.title || 'Untitled CP';
   return {
     format: NATIVE_PROJECT_FORMAT,
-    schemaVersion: 1,
+    schemaVersion: 2,
     minimumReaderSchemaVersion: 1,
     createdBy: actor,
     modifiedBy: actor,
@@ -198,24 +230,7 @@ export function createNativeCreasePatternProjectFile(
       activeDocumentId: 'crease-pattern',
       activeMode: 'crease-pattern',
       documents: [
-        {
-          id: 'crease-pattern',
-          kind: 'crease-pattern',
-          title,
-          source: sourceFromFilename(input.filename, input.path),
-          creasePattern: {
-            engine: 'oristudio-cp',
-            document: input.document,
-            source: input.source,
-            foldProjection: input.foldProjection,
-          },
-          viewState: {
-            creaseColorMode: input.creaseColorMode,
-            selection: input.selection,
-            viewport: input.viewport,
-          },
-          extensions: {},
-        },
+        createNativeCreasePatternDocument(input, 'crease-pattern'),
       ],
       viewState: {},
     },
@@ -228,6 +243,33 @@ export function createNativeCreasePatternProjectFile(
             },
           }
         : {},
+    extensions: {},
+  };
+}
+
+function createNativeCreasePatternDocument(
+  input: NativeCreasePatternProjectInput,
+  id: string
+): NativeCreasePatternDocumentV1 {
+  const title = input.title.trim() || input.document.title || 'Untitled CP';
+  return {
+    id,
+    kind: 'crease-pattern',
+    title,
+    source: sourceFromFilename(input.filename, input.path),
+    creasePattern: {
+      engine: 'oristudio-cp',
+      document: input.document,
+      source: input.source,
+      foldProjection: input.foldProjection,
+      lineage: input.lineage,
+    },
+    viewState: {
+      creaseColorMode: input.creaseColorMode,
+      selection: input.selection,
+      viewport: input.viewport,
+      symmetry: input.symmetry,
+    },
     extensions: {},
   };
 }
@@ -287,7 +329,7 @@ function validateV1(value: Record<string, unknown>): NativeProjectFileV1 {
 
   return {
     format: NATIVE_PROJECT_FORMAT,
-    schemaVersion: 1,
+    schemaVersion: 2,
     minimumReaderSchemaVersion: 1,
     createdBy: validateActor(recordField(value.createdBy, 'createdBy')),
     modifiedBy: validateActor(recordField(value.modifiedBy, 'modifiedBy')),
@@ -351,6 +393,9 @@ function validateDocumentV1(value: unknown): NativeProjectDocumentV1 {
         foldProjection: isRecord(creasePattern.foldProjection)
           ? (creasePattern.foldProjection as unknown as FoldDocument)
           : null,
+        lineage: isRecord(creasePattern.lineage)
+          ? normalizeCpLineage(creasePattern.lineage)
+          : importedCpLineage(),
       },
       viewState: {
         creaseColorMode:
@@ -370,6 +415,9 @@ function validateDocumentV1(value: unknown): NativeProjectDocumentV1 {
         viewport: isRecord(viewState.viewport)
           ? (viewState.viewport as unknown as OristudioCpViewportOptions)
           : ({} as OristudioCpViewportOptions),
+        symmetry: isRecord(viewState.symmetry)
+          ? normalizeOristudioCpSymmetry(viewState.symmetry)
+          : defaultOristudioCpSymmetry(),
       },
       extensions,
     };

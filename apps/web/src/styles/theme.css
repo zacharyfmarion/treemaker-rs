@@ -2733,6 +2733,26 @@
   pointer-events: none;
 }
 
+.cp-symmetry-line {
+  stroke: var(--accent-tertiary);
+  stroke-width: 1.7;
+  stroke-dasharray: 12 8;
+  opacity: 0.7;
+  pointer-events: none;
+  vector-effect: non-scaling-stroke;
+}
+
+.cp-symmetry-line--active {
+  opacity: 0.95;
+  stroke-width: 2.1;
+}
+
+.cp-symmetry-line--draft {
+  stroke: var(--accent-primary);
+  stroke-dasharray: 4 6;
+  opacity: 0.86;
+}
+
 .symmetry-snap-lane {
   stroke: color-mix(in srgb, var(--accent-tertiary) 28%, transparent);
   stroke-width: 18;
@@ -3515,6 +3535,29 @@
   white-space: nowrap;
 }
 
+.cp-symmetry-controls {
+  position: absolute;
+  left: var(--space-3);
+  bottom: calc(var(--space-3) + 44px);
+  z-index: 15;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  max-width: min(560px, calc(100% - var(--space-6)));
+  min-height: 32px;
+  padding: 2px 4px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--domain-overlay-bg);
+  box-shadow: 0 8px 24px var(--shadow-overlay);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.cp-symmetry-controls__toggle {
+  gap: 5px;
+}
+
 .viewport-toolbar__separator {
   width: 1px;
   height: 18px;
@@ -3695,6 +3738,12 @@
   .cp-tool-rail__button {
     width: 34px;
     height: 32px;
+  }
+
+  .cp-symmetry-controls {
+    right: var(--space-3);
+    flex-wrap: wrap;
+    white-space: normal;
   }
 }
 

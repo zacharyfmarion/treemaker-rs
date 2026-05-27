@@ -6,8 +6,7 @@ Add app-level copy and paste for selected lines in the editable crease-pattern
 editor, with `Cmd/Ctrl+C` and `Cmd/Ctrl+V` working through the existing shared
 Edit command path. Selected crease-pattern contents should get a subtle
 Photoshop/Affinity-style transform affordance: a dotted selection bounds
-rectangle, compact contextual controls, and a corner-square rotation handle with
-an external curved rotate arrow.
+rectangle, compact contextual controls, and a corner-square rotation handle.
 
 Generated TreeMaker crease patterns remain read-only artifacts. This feature
 targets editable Oristudio CP documents loaded in `documentMode ===
@@ -28,10 +27,9 @@ targets editable Oristudio CP documents loaded in `documentMode ===
   - flip vertical
   - rotate left 90 degrees
   - rotate right 90 degrees
-- A small square corner handle sits on the dotted rectangle, with a curved
-  rotate arrow just outside the corner. Dragging it free-rotates the selected
-  geometry around the selection center. Holding Shift snaps rotation to 22.5
-  degree increments.
+- A small square corner handle sits on the dotted rectangle. Dragging it
+  free-rotates the selected geometry around the selection center. Holding Shift
+  snaps rotation to 22.5 degree increments.
 - Dragging inside the dotted selection bounds free-moves the selected geometry.
   If CP snapping is enabled, translated endpoints can snap to the grid,
   unselected vertices, and unselected lines so the moved shape falls neatly into
@@ -67,8 +65,7 @@ targets editable Oristudio CP documents loaded in `documentMode ===
   - deriving an SVG-space dotted rectangle from selected model-space geometry
   - placing the compact contextual menu near the rectangle without covering the
     selected geometry
-  - placing a corner-square rotate handle with an external curved arrow that
-    remains usable under zoom
+  - placing a corner-square rotate handle that remains usable under zoom
   - converting pointer movement around the selection center into a rotation
     angle
   - snapping the angle to 22.5 degree increments while Shift is held
@@ -142,8 +139,8 @@ targets editable Oristudio CP documents loaded in `documentMode ===
       selection has transformable contents.
 - [x] Add a corner rotate handle with free rotation by default and Shift-held
       22.5 degree snapping.
-- [x] Match the rotate handle to the chosen visual: a small square on the corner
-      with a curved rotate arrow outside the bounds.
+- [x] Match the rotate handle to the chosen visual: a small square on the
+      corner without an external icon.
 - [x] Support free-moving the selected CP line geometry by dragging inside the
       dotted transform bounds.
 - [x] Make move dragging respect enabled CP snapping while excluding selected

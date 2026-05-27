@@ -3741,9 +3741,6 @@ function SelectionTransformBox({
   const cornerX = x + width;
   const cornerY = y;
   const cornerSize = 9 * uiScale;
-  const arrowStart = { x: cornerX + 16 * uiScale, y: cornerY - 29 * uiScale };
-  const arrowEnd = { x: cornerX + 18 * uiScale, y: cornerY - 7 * uiScale };
-  const arrowHead = 6 * uiScale;
   const rotateHitX = cornerX - 12 * uiScale;
   const rotateHitY = cornerY - 40 * uiScale;
   const rotateHitSize = 56 * uiScale;
@@ -3842,14 +3839,6 @@ function SelectionTransformBox({
           y={cornerY - cornerSize / 2}
           width={cornerSize}
           height={cornerSize}
-        />
-        <path
-          className="cp-selection-transform__rotate-arrow"
-          d={`M ${arrowStart.x} ${arrowStart.y} C ${cornerX + 34 * uiScale} ${cornerY - 27 * uiScale}, ${cornerX + 33 * uiScale} ${cornerY - 10 * uiScale}, ${arrowEnd.x} ${arrowEnd.y}`}
-        />
-        <path
-          className="cp-selection-transform__rotate-arrow"
-          d={`M ${arrowEnd.x - arrowHead * 0.25} ${arrowEnd.y - arrowHead} L ${arrowEnd.x} ${arrowEnd.y} L ${arrowEnd.x + arrowHead} ${arrowEnd.y - arrowHead * 0.2}`}
         />
       </g>
     </g>

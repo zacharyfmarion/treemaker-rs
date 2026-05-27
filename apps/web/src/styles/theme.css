@@ -2323,17 +2323,6 @@
   vector-effect: non-scaling-stroke;
 }
 
-.cp-selection-transform__rotate-arrow {
-  fill: none;
-  stroke: var(--text-inverse);
-  stroke-width: 2.3;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  filter: drop-shadow(0 1px 2px color-mix(in srgb, var(--shadow-overlay) 45%, transparent));
-  pointer-events: none;
-  vector-effect: non-scaling-stroke;
-}
-
 .cp-selection-transform-preview {
   opacity: 0.66;
   stroke-dasharray: 7 4;

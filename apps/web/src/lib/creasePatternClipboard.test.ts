@@ -6,6 +6,7 @@ import {
   offsetCpLineSegmentsForPaste,
   rotationAngleFromCenter,
   snapRotationDegrees,
+  translateCpLineSegments,
   transformCpLineSegments,
 } from './creasePatternClipboard';
 import { emptyOristudioCpSelection } from './creasePatternViewport';
@@ -88,6 +89,18 @@ describe('crease-pattern clipboard geometry', () => {
       b: { x: 18, y: -14 },
     });
     expect(source[0].a).toEqual({ x: 1, y: 1 });
+  });
+
+  it('translates selected lines by a model-space delta', () => {
+    const translated = translateCpLineSegments(
+      [cpLine({ x: 1, y: 2 }, { x: 3, y: 4 })],
+      { x: -2, y: 5 }
+    );
+
+    expect(translated[0]).toMatchObject({
+      a: { x: -1, y: 7 },
+      b: { x: 1, y: 9 },
+    });
   });
 
   it('rotates and flips selected lines around their content center', () => {

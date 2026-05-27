@@ -25,6 +25,7 @@ export interface CpLineClipboardPayload {
 }
 
 export type CpSelectionTransform =
+  | { kind: 'translate'; delta: Point }
   | { kind: 'rotate'; angleDegrees: number; center?: Point }
   | { kind: 'flip-horizontal'; center?: Point; swapMountainValley?: boolean }
   | { kind: 'flip-vertical'; center?: Point; swapMountainValley?: boolean };
@@ -88,6 +89,11 @@ export function transformCpLineSegments(
 ): OristudioCpLineSegment[] {
   const bounds = cpLineSelectionBounds(lines);
   if (!bounds) return [];
+
+  if (transform.kind === 'translate') {
+    return translateCpLineSegments(lines, transform.delta);
+  }
+
   const center = transform.center ?? bounds.center;
 
   if (transform.kind === 'rotate') {
@@ -117,6 +123,15 @@ export function transformCpLineSegments(
   });
 }
 
+export function translateCpLineSegments(
+  lines: readonly OristudioCpLineSegment[],
+  delta: Point
+): OristudioCpLineSegment[] {
+  return lines.map((line) =>
+    transformLinePoints(line, (point) => ({ x: point.x + delta.x, y: point.y + delta.y }))
+  );
+}
+
 export function snapRotationDegrees(angleDegrees: number): number {
   return Math.round(angleDegrees / ROTATION_SNAP_DEGREES) * ROTATION_SNAP_DEGREES;
 }
@@ -127,6 +142,8 @@ export function rotationAngleFromCenter(center: Point, point: Point): number {
 
 export function cpSelectionTransformLabel(transform: CpSelectionTransform): string {
   switch (transform.kind) {
+    case 'translate':
+      return 'Move CP selection';
     case 'flip-horizontal':
       return 'Flip CP selection horizontal';
     case 'flip-vertical':

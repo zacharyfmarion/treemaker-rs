@@ -6,7 +6,8 @@ Add app-level copy and paste for selected lines in the editable crease-pattern
 editor, with `Cmd/Ctrl+C` and `Cmd/Ctrl+V` working through the existing shared
 Edit command path. Selected crease-pattern contents should get a subtle
 Photoshop/Affinity-style transform affordance: a dotted selection bounds
-rectangle, compact contextual controls, and a corner rotation handle.
+rectangle, compact contextual controls, and a corner-square rotation handle with
+an external curved rotate arrow.
 
 Generated TreeMaker crease patterns remain read-only artifacts. This feature
 targets editable Oristudio CP documents loaded in `documentMode ===
@@ -28,11 +29,17 @@ targets editable Oristudio CP documents loaded in `documentMode ===
   - rotate left 90 degrees
   - rotate right 90 degrees
   - rotate 180 degrees
-- A small rotate icon/handle sits at a corner of the dotted rectangle.
-  Dragging it free-rotates the selected geometry around the selection center.
-  Holding Shift snaps rotation to 22.5 degree increments.
-- During rotate drag, show a lightweight ghost preview and angle readout. Commit
-  on pointer release; Escape cancels the active transform before commit.
+- A small square corner handle sits on the dotted rectangle, with a curved
+  rotate arrow just outside the corner. Dragging it free-rotates the selected
+  geometry around the selection center. Holding Shift snaps rotation to 22.5
+  degree increments.
+- Dragging inside the dotted selection bounds free-moves the selected geometry.
+  If CP snapping is enabled, translated endpoints can snap to the grid,
+  unselected vertices, and unselected lines so the moved shape falls neatly into
+  place without snapping back to its own source geometry.
+- During rotate or move drag, show a lightweight ghost preview and status
+  readout. Commit on pointer release; Escape cancels the active transform before
+  commit.
 - The Crease Pattern menu gets a `Transform Selection` submenu with the same
   actions for desktop parity and discoverability.
 - The interaction model is: select something, then manipulate the visible
@@ -58,10 +65,13 @@ targets editable Oristudio CP documents loaded in `documentMode ===
   - deriving an SVG-space dotted rectangle from selected model-space geometry
   - placing the compact contextual menu near the rectangle without covering the
     selected geometry
-  - placing a corner rotate handle that remains usable under zoom
+  - placing a corner-square rotate handle with an external curved arrow that
+    remains usable under zoom
   - converting pointer movement around the selection center into a rotation
     angle
   - snapping the angle to 22.5 degree increments while Shift is held
+  - dragging the selection bounds as a move handle, with translated endpoints
+    evaluated against the existing CP snap targets
 - Add a kernel-backed insertion command instead of faking paste through
   `CreaseCopy`. The existing `CreaseCopy` operation transforms current document
   line IDs, but clipboard paste needs to insert copied geometry even after the
@@ -81,6 +91,8 @@ targets editable Oristudio CP documents loaded in `documentMode ===
   - paste: one history entry
   - contextual flip or fixed rotation: one history entry
   - free rotate drag: no history while previewing, one history entry on pointer
+    release
+  - free move drag: no history while previewing, one history entry on pointer
     release
   - canceled transform previews: no history
 - Preserve line colors during mirror. Mirroring geometry should not silently
@@ -128,7 +140,15 @@ targets editable Oristudio CP documents loaded in `documentMode ===
       selection has transformable contents.
 - [x] Add a corner rotate handle with free rotation by default and Shift-held
       22.5 degree snapping.
+- [x] Match the rotate handle to the chosen visual: a small square on the corner
+      with a curved rotate arrow outside the bounds.
+- [x] Support free-moving the selected CP line geometry by dragging inside the
+      dotted transform bounds.
+- [x] Make move dragging respect enabled CP snapping while excluding selected
+      source lines from snap candidates.
 - [x] Add a ghost preview and angle readout while rotating, with Escape cancel
+      before commit.
+- [x] Add a ghost preview and move readout while translating, with Escape cancel
       before commit.
 - [x] Make undo/redo restore CP document state and pasted-line selection.
 - [x] Add unit tests for capabilities, menu routing, clipboard payload
@@ -139,3 +159,5 @@ targets editable Oristudio CP documents loaded in `documentMode ===
       payload shape.
 - [x] Run focused validation: `npm run test:web`, `cargo test -p
       oristudio-cp`, and `wasm-pack test --node crates/oristudio-cp-wasm`.
+- [x] Run follow-up validation for the transform-handle and move-drag UX:
+      web lint, web typecheck, focused clipboard/store tests, and browser smoke.

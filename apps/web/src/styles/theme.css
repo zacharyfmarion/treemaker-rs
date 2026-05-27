@@ -2245,8 +2245,13 @@
   vector-effect: non-scaling-stroke;
 }
 
-.cp-selection-transform__menu-foreign,
-.cp-selection-transform__handle-foreign {
+.cp-selection-transform__move-hit-area {
+  fill: transparent;
+  cursor: move;
+  pointer-events: all;
+}
+
+.cp-selection-transform__menu-foreign {
   overflow: visible;
   pointer-events: all;
 }
@@ -2263,8 +2268,7 @@
   pointer-events: all;
 }
 
-.cp-selection-transform__menu button,
-.cp-selection-transform__rotate-handle {
+.cp-selection-transform__menu button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2277,20 +2281,17 @@
   cursor: pointer;
 }
 
-.cp-selection-transform__menu button:hover,
-.cp-selection-transform__rotate-handle:hover {
+.cp-selection-transform__menu button:hover {
   color: var(--text-primary);
   background: var(--bg-tertiary);
 }
 
-.cp-selection-transform__menu button:focus-visible,
-.cp-selection-transform__rotate-handle:focus-visible {
+.cp-selection-transform__menu button:focus-visible {
   outline: 2px solid var(--accent-primary);
   outline-offset: 1px;
 }
 
-.cp-selection-transform__menu button > svg,
-.cp-selection-transform__rotate-handle > svg {
+.cp-selection-transform__menu button > svg {
   pointer-events: none;
 }
 
@@ -2301,11 +2302,36 @@
 }
 
 .cp-selection-transform__rotate-handle {
-  border: 1px solid color-mix(in srgb, var(--border-default) 90%, transparent);
-  border-radius: 50%;
-  background: var(--bg-elevated);
-  box-shadow: 0 7px 18px var(--shadow-overlay);
   pointer-events: all;
+  cursor: grab;
+}
+
+.cp-selection-transform__rotate-handle:active {
+  cursor: grabbing;
+}
+
+.cp-selection-transform__rotate-hit-area {
+  fill: transparent;
+  pointer-events: all;
+}
+
+.cp-selection-transform__corner-handle {
+  fill: var(--bg-paper);
+  stroke: var(--accent-primary);
+  stroke-width: 1.5;
+  pointer-events: none;
+  vector-effect: non-scaling-stroke;
+}
+
+.cp-selection-transform__rotate-arrow {
+  fill: none;
+  stroke: var(--text-inverse);
+  stroke-width: 2.3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 1px 2px color-mix(in srgb, var(--shadow-overlay) 45%, transparent));
+  pointer-events: none;
+  vector-effect: non-scaling-stroke;
 }
 
 .cp-selection-transform-preview {

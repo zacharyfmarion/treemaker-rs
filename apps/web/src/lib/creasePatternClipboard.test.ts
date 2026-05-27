@@ -3,6 +3,7 @@ import type { OristudioCpDocumentSnapshot, OristudioCpLineSegment } from '../eng
 import {
   buildCpLineClipboardPayload,
   cpLineSelectionBounds,
+  cpLineSelectionMoveAnchorPoints,
   offsetCpLineSegmentsForPaste,
   rotationAngleFromCenter,
   snapRotationDegrees,
@@ -101,6 +102,18 @@ describe('crease-pattern clipboard geometry', () => {
       a: { x: -1, y: 7 },
       b: { x: 1, y: 9 },
     });
+  });
+
+  it('includes selection bounds corners as move snap anchors', () => {
+    const anchors = cpLineSelectionMoveAnchorPoints([
+      cpLine({ x: 0, y: 10 }, { x: 6, y: 0 }),
+      cpLine({ x: 6, y: 0 }, { x: 0, y: -10 }),
+    ]);
+
+    expect(anchors).toContainEqual({ x: 6, y: 10 });
+    expect(anchors).toContainEqual({ x: 6, y: -10 });
+    expect(anchors).toContainEqual({ x: 0, y: 10 });
+    expect(anchors).toContainEqual({ x: 0, y: -10 });
   });
 
   it('rotates and flips selected lines around their content center', () => {

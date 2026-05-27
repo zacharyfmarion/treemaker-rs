@@ -73,6 +73,20 @@ export function cpLineSelectionBounds(
   };
 }
 
+export function cpLineSelectionMoveAnchorPoints(
+  lines: readonly OristudioCpLineSegment[]
+): Point[] {
+  const bounds = cpLineSelectionBounds(lines);
+  if (!bounds) return [];
+  return [
+    ...lines.flatMap((line) => [line.a, line.b]),
+    { x: bounds.minX, y: bounds.minY },
+    { x: bounds.minX, y: bounds.maxY },
+    { x: bounds.maxX, y: bounds.minY },
+    { x: bounds.maxX, y: bounds.maxY },
+  ];
+}
+
 export function offsetCpLineSegmentsForPaste(
   lines: readonly OristudioCpLineSegment[],
   pasteCount: number

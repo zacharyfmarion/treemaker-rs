@@ -36,6 +36,9 @@ targets editable Oristudio CP documents loaded in `documentMode ===
   If CP snapping is enabled, translated endpoints can snap to the grid,
   unselected vertices, and unselected lines so the moved shape falls neatly into
   place without snapping back to its own source geometry.
+- Move snapping also treats the selection-bounds corners as anchors and treats
+  paper corners as point-like snap targets, so a transform-box corner can land
+  exactly on a paper corner.
 - During rotate or move drag, show a lightweight ghost preview and status
   readout. Commit on pointer release; Escape cancels the active transform before
   commit.
@@ -145,6 +148,7 @@ targets editable Oristudio CP documents loaded in `documentMode ===
       dotted transform bounds.
 - [x] Make move dragging respect enabled CP snapping while excluding selected
       source lines from snap candidates.
+- [x] Snap move-drag selection bounds corners to paper corners.
 - [x] Add a ghost preview and angle readout while rotating, with Escape cancel
       before commit.
 - [x] Add a ghost preview and move readout while translating, with Escape cancel

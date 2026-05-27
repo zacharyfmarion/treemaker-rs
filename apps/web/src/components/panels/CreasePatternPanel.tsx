@@ -117,6 +117,7 @@ import {
 } from '../../lib/creasePatternViewport';
 import {
   cpLineSelectionBounds,
+  cpLineSelectionMoveAnchorPoints,
   rotationAngleFromCenter,
   selectedCpLineSegments,
   snapRotationDegrees,
@@ -1635,32 +1636,32 @@ export function CreasePatternPanel() {
 
       if (selectionMoveSnapDocument && snappingEnabled) {
         const translated = translateCpLineSegments(drag.sourceLines, rawDelta);
-        const endpoints = translated.flatMap((line) => [line.a, line.b]);
+        const anchorPoints = cpLineSelectionMoveAnchorPoints(translated);
         const maxDistance = modelSelectionDistance(editableCpBounds, zoomPercent / 100);
         let best:
           | {
               target: CpSnapTarget;
-              endpoint: Point;
+              anchorPoint: Point;
             }
           | null = null;
-        for (const endpoint of endpoints) {
+        for (const anchorPoint of anchorPoints) {
           const target = nearestCpSnapTarget(
             selectionMoveSnapDocument,
-            endpoint,
+            anchorPoint,
             editableCpBounds,
             oristudioCpViewport,
             maxDistance
           );
           if (!target) continue;
           if (!best || target.distance < best.target.distance) {
-            best = { target, endpoint };
+            best = { target, anchorPoint };
           }
         }
         if (best) {
           snappedTarget = best.target;
           delta = {
-            x: rawDelta.x + best.target.point.x - best.endpoint.x,
-            y: rawDelta.y + best.target.point.y - best.endpoint.y,
+            x: rawDelta.x + best.target.point.x - best.anchorPoint.x,
+            y: rawDelta.y + best.target.point.y - best.anchorPoint.y,
           };
         }
       }

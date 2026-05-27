@@ -338,6 +338,8 @@ const ORIEDITA_RAIL_ACTION_OVERRIDES: Partial<
     upstreamMouseMode: 'OPERATION_FRAME_CREATE_61',
   },
   LengthenCreaseSameColor: {
+    group: 'draw',
+    railOrder: 55,
     upstreamAction: 'lengthenCrease2Action',
     upstreamMouseMode: 'LENGTHEN_CREASE_SAME_COLOR_70',
   },

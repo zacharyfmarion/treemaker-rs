@@ -188,3 +188,5 @@ targets editable Oristudio CP documents loaded in `documentMode ===
       selection over line" in the Transform tools.
 - [x] Make Reflect selection over line accept either two snapped points or a
       clicked existing line for the reflection axis.
+- [x] Move Lengthen by Same Color into the Draw tools and highlight the pending
+      source line while lengthen tools wait for the target line.

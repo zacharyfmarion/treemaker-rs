@@ -501,7 +501,7 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
     toolSteps: ['Pick drag start point', 'Pick drag end point'],
     tooltip: 'Unselect crease segments intersecting or overlapping a dragged line',
   }),
-  ready('LengthenCreaseSameColor', 'Lengthen same color', 'transform', 'stretch-horizontal', 'MouseHandlerLengthenCreaseSameColor', {
+  ready('LengthenCreaseSameColor', 'Lengthen by Same Color', 'draw', 'stretch-horizontal', 'MouseHandlerLengthenCreaseSameColor', {
     toolSteps: ['Select line to extend', 'Select target line'],
     tooltip: 'Extend creases crossed by the guide line while preserving original colors',
   }),

@@ -1201,6 +1201,13 @@ export function CreasePatternPanel() {
   )
     ? selectionTransformFrame
     : null;
+  const highlightedEditableLineIds = useMemo(
+    () => [
+      ...pendingSquareBisectorLineIds,
+      ...(pendingLengthenLineId === null ? [] : [pendingLengthenLineId]),
+    ],
+    [pendingLengthenLineId, pendingSquareBisectorLineIds]
+  );
   const liveCommandPreviewPoints = useMemo(() => {
     if (cpToolPath.length > 0) return cpToolPath;
     if (!activeCpCommand || cpToolState.phase !== 'active') return cpToolPoints;
@@ -3461,7 +3468,7 @@ export function CreasePatternPanel() {
                         commandPreviewCircles={renderedCommandPreviewCircles}
                         commandPreviewPoints={renderedCommandPreviewPoints}
                         commandPreviewSegments={renderedCommandPreviewSegments}
-                        highlightedLineIds={pendingSquareBisectorLineIds}
+                        highlightedLineIds={highlightedEditableLineIds}
                         selectionTransformFrame={visibleSelectionTransformFrame}
                         selectionTransformPreview={selectionRotationPreview}
                         selectionTransformUiScale={cpUiScale}

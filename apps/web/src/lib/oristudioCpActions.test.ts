@@ -62,6 +62,10 @@ describe('oristudio CP action registry', () => {
       'Rabbit Ear',
       'Flat Foldable Line',
       'Extend Line',
+      'Lengthen by Same Color',
+    ]);
+
+    expect(cpRailActions().slice(14, 15).map((action) => action.label)).toEqual([
       'Perpendicular Line',
     ]);
 

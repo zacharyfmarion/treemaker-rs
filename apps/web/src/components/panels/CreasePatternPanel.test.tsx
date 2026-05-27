@@ -2658,6 +2658,11 @@ describe('CreasePatternPanel', () => {
     });
     expect(executeOristudioCpCommand).not.toHaveBeenCalled();
     expect(container.textContent).toContain('Extend Line: Select target line');
+    expect(
+      container
+        .querySelector<SVGLineElement>('[data-cp-line-id="1"]')
+        ?.classList.contains('crease--selected')
+    ).toBe(true);
 
     await act(async () => {
       container.querySelector<SVGLineElement>('[data-cp-line-id="2"]')?.dispatchEvent(

@@ -3,6 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useLayoutStore } from '../store/layoutStore';
 import { useSettingsStore, type SettingsTab } from '../store/settingsStore';
+import { useShortcutStore } from '../store/shortcutStore';
 import { useThemeStore } from '../store/themeStore';
 import { applyTheme, DEFAULT_THEME, PRESET_THEMES } from '../themes';
 import { CommandDialogModal } from './CommandDialogModal';
@@ -12,6 +13,7 @@ import { SettingsModal } from './SettingsModal';
 
 const initialSettingsState = useSettingsStore.getInitialState();
 const initialLayoutState = useLayoutStore.getInitialState();
+const initialShortcutState = useShortcutStore.getInitialState();
 
 let root: Root | null = null;
 let container: HTMLDivElement | null = null;
@@ -42,6 +44,15 @@ function themeNamesForSection(rendered: HTMLElement, label: string): string[] {
   );
 }
 
+function shortcutRowFor(label: string): HTMLElement {
+  const row = Array.from(container?.querySelectorAll('.settings-shortcuts__row') ?? []).find(
+    (element) =>
+      element.querySelector('.settings-shortcuts__copy span')?.textContent === label
+  );
+  expect(row).toBeDefined();
+  return row as HTMLElement;
+}
+
 function renderModal(tab?: SettingsTab) {
   useSettingsStore.getState().openSettings(tab);
   container = document.createElement('div');
@@ -67,6 +78,7 @@ beforeEach(() => {
   });
   useSettingsStore.setState(initialSettingsState, true);
   useLayoutStore.setState(initialLayoutState, true);
+  useShortcutStore.setState(initialShortcutState, true);
 });
 
 afterEach(() => {
@@ -120,6 +132,76 @@ describe('SettingsModal', () => {
     });
 
     expect(resetLayout).toHaveBeenCalledOnce();
+  });
+
+  it('captures, clears, and resets shortcuts', () => {
+    const rendered = renderModal('shortcuts');
+
+    expect(rendered.textContent).toContain('Shortcuts');
+    expect(rendered.textContent).toContain('Save');
+
+    const saveRow = shortcutRowFor('Save');
+    const capture = saveRow?.querySelector('.settings-shortcuts__capture') as HTMLButtonElement;
+
+    act(() => {
+      capture.click();
+    });
+    act(() => {
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 's',
+          ctrlKey: true,
+          altKey: true,
+          bubbles: true,
+          cancelable: true,
+        })
+      );
+    });
+
+    expect(useShortcutStore.getState().overrides['file.save']).toEqual({
+      primary: true,
+      alt: true,
+      key: 's',
+    });
+    expect(rendered.textContent).toMatch(/(Alt|Option)\+S/u);
+
+    const clear = saveRow?.querySelector('[aria-label="Clear Save shortcut"]') as HTMLButtonElement;
+    act(() => {
+      clear.click();
+    });
+
+    expect(useShortcutStore.getState().overrides['file.save']).toBeNull();
+    expect(rendered.textContent).toContain('Unassigned');
+
+    const reset = saveRow?.querySelector('[aria-label="Reset Save shortcut"]') as HTMLButtonElement;
+    act(() => {
+      reset.click();
+    });
+
+    expect(useShortcutStore.getState().overrides['file.save']).toBeUndefined();
+  });
+
+  it('blocks conflicting shortcut captures', () => {
+    const rendered = renderModal('shortcuts');
+    const saveRow = shortcutRowFor('Save');
+    const capture = saveRow?.querySelector('.settings-shortcuts__capture') as HTMLButtonElement;
+
+    act(() => {
+      capture.click();
+    });
+    act(() => {
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'o',
+          ctrlKey: true,
+          bubbles: true,
+          cancelable: true,
+        })
+      );
+    });
+
+    expect(useShortcutStore.getState().overrides['file.save']).toBeUndefined();
+    expect(rendered.textContent).toContain('already assigned to Open');
   });
 
   it('closes on Escape', () => {

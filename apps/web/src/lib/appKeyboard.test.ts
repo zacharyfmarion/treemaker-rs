@@ -136,4 +136,29 @@ describe('app keyboard shortcuts', () => {
 
     expect(actions.handleMenuAction).toHaveBeenCalledWith('edit.delete');
   });
+
+  it('honors user shortcut overrides', () => {
+    const actions = {
+      ...createActions({ kind: 'tree' }),
+      getShortcutOverrides: vi.fn(() => ({
+        'file.save': { primary: true, alt: true, key: 's' },
+      })),
+    };
+    const original = new KeyboardEvent('keydown', {
+      key: 's',
+      ctrlKey: true,
+      cancelable: true,
+    });
+    const rebound = new KeyboardEvent('keydown', {
+      key: 's',
+      ctrlKey: true,
+      altKey: true,
+      cancelable: true,
+    });
+
+    expect(handleAppKeyDown(original, actions)).toBe(false);
+    expect(handleAppKeyDown(rebound, actions)).toBe(true);
+
+    expect(actions.handleMenuAction).toHaveBeenCalledWith('file.save');
+  });
 });

@@ -24,6 +24,8 @@ import {
   Waypoints,
 } from 'lucide-react';
 import { handleMenuAction } from '../../commands/menuActions';
+import { handleShortcutKeyDown } from '../../keyboard/shortcutDispatcher';
+import type { ViewportShortcutId } from '../../keyboard/shortcuts';
 import { formatNumber, paperToSvg, type Point } from '../../lib/geometry';
 import {
   DEFAULT_DESIGN_VIEW_LAYERS,
@@ -63,6 +65,7 @@ import {
   symmetrySide,
 } from '../../lib/symmetryAuthoring';
 import { useWorkspaceStore } from '../../store/workspaceStore';
+import { useShortcutStore } from '../../store/shortcutStore';
 import { Button } from '../ui/Button';
 import { IconButton } from '../ui/IconButton';
 import { Toggle } from '../ui/Toggle';
@@ -477,6 +480,7 @@ export function DesignPanel() {
   const designViewportFitRequestId = useWorkspaceStore(
     (state) => state.designViewportFitRequestId
   );
+  const shortcutOverrides = useShortcutStore((state) => state.overrides);
   const mirrorMode = toolMode === 'symmetry';
   const inferredSymmetryMode = symmetrySelectValueForState({
     hasSymmetry: project.hasSymmetry,
@@ -611,6 +615,26 @@ export function DesignPanel() {
   const setZoomLevel = useCallback((scale: number) => {
     transformRef.current?.centerView(scale, 160);
   }, []);
+
+  const handleViewportShortcut = useCallback(
+    (id: ViewportShortcutId) => {
+      switch (id) {
+        case 'viewport.zoomIn':
+          transformRef.current?.zoomIn(0.35, 120);
+          break;
+        case 'viewport.zoomOut':
+          transformRef.current?.zoomOut(0.35, 120);
+          break;
+        case 'viewport.fit':
+          fitToView();
+          break;
+        case 'viewport.actualSize':
+          setActualSize();
+          break;
+      }
+    },
+    [fitToView, setActualSize]
+  );
 
   const lastFittedProjectLoadIdRef = useRef<number | null>(null);
   const lastHandledFitRequestRef = useRef(0);
@@ -792,28 +816,15 @@ export function DesignPanel() {
         return;
       }
 
-      if (interactive || (!event.metaKey && !event.ctrlKey)) return;
+      if (interactive) return;
 
-      switch (event.key) {
-        case '=':
-        case '+':
-          event.preventDefault();
-          transformRef.current?.zoomIn(0.35, 120);
-          break;
-        case '-':
-        case '_':
-          event.preventDefault();
-          transformRef.current?.zoomOut(0.35, 120);
-          break;
-        case '0':
-          event.preventDefault();
-          fitToView();
-          break;
-        case '1':
-          event.preventDefault();
-          setActualSize();
-          break;
-      }
+      handleShortcutKeyDown(event, {
+        scopeStack: ['viewport'],
+        overrides: shortcutOverrides,
+        executors: {
+          viewport: handleViewportShortcut,
+        },
+      });
     };
 
     const onKeyUp = (event: KeyboardEvent) => {
@@ -831,7 +842,7 @@ export function DesignPanel() {
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', clearSpace);
     };
-  }, [fitToView, setActualSize]);
+  }, [handleViewportShortcut, shortcutOverrides]);
 
   const onPaperPointerDown = (event: PointerEvent<SVGRectElement>) => {
     if (event.button !== 0 || spacePressed) return;

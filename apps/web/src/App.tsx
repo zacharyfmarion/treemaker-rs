@@ -38,6 +38,7 @@ import { applyWindowTitle, formatWindowTitle } from './platform/windowTitle';
 import { requestConfirmation } from './store/commandDialogStore';
 import { applyDefaultLayout, useLayoutStore } from './store/layoutStore';
 import { useSettingsStore } from './store/settingsStore';
+import { useShortcutStore } from './store/shortcutStore';
 import { useThemeStore } from './store/themeStore';
 import { useWorkspaceStore } from './store/workspaceStore';
 import { useWorkspaceCapabilities } from './store/workspaceStore/useWorkspaceCapabilities';
@@ -247,6 +248,7 @@ export default function App() {
         getSelection: () => useWorkspaceStore.getState().selection,
         handleMenuAction,
         selectNone,
+        getShortcutOverrides: () => useShortcutStore.getState().overrides,
       });
     };
     window.addEventListener('keydown', onKeyDown);

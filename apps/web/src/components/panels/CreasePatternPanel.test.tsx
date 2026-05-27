@@ -685,6 +685,9 @@ describe('CreasePatternPanel', () => {
     expect(container.querySelector('button[aria-label="Valley"]')?.textContent).toContain('V');
     expect(container.querySelector('button[aria-label="Edge"]')?.textContent).toContain('E');
     expect(container.querySelector('button[aria-label="Auxiliary"]')?.textContent).toContain('A');
+    expect(
+      container.querySelector<HTMLButtonElement>('button[aria-label="Rabbit Ear"]')?.title
+    ).toMatch(/(Ctrl|Cmd)\+B/u);
 
     const drawCreaseButton = container.querySelector<HTMLButtonElement>(
       'button[aria-label="Line"]'
@@ -734,6 +737,15 @@ describe('CreasePatternPanel', () => {
     expect(foldEstimateButton?.getAttribute('data-ui-status')).toBe('porting');
     expect(foldEstimateButton?.title).toContain('Kernel port is in progress');
     expect(boxSelectButton?.hasAttribute('data-active')).toBe(true);
+
+    act(() => {
+      container.querySelector<HTMLElement>('.cp-panel__body')?.dispatchEvent(
+        new KeyboardEvent('keydown', { bubbles: true, key: 'v' })
+      );
+    });
+    expect(container.querySelector('button[aria-label="Valley"]')?.getAttribute('data-active')).toBe(
+      'true'
+    );
 
     act(() => {
       drawCreaseButton?.click();

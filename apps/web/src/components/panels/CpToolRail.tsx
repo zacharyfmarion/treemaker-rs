@@ -81,7 +81,9 @@ import {
   type OristudioCpActionId,
 } from '../../lib/oristudioCpActions';
 import type { OristudioCpLineColor } from '../../engine/oristudioCpTypes';
+import { shortcutLabelForAction } from '../../keyboard/shortcuts';
 import type { OristudioCpOperationId } from '../../lib/oristudioCpCommands';
+import { useShortcutStore } from '../../store/shortcutStore';
 
 interface CpToolRailProps {
   activeActionId: OristudioCpActionId | null;
@@ -297,6 +299,8 @@ export function CpToolRail({
   editable,
   onSelectAction,
 }: CpToolRailProps) {
+  const shortcutOverrides = useShortcutStore((state) => state.overrides);
+
   return (
     <aside className="cp-tool-rail" aria-label="Crease pattern tools">
       <div className="cp-tool-rail__groups">
@@ -323,6 +327,7 @@ export function CpToolRail({
                         : activeActionId === action.id
                     }
                     onSelectAction={onSelectAction}
+                    shortcutLabel={shortcutLabelForAction(action.id, shortcutOverrides)}
                   />
                 ))}
               </div>
@@ -339,11 +344,13 @@ function CpToolButton({
   editable,
   isActive,
   onSelectAction,
+  shortcutLabel,
 }: {
   action: OristudioCpActionDefinition;
   editable: boolean;
   isActive: boolean;
   onSelectAction: (action: OristudioCpActionDefinition) => void;
+  shortcutLabel?: string;
 }) {
   const Icon =
     action.kind === 'command'
@@ -354,6 +361,9 @@ function CpToolButton({
     (action.kind === 'command' ? ORIEDITA_OPERATION_GLYPHS[action.operationId] : undefined);
   const available = editable && action.uiStatus === 'ready';
   const statusLabel = commandStatusLabel(action, editable);
+  const title = shortcutLabel
+    ? `${action.label} (${shortcutLabel}) - ${statusLabel}`
+    : `${action.label} - ${statusLabel}`;
 
   return (
     <button
@@ -365,7 +375,7 @@ function CpToolButton({
       data-action-kind={action.kind}
       data-line-color={action.kind === 'line-type' ? action.lineColor : undefined}
       data-ui-status={action.uiStatus}
-      title={`${action.label} - ${statusLabel}`}
+      title={title}
       onClick={() => {
         if (!available) return;
         onSelectAction(action);

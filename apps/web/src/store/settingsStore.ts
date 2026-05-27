@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 
-export type SettingsTab = 'appearance' | 'workspace';
+export type SettingsTab = 'appearance' | 'shortcuts' | 'workspace';
 
 interface SettingsState {
   isSettingsOpen: boolean;

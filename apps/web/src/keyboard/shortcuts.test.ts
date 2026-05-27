@@ -1,0 +1,83 @@
+import { describe, expect, it } from 'vitest';
+import {
+  classifyReservedKey,
+  findShortcutConflict,
+  formatKeyChord,
+  getResolvedShortcut,
+  getShortcutRegistryDiagnostics,
+  keyChordEquals,
+  parseOrieditaKeyStroke,
+  SHORTCUT_DEFINITIONS,
+  shortcutLabelForAction,
+} from './shortcuts';
+
+describe('shortcut registry', () => {
+  it('parses Oriedita keystrokes into normalized chords', () => {
+    expect(parseOrieditaKeyStroke('ctrl shift V', { ctrlAsPrimary: true })).toEqual({
+      primary: true,
+      shift: true,
+      key: 'v',
+    });
+    expect(parseOrieditaKeyStroke('DELETE')).toEqual({ key: 'delete' });
+    expect(parseOrieditaKeyStroke('F')).toEqual({ key: 'f' });
+  });
+
+  it('formats primary modifiers for each platform', () => {
+    const chord = { primary: true, shift: true, key: 's' };
+
+    expect(formatKeyChord(chord, { platform: 'mac' })).toBe('Cmd+Shift+S');
+    expect(formatKeyChord(chord, { platform: 'other' })).toBe('Ctrl+Shift+S');
+  });
+
+  it('keeps hybrid globals while applying Oriedita scoped CP defaults', () => {
+    expect(shortcutLabelForAction('file.saveAs')).toMatch(/Shift\+S$/u);
+    expect(getResolvedShortcut('cp.action.line-type.mountain')).toEqual({
+      key: 'm',
+    });
+    expect(getResolvedShortcut('cp.action.line-type.valley')).toEqual({
+      key: 'v',
+    });
+    expect(getResolvedShortcut('cp.action.line-type.edge')).toEqual({
+      key: 'l',
+    });
+    expect(getResolvedShortcut('cp.action.draw-crease')).toBeNull();
+  });
+
+  it('detects conflicts only across overlapping scopes', () => {
+    const conflict = findShortcutConflict('file.open', { primary: true, key: 's' });
+    expect(conflict?.id).toBe('file.save');
+
+    expect(
+      findShortcutConflict('cp.action.line-type.mountain', { primary: true, key: 's' })
+    ).toBeNull();
+  });
+
+  it('classifies high-risk browser shortcuts', () => {
+    expect(classifyReservedKey({ primary: true, key: 'l' })).toBe('hard-reserved');
+    expect(classifyReservedKey({ primary: true, key: 'r' })).toBe('soft-reserved');
+    expect(classifyReservedKey({ key: 'm' })).toBe('allowed');
+  });
+
+  it('normalizes equivalent chords', () => {
+    expect(keyChordEquals({ key: 'DELETE' }, { key: 'delete' })).toBe(true);
+  });
+
+  it('keeps every shortcut id unique', () => {
+    const ids = SHORTCUT_DEFINITIONS.map((definition) => definition.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('reports import diagnostics for follow-up mapping work', () => {
+    const diagnostics = getShortcutRegistryDiagnostics();
+
+    expect(diagnostics.unmappedOrieditaActions).toContain('exitAction');
+    expect(diagnostics.reservedDefaultChords).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          actionId: 'optimize.scale',
+          classification: 'soft-reserved',
+        }),
+      ])
+    );
+  });
+});

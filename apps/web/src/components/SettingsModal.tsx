@@ -1,8 +1,19 @@
 import { useEffect, useMemo, useState, type ReactElement } from 'react';
-import { Check, LayoutDashboard, Palette, RotateCcw, X } from 'lucide-react';
+import { Check, Keyboard, LayoutDashboard, Palette, RotateCcw, X } from 'lucide-react';
+import {
+  classifyReservedKey,
+  findShortcutConflict,
+  formatKeyChord,
+  getResolvedShortcut,
+  keyChordFromKeyboardEvent,
+  SHORTCUT_DEFINITIONS,
+  shortcutLabelForAction,
+  type ShortcutActionId,
+} from '../keyboard/shortcuts';
 import { requestConfirmation } from '../store/commandDialogStore';
 import { useLayoutStore } from '../store/layoutStore';
 import { type SettingsTab, useSettingsStore } from '../store/settingsStore';
+import { useShortcutStore } from '../store/shortcutStore';
 import { useThemeStore } from '../store/themeStore';
 import type { TreeMakerTheme } from '../themes';
 import { Button } from './ui/Button';
@@ -10,11 +21,13 @@ import { IconButton } from './ui/IconButton';
 
 const TABS: Array<{ key: SettingsTab; label: string; icon: typeof Palette }> = [
   { key: 'appearance', label: 'Appearance', icon: Palette },
+  { key: 'shortcuts', label: 'Shortcuts', icon: Keyboard },
   { key: 'workspace', label: 'Workspace', icon: LayoutDashboard },
 ];
 
 const TAB_TITLES: Record<SettingsTab, string> = {
   appearance: 'Appearance',
+  shortcuts: 'Shortcuts',
   workspace: 'Workspace',
 };
 
@@ -126,8 +139,193 @@ function WorkspaceTab() {
   );
 }
 
+function ShortcutsTab() {
+  const overrides = useShortcutStore((state) => state.overrides);
+  const setShortcut = useShortcutStore((state) => state.setShortcut);
+  const clearShortcut = useShortcutStore((state) => state.clearShortcut);
+  const resetShortcut = useShortcutStore((state) => state.resetShortcut);
+  const resetAllShortcuts = useShortcutStore((state) => state.resetAllShortcuts);
+  const [search, setSearch] = useState('');
+  const [assignedOnly, setAssignedOnly] = useState(false);
+  const [capturingId, setCapturingId] = useState<ShortcutActionId | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!capturingId) return undefined;
+    const onKeyDown = (event: KeyboardEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.key === 'Escape') {
+        setCapturingId(null);
+        setMessage(null);
+        return;
+      }
+      const chord = keyChordFromKeyboardEvent(event);
+      if (!chord) return;
+      const reserved = classifyReservedKey(chord);
+      if (reserved === 'hard-reserved') {
+        setMessage(`${formatKeyChord(chord)} is reserved by the browser.`);
+        return;
+      }
+      const conflict = findShortcutConflict(capturingId, chord, overrides);
+      if (conflict) {
+        setMessage(`${formatKeyChord(chord)} is already assigned to ${conflict.label}.`);
+        return;
+      }
+      setShortcut(capturingId, chord);
+      setCapturingId(null);
+      setMessage(
+        reserved === 'soft-reserved'
+          ? `${formatKeyChord(chord)} was assigned, but some browsers may reserve it.`
+          : null
+      );
+    };
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => window.removeEventListener('keydown', onKeyDown, true);
+  }, [capturingId, overrides, setShortcut]);
+
+  const rows = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return SHORTCUT_DEFINITIONS.filter((definition) => {
+      const current = getResolvedShortcut(definition.id, overrides);
+      if (assignedOnly && !current) return false;
+      if (!query) return true;
+      return [
+        definition.label,
+        definition.category,
+        definition.scope,
+        definition.upstreamAction ?? '',
+        shortcutLabelForAction(definition.id, overrides) ?? '',
+      ]
+        .join(' ')
+        .toLowerCase()
+        .includes(query);
+    });
+  }, [assignedOnly, overrides, search]);
+
+  const groupedRows = useMemo(() => {
+    return rows.reduce<Record<string, typeof rows>>((groups, row) => {
+      groups[row.category] = groups[row.category] ?? [];
+      groups[row.category].push(row);
+      return groups;
+    }, {});
+  }, [rows]);
+
+  const resetAll = () => {
+    void requestConfirmation({
+      title: 'Reset Shortcuts',
+      message: 'Restore all keyboard shortcuts to their defaults?',
+      confirmLabel: 'Reset',
+      tone: 'danger',
+    }).then((confirmed) => {
+      if (!confirmed) return;
+      resetAllShortcuts();
+      setCapturingId(null);
+      setMessage(null);
+    });
+  };
+
+  return (
+    <div className="settings-tab settings-shortcuts">
+      <section className="settings-section">
+        <div className="settings-shortcuts__toolbar">
+          <input
+            type="search"
+            value={search}
+            placeholder="Search shortcuts"
+            aria-label="Search shortcuts"
+            onChange={(event) => setSearch(event.target.value)}
+          />
+          <label className="settings-shortcuts__assigned">
+            <input
+              type="checkbox"
+              checked={assignedOnly}
+              onChange={(event) => setAssignedOnly(event.target.checked)}
+            />
+            Assigned
+          </label>
+          <Button size="sm" variant="secondary" onClick={resetAll}>
+            <RotateCcw size={14} />
+            Reset All
+          </Button>
+        </div>
+        {message && <div className="settings-shortcuts__message">{message}</div>}
+      </section>
+
+      {Object.entries(groupedRows).map(([category, definitions]) => (
+        <section key={category} className="settings-section">
+          <h3 className="settings-section__title">{category}</h3>
+          <div className="settings-shortcuts__table">
+            {definitions.map((definition) => {
+              const current = getResolvedShortcut(definition.id, overrides);
+              const defaultChord = definition.defaultChord;
+              const hasOverride = Object.prototype.hasOwnProperty.call(
+                overrides,
+                definition.id
+              );
+              return (
+                <div key={definition.id} className="settings-shortcuts__row">
+                  <div className="settings-shortcuts__copy">
+                    <span>{definition.label}</span>
+                    <small>
+                      {definition.scope}
+                      {definition.upstreamAction ? ` - ${definition.upstreamAction}` : ''}
+                    </small>
+                  </div>
+                  <button
+                    type="button"
+                    className="settings-shortcuts__capture"
+                    data-capturing={capturingId === definition.id || undefined}
+                    onClick={() => {
+                      setCapturingId(definition.id);
+                      setMessage(`Press a shortcut for ${definition.label}.`);
+                    }}
+                  >
+                    {capturingId === definition.id
+                      ? 'Press keys'
+                      : current
+                        ? formatKeyChord(current)
+                        : 'Unassigned'}
+                  </button>
+                  <span className="settings-shortcuts__default">
+                    {defaultChord ? formatKeyChord(defaultChord) : '-'}
+                  </span>
+                  <IconButton
+                    size="sm"
+                    aria-label={`Clear ${definition.label} shortcut`}
+                    onClick={() => {
+                      clearShortcut(definition.id);
+                      setCapturingId(null);
+                      setMessage(null);
+                    }}
+                  >
+                    <X size={13} />
+                  </IconButton>
+                  <IconButton
+                    size="sm"
+                    aria-label={`Reset ${definition.label} shortcut`}
+                    disabled={!hasOverride}
+                    onClick={() => {
+                      resetShortcut(definition.id);
+                      setCapturingId(null);
+                      setMessage(null);
+                    }}
+                  >
+                    <RotateCcw size={13} />
+                  </IconButton>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      ))}
+    </div>
+  );
+}
+
 const TAB_COMPONENTS: Record<SettingsTab, () => ReactElement> = {
   appearance: AppearanceTab,
+  shortcuts: ShortcutsTab,
   workspace: WorkspaceTab,
 };
 

@@ -2232,6 +2232,115 @@
   vector-effect: non-scaling-stroke;
 }
 
+.cp-selection-transform {
+  pointer-events: none;
+}
+
+.cp-selection-transform__box {
+  fill: color-mix(in srgb, var(--accent-primary) 8%, transparent);
+  stroke: color-mix(in srgb, var(--accent-primary) 86%, var(--text-primary));
+  stroke-width: 1.2;
+  stroke-dasharray: 4 4;
+  pointer-events: none;
+  vector-effect: non-scaling-stroke;
+}
+
+.cp-selection-transform__move-hit-area {
+  fill: transparent;
+  cursor: move;
+  pointer-events: all;
+}
+
+.cp-selection-transform__menu-foreign {
+  overflow: visible;
+  pointer-events: all;
+}
+
+.cp-selection-transform__menu {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px;
+  border: 1px solid color-mix(in srgb, var(--border-default) 88%, transparent);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--bg-elevated) 94%, transparent);
+  box-shadow: 0 8px 22px var(--shadow-overlay);
+  pointer-events: all;
+}
+
+.cp-selection-transform__menu button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 25px;
+  height: 25px;
+  border: 0;
+  border-radius: 5px;
+  color: var(--text-secondary);
+  background: transparent;
+  cursor: pointer;
+}
+
+.cp-selection-transform__menu button:hover {
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+}
+
+.cp-selection-transform__menu button:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 1px;
+}
+
+.cp-selection-transform__menu button > svg {
+  pointer-events: none;
+}
+
+.cp-selection-transform__separator {
+  width: 1px;
+  height: 18px;
+  background: var(--border-subtle);
+}
+
+.cp-selection-transform__rotate-hit-area {
+  fill: transparent;
+  pointer-events: all;
+  cursor:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M17 5v5h-5' fill='none' stroke='%230d1114' stroke-width='2.3' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M17 10a6.5 6.5 0 1 0 1.6 4.3' fill='none' stroke='%230d1114' stroke-width='2.3' stroke-linecap='round'/%3E%3C/svg%3E")
+      12 12,
+    grab;
+}
+
+.cp-selection-transform__resize-handle {
+  fill: var(--bg-paper);
+  stroke: var(--accent-primary);
+  stroke-width: 1.5;
+  pointer-events: all;
+  vector-effect: non-scaling-stroke;
+}
+
+.cp-selection-transform__resize-handle[data-cp-resize-cursor='ew'] {
+  cursor: ew-resize;
+}
+
+.cp-selection-transform__resize-handle[data-cp-resize-cursor='ns'] {
+  cursor: ns-resize;
+}
+
+.cp-selection-transform__resize-handle[data-cp-resize-cursor='nwse'] {
+  cursor: nwse-resize;
+}
+
+.cp-selection-transform__resize-handle[data-cp-resize-cursor='nesw'] {
+  cursor: nesw-resize;
+}
+
+.cp-selection-transform-preview {
+  opacity: 0.66;
+  stroke-dasharray: 7 4;
+  pointer-events: none;
+  vector-effect: non-scaling-stroke;
+}
+
 .cp-command-candidate-point {
   fill: var(--accent-primary);
   stroke: var(--bg-primary);

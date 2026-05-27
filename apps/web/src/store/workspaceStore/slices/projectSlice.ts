@@ -70,9 +70,11 @@ import {
   createBlankOristudioCpDocument,
   getOristudioCpOperationDescriptors,
   loadOristudioCpDocumentFromText,
+  insertOristudioCpLineSegments as insertRuntimeOristudioCpLineSegments,
   oristudioCpError,
   previewOristudioCpCommand as previewRuntimeOristudioCpCommand,
   releaseOristudioCpDocument,
+  replaceOristudioCpLineSegments as replaceRuntimeOristudioCpLineSegments,
   restoreOristudioCpDocument,
   setOristudioCpDocumentSource,
 } from '../oristudioCpRuntime';
@@ -194,6 +196,17 @@ function oristudioCpSelectionAfterCommand(
   };
 }
 
+function selectedLineSelectionFromDocument(
+  document: OristudioCpDocumentSnapshot
+): OristudioCpSelection {
+  return {
+    ...emptyOristudioCpSelection(),
+    lines: document.crease_pattern.line_segments
+      .map((line, index) => (line.selected === 0 ? null : index + 1))
+      .filter((id): id is number => id !== null),
+  };
+}
+
 function basenameWithoutProjectExtension(filename: string): string {
   return filename.replace(/\.(osf|tmd5?|tmd4)$/i, '') || 'Untitled';
 }
@@ -309,6 +322,57 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
       initialOptions: defaultCreaseExportOptions(get().creaseColorMode),
       confirmLabel: `Export ${label}`,
     });
+  };
+
+  const applyOristudioCpLineMutation = async (
+    label: string,
+    mutate: () => Promise<OristudioCpDocumentState>
+  ): Promise<boolean> => {
+    if (!get().oristudioCpDocument) {
+      set({
+        oristudioCpError: 'No editable crease-pattern document is loaded',
+        error: {
+          code: 'invalid_operation',
+          message: 'No editable crease-pattern document is loaded',
+        },
+      });
+      return false;
+    }
+
+    try {
+      const previousDocument = get().oristudioCpDocument?.document ?? null;
+      const previousSelection = get().oristudioCpSelection;
+      const commandDocument = await mutate();
+      const checked = await refreshAlwaysOnCamvDiagnostics(commandDocument);
+      const nextDocument = checked.documentState;
+      set({
+        oristudioCpDocument: nextDocument,
+        oristudioCpCamvResult: checked.camvResult,
+        oristudioCpOperationDescriptors: nextDocument.operationDescriptors,
+        oristudioCpError: null,
+        oristudioCpActiveDiagnosticId: null,
+        oristudioCpSelection: selectedLineSelectionFromDocument(nextDocument.document),
+        oristudioCpHistoryPast: previousDocument
+          ? [
+              ...get().oristudioCpHistoryPast,
+              cpHistoryEntry(previousDocument, label, previousSelection),
+            ]
+          : get().oristudioCpHistoryPast,
+        oristudioCpHistoryFuture: [],
+        ...staleFoldArtifactResourceState(get().foldArtifactRevision),
+        error: null,
+        dirty: true,
+        projectMessage: label,
+      });
+      return true;
+    } catch (error) {
+      const normalized = oristudioCpError(error);
+      set({
+        oristudioCpError: normalized.message,
+        error: normalized,
+      });
+      return false;
+    }
   };
 
   const loadText = async (
@@ -1116,6 +1180,24 @@ export const createProjectSlice: WorkspaceSliceCreator<ProjectSlice> = (set, get
         });
         return false;
       }
+    },
+
+    insertOristudioCpLineSegments: async (segments, label = 'Paste CP lines') => {
+      if (segments.length === 0) return false;
+      return applyOristudioCpLineMutation(label, () =>
+        insertRuntimeOristudioCpLineSegments(segments)
+      );
+    },
+
+    replaceOristudioCpLineSegments: async (
+      lineIds,
+      segments,
+      label = 'Transform CP selection'
+    ) => {
+      if (lineIds.length === 0 || segments.length === 0) return false;
+      return applyOristudioCpLineMutation(label, () =>
+        replaceRuntimeOristudioCpLineSegments(lineIds, segments)
+      );
     },
 
     previewOristudioCpCommand: async (operationId, payload = {}) => {

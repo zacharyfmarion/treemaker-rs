@@ -304,6 +304,8 @@ const ORIEDITA_RAIL_ACTION_OVERRIDES: Partial<
     upstreamMouseMode: 'DRAW_POINT_14',
   },
   DrawCreaseSymmetric: {
+    label: 'Reflect selection over line',
+    group: 'transform',
     upstreamAction: 'reflectAction',
     upstreamMouseMode: 'DRAW_CREASE_SYMMETRIC_12',
   },
@@ -336,6 +338,8 @@ const ORIEDITA_RAIL_ACTION_OVERRIDES: Partial<
     upstreamMouseMode: 'OPERATION_FRAME_CREATE_61',
   },
   LengthenCreaseSameColor: {
+    group: 'draw',
+    railOrder: 55,
     upstreamAction: 'lengthenCrease2Action',
     upstreamMouseMode: 'LENGTHEN_CREASE_SAME_COLOR_70',
   },

@@ -4,6 +4,7 @@ import {
   ORISTUDIO_CP_ACTION_GROUPS,
   ORISTUDIO_CP_LINE_TYPE_ACTIONS,
   cpActionById,
+  cpActionByOperation,
   cpRailActions,
 } from './oristudioCpActions';
 import { ORISTUDIO_CP_COMMANDS } from './oristudioCpCommands';
@@ -61,6 +62,10 @@ describe('oristudio CP action registry', () => {
       'Rabbit Ear',
       'Flat Foldable Line',
       'Extend Line',
+      'Lengthen by Same Color',
+    ]);
+
+    expect(cpRailActions().slice(14, 15).map((action) => action.label)).toEqual([
       'Perpendicular Line',
     ]);
 
@@ -144,6 +149,14 @@ describe('oristudio CP action registry', () => {
       inputMode: 'drag-line',
       lineInputMode: 'aux-line',
       uiStatus: 'not-implemented',
+    });
+
+    expect(cpActionByOperation('DrawCreaseSymmetric')).toMatchObject({
+      kind: 'command',
+      operationId: 'DrawCreaseSymmetric',
+      label: 'Reflect selection over line',
+      group: 'transform',
+      toolSteps: ['Select 2 points or select a line', 'Pick reflection line end'],
     });
   });
 });

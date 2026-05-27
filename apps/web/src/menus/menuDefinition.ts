@@ -172,6 +172,17 @@ export function getMenuBarDef(): MenuDef[] {
         },
         {
           type: 'submenu',
+          label: 'Transform Selection',
+          items: [
+            { type: 'action', id: 'cp.transformFlipHorizontal', label: 'Flip Horizontal' },
+            { type: 'action', id: 'cp.transformFlipVertical', label: 'Flip Vertical' },
+            { type: 'separator' },
+            { type: 'action', id: 'cp.transformRotateLeft', label: 'Rotate Left 90' },
+            { type: 'action', id: 'cp.transformRotateRight', label: 'Rotate Right 90' },
+          ],
+        },
+        {
+          type: 'submenu',
           label: 'Diagnostics',
           items: [
             { type: 'action', id: 'cp.checkCamv', label: 'Check CAMV', shortcut: `${mod}+Shift+M` },

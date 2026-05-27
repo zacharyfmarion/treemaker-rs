@@ -337,6 +337,36 @@ describe('crease pattern viewport helpers', () => {
     ).toMatchObject({ kind: 'grid', point: { x: 40, y: 40 } });
   });
 
+  it('treats paper corners as point-like snap targets', () => {
+    const options = {
+      gridVisible: false,
+      snapToGrid: false,
+      snapToVertices: true,
+      snapToLines: false,
+    };
+
+    expect(
+      nearestCpSnapTarget(document, { x: 198, y: 199 }, ORIEDITA_PAPER_BOUNDS, options, 4)
+    ).toMatchObject({
+      kind: 'vertex',
+      label: 'paper top right',
+      point: { x: 200, y: 200 },
+    });
+    expect(
+      nearestOrieditaDrawPointTarget(
+        document,
+        { x: -198, y: -199 },
+        ORIEDITA_PAPER_BOUNDS,
+        options,
+        4
+      )
+    ).toMatchObject({
+      kind: 'vertex',
+      label: 'paper bottom left',
+      point: { x: -200, y: -200 },
+    });
+  });
+
   it('uses the visible viewport grid for grid snapping when saved grid state is hidden', () => {
     const hiddenDocument: OristudioCpDocumentSnapshot = {
       ...document,

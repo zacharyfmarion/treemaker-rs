@@ -20,6 +20,7 @@ function capabilities({
   oristudioCpSelectedCircleCount = 0,
   historyPastCount = 0,
   historyFutureCount = 0,
+  clipboard = null,
   selection = treeSelection,
 }: {
   documentMode?: DocumentMode;
@@ -37,6 +38,7 @@ function capabilities({
   oristudioCpSelectedCircleCount?: number;
   historyPastCount?: number;
   historyFutureCount?: number;
+  clipboard?: unknown | null;
   selection?: Selection;
 } = {}) {
   return getWorkspaceCapabilities({
@@ -56,7 +58,7 @@ function capabilities({
     oristudioCpSelectedCircleCount,
     historyPastCount,
     historyFutureCount,
-    clipboard: null,
+    clipboard,
     selection,
   });
 }
@@ -223,10 +225,55 @@ describe('workspace capabilities', () => {
       enabled: true,
       reason: 'Make selected lines mountain folds',
     });
+    expect(state['edit.copy']).toMatchObject({
+      enabled: true,
+      reason: 'Copy selected crease-pattern lines',
+    });
+    expect(state['cp.transformFlipHorizontal']).toMatchObject({
+      enabled: true,
+      reason: 'Flip selected crease-pattern lines horizontally',
+    });
+    expect(state['cp.transformRotateRight']).toMatchObject({
+      enabled: true,
+      reason: 'Rotate selected crease-pattern lines right',
+    });
     expect(state['cp.replaceLineType']).toMatchObject({
       enabled: true,
       reason: 'Open line-type replacement settings for selected lines',
     });
+  });
+
+  it('enables CP paste only for a copied CP line payload', () => {
+    const emptyClipboard = capabilities({
+      documentMode: 'crease-pattern',
+      status: 'crease_pattern_ready',
+      hasEditableCreasePattern: true,
+      oristudioCpSelectedLineCount: 1,
+    });
+    const cpClipboard = capabilities({
+      documentMode: 'crease-pattern',
+      status: 'crease_pattern_ready',
+      hasEditableCreasePattern: true,
+      oristudioCpSelectedLineCount: 1,
+      clipboard: { kind: 'cp-lines' },
+    });
+    const treeClipboard = capabilities({
+      documentMode: 'crease-pattern',
+      status: 'crease_pattern_ready',
+      hasEditableCreasePattern: true,
+      oristudioCpSelectedLineCount: 1,
+      clipboard: { kind: 'tree' },
+    });
+
+    expect(emptyClipboard['edit.paste']).toMatchObject({
+      enabled: false,
+      reason: 'Copy crease-pattern lines before pasting',
+    });
+    expect(cpClipboard['edit.paste']).toMatchObject({
+      enabled: true,
+      reason: 'Paste copied crease-pattern lines',
+    });
+    expect(treeClipboard['edit.paste'].enabled).toBe(false);
   });
 
   it('enables Delete Selected when editable CP points are selected', () => {

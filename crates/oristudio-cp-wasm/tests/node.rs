@@ -63,6 +63,48 @@ fn command_dispatch_accepts_resolved_line_payloads() {
 }
 
 #[wasm_bindgen_test]
+fn inserts_and_replaces_clipboard_line_segments() {
+    let handle =
+        oristudio_cp_wasm::load_cp("1 0 0 1 0\n", "sample").expect("cp import should succeed");
+    let inserted = oristudio_cp_wasm::insert_line_segments(
+        handle,
+        serde_wasm_bindgen::to_value(&vec![oristudio_cp::geometry::LineSegment::with_color(
+            oristudio_cp::geometry::Point::new(2.0, 0.0),
+            oristudio_cp::geometry::Point::new(3.0, 0.0),
+            oristudio_cp::geometry::LineColor::Blue2,
+        )])
+        .expect("line segments should serialize"),
+    )
+    .expect("insert should succeed");
+    let snapshot = oristudio_cp_wasm::document_snapshot(handle).expect("snapshot should serialize");
+    let snapshot: serde_json::Value =
+        serde_wasm_bindgen::from_value(snapshot).expect("snapshot should deserialize");
+
+    assert_eq!(inserted, 1);
+    assert_eq!(
+        snapshot["crease_pattern"]["line_segments"][1]["selected"],
+        serde_json::json!(2)
+    );
+
+    let replaced = oristudio_cp_wasm::replace_line_segments(
+        handle,
+        serde_wasm_bindgen::to_value(&vec![2_usize]).expect("line ids should serialize"),
+        serde_wasm_bindgen::to_value(&vec![oristudio_cp::geometry::LineSegment::with_color(
+            oristudio_cp::geometry::Point::new(4.0, 0.0),
+            oristudio_cp::geometry::Point::new(5.0, 0.0),
+            oristudio_cp::geometry::LineColor::Red1,
+        )])
+        .expect("line segments should serialize"),
+    )
+    .expect("replace should succeed");
+    let exported = oristudio_cp_wasm::export_cp(handle).expect("cp export should succeed");
+
+    assert_eq!(replaced, 1);
+    assert!(exported.contains("3 4.0 0.0 5.0 0.0"));
+    oristudio_cp_wasm::free_document(handle).expect("document handle should free");
+}
+
+#[wasm_bindgen_test]
 fn command_dispatch_accepts_resolved_point_payloads() {
     let handle =
         oristudio_cp_wasm::load_cp("1 0 0 1 0\n", "sample").expect("cp import should succeed");

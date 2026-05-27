@@ -261,9 +261,10 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
     toolSteps: ['Drag between existing points'],
     inputMode: 'drag-line',
   }),
-  ready('DrawCreaseSymmetric', 'Mirror selected creases', 'construct', 'copy-plus', 'MouseHandlerDrawCreaseSymmetric', {
+  ready('DrawCreaseSymmetric', 'Reflect selection over line', 'transform', 'flip-horizontal', 'MouseHandlerDrawCreaseSymmetric', {
     selectionRequirement: 'selected creases',
-    toolSteps: ['Pick mirror axis start', 'Pick mirror axis end'],
+    toolSteps: ['Select 2 points or select a line', 'Pick reflection line end'],
+    tooltip: 'Reflect selected creases across a line drawn with two points',
   }),
   ready('DrawCreaseAngleRestricted', 'Angle restricted crease', 'construct', 'drafting-compass', 'MouseHandlerDrawCreaseAngleRestricted', {
     toolSteps: ['Pick base start point', 'Pick base end point', 'Pick convergence candidate'],
@@ -500,7 +501,7 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
     toolSteps: ['Pick drag start point', 'Pick drag end point'],
     tooltip: 'Unselect crease segments intersecting or overlapping a dragged line',
   }),
-  ready('LengthenCreaseSameColor', 'Lengthen same color', 'transform', 'stretch-horizontal', 'MouseHandlerLengthenCreaseSameColor', {
+  ready('LengthenCreaseSameColor', 'Lengthen by Same Color', 'draw', 'stretch-horizontal', 'MouseHandlerLengthenCreaseSameColor', {
     toolSteps: ['Select line to extend', 'Select target line'],
     tooltip: 'Extend creases crossed by the guide line while preserving original colors',
   }),

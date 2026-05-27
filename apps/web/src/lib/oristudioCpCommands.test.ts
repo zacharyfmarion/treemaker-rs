@@ -42,6 +42,19 @@ describe('oristudio CP command registry', () => {
       uiStatus: 'ready',
       toolSteps: ['Pick source point', 'Pick destination point'],
     });
+    expect(cpCommandByOperation('LengthenCreaseSameColor')).toMatchObject({
+      uiStatus: 'ready',
+      label: 'Lengthen by Same Color',
+      group: 'draw',
+      toolSteps: ['Select line to extend', 'Select target line'],
+    });
+    expect(cpCommandByOperation('DrawCreaseSymmetric')).toMatchObject({
+      uiStatus: 'ready',
+      label: 'Reflect selection over line',
+      group: 'transform',
+      selectionRequirement: 'selected creases',
+      toolSteps: ['Select 2 points or select a line', 'Pick reflection line end'],
+    });
     expect(cpCommandByOperation('CreaseMove4p')).toMatchObject({
       uiStatus: 'ready',
       toolSteps: [

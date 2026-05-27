@@ -9,7 +9,19 @@ import {
   type SetStateAction,
 } from 'react';
 import { TransformComponent, TransformWrapper, type ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
-import { ChevronDown, ChevronRight, FlipHorizontal2, GitBranch, Grid2X2, Magnet, ScanLine } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronRight,
+  FlipHorizontal,
+  FlipHorizontal2,
+  FlipVertical,
+  GitBranch,
+  Grid2X2,
+  Magnet,
+  RotateCcw,
+  RotateCw,
+  ScanLine,
+} from 'lucide-react';
 import type {
   OristudioCpCommandPayload,
   OristudioCpCommandPreview,
@@ -103,6 +115,19 @@ import {
   type CpVertex,
   type OristudioCpSelection,
 } from '../../lib/creasePatternViewport';
+import {
+  cpFramePointToLocal,
+  cpLineSelectionFrame,
+  cpLineSelectionMoveAnchorPoints,
+  rotationAngleFromCenter,
+  scaleCpLineSegments,
+  selectedCpLineSegments,
+  snapRotationDegrees,
+  translateCpLineSegments,
+  transformCpLineSegments,
+  type CpLineSelectionFrame,
+  type CpSelectionTransform,
+} from '../../lib/creasePatternClipboard';
 import type { Selection, TreeProject } from '../../lib/sampleProject';
 import {
   isCreaseSelected,
@@ -366,6 +391,40 @@ function pointDistanceSquared(a: Point, b: Point): number {
   return dx * dx + dy * dy;
 }
 
+function pointToLineSegmentDistanceSquared(point: Point, segment: OristudioCpLineSegment): number {
+  const dx = segment.b.x - segment.a.x;
+  const dy = segment.b.y - segment.a.y;
+  const lengthSquared = dx * dx + dy * dy;
+  if (lengthSquared === 0) return pointDistanceSquared(point, segment.a);
+  const t = Math.max(
+    0,
+    Math.min(1, ((point.x - segment.a.x) * dx + (point.y - segment.a.y) * dy) / lengthSquared)
+  );
+  return pointDistanceSquared(point, {
+    x: segment.a.x + dx * t,
+    y: segment.a.y + dy * t,
+  });
+}
+
+function nearestEditableCpLineId(
+  document: OristudioCpDocumentSnapshot,
+  point: Point,
+  maxDistance: number
+): number | null {
+  const maxDistanceSquared = maxDistance * maxDistance;
+  let nearestId: number | null = null;
+  let nearestDistanceSquared = Number.POSITIVE_INFINITY;
+  document.crease_pattern.line_segments.forEach((segment, index) => {
+    const distanceSquared = pointToLineSegmentDistanceSquared(point, segment);
+    if (distanceSquared > maxDistanceSquared) return;
+    if (distanceSquared < nearestDistanceSquared) {
+      nearestId = index + 1;
+      nearestDistanceSquared = distanceSquared;
+    }
+  });
+  return nearestId;
+}
+
 function isLineClickSelectionOperation(operationId: string | null | undefined): boolean {
   return operationId === 'CreaseSelect' || operationId === 'CreaseUnselect';
 }
@@ -386,6 +445,8 @@ function shouldPreferPointSnapForStep(
   command: OristudioCpCommandDefinition | null | undefined,
   stepIndex: number
 ): boolean {
+  if (command?.operationId === 'DrawCreaseSymmetric') return true;
+  if (command?.operationId === 'DoubleSymmetricDraw') return true;
   const step = command?.toolSteps?.[stepIndex]?.toLowerCase();
   if (!step) return false;
   if (step.includes('crease') || step.includes('line')) return false;
@@ -413,6 +474,10 @@ function isDefaultSelectionMode(
 
 function isRestrictedDrawOperation(operationId: string | null | undefined): boolean {
   return operationId === 'DrawCreaseRestricted';
+}
+
+function isReflectSelectionOperation(operationId: string | null | undefined): boolean {
+  return operationId === 'DrawCreaseSymmetric';
 }
 
 function cpLineTypeStatusLabel(lineColor: OristudioCpLineColor): string {
@@ -738,6 +803,13 @@ function isCpSelectableEntityEventTarget(target: EventTarget | null): boolean {
   );
 }
 
+function isCpSelectionTransformEventTarget(target: EventTarget | null): boolean {
+  return (
+    target instanceof Element &&
+    target.closest('[data-cp-selection-transform-control]') !== null
+  );
+}
+
 function cpTextIdFromEventTarget(target: EventTarget | null): number | null {
   if (!(target instanceof Element)) return null;
   const element = target.closest('[data-cp-text-id]');
@@ -749,6 +821,74 @@ function cpTextIdFromEventTarget(target: EventTarget | null): number | null {
 
 type CpMeasurementSlotId = 'length1' | 'length2' | 'angle1' | 'angle2' | 'angle3';
 type CpMeasurementSlots = Record<CpMeasurementSlotId, number | null>;
+
+interface CpSelectionRotationDrag {
+  pointerId: number;
+  center: Point;
+  startAngleDegrees: number;
+  sourceLines: OristudioCpLineSegment[];
+  currentAngleDegrees: number;
+}
+
+interface CpSelectionMoveDrag {
+  pointerId: number;
+  startPoint: Point;
+  sourceLines: OristudioCpLineSegment[];
+  currentDelta: Point;
+}
+
+type CpSelectionResizeHandle =
+  | 'top-left'
+  | 'top'
+  | 'top-right'
+  | 'right'
+  | 'bottom-right'
+  | 'bottom'
+  | 'bottom-left'
+  | 'left';
+
+interface CpSelectionResizeDrag {
+  pointerId: number;
+  frame: CpLineSelectionFrame;
+  handle: CpSelectionResizeHandle;
+  sourceLines: OristudioCpLineSegment[];
+  currentTransform: Extract<CpSelectionTransform, { kind: 'scale' }> | null;
+}
+
+interface CpSelectionTransformPreview {
+  kind: 'rotate' | 'translate' | 'scale';
+  angleDegrees?: number;
+  delta?: Point;
+  scaleX?: number;
+  scaleY?: number;
+  snapLabel?: string | null;
+  segments: OristudioCpLineSegment[];
+  frame: CpLineSelectionFrame;
+}
+
+interface CpSelectionResizeHandleSpec {
+  id: CpSelectionResizeHandle;
+  x: -1 | 0 | 1;
+  y: -1 | 0 | 1;
+  scaleX: boolean;
+  scaleY: boolean;
+  cursor: 'ew' | 'ns' | 'nwse' | 'nesw';
+}
+
+const CP_SELECTION_RESIZE_HANDLES: readonly CpSelectionResizeHandleSpec[] = [
+  { id: 'top-left', x: -1, y: 1, scaleX: true, scaleY: true, cursor: 'nwse' },
+  { id: 'top', x: 0, y: 1, scaleX: false, scaleY: true, cursor: 'ns' },
+  { id: 'top-right', x: 1, y: 1, scaleX: true, scaleY: true, cursor: 'nesw' },
+  { id: 'right', x: 1, y: 0, scaleX: true, scaleY: false, cursor: 'ew' },
+  { id: 'bottom-right', x: 1, y: -1, scaleX: true, scaleY: true, cursor: 'nwse' },
+  { id: 'bottom', x: 0, y: -1, scaleX: false, scaleY: true, cursor: 'ns' },
+  { id: 'bottom-left', x: -1, y: -1, scaleX: true, scaleY: true, cursor: 'nesw' },
+  { id: 'left', x: -1, y: 0, scaleX: true, scaleY: false, cursor: 'ew' },
+];
+
+const CP_SELECTION_RESIZE_HANDLE_BY_ID = new Map(
+  CP_SELECTION_RESIZE_HANDLES.map((handle) => [handle.id, handle])
+);
 
 const CP_MEASUREMENT_SLOT_LABELS: Record<CpMeasurementSlotId, string> = {
   length1: 'L1',
@@ -829,6 +969,65 @@ function formatCpMeasurementValue(slot: CpMeasurementSlotId, value: number | nul
   return `${formatNumber(value, precision)}${unit}`;
 }
 
+function resizeTransformForPoint(
+  frame: CpLineSelectionFrame,
+  handleId: CpSelectionResizeHandle,
+  point: Point,
+  minSpan: number
+): Extract<CpSelectionTransform, { kind: 'scale' }> {
+  const handle = CP_SELECTION_RESIZE_HANDLE_BY_ID.get(handleId);
+  const halfWidth = frame.width / 2;
+  const halfHeight = frame.height / 2;
+  if (!handle) {
+    return {
+      kind: 'scale',
+      frame,
+      anchor: { x: 0, y: 0 },
+      scaleX: 1,
+      scaleY: 1,
+    };
+  }
+
+  const local = cpFramePointToLocal(frame, point);
+  const anchor = {
+    x: handle.scaleX ? -handle.x * halfWidth : 0,
+    y: handle.scaleY ? -handle.y * halfHeight : 0,
+  };
+  const handleLocal = {
+    x: handle.x * halfWidth,
+    y: handle.y * halfHeight,
+  };
+  let scaleX = 1;
+  let scaleY = 1;
+  if (handle.scaleX) {
+    const denominator = handleLocal.x - anchor.x;
+    if (Math.abs(denominator) > 1e-9) {
+      const minScale = minSpan / Math.max(frame.width, 1e-9);
+      scaleX = Math.max(minScale, (local.x - anchor.x) / denominator);
+    }
+  }
+  if (handle.scaleY) {
+    const denominator = handleLocal.y - anchor.y;
+    if (Math.abs(denominator) > 1e-9) {
+      const minScale = minSpan / Math.max(frame.height, 1e-9);
+      scaleY = Math.max(minScale, (local.y - anchor.y) / denominator);
+    }
+  }
+
+  return {
+    kind: 'scale',
+    frame,
+    anchor,
+    scaleX,
+    scaleY,
+  };
+}
+
+function normalizeSelectionTransformAngle(angleDegrees: number): number {
+  const normalized = angleDegrees % 360;
+  return normalized < 0 ? normalized + 360 : normalized;
+}
+
 export function CreasePatternPanel() {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -851,10 +1050,16 @@ export function CreasePatternPanel() {
   );
   const [cpCommandPreview, setCpCommandPreview] = useState<OristudioCpCommandPreview | null>(null);
   const [cpSymmetryAxisPickPoints, setCpSymmetryAxisPickPoints] = useState<Point[] | null>(null);
+  const [selectionRotationPreview, setSelectionRotationPreview] =
+    useState<CpSelectionTransformPreview | null>(null);
+  const [selectionTransformAngleDegrees, setSelectionTransformAngleDegrees] = useState(0);
   const [diagnosticHudExpanded, setDiagnosticHudExpanded] = useState(false);
   const cpPreviewRequestRef = useRef(0);
   const lastFocusedDiagnosticRef = useRef<string | null>(null);
   const defaultCpToolDocumentRef = useRef<string | null>(null);
+  const selectionRotateDragRef = useRef<CpSelectionRotationDrag | null>(null);
+  const selectionMoveDragRef = useRef<CpSelectionMoveDrag | null>(null);
+  const selectionResizeDragRef = useRef<CpSelectionResizeDrag | null>(null);
   const cpToolDragRef = useRef<{
     operationId: OristudioCpCommandDefinition['operationId'];
     actionId: OristudioCpCommandActionDefinition['id'] | null;
@@ -920,6 +1125,9 @@ export function CreasePatternPanel() {
   const previewOristudioCpCommand = useWorkspaceStore(
     (state) => state.previewOristudioCpCommand
   );
+  const transformOristudioCpSelection = useWorkspaceStore(
+    (state) => state.transformOristudioCpSelection
+  );
 
   const editableCp = oristudioCpDocument?.document ?? null;
   const editableCpHandle = oristudioCpDocument?.handle ?? null;
@@ -957,6 +1165,18 @@ export function CreasePatternPanel() {
   const hasCreasePattern =
     hasEditableCreasePattern || project.creases.length > 0 || project.facets.length > 0;
   const editableSelectionSize = cpSelectionSize(oristudioCpSelection);
+  const editableSelectionLineKey = oristudioCpSelection.lines.join(',');
+  const selectedEditableCpLines = useMemo(
+    () => selectedCpLineSegments(editableCp, oristudioCpSelection),
+    [editableCp, oristudioCpSelection]
+  );
+  const selectionTransformFrame = useMemo(
+    () =>
+      selectionRotationPreview?.frame ??
+      cpLineSelectionFrame(selectedEditableCpLines, selectionTransformAngleDegrees),
+    [selectedEditableCpLines, selectionRotationPreview, selectionTransformAngleDegrees]
+  );
+  const cpUiScale = 100 / Math.max(zoomPercent, 1);
   const activeCpAction = useMemo(
     () => (cpToolState.activeActionId ? cpActionById(cpToolState.activeActionId) : undefined),
     [cpToolState.activeActionId]
@@ -973,6 +1193,20 @@ export function CreasePatternPanel() {
   const activeCpInputMode = useMemo(
     () => activeActionInputMode(activeCpAction, activeCpCommand),
     [activeCpAction, activeCpCommand]
+  );
+  const visibleSelectionTransformFrame = isDefaultSelectionMode(
+    cpToolState,
+    cpToolPoints.length,
+    cpToolPath.length
+  )
+    ? selectionTransformFrame
+    : null;
+  const highlightedEditableLineIds = useMemo(
+    () => [
+      ...pendingSquareBisectorLineIds,
+      ...(pendingLengthenLineId === null ? [] : [pendingLengthenLineId]),
+    ],
+    [pendingLengthenLineId, pendingSquareBisectorLineIds]
   );
   const liveCommandPreviewPoints = useMemo(() => {
     if (cpToolPath.length > 0) return cpToolPath;
@@ -1448,7 +1682,7 @@ export function CreasePatternPanel() {
   ]);
 
   const eventToEditableModelPoint = useCallback(
-    (event: PointerEvent<SVGElement>): Point | null => {
+    (event: Pick<PointerEvent<Element>, 'clientX' | 'clientY'>): Point | null => {
       const svg = svgRef.current;
       if (!svg || !editableCp) return null;
       const bounds = svg.getBoundingClientRect();
@@ -1507,6 +1741,284 @@ export function CreasePatternPanel() {
       return { point: target?.point ?? modelPoint, target };
     },
     [editableCp, editableCpBounds, eventToEditableModelPoint, oristudioCpViewport, zoomPercent]
+  );
+
+  const handleSelectionTransform = useCallback(
+    (transform: CpSelectionTransform) => {
+      const resolvedTransform =
+        transform.kind === 'rotate' && !transform.center && selectionTransformFrame
+          ? { ...transform, center: selectionTransformFrame.center }
+          : transform;
+      void transformOristudioCpSelection(resolvedTransform).then((succeeded) => {
+        if (succeeded && resolvedTransform.kind === 'rotate') {
+          setSelectionTransformAngleDegrees((current) =>
+            normalizeSelectionTransformAngle(current + resolvedTransform.angleDegrees)
+          );
+        }
+      });
+    },
+    [selectionTransformFrame, transformOristudioCpSelection]
+  );
+
+  const updateSelectionRotationPreview = useCallback(
+    (drag: CpSelectionRotationDrag, point: Point, snap: boolean) => {
+      const rawAngle =
+        rotationAngleFromCenter(drag.center, point) - drag.startAngleDegrees;
+      const angleDegrees = snap ? snapRotationDegrees(rawAngle) : rawAngle;
+      const segments = transformCpLineSegments(drag.sourceLines, {
+        kind: 'rotate',
+        angleDegrees,
+        center: drag.center,
+      });
+      const frame = cpLineSelectionFrame(
+        segments,
+        selectionTransformAngleDegrees + angleDegrees
+      );
+      drag.currentAngleDegrees = angleDegrees;
+      if (frame) {
+        setSelectionRotationPreview({ kind: 'rotate', angleDegrees, segments, frame });
+      }
+    },
+    [selectionTransformAngleDegrees]
+  );
+
+  const selectionMoveSnapDocument = useMemo<OristudioCpDocumentSnapshot | null>(() => {
+    if (!editableCp || oristudioCpSelection.lines.length === 0) return null;
+    const selectedLineIds = new Set(oristudioCpSelection.lines);
+    return {
+      ...editableCp,
+      crease_pattern: {
+        ...editableCp.crease_pattern,
+        line_segments: editableCp.crease_pattern.line_segments.filter(
+          (_line, index) => !selectedLineIds.has(index + 1)
+        ),
+      },
+    };
+  }, [editableCp, oristudioCpSelection.lines]);
+
+  const updateSelectionMovePreview = useCallback(
+    (drag: CpSelectionMoveDrag, point: Point) => {
+      const rawDelta = {
+        x: point.x - drag.startPoint.x,
+        y: point.y - drag.startPoint.y,
+      };
+      let delta = rawDelta;
+      let snappedTarget: CpSnapTarget | null = null;
+      const snappingEnabled =
+        oristudioCpViewport.snapToGrid ||
+        oristudioCpViewport.snapToVertices ||
+        oristudioCpViewport.snapToLines;
+
+      if (selectionMoveSnapDocument && snappingEnabled) {
+        const translated = translateCpLineSegments(drag.sourceLines, rawDelta);
+        const anchorPoints = cpLineSelectionMoveAnchorPoints(
+          translated,
+          selectionTransformAngleDegrees
+        );
+        const maxDistance = modelSelectionDistance(editableCpBounds, zoomPercent / 100);
+        let best:
+          | {
+              target: CpSnapTarget;
+              anchorPoint: Point;
+            }
+          | null = null;
+        for (const anchorPoint of anchorPoints) {
+          const target = nearestCpSnapTarget(
+            selectionMoveSnapDocument,
+            anchorPoint,
+            editableCpBounds,
+            oristudioCpViewport,
+            maxDistance
+          );
+          if (!target) continue;
+          if (!best || target.distance < best.target.distance) {
+            best = { target, anchorPoint };
+          }
+        }
+        if (best) {
+          snappedTarget = best.target;
+          delta = {
+            x: rawDelta.x + best.target.point.x - best.anchorPoint.x,
+            y: rawDelta.y + best.target.point.y - best.anchorPoint.y,
+          };
+        }
+      }
+
+      const segments = translateCpLineSegments(drag.sourceLines, delta);
+      const frame = cpLineSelectionFrame(segments, selectionTransformAngleDegrees);
+      drag.currentDelta = delta;
+      setCursorModelPoint(point);
+      setSnapTarget(snappedTarget);
+      if (frame) {
+        setSelectionRotationPreview({
+          kind: 'translate',
+          delta,
+          snapLabel: snappedTarget?.label ?? null,
+          segments,
+          frame,
+        });
+      }
+    },
+    [
+      editableCpBounds,
+      oristudioCpViewport,
+      selectionMoveSnapDocument,
+      selectionTransformAngleDegrees,
+      zoomPercent,
+    ]
+  );
+
+  const updateSelectionResizePreview = useCallback(
+    (drag: CpSelectionResizeDrag, point: Point) => {
+      const transform = resizeTransformForPoint(
+        drag.frame,
+        drag.handle,
+        point,
+        modelSelectionDistance(editableCpBounds, zoomPercent / 100) / 2
+      );
+      const segments = scaleCpLineSegments(
+        drag.sourceLines,
+        transform.frame,
+        transform.anchor,
+        transform.scaleX,
+        transform.scaleY
+      );
+      const frame = cpLineSelectionFrame(segments, drag.frame.angleDegrees);
+      drag.currentTransform = transform;
+      setCursorModelPoint(point);
+      setSnapTarget(null);
+      if (frame) {
+        setSelectionRotationPreview({
+          kind: 'scale',
+          scaleX: transform.scaleX,
+          scaleY: transform.scaleY,
+          segments,
+          frame,
+        });
+      }
+    },
+    [editableCpBounds, zoomPercent]
+  );
+
+  const handleSelectionRotatePointerDown = useCallback(
+    (event: PointerEvent<Element>) => {
+      if (event.button !== 0 || spacePressed || !editableCp || selectedEditableCpLines.length === 0) {
+        return;
+      }
+      const frame = selectionTransformFrame;
+      const point = eventToEditableModelPoint(event);
+      if (!frame || !point) return;
+      event.preventDefault();
+      event.stopPropagation();
+      selectionRotateDragRef.current = {
+        pointerId: event.pointerId,
+        center: frame.center,
+        startAngleDegrees: rotationAngleFromCenter(frame.center, point),
+        sourceLines: selectedEditableCpLines,
+        currentAngleDegrees: 0,
+      };
+      svgRef.current?.setPointerCapture?.(event.pointerId);
+      setSelectionRotationPreview({
+        kind: 'rotate',
+        angleDegrees: 0,
+        segments: selectedEditableCpLines,
+        frame,
+      });
+    },
+    [editableCp, eventToEditableModelPoint, selectedEditableCpLines, selectionTransformFrame, spacePressed]
+  );
+
+  const handleSelectionMovePointerDown = useCallback(
+    (event: PointerEvent<Element>) => {
+      if (event.button !== 0 || spacePressed || !editableCp || selectedEditableCpLines.length === 0) {
+        return;
+      }
+      const frame = selectionTransformFrame;
+      const point = eventToEditableModelPoint(event);
+      if (!frame || !point) return;
+      if (event.shiftKey || event.metaKey || event.ctrlKey) {
+        const lineId = nearestEditableCpLineId(
+          editableCp,
+          point,
+          modelSelectionDistance(editableCpBounds, zoomPercent / 100)
+        );
+        if (lineId !== null) {
+          event.preventDefault();
+          event.stopPropagation();
+          toggleOristudioCpLineSelection(lineId, true);
+        }
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      selectionMoveDragRef.current = {
+        pointerId: event.pointerId,
+        startPoint: point,
+        sourceLines: selectedEditableCpLines,
+        currentDelta: { x: 0, y: 0 },
+      };
+      svgRef.current?.setPointerCapture?.(event.pointerId);
+      setSelectionRotationPreview({
+        kind: 'translate',
+        delta: { x: 0, y: 0 },
+        snapLabel: null,
+        segments: selectedEditableCpLines,
+        frame,
+      });
+    },
+    [
+      editableCp,
+      editableCpBounds,
+      eventToEditableModelPoint,
+      selectedEditableCpLines,
+      selectionTransformFrame,
+      spacePressed,
+      toggleOristudioCpLineSelection,
+      zoomPercent,
+    ]
+  );
+
+  const handleSelectionResizePointerDown = useCallback(
+    (handle: CpSelectionResizeHandle, event: PointerEvent<Element>) => {
+      if (event.button !== 0 || spacePressed || !editableCp || selectedEditableCpLines.length === 0) {
+        return;
+      }
+      const frame = selectionTransformFrame;
+      const point = eventToEditableModelPoint(event);
+      if (!frame || !point) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const transform = resizeTransformForPoint(
+        frame,
+        handle,
+        point,
+        modelSelectionDistance(editableCpBounds, zoomPercent / 100) / 2
+      );
+      selectionResizeDragRef.current = {
+        pointerId: event.pointerId,
+        frame,
+        handle,
+        sourceLines: selectedEditableCpLines,
+        currentTransform: transform,
+      };
+      svgRef.current?.setPointerCapture?.(event.pointerId);
+      setSelectionRotationPreview({
+        kind: 'scale',
+        scaleX: transform.scaleX,
+        scaleY: transform.scaleY,
+        segments: selectedEditableCpLines,
+        frame,
+      });
+    },
+    [
+      editableCp,
+      editableCpBounds,
+      eventToEditableModelPoint,
+      selectedEditableCpLines,
+      selectionTransformFrame,
+      spacePressed,
+      zoomPercent,
+    ]
   );
 
   const updateEditablePointerStatus = useCallback(
@@ -1588,6 +2100,8 @@ export function CreasePatternPanel() {
       if (
         event.button !== 0 ||
         spacePressed ||
+        isViewportInteractiveTarget(event.target) ||
+        isCpSelectionTransformEventTarget(event.target) ||
         !editableCp ||
         !activeCpCommand ||
         activeCpCommand.uiStatus !== 'ready' ||
@@ -1633,6 +2147,13 @@ export function CreasePatternPanel() {
       if (stepCount === 0) return;
       if (
         isLineClickSelectionOperation(activeCpCommand.operationId) &&
+        isCpLineEventTarget(event.target)
+      ) {
+        return;
+      }
+      if (
+        isReflectSelectionOperation(activeCpCommand.operationId) &&
+        cpToolPoints.length === 0 &&
         isCpLineEventTarget(event.target)
       ) {
         return;
@@ -1896,6 +2417,33 @@ export function CreasePatternPanel() {
 
   const handleEditablePointerMove = useCallback(
     (event: PointerEvent<SVGElement>) => {
+      const selectionRotateDrag = selectionRotateDragRef.current;
+      if (selectionRotateDrag && selectionRotateDrag.pointerId === event.pointerId) {
+        const point = eventToEditableModelPoint(event);
+        if (!point) return;
+        event.preventDefault();
+        event.stopPropagation();
+        updateSelectionRotationPreview(selectionRotateDrag, point, event.shiftKey);
+        return;
+      }
+      const selectionMoveDrag = selectionMoveDragRef.current;
+      if (selectionMoveDrag && selectionMoveDrag.pointerId === event.pointerId) {
+        const point = eventToEditableModelPoint(event);
+        if (!point) return;
+        event.preventDefault();
+        event.stopPropagation();
+        updateSelectionMovePreview(selectionMoveDrag, point);
+        return;
+      }
+      const selectionResizeDrag = selectionResizeDragRef.current;
+      if (selectionResizeDrag && selectionResizeDrag.pointerId === event.pointerId) {
+        const point = eventToEditableModelPoint(event);
+        if (!point) return;
+        event.preventDefault();
+        event.stopPropagation();
+        updateSelectionResizePreview(selectionResizeDrag, point);
+        return;
+      }
       updateEditablePointerStatus(event);
       const drag = cpToolDragRef.current;
       if (!drag || drag.pointerId !== event.pointerId) return;
@@ -1940,6 +2488,9 @@ export function CreasePatternPanel() {
       editableCpBounds,
       eventToEditableModelPoint,
       resolveEditableDrawPoint,
+      updateSelectionMovePreview,
+      updateSelectionResizePreview,
+      updateSelectionRotationPreview,
       updateEditablePointerStatus,
       zoomPercent,
     ]
@@ -1947,6 +2498,72 @@ export function CreasePatternPanel() {
 
   const finishEditableDragPath = useCallback(
     (event: PointerEvent<SVGElement>) => {
+      const selectionRotateDrag = selectionRotateDragRef.current;
+      if (selectionRotateDrag && selectionRotateDrag.pointerId === event.pointerId) {
+        event.preventDefault();
+        event.stopPropagation();
+        const point = eventToEditableModelPoint(event);
+        if (point) {
+          updateSelectionRotationPreview(selectionRotateDrag, point, event.shiftKey);
+        }
+        const angleDegrees = selectionRotateDrag.currentAngleDegrees;
+        selectionRotateDragRef.current = null;
+        setSelectionRotationPreview(null);
+        svgRef.current?.releasePointerCapture?.(event.pointerId);
+        if (Math.abs(angleDegrees) > 0.001) {
+          void transformOristudioCpSelection({
+            kind: 'rotate',
+            angleDegrees,
+            center: selectionRotateDrag.center,
+          }).then((succeeded) => {
+            if (succeeded) {
+              setSelectionTransformAngleDegrees((current) =>
+                normalizeSelectionTransformAngle(current + angleDegrees)
+              );
+            }
+          });
+        }
+        return;
+      }
+      const selectionMoveDrag = selectionMoveDragRef.current;
+      if (selectionMoveDrag && selectionMoveDrag.pointerId === event.pointerId) {
+        event.preventDefault();
+        event.stopPropagation();
+        const point = eventToEditableModelPoint(event);
+        if (point) {
+          updateSelectionMovePreview(selectionMoveDrag, point);
+        }
+        const delta = selectionMoveDrag.currentDelta;
+        selectionMoveDragRef.current = null;
+        setSelectionRotationPreview(null);
+        setSnapTarget(null);
+        svgRef.current?.releasePointerCapture?.(event.pointerId);
+        if (pointDistanceSquared({ x: 0, y: 0 }, delta) > 1e-10) {
+          void transformOristudioCpSelection({ kind: 'translate', delta });
+        }
+        return;
+      }
+      const selectionResizeDrag = selectionResizeDragRef.current;
+      if (selectionResizeDrag && selectionResizeDrag.pointerId === event.pointerId) {
+        event.preventDefault();
+        event.stopPropagation();
+        const point = eventToEditableModelPoint(event);
+        if (point) {
+          updateSelectionResizePreview(selectionResizeDrag, point);
+        }
+        const transform = selectionResizeDrag.currentTransform;
+        selectionResizeDragRef.current = null;
+        setSelectionRotationPreview(null);
+        setSnapTarget(null);
+        svgRef.current?.releasePointerCapture?.(event.pointerId);
+        if (
+          transform &&
+          (Math.abs(transform.scaleX - 1) > 0.001 || Math.abs(transform.scaleY - 1) > 0.001)
+        ) {
+          void transformOristudioCpSelection(transform);
+        }
+        return;
+      }
       const drag = cpToolDragRef.current;
       if (!drag || drag.pointerId !== event.pointerId) return;
       event.preventDefault();
@@ -2066,11 +2683,38 @@ export function CreasePatternPanel() {
       oristudioCpSelection.circles,
       oristudioCpSelection.lines,
       resolveEditableDrawPoint,
+      transformOristudioCpSelection,
+      updateSelectionMovePreview,
+      updateSelectionResizePreview,
+      updateSelectionRotationPreview,
       zoomPercent,
     ]
   );
 
   const cancelEditableDragPath = useCallback((event: PointerEvent<SVGElement>) => {
+    const selectionRotateDrag = selectionRotateDragRef.current;
+    if (selectionRotateDrag && selectionRotateDrag.pointerId === event.pointerId) {
+      selectionRotateDragRef.current = null;
+      setSelectionRotationPreview(null);
+      svgRef.current?.releasePointerCapture?.(event.pointerId);
+      return;
+    }
+    const selectionMoveDrag = selectionMoveDragRef.current;
+    if (selectionMoveDrag && selectionMoveDrag.pointerId === event.pointerId) {
+      selectionMoveDragRef.current = null;
+      setSelectionRotationPreview(null);
+      setSnapTarget(null);
+      svgRef.current?.releasePointerCapture?.(event.pointerId);
+      return;
+    }
+    const selectionResizeDrag = selectionResizeDragRef.current;
+    if (selectionResizeDrag && selectionResizeDrag.pointerId === event.pointerId) {
+      selectionResizeDragRef.current = null;
+      setSelectionRotationPreview(null);
+      setSnapTarget(null);
+      svgRef.current?.releasePointerCapture?.(event.pointerId);
+      return;
+    }
     const drag = cpToolDragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
     cpToolDragRef.current = null;
@@ -2080,6 +2724,42 @@ export function CreasePatternPanel() {
 
   const handleEditableLineClick = useCallback(
     (id: number, additive = false) => {
+      if (
+        activeCpCommand?.uiStatus === 'ready' &&
+        cpToolState.phase === 'active' &&
+        isReflectSelectionOperation(activeCpCommand.operationId) &&
+        cpToolPoints.length === 0
+      ) {
+        const axis = editableCp?.crease_pattern.line_segments[id - 1];
+        if (!axis) return;
+        setCpToolPoints([]);
+        setCpToolPath([]);
+        void (async () => {
+          const succeeded = await executeOristudioCpCommand(
+            activeCpCommand.operationId,
+            buildCpCommandPayload(activeCpCommand, {
+              line_ids: oristudioCpSelection.lines,
+              points: [axis.a, axis.b],
+            })
+          );
+          setCpToolState((state) =>
+            state.activeOperationId === activeCpCommand.operationId
+              ? transitionOristudioCpToolState(
+                  state,
+                  succeeded
+                    ? { type: 'commit', keepActive: true }
+                    : {
+                        type: 'commandError',
+                        message:
+                          useWorkspaceStore.getState().oristudioCpError ?? 'Command failed',
+                      }
+                )
+              : state
+          );
+        })();
+        return;
+      }
+
       if (
         activeCpCommand?.uiStatus === 'ready' &&
         cpToolState.phase === 'active' &&
@@ -2227,7 +2907,9 @@ export function CreasePatternPanel() {
       cpToolPoints.length,
       cpToolPath.length,
       cpToolState.phase,
+      editableCp,
       executeOristudioCpCommand,
+      oristudioCpSelection.lines,
       pendingLengthenLineId,
       pendingSquareBisectorLineIds,
       toggleOristudioCpLineSelection,
@@ -2370,6 +3052,10 @@ export function CreasePatternPanel() {
   );
   const lastFittedCreasePatternRef = useRef<string | null>(null);
 
+  useEffect(() => {
+    setSelectionTransformAngleDegrees(0);
+  }, [editableCpHandle, editableSelectionLineKey]);
+
   const fitLoadedCreasePattern = useCallback(
     (animationTime = 0) => {
       if (!hasCreasePattern) {
@@ -2472,6 +3158,20 @@ export function CreasePatternPanel() {
           return;
         }
         if (
+          selectionRotateDragRef.current ||
+          selectionMoveDragRef.current ||
+          selectionResizeDragRef.current ||
+          selectionRotationPreview
+        ) {
+          event.preventDefault();
+          selectionRotateDragRef.current = null;
+          selectionMoveDragRef.current = null;
+          selectionResizeDragRef.current = null;
+          setSelectionRotationPreview(null);
+          setSnapTarget(null);
+          return;
+        }
+        if (
           editableSelectionSize > 0 &&
           isDefaultSelectionMode(cpToolState, cpToolPoints.length, cpToolPath.length)
         ) {
@@ -2552,6 +3252,7 @@ export function CreasePatternPanel() {
     editableSelectionSize,
     fitToView,
     hasCreasePattern,
+    selectionRotationPreview,
     setActualSize,
   ]);
 
@@ -2563,6 +3264,10 @@ export function CreasePatternPanel() {
       setPendingSquareBisectorLineIds([]);
       setCpSymmetryAxisPickPoints(null);
       cpToolDragRef.current = null;
+      selectionRotateDragRef.current = null;
+      selectionMoveDragRef.current = null;
+      selectionResizeDragRef.current = null;
+      setSelectionRotationPreview(null);
       setCpToolState(IDLE_ORISTUDIO_CP_TOOL_STATE);
     }
   }, [editableCp]);
@@ -2763,9 +3468,16 @@ export function CreasePatternPanel() {
                         commandPreviewCircles={renderedCommandPreviewCircles}
                         commandPreviewPoints={renderedCommandPreviewPoints}
                         commandPreviewSegments={renderedCommandPreviewSegments}
-                        highlightedLineIds={pendingSquareBisectorLineIds}
+                        highlightedLineIds={highlightedEditableLineIds}
+                        selectionTransformFrame={visibleSelectionTransformFrame}
+                        selectionTransformPreview={selectionRotationPreview}
+                        selectionTransformUiScale={cpUiScale}
                         activeDiagnosticId={oristudioCpActiveDiagnosticId}
                         diagnostics={latestDiagnosticEntries}
+                        onSelectionMovePointerDown={handleSelectionMovePointerDown}
+                        onSelectionResizePointerDown={handleSelectionResizePointerDown}
+                        onSelectionRotatePointerDown={handleSelectionRotatePointerDown}
+                        onSelectionTransform={handleSelectionTransform}
                         selectDiagnostic={handleSelectCpDiagnostic}
                         selection={oristudioCpSelection}
                         snapTarget={snapTarget}
@@ -2897,6 +3609,21 @@ export function CreasePatternPanel() {
                 {editableCp && editableSelectionSize > 0 && (
                   <span>{editableSelectionSize} selected</span>
                 )}
+                {editableCp && selectionRotationPreview?.kind === 'rotate' && (
+                  <span>{formatNumber(selectionRotationPreview.angleDegrees ?? 0, 1)} deg</span>
+                )}
+                {editableCp && selectionRotationPreview?.kind === 'translate' && selectionRotationPreview.delta && (
+                  <span>
+                    Move {formatNumber(selectionRotationPreview.delta.x, 2)},{' '}
+                    {formatNumber(selectionRotationPreview.delta.y, 2)}
+                  </span>
+                )}
+                {editableCp && selectionRotationPreview?.kind === 'scale' && (
+                  <span>
+                    Scale {formatNumber((selectionRotationPreview.scaleX ?? 1) * 100, 0)}%,{' '}
+                    {formatNumber((selectionRotationPreview.scaleY ?? 1) * 100, 0)}%
+                  </span>
+                )}
               </div>
             </div>
           </>
@@ -2929,8 +3656,18 @@ interface EditableCreasePatternProps {
   commandPreviewSegments: OristudioCpLineSegment[];
   diagnostics: OristudioCpDiagnosticEntry[];
   highlightedLineIds: number[];
+  onSelectionMovePointerDown: (event: PointerEvent<Element>) => void;
+  onSelectionResizePointerDown: (
+    handle: CpSelectionResizeHandle,
+    event: PointerEvent<Element>
+  ) => void;
+  onSelectionRotatePointerDown: (event: PointerEvent<Element>) => void;
+  onSelectionTransform: (transform: CpSelectionTransform) => void;
   selectDiagnostic: (id: string) => void;
   selection: OristudioCpSelection;
+  selectionTransformFrame: CpLineSelectionFrame | null;
+  selectionTransformPreview: CpSelectionTransformPreview | null;
+  selectionTransformUiScale: number;
   snapTarget: CpSnapTarget | null;
   spacePressed: boolean;
   toggleCircle: (id: number, additive?: boolean) => void;
@@ -2959,8 +3696,15 @@ function EditableCreasePattern({
   commandPreviewSegments,
   diagnostics,
   highlightedLineIds,
+  onSelectionMovePointerDown,
+  onSelectionResizePointerDown,
+  onSelectionRotatePointerDown,
+  onSelectionTransform,
   selectDiagnostic,
   selection,
+  selectionTransformFrame,
+  selectionTransformPreview,
+  selectionTransformUiScale,
   snapTarget,
   spacePressed,
   toggleCircle,
@@ -3037,6 +3781,23 @@ function EditableCreasePattern({
               }}
             />
           </g>
+        );
+      })}
+      {selectionTransformPreview?.segments.map((segment, index) => {
+        const a = modelPointToCpSvg(segment.a, bounds);
+        const b = modelPointToCpSvg(segment.b, bounds);
+        return (
+          <line
+            key={`selection-transform-preview-${index}-${segment.a.x}-${segment.a.y}-${segment.b.x}-${segment.b.y}`}
+            className={[
+              cpLineColorClass(segment.color, mode),
+              'cp-selection-transform-preview',
+            ].join(' ')}
+            x1={a.x}
+            y1={a.y}
+            x2={b.x}
+            y2={b.y}
+          />
         );
       })}
       {document.crease_pattern.points.map((point, index) => {
@@ -3278,6 +4039,17 @@ function EditableCreasePattern({
           />
         );
       })}
+      {selectionTransformFrame && (
+        <SelectionTransformBox
+          bounds={bounds}
+          selectionFrame={selectionTransformFrame}
+          uiScale={selectionTransformUiScale}
+          onMovePointerDown={onSelectionMovePointerDown}
+          onResizePointerDown={onSelectionResizePointerDown}
+          onRotatePointerDown={onSelectionRotatePointerDown}
+          onTransform={onSelectionTransform}
+        />
+      )}
       {snapTarget && (
         <circle
           className="cp-snap-target"
@@ -3295,6 +4067,197 @@ function EditableCreasePattern({
         onPointerDown={clearSelectionOnBackgroundPointerDown}
       />
     </>
+  );
+}
+
+function SelectionTransformBox({
+  bounds,
+  selectionFrame,
+  uiScale,
+  onMovePointerDown,
+  onResizePointerDown,
+  onRotatePointerDown,
+  onTransform,
+}: {
+  bounds: CpModelBounds;
+  selectionFrame: CpLineSelectionFrame;
+  uiScale: number;
+  onMovePointerDown: (event: PointerEvent<Element>) => void;
+  onResizePointerDown: (
+    handle: CpSelectionResizeHandle,
+    event: PointerEvent<Element>
+  ) => void;
+  onRotatePointerDown: (event: PointerEvent<Element>) => void;
+  onTransform: (transform: CpSelectionTransform) => void;
+}) {
+  const center = modelPointToCpSvg(selectionFrame.center, bounds);
+  const axisXEnd = modelPointToCpSvg(
+    {
+      x: selectionFrame.center.x + selectionFrame.axisX.x,
+      y: selectionFrame.center.y + selectionFrame.axisX.y,
+    },
+    bounds
+  );
+  const axisYEnd = modelPointToCpSvg(
+    {
+      x: selectionFrame.center.x + selectionFrame.axisY.x,
+      y: selectionFrame.center.y + selectionFrame.axisY.y,
+    },
+    bounds
+  );
+  const axisXVector = { x: axisXEnd.x - center.x, y: axisXEnd.y - center.y };
+  const axisYVector = { x: axisYEnd.x - center.x, y: axisYEnd.y - center.y };
+  const axisXLength = Math.max(1e-9, Math.hypot(axisXVector.x, axisXVector.y));
+  const axisYLength = Math.max(1e-9, Math.hypot(axisYVector.x, axisYVector.y));
+  const axisX = { x: axisXVector.x / axisXLength, y: axisXVector.y / axisXLength };
+  const axisY = { x: axisYVector.x / axisYLength, y: axisYVector.y / axisYLength };
+  const minSize = 18 * uiScale;
+  const width = Math.max(selectionFrame.width * axisXLength, minSize);
+  const height = Math.max(selectionFrame.height * axisYLength, minSize);
+  const halfWidth = width / 2;
+  const halfHeight = height / 2;
+  const framePoint = (xSign: -1 | 0 | 1, ySign: -1 | 0 | 1): Point => ({
+    x: center.x + axisX.x * halfWidth * xSign + axisY.x * halfHeight * ySign,
+    y: center.y + axisX.y * halfWidth * xSign + axisY.y * halfHeight * ySign,
+  });
+  const boxPoints = [
+    framePoint(-1, 1),
+    framePoint(1, 1),
+    framePoint(1, -1),
+    framePoint(-1, -1),
+  ];
+  const boxMinX = Math.min(...boxPoints.map((point) => point.x));
+  const boxMinY = Math.min(...boxPoints.map((point) => point.y));
+  const boxMaxY = Math.max(...boxPoints.map((point) => point.y));
+  const menuButtonCount = 4;
+  const menuSeparatorCount = 1;
+  const menuChildCount = menuButtonCount + menuSeparatorCount;
+  const menuButtonSize = 25;
+  const menuGap = 3;
+  const menuPadding = 4;
+  const menuBorderWidth = 1;
+  const menuSeparatorWidth = 1;
+  const menuWidth =
+    menuButtonCount * menuButtonSize +
+    menuSeparatorCount * menuSeparatorWidth +
+    (menuChildCount - 1) * menuGap +
+    menuPadding * 2 +
+    menuBorderWidth * 2;
+  const menuHeight = 34;
+  const canvasPadding = 10 * uiScale;
+  const menuSvgWidth = menuWidth * uiScale;
+  const menuSvgHeight = menuHeight * uiScale;
+  const menuX = Math.min(
+    Math.max(boxMinX, CP_EDITABLE_CANVAS_RECT.x + canvasPadding),
+    CP_EDITABLE_CANVAS_RECT.x + CP_EDITABLE_CANVAS_RECT.width - menuSvgWidth - canvasPadding
+  );
+  const aboveMenuY = boxMinY - menuSvgHeight - 10 * uiScale;
+  const menuY =
+    aboveMenuY < CP_EDITABLE_CANVAS_RECT.y + canvasPadding
+      ? boxMaxY + 10 * uiScale
+      : aboveMenuY;
+  const boxPointList = boxPoints.map((point) => `${point.x},${point.y}`).join(' ');
+  const handleRadius = 5 * uiScale;
+  const rotateHitRadius = 18 * uiScale;
+  const resizeHandles = CP_SELECTION_RESIZE_HANDLES.map((handle) => ({
+    ...handle,
+    point: framePoint(handle.x, handle.y),
+  }));
+
+  return (
+    <g className="cp-selection-transform" data-cp-selection-transform-control="true">
+      <polygon
+        className="cp-selection-transform__move-hit-area"
+        points={boxPointList}
+        onPointerDown={onMovePointerDown}
+      />
+      <polygon
+        className="cp-selection-transform__box"
+        points={boxPointList}
+      />
+      <foreignObject
+        x={menuX}
+        y={menuY}
+        width={menuSvgWidth}
+        height={menuSvgHeight}
+        className="cp-selection-transform__menu-foreign"
+      >
+        <div
+          className="cp-selection-transform__menu"
+          role="toolbar"
+          aria-label="Selection transforms"
+          style={{
+            width: menuWidth,
+            height: menuHeight,
+            transform: `scale(${uiScale})`,
+            transformOrigin: 'top left',
+          }}
+        >
+          <button
+            type="button"
+            title="Flip Horizontal"
+            aria-label="Flip Horizontal"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={() => onTransform({ kind: 'flip-horizontal' })}
+          >
+            <FlipHorizontal size={14} />
+          </button>
+          <button
+            type="button"
+            title="Flip Vertical"
+            aria-label="Flip Vertical"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={() => onTransform({ kind: 'flip-vertical' })}
+          >
+            <FlipVertical size={14} />
+          </button>
+          <span className="cp-selection-transform__separator" />
+          <button
+            type="button"
+            title="Rotate Left 90"
+            aria-label="Rotate Left 90"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={() => onTransform({ kind: 'rotate', angleDegrees: 90 })}
+          >
+            <RotateCcw size={14} />
+          </button>
+          <button
+            type="button"
+            title="Rotate Right 90"
+            aria-label="Rotate Right 90"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={() => onTransform({ kind: 'rotate', angleDegrees: -90 })}
+          >
+            <RotateCw size={14} />
+          </button>
+        </div>
+      </foreignObject>
+      {resizeHandles
+        .filter((handle) => handle.x !== 0 && handle.y !== 0)
+        .map((handle) => (
+          <circle
+            key={`rotate-${handle.id}`}
+            className="cp-selection-transform__rotate-hit-area"
+            cx={handle.point.x}
+            cy={handle.point.y}
+            r={rotateHitRadius}
+            aria-label="Rotate selection"
+            onPointerDown={onRotatePointerDown}
+          />
+        ))}
+      {resizeHandles.map((handle) => (
+        <circle
+          key={handle.id}
+          className="cp-selection-transform__resize-handle"
+          data-cp-resize-cursor={handle.cursor}
+          data-cp-resize-handle={handle.id}
+          cx={handle.point.x}
+          cy={handle.point.y}
+          r={handleRadius}
+          onPointerDown={(event) => onResizePointerDown(handle.id, event)}
+        />
+      ))}
+    </g>
   );
 }
 

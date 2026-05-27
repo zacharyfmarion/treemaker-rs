@@ -10,7 +10,9 @@ import init, {
   load_cp,
   load_document,
   load_fold,
+  insert_line_segments,
   preview_cp_command,
+  replace_line_segments,
 } from '../generated/oristudio-cp-wasm/oristudio_cp_wasm';
 import type {
   OristudioCpCommandPayload,
@@ -18,6 +20,7 @@ import type {
   OristudioCpCommandResult,
   OristudioCpDocumentSnapshot,
   OristudioCpDocumentSummary,
+  OristudioCpLineSegment,
   OristudioCpOperationDescriptor,
 } from '../engine/oristudioCpTypes';
 import type { OristudioCpOperationId } from '../lib/oristudioCpCommands';
@@ -87,6 +90,19 @@ const api = {
     payload: OristudioCpCommandPayload = {}
   ): Promise<OristudioCpCommandPreview> {
     return call(() => preview_cp_command(handle, operationId, payload) as OristudioCpCommandPreview);
+  },
+  async insertLineSegments(
+    handle: number,
+    segments: OristudioCpLineSegment[]
+  ): Promise<number> {
+    return call(() => insert_line_segments(handle, segments));
+  },
+  async replaceLineSegments(
+    handle: number,
+    lineIds: number[],
+    segments: OristudioCpLineSegment[]
+  ): Promise<number> {
+    return call(() => replace_line_segments(handle, lineIds, segments));
   },
   async exportCp(handle: number): Promise<string> {
     return call(() => export_cp(handle));

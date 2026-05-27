@@ -59,6 +59,10 @@ export type WorkspaceCapabilityId =
   | 'cp.makeEdge'
   | 'cp.makeAuxiliary'
   | 'cp.toggleMountainValley'
+  | 'cp.transformFlipHorizontal'
+  | 'cp.transformFlipVertical'
+  | 'cp.transformRotateLeft'
+  | 'cp.transformRotateRight'
   | 'cp.replaceLineType'
   | 'cp.deleteLineType'
   | 'cp.checkCamv'
@@ -143,6 +147,7 @@ export function getWorkspaceCapabilities(input: WorkspaceCapabilityInput): Works
   const hasOneSelectedEdge = selectedEdgeCount(input.selection) === 1;
   const hasSelectedNodes = selectedNodeCount(input.selection) > 0;
   const hasOneSelectedNode = selectedNodeCount(input.selection) === 1;
+  const clipboardKind = workspaceClipboardKind(input.clipboard);
   const buildLabel = hasCreasePattern ? 'Rebuild CP' : 'Build CP';
   const buildReason = hasCreasePattern ? 'Rebuild crease pattern' : 'Build crease pattern';
 
@@ -223,14 +228,29 @@ export function getWorkspaceCapabilities(input: WorkspaceCapabilityInput): Works
       treeMode ? 'Cut selected tree parts' : 'Imported crease patterns are read-only'
     ),
     'edit.copy': capability(
-      treeMode && hasSelection,
+      (treeMode && hasSelection) || (canEditCp && hasSelectedCpLines),
       'Copy',
-      treeMode ? 'Copy selected tree parts' : 'Imported crease patterns are read-only'
+      treeMode
+        ? 'Copy selected tree parts'
+        : canEditCp
+          ? hasSelectedCpLines
+            ? 'Copy selected crease-pattern lines'
+            : 'Select one or more crease-pattern lines first'
+          : 'Open an editable crease pattern first'
     ),
     'edit.paste': capability(
-      treeMode && input.clipboard !== null && !isBusy,
+      (treeMode && clipboardKind === 'tree' && !isBusy) ||
+        (canEditCp && clipboardKind === 'cp-lines'),
       'Paste',
-      treeMode ? 'Paste copied tree parts' : 'Imported crease patterns are read-only'
+      treeMode
+        ? clipboardKind === 'tree'
+          ? busyOr('Paste copied tree parts', input.status)
+          : 'Copy tree parts before pasting'
+        : canEditCp
+          ? clipboardKind === 'cp-lines'
+            ? 'Paste copied crease-pattern lines'
+            : 'Copy crease-pattern lines before pasting'
+          : 'Open an editable crease pattern first'
     ),
     'edit.delete': capability(
       (treeMode && !activeCpSurface && hasSelection && !isBusy) ||
@@ -445,6 +465,30 @@ export function getWorkspaceCapabilities(input: WorkspaceCapabilityInput): Works
       'Toggle Mountain/Valley',
       'Toggle selected mountain and valley lines'
     ),
+    'cp.transformFlipHorizontal': selectedCpLineCapability(
+      canEditCp,
+      hasSelectedCpLines,
+      'Flip Horizontal',
+      'Flip selected crease-pattern lines horizontally'
+    ),
+    'cp.transformFlipVertical': selectedCpLineCapability(
+      canEditCp,
+      hasSelectedCpLines,
+      'Flip Vertical',
+      'Flip selected crease-pattern lines vertically'
+    ),
+    'cp.transformRotateLeft': selectedCpLineCapability(
+      canEditCp,
+      hasSelectedCpLines,
+      'Rotate Left 90',
+      'Rotate selected crease-pattern lines left'
+    ),
+    'cp.transformRotateRight': selectedCpLineCapability(
+      canEditCp,
+      hasSelectedCpLines,
+      'Rotate Right 90',
+      'Rotate selected crease-pattern lines right'
+    ),
     'cp.replaceLineType': selectedCpLineCapability(
       canEditCp,
       hasSelectedCpLines,
@@ -567,6 +611,12 @@ function selectedCpLineCapability(
         : 'Select one or more crease-pattern lines first'
       : 'Open an editable crease pattern first'
   );
+}
+
+function workspaceClipboardKind(clipboard: unknown | null): string | null {
+  if (!clipboard || typeof clipboard !== 'object' || !('kind' in clipboard)) return null;
+  const kind = (clipboard as { kind?: unknown }).kind;
+  return typeof kind === 'string' ? kind : null;
 }
 
 function commandCapability(

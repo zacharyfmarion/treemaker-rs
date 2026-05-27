@@ -158,6 +158,41 @@ pub fn preview_cp_command(
 }
 
 #[wasm_bindgen]
+pub fn insert_line_segments(handle: u32, segments: JsValue) -> Result<u32, JsValue> {
+    let segments: Vec<oristudio_cp::geometry::LineSegment> =
+        serde_wasm_bindgen::from_value(segments).map_err(to_js_value_error)?;
+    with_document_mut(handle, |document| {
+        let changed = oristudio_cp::operations::transform::insert_line_segments(
+            &mut document.crease_pattern,
+            &segments,
+            true,
+        );
+        Ok(changed as u32)
+    })
+}
+
+#[wasm_bindgen]
+pub fn replace_line_segments(
+    handle: u32,
+    line_ids: JsValue,
+    segments: JsValue,
+) -> Result<u32, JsValue> {
+    let line_ids: Vec<usize> =
+        serde_wasm_bindgen::from_value(line_ids).map_err(to_js_value_error)?;
+    let segments: Vec<oristudio_cp::geometry::LineSegment> =
+        serde_wasm_bindgen::from_value(segments).map_err(to_js_value_error)?;
+    with_document_mut(handle, |document| {
+        let indices = resolved_line_indices(&document.crease_pattern, &line_ids)?;
+        let changed = oristudio_cp::operations::transform::replace_line_segments(
+            &mut document.crease_pattern,
+            &indices,
+            &segments,
+        );
+        Ok(changed as u32)
+    })
+}
+
+#[wasm_bindgen]
 pub fn export_cp(handle: u32) -> Result<String, JsValue> {
     with_document(handle, |document| {
         Ok(io::cp::export_cp_string(&document.crease_pattern))
@@ -227,6 +262,31 @@ fn with_document_mut<T>(
             .ok_or_else(|| js_error("invalid_handle", "invalid CreasePatternDocument handle"))?;
         f(document)
     })
+}
+
+fn resolved_line_indices(
+    model: &oristudio_cp::CreasePatternModel,
+    line_ids: &[usize],
+) -> Result<Vec<usize>, JsValue> {
+    if line_ids.is_empty() {
+        return Err(js_error(
+            "invalid_input",
+            "at least one line id is required",
+        ));
+    }
+    let mut indices = Vec::with_capacity(line_ids.len());
+    for id in line_ids {
+        let Some(index) = id.checked_sub(1) else {
+            return Err(js_error("invalid_input", "line ids are one-based"));
+        };
+        if index >= model.line_segments.len() {
+            return Err(js_error("invalid_input", "line id is out of range"));
+        }
+        indices.push(index);
+    }
+    indices.sort_unstable();
+    indices.dedup();
+    Ok(indices)
 }
 
 fn title_from_js(title: &str) -> Option<String> {

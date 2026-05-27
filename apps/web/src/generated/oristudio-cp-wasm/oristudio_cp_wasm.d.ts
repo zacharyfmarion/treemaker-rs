@@ -15,6 +15,8 @@ export function export_fold(handle: number): string;
 
 export function free_document(handle: number): void;
 
+export function insert_line_segments(handle: number, segments: any): number;
+
 export function load_cp(text: string, title: string): number;
 
 export function load_document(document: any): number;
@@ -22,6 +24,8 @@ export function load_document(document: any): number;
 export function load_fold(text: string, title: string): number;
 
 export function preview_cp_command(handle: number, operation: any, payload: any): any;
+
+export function replace_line_segments(handle: number, line_ids: any, segments: any): number;
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
@@ -34,10 +38,12 @@ export interface InitOutput {
     readonly export_cp: (a: number) => [number, number, number, number];
     readonly export_fold: (a: number) => [number, number, number, number];
     readonly free_document: (a: number) => [number, number];
+    readonly insert_line_segments: (a: number, b: any) => [number, number, number];
     readonly load_cp: (a: number, b: number, c: number, d: number) => [number, number, number];
     readonly load_document: (a: any) => [number, number, number];
     readonly load_fold: (a: number, b: number, c: number, d: number) => [number, number, number];
     readonly preview_cp_command: (a: number, b: any, c: any) => [number, number, number];
+    readonly replace_line_segments: (a: number, b: any, c: any) => [number, number, number];
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
     readonly __wbindgen_exn_store: (a: number) => void;

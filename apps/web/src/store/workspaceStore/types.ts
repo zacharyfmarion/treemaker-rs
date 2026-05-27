@@ -34,9 +34,11 @@ import type {
   OristudioCpCommandResult,
   OristudioCpDocumentSnapshot,
   OristudioCpDocumentState,
+  OristudioCpLineSegment,
   OristudioCpOperationDescriptor,
 } from '../../engine/oristudioCpTypes';
 import type { OristudioCpOperationId } from '../../lib/oristudioCpCommands';
+import type { CpLineClipboardPayload, CpSelectionTransform } from '../../lib/creasePatternClipboard';
 import type { OristudioCpLineage } from '../../lib/oristudioCpLineage';
 import type { OristudioCpSymmetryState } from '../../lib/oristudioCpSymmetry';
 
@@ -101,6 +103,15 @@ export interface ProjectSliceActions {
   executeOristudioCpCommand: (
     operationId: OristudioCpOperationId,
     payload?: OristudioCpCommandPayload
+  ) => Promise<boolean>;
+  insertOristudioCpLineSegments: (
+    segments: OristudioCpLineSegment[],
+    label?: string
+  ) => Promise<boolean>;
+  replaceOristudioCpLineSegments: (
+    lineIds: number[],
+    segments: OristudioCpLineSegment[],
+    label?: string
   ) => Promise<boolean>;
   previewOristudioCpCommand: (
     operationId: OristudioCpOperationId,
@@ -229,12 +240,15 @@ export interface ClipboardEdge {
 }
 
 export interface TreeClipboardPayload {
+  kind: 'tree';
   nodes: ClipboardNode[];
   edges: ClipboardEdge[];
 }
 
+export type WorkspaceClipboardPayload = TreeClipboardPayload | CpLineClipboardPayload;
+
 export interface ClipboardSliceState {
-  clipboard: TreeClipboardPayload | null;
+  clipboard: WorkspaceClipboardPayload | null;
   clipboardPasteCount: number;
 }
 
@@ -297,6 +311,7 @@ export interface CreasePatternSliceActions {
   toggleOristudioCpPointSelection: (id: number, additive?: boolean) => void;
   toggleOristudioCpCircleSelection: (id: number, additive?: boolean) => void;
   toggleOristudioCpTextSelection: (id: number, additive?: boolean) => void;
+  transformOristudioCpSelection: (transform: CpSelectionTransform) => Promise<boolean>;
 }
 
 export type CreasePatternSlice = CreasePatternSliceState & CreasePatternSliceActions;

@@ -6,6 +6,7 @@ import type {
   OristudioCpDocumentSnapshot,
   OristudioCpDocumentState,
   OristudioCpDocumentSummary,
+  OristudioCpLineSegment,
   OristudioCpOperationDescriptor,
 } from '../../engine/oristudioCpTypes';
 import type { WasmErrorEnvelope } from '../../engine/types';
@@ -188,6 +189,33 @@ export async function previewOristudioCpCommand(
   }
   const api = await getOristudioCpClient();
   return api.previewCommand(handle, operationId, payload);
+}
+
+export async function insertOristudioCpLineSegments(
+  segments: OristudioCpLineSegment[]
+): Promise<OristudioCpDocumentState> {
+  if (handle === null) {
+    throw new Error('No editable crease-pattern document is loaded');
+  }
+  const api = await getOristudioCpClient();
+  await api.insertLineSegments(handle, segments);
+  const refreshed = await refreshOristudioCpDocument(null);
+  if (!refreshed) throw new Error('Editable crease-pattern document was released');
+  return refreshed;
+}
+
+export async function replaceOristudioCpLineSegments(
+  lineIds: number[],
+  segments: OristudioCpLineSegment[]
+): Promise<OristudioCpDocumentState> {
+  if (handle === null) {
+    throw new Error('No editable crease-pattern document is loaded');
+  }
+  const api = await getOristudioCpClient();
+  await api.replaceLineSegments(handle, lineIds, segments);
+  const refreshed = await refreshOristudioCpDocument(null);
+  if (!refreshed) throw new Error('Editable crease-pattern document was released');
+  return refreshed;
 }
 
 export async function exportOristudioCpDocumentAsCp(): Promise<string> {

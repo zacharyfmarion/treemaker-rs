@@ -5,6 +5,11 @@ import {
   emptyOristudioCpSelection,
   toggleCpSelectionList,
 } from '../../../lib/creasePatternViewport';
+import {
+  cpSelectionTransformLabel,
+  selectedCpLineSegments,
+  transformCpLineSegments,
+} from '../../../lib/creasePatternClipboard';
 import { DEFAULT_CREASE_COLOR_MODE } from '../../../lib/sampleProject';
 import {
   generatedCpLineage,
@@ -491,6 +496,28 @@ export const createCreasePatternSlice: WorkspaceSliceCreator<CreasePatternSlice>
 
     clearOristudioCpSelection: () =>
       set({ oristudioCpSelection: emptyOristudioCpSelection() }),
+
+    transformOristudioCpSelection: async (transform) => {
+      const document = get().oristudioCpDocument?.document;
+      const selection = get().oristudioCpSelection;
+      const selectedLines = selectedCpLineSegments(document, selection);
+      if (selection.lines.length === 0 || selectedLines.length === 0) {
+        set({
+          error: {
+            code: 'invalid_operation',
+            message: 'Select one or more crease-pattern lines first',
+          },
+        });
+        return false;
+      }
+      const transformed = transformCpLineSegments(selectedLines, transform);
+      if (transformed.length === 0) return false;
+      return get().replaceOristudioCpLineSegments(
+        selection.lines,
+        transformed,
+        cpSelectionTransformLabel(transform)
+      );
+    },
 
     toggleOristudioCpLineSelection: (id, additive = false) =>
       set({

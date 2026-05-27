@@ -10,7 +10,8 @@ use crate::geometry::{
 };
 use crate::model::CreasePatternModel;
 use crate::operations::arrangement::{
-    add_line_segment_like_worker, divide_line_segment_with_new_lines,
+    add_line_segment_like_worker, delete_line_segments_for_indices,
+    divide_line_segment_with_new_lines,
 };
 use crate::operations::selection::{delete_selected_lines, unselect_all};
 use serde::{Deserialize, Serialize};
@@ -364,6 +365,41 @@ pub fn copy_selected_lines_by_points(
     append_and_split(model, selected);
     unselect_all(model);
     copied_count
+}
+
+/// Insert app-resolved clipboard line segments into the editable fold line set.
+pub fn insert_line_segments(
+    model: &mut CreasePatternModel,
+    segments: &[LineSegment],
+    select_inserted: bool,
+) -> usize {
+    unselect_all(model);
+    let selected = if select_inserted { 2 } else { 0 };
+    let mut inserted = 0;
+    for segment in segments {
+        if !Epsilon::HIGH.gt0(segment.a.distance(segment.b)) {
+            continue;
+        }
+        model.add_line_segment(segment.with_selected(selected));
+        inserted += 1;
+    }
+    inserted
+}
+
+/// Replace resolved line IDs with transformed app-resolved line segments.
+pub fn replace_line_segments(
+    model: &mut CreasePatternModel,
+    line_indices: &[usize],
+    segments: &[LineSegment],
+) -> usize {
+    if line_indices.is_empty() || segments.is_empty() {
+        return 0;
+    }
+    let deleted = delete_line_segments_for_indices(model, line_indices);
+    if deleted == 0 {
+        return 0;
+    }
+    insert_line_segments(model, segments, true)
 }
 
 /// Oriedita `FoldLineSet.move(ta, tb, tc, td)` line-segment transform.

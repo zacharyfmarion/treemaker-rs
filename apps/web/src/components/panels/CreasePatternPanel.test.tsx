@@ -272,6 +272,24 @@ function blankEditableCpState(): OristudioCpDocumentState {
   };
 }
 
+function editableCpStateWithInteriorLine(): OristudioCpDocumentState {
+  const state = editableCpState();
+  state.summary.line_segments = 3;
+  state.document.crease_pattern.line_segments = [
+    ...state.document.crease_pattern.line_segments,
+    {
+      a: { x: 0.25, y: 0.5 },
+      b: { x: 0.75, y: 0.5 },
+      active: 'Inactive0',
+      color: 'Black0',
+      selected: 0,
+      customized: 0,
+      customized_color: { red: 100, green: 200, blue: 200 },
+    },
+  ];
+  return state;
+}
+
 function editableCpStateWithCircleSet(): OristudioCpDocumentState {
   const state = editableCpState();
   state.summary.circles = 4;
@@ -862,6 +880,73 @@ describe('CreasePatternPanel', () => {
 
     expect(panel?.textContent).toContain('Delete Point');
     expect(panel?.textContent).toContain('Delete a vertex on a straight line of uniform color.');
+  });
+
+  it('allows additive line selection through the transform move hit area', () => {
+    const editableCp = editableCpStateWithInteriorLine();
+    const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
+      documentMode: 'crease-pattern',
+      importedCreasePattern: importedCpDocument(),
+      oristudioCpDocument: editableCp,
+      oristudioCpSelection: {
+        lines: [1, 2],
+        vertices: [],
+        points: [],
+        circles: [],
+        texts: [],
+        faces: [],
+      },
+    });
+    setCanvasClientRect(container);
+    const svgPoint = modelPointToCpSvg(
+      { x: 0.5, y: 0.5 },
+      getEditableCpModelBounds(editableCp.document)
+    );
+    const moveHitArea = container.querySelector<SVGPolygonElement>(
+      '.cp-selection-transform__move-hit-area'
+    );
+    expect(moveHitArea).not.toBeNull();
+
+    act(() => {
+      moveHitArea?.dispatchEvent(
+        new MouseEvent('pointerdown', {
+          bubbles: true,
+          button: 0,
+          shiftKey: true,
+          clientX: svgPoint.x,
+          clientY: svgPoint.y,
+        })
+      );
+    });
+
+    expect(useWorkspaceStore.getState().oristudioCpSelection.lines).toEqual([1, 2, 3]);
+  });
+
+  it('hides the selection transform controls while a selected-line tool is active', () => {
+    const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
+      documentMode: 'crease-pattern',
+      importedCreasePattern: importedCpDocument(),
+      oristudioCpDocument: editableCpState(),
+      oristudioCpSelection: {
+        lines: [1, 2],
+        vertices: [],
+        points: [],
+        circles: [],
+        texts: [],
+        faces: [],
+      },
+    });
+
+    expect(container.querySelector('.cp-selection-transform')).not.toBeNull();
+
+    act(() => {
+      container
+        .querySelector<HTMLButtonElement>('button[aria-label="Copy selected creases"]')
+        ?.click();
+    });
+
+    expect(container.querySelector('.cp-selection-transform')).toBeNull();
+    expect(container.textContent).toContain('Copy selected creases: Pick source point');
   });
 
   it('uses an expanded canvas for imported editable CP documents', () => {
@@ -2573,6 +2658,11 @@ describe('CreasePatternPanel', () => {
     });
     expect(executeOristudioCpCommand).not.toHaveBeenCalled();
     expect(container.textContent).toContain('Extend Line: Select target line');
+    expect(
+      container
+        .querySelector<SVGLineElement>('[data-cp-line-id="1"]')
+        ?.classList.contains('crease--selected')
+    ).toBe(true);
 
     await act(async () => {
       container.querySelector<SVGLineElement>('[data-cp-line-id="2"]')?.dispatchEvent(
@@ -2866,6 +2956,117 @@ describe('CreasePatternPanel', () => {
     ]);
     expect(payload?.points?.[3]?.x).toBeCloseTo(0.5);
     expect(payload?.points?.[3]?.y).toBeCloseTo(0);
+  });
+
+  it('snaps reflect-selection point picks to Oriedita draw targets', async () => {
+    const executeOristudioCpCommand = vi.fn(
+      async (_operationId: string, _payload?: OristudioCpCommandPayload) => true
+    );
+    const editableCp = editableCpState();
+    const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
+      documentMode: 'crease-pattern',
+      importedCreasePattern: importedCpDocument(),
+      oristudioCpDocument: editableCp,
+      oristudioCpSelection: {
+        lines: [2],
+        vertices: [],
+        points: [],
+        circles: [],
+        texts: [],
+        faces: [],
+      },
+      oristudioCpViewport: {
+        gridVisible: false,
+        snapToGrid: false,
+        snapToVertices: true,
+        snapToLines: true,
+      },
+      executeOristudioCpCommand,
+    });
+    const canvas = setCanvasClientRect(container);
+    const bounds = getEditableCpModelBounds(editableCp.document);
+    const pointerDownAtModelPoint = (point: { x: number; y: number }) => {
+      const svgPoint = modelPointToCpSvg(point, bounds);
+      canvas.dispatchEvent(
+        new MouseEvent('pointerdown', {
+          bubbles: true,
+          button: 0,
+          clientX: svgPoint.x,
+          clientY: svgPoint.y,
+        })
+      );
+    };
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>('button[aria-label="Reflect selection over line"]')
+        ?.click();
+      await Promise.resolve();
+    });
+    expect(container.textContent).toContain(
+      'Reflect selection over line: Select 2 points or select a line'
+    );
+
+    act(() => {
+      pointerDownAtModelPoint({ x: 0.02, y: 0.02 });
+    });
+    await act(async () => {
+      pointerDownAtModelPoint({ x: 0.98, y: 0.02 });
+      await Promise.resolve();
+    });
+
+    expect(executeOristudioCpCommand).toHaveBeenCalledOnce();
+    const [operation, payload] = executeOristudioCpCommand.mock.calls[0] ?? [];
+    expect(operation).toBe('DrawCreaseSymmetric');
+    expect(payload?.line_ids).toEqual([2]);
+    expect(payload?.points).toEqual([
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+    ]);
+  });
+
+  it('uses a clicked line as the reflect-selection axis', async () => {
+    const executeOristudioCpCommand = vi.fn(
+      async (_operationId: string, _payload?: OristudioCpCommandPayload) => true
+    );
+    const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
+      documentMode: 'crease-pattern',
+      importedCreasePattern: importedCpDocument(),
+      oristudioCpDocument: editableCpState(),
+      oristudioCpSelection: {
+        lines: [2],
+        vertices: [],
+        points: [],
+        circles: [],
+        texts: [],
+        faces: [],
+      },
+      executeOristudioCpCommand,
+    });
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>('button[aria-label="Reflect selection over line"]')
+        ?.click();
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      const axisLine = container.querySelector<SVGLineElement>('[data-cp-line-id="1"]');
+      axisLine?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
+      axisLine?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    expect(executeOristudioCpCommand).toHaveBeenCalledOnce();
+    const [operation, payload] = executeOristudioCpCommand.mock.calls[0] ?? [];
+    expect(operation).toBe('DrawCreaseSymmetric');
+    expect(payload?.line_ids).toEqual([2]);
+    expect(payload?.points).toEqual([
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+    ]);
+    expect(useWorkspaceStore.getState().oristudioCpSelection.lines).toEqual([2]);
   });
 
   it('runs ready lasso commands from a freehand drag path', async () => {

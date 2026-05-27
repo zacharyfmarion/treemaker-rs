@@ -106,6 +106,19 @@ export function free_document(handle) {
 }
 
 /**
+ * @param {number} handle
+ * @param {any} segments
+ * @returns {number}
+ */
+export function insert_line_segments(handle, segments) {
+    const ret = wasm.insert_line_segments(handle, segments);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return ret[0] >>> 0;
+}
+
+/**
  * @param {string} text
  * @param {string} title
  * @returns {number}
@@ -163,6 +176,20 @@ export function preview_cp_command(handle, operation, payload) {
         throw takeFromExternrefTable0(ret[1]);
     }
     return takeFromExternrefTable0(ret[0]);
+}
+
+/**
+ * @param {number} handle
+ * @param {any} line_ids
+ * @param {any} segments
+ * @returns {number}
+ */
+export function replace_line_segments(handle, line_ids, segments) {
+    const ret = wasm.replace_line_segments(handle, line_ids, segments);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return ret[0] >>> 0;
 }
 function __wbg_get_imports() {
     const import0 = {

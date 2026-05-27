@@ -32,6 +32,12 @@ export const ORIEDITA_PAPER_BOUNDS: CpModelBounds = {
   spanX: ORIEDITA_PAPER_SIZE,
   spanY: ORIEDITA_PAPER_SIZE,
 };
+const ORIEDITA_PAPER_CORNERS: Array<{ point: Point; label: string }> = [
+  { point: { x: ORIEDITA_PAPER_MIN, y: ORIEDITA_PAPER_MAX }, label: 'paper top left' },
+  { point: { x: ORIEDITA_PAPER_MAX, y: ORIEDITA_PAPER_MAX }, label: 'paper top right' },
+  { point: { x: ORIEDITA_PAPER_MIN, y: ORIEDITA_PAPER_MIN }, label: 'paper bottom left' },
+  { point: { x: ORIEDITA_PAPER_MAX, y: ORIEDITA_PAPER_MIN }, label: 'paper bottom right' },
+];
 
 const MODEL_PADDING_RATIO = 0.04;
 const DEFAULT_SPAN = 1;
@@ -519,6 +525,9 @@ export function nearestCpSnapTarget(
     document.crease_pattern.points.forEach((candidate, index) => {
       consider(pointTarget(candidate, point, 'point', `point ${index + 1}`), pointSnapDistance);
     });
+    ORIEDITA_PAPER_CORNERS.forEach((corner) => {
+      consider(pointTarget(corner.point, point, 'vertex', corner.label), pointSnapDistance);
+    });
   }
 
   if (options.snapToLines) {
@@ -574,6 +583,9 @@ export function nearestOrieditaDrawPointTarget(
         pointTarget({ x: circle.x, y: circle.y }, point, 'point', `circle ${index + 1} center`),
         pointSnapDistance
       );
+    });
+    ORIEDITA_PAPER_CORNERS.forEach((corner) => {
+      consider(pointTarget(corner.point, point, 'vertex', corner.label), pointSnapDistance);
     });
   }
 

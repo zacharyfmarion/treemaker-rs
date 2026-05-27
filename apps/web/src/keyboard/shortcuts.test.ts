@@ -4,6 +4,7 @@ import {
   findShortcutConflict,
   formatKeyChord,
   getResolvedShortcut,
+  getResolvedShortcuts,
   getShortcutRegistryDiagnostics,
   keyChordEquals,
   parseOrieditaKeyStroke,
@@ -41,6 +42,11 @@ describe('shortcut registry', () => {
       key: 'l',
     });
     expect(getResolvedShortcut('cp.action.draw-crease')).toBeNull();
+    expect(getResolvedShortcuts('edit.delete')).toEqual([
+      { key: 'delete' },
+      { key: 'backspace' },
+    ]);
+    expect(shortcutLabelForAction('edit.delete')).toContain('Delete / Backspace');
   });
 
   it('detects conflicts only across overlapping scopes', () => {

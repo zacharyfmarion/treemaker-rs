@@ -5,10 +5,15 @@ import { selectEverything } from './selection';
 
 function createActions(
   selection: Selection,
-  options: { documentMode?: 'tree' | 'crease-pattern'; cpSelectionSize?: number } = {}
+  options: {
+    documentMode?: 'tree' | 'crease-pattern';
+    activeEditingSurface?: 'tree' | 'crease-pattern';
+    cpSelectionSize?: number;
+  } = {}
 ) {
   return {
     getDocumentMode: vi.fn(() => options.documentMode ?? 'tree'),
+    getActiveEditingSurface: vi.fn(() => options.activeEditingSurface ?? 'tree'),
     getCpSelectionSize: vi.fn(() => options.cpSelectionSize ?? 0),
     getSelection: vi.fn(() => selection),
     handleMenuAction: vi.fn(),
@@ -137,11 +142,20 @@ describe('app keyboard shortcuts', () => {
     expect(actions.handleMenuAction).toHaveBeenCalledWith('edit.delete');
   });
 
+  it('routes Backspace through the menu layer as a Delete alias', () => {
+    const actions = createActions({ kind: 'tree' });
+    const event = new KeyboardEvent('keydown', { key: 'Backspace', cancelable: true });
+
+    expect(handleAppKeyDown(event, actions)).toBe(true);
+
+    expect(actions.handleMenuAction).toHaveBeenCalledWith('edit.delete');
+  });
+
   it('honors user shortcut overrides', () => {
     const actions = {
       ...createActions({ kind: 'tree' }),
       getShortcutOverrides: vi.fn(() => ({
-        'file.save': { primary: true, alt: true, key: 's' },
+        'file.save': [{ primary: true, alt: true, key: 's' }],
       })),
     };
     const original = new KeyboardEvent('keydown', {

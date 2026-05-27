@@ -14,6 +14,14 @@ bindings after the browser-first shortcut registry and rebinding UI have landed.
   shortcuts from the web app to the Tauri shell.
 - Do not expose CP tool or viewport shortcuts as native menu accelerators unless
   those actions are also represented by native menu items.
+- Treat the web shortcut runtime as the owner for CP tools, line-type actions,
+  and viewport actions in both browser and desktop. Native Tauri accelerators
+  should only handle `target: "menu"` shortcut definitions, then emit the same
+  stable `menu-action` ids already used by the shared frontend command layer.
+- Account for actions with multiple resolved chords, such as Delete and
+  Backspace. The bridge should either set the platform-preferred native
+  accelerator and leave aliases to the web runtime, or support multiple native
+  menu items only if Tauri exposes a safe first-class path for that.
 - Preserve static default accelerators as a fallback when the bridge is
   unavailable.
 

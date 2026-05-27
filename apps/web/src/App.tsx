@@ -243,6 +243,7 @@ export default function App() {
     const onKeyDown = (event: KeyboardEvent) => {
       handleAppKeyDown(event, {
         getDocumentMode: () => useWorkspaceStore.getState().documentMode,
+        getActiveEditingSurface: () => useWorkspaceStore.getState().activeEditingSurface,
         getCpSelectionSize: () =>
           cpSelectionSize(useWorkspaceStore.getState().oristudioCpSelection),
         getSelection: () => useWorkspaceStore.getState().selection,

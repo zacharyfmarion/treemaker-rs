@@ -1,13 +1,14 @@
 import { selectionSize } from './selection';
 import type { DocumentMode, Selection } from './sampleProject';
 import {
-  handleShortcutKeyDown,
   isShortcutEditingTarget,
 } from '../keyboard/shortcutDispatcher';
+import { handleShortcutRuntimeKeyDown } from '../keyboard/shortcutRuntime';
 import type { ShortcutOverrides } from '../keyboard/shortcuts';
 
 interface AppKeyboardActions {
   getDocumentMode: () => DocumentMode;
+  getActiveEditingSurface: () => DocumentMode;
   getCpSelectionSize: () => number;
   getSelection: () => Selection;
   handleMenuAction: (id: string) => unknown;
@@ -31,11 +32,12 @@ export function handleAppKeyDown(event: KeyboardEvent, actions: AppKeyboardActio
     return true;
   }
 
-  return handleShortcutKeyDown(event, {
-    scopeStack: ['global'],
-    overrides: actions.getShortcutOverrides?.(),
-    executors: {
-      menu: actions.handleMenuAction,
+  return handleShortcutRuntimeKeyDown(event, {
+    context: {
+      documentMode: actions.getDocumentMode(),
+      activeEditingSurface: actions.getActiveEditingSurface(),
     },
+    overrides: actions.getShortcutOverrides?.(),
+    menu: actions.handleMenuAction,
   });
 }

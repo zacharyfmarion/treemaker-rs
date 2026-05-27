@@ -30,10 +30,11 @@ export interface ShortcutDefinition {
   scope: ShortcutScope;
   target: ShortcutTarget;
   defaultChord: KeyChord | null;
+  defaultChords: KeyChord[];
   upstreamAction?: string;
 }
 
-export type ShortcutOverrides = Partial<Record<ShortcutActionId, KeyChord | null>>;
+export type ShortcutOverrides = Partial<Record<ShortcutActionId, KeyChord[] | null>>;
 
 export interface ShortcutRegistryDiagnostics {
   unmappedOrieditaActions: string[];
@@ -93,7 +94,13 @@ const MENU_SHORTCUTS: ShortcutDefinition[] = [
   menuShortcut('edit.cut', 'Cut', 'Edit', { primary: true, key: 'x' }, 'cutClipboardAction'),
   menuShortcut('edit.copy', 'Copy', 'Edit', { primary: true, key: 'c' }, 'copyClipboardAction'),
   menuShortcut('edit.paste', 'Paste', 'Edit', { primary: true, key: 'v' }, 'pasteClipboardAction'),
-  menuShortcut('edit.delete', 'Delete Selected', 'Edit', { key: 'delete' }, 'deleteSelectedLineSegmentAction'),
+  menuShortcut(
+    'edit.delete',
+    'Delete Selected',
+    'Edit',
+    [{ key: 'delete' }, { key: 'backspace' }],
+    'deleteSelectedLineSegmentAction'
+  ),
   menuShortcut('edit.selectAll', 'Select All', 'Edit', { primary: true, key: 'a' }, 'selectAllAction'),
   menuShortcut('optimize.scale', 'Optimize Scale', 'Design', { primary: true, key: 'r' }),
   menuShortcut('cp.build', 'Build Crease Pattern', 'Design', { primary: true, key: 'b' }),
@@ -131,16 +138,18 @@ function menuShortcut(
   id: MenuActionId,
   label: string,
   category: string,
-  defaultChord: KeyChord | null,
+  defaultChord: KeyChord | KeyChord[] | null,
   upstreamAction?: string
 ): ShortcutDefinition {
+  const defaultChords = normalizeDefaultChords(defaultChord);
   return {
     id,
     label,
     category,
     scope: 'global',
     target: 'menu',
-    defaultChord,
+    defaultChord: defaultChords[0] ?? null,
+    defaultChords,
     upstreamAction,
   };
 }
@@ -150,13 +159,15 @@ function viewportShortcut(
   label: string,
   defaultChord: KeyChord
 ): ShortcutDefinition {
+  const defaultChords = normalizeDefaultChords(defaultChord);
   return {
     id,
     label,
     category: 'Viewport',
     scope: 'viewport',
     target: 'viewport',
-    defaultChord,
+    defaultChord: defaultChords[0] ?? null,
+    defaultChords,
   };
 }
 
@@ -166,6 +177,7 @@ function buildCpShortcutDefinitions(): ShortcutDefinition[] {
     const defaultChord = defaultChordForCpAction(action.upstreamAction);
     const duplicate = defaultChord ? keyChordId(defaultChord) : null;
     const safeDefaultChord = duplicate && seen.has(duplicate) ? null : defaultChord;
+    const defaultChords = normalizeDefaultChords(safeDefaultChord);
     if (duplicate && safeDefaultChord) seen.add(duplicate);
     return {
       id: action.id,
@@ -173,10 +185,17 @@ function buildCpShortcutDefinitions(): ShortcutDefinition[] {
       category: action.group === 'line-type' ? 'Line Type' : cpCategoryLabel(action.group),
       scope: 'crease-pattern',
       target: 'cp-action',
-      defaultChord: safeDefaultChord,
+      defaultChord: defaultChords[0] ?? null,
+      defaultChords,
       upstreamAction: action.upstreamAction,
     };
   });
+}
+
+function normalizeDefaultChords(chords: KeyChord | KeyChord[] | null): KeyChord[] {
+  if (!chords) return [];
+  const values = Array.isArray(chords) ? chords : [chords];
+  return values.map(normalizeKeyChord).filter((chord) => chord.key);
 }
 
 function defaultChordForCpAction(upstreamAction: string): KeyChord | null {
@@ -225,19 +244,20 @@ export function getShortcutRegistryDiagnostics(): ShortcutRegistryDiagnostics {
   const reservedDefaultChords: ShortcutRegistryDiagnostics['reservedDefaultChords'] = [];
 
   for (const definition of SHORTCUT_DEFINITIONS) {
-    if (!definition.defaultChord) continue;
-    const duplicateKey = `${definition.scope}:${keyChordId(definition.defaultChord)}`;
-    duplicateBuckets.set(duplicateKey, [
-      ...(duplicateBuckets.get(duplicateKey) ?? []),
-      definition.id,
-    ]);
-    const classification = classifyReservedKey(definition.defaultChord);
-    if (classification !== 'allowed') {
-      reservedDefaultChords.push({
-        actionId: definition.id,
-        chord: formatKeyChord(definition.defaultChord),
-        classification,
-      });
+    for (const defaultChord of definition.defaultChords) {
+      const duplicateKey = `${definition.scope}:${keyChordId(defaultChord)}`;
+      duplicateBuckets.set(duplicateKey, [
+        ...(duplicateBuckets.get(duplicateKey) ?? []),
+        definition.id,
+      ]);
+      const classification = classifyReservedKey(defaultChord);
+      if (classification !== 'allowed') {
+        reservedDefaultChords.push({
+          actionId: definition.id,
+          chord: formatKeyChord(defaultChord),
+          classification,
+        });
+      }
     }
   }
 
@@ -259,18 +279,25 @@ export function getResolvedShortcut(
   id: ShortcutActionId,
   overrides: ShortcutOverrides = {}
 ): KeyChord | null {
+  return getResolvedShortcuts(id, overrides)[0] ?? null;
+}
+
+export function getResolvedShortcuts(
+  id: ShortcutActionId,
+  overrides: ShortcutOverrides = {}
+): KeyChord[] {
   if (Object.prototype.hasOwnProperty.call(overrides, id)) {
-    return overrides[id] ?? null;
+    return (overrides[id] ?? []).map(normalizeKeyChord).filter((chord) => chord.key);
   }
-  return getShortcutDefinition(id)?.defaultChord ?? null;
+  return getShortcutDefinition(id)?.defaultChords ?? [];
 }
 
 export function shortcutLabelForAction(
   id: ShortcutActionId,
   overrides: ShortcutOverrides = {}
 ): string | undefined {
-  const chord = getResolvedShortcut(id, overrides);
-  return chord ? formatKeyChord(chord) : undefined;
+  const chords = getResolvedShortcuts(id, overrides);
+  return chords.length > 0 ? chords.map((chord) => formatKeyChord(chord)).join(' / ') : undefined;
 }
 
 export function findShortcutConflict(
@@ -284,8 +311,13 @@ export function findShortcutConflict(
   for (const candidate of SHORTCUT_DEFINITIONS) {
     if (candidate.id === actionId) continue;
     if (!shortcutScopesOverlap(definition.scope, candidate.scope)) continue;
-    const candidateChord = getResolvedShortcut(candidate.id, overrides);
-    if (candidateChord && keyChordEquals(candidateChord, chord)) return candidate;
+    if (
+      getResolvedShortcuts(candidate.id, overrides).some((candidateChord) =>
+        keyChordEquals(candidateChord, chord)
+      )
+    ) {
+      return candidate;
+    }
   }
   return null;
 }

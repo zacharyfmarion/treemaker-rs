@@ -159,11 +159,13 @@ describe('SettingsModal', () => {
       );
     });
 
-    expect(useShortcutStore.getState().overrides['file.save']).toEqual({
-      primary: true,
-      alt: true,
-      key: 's',
-    });
+    expect(useShortcutStore.getState().overrides['file.save']).toEqual([
+      {
+        primary: true,
+        alt: true,
+        key: 's',
+      },
+    ]);
     expect(rendered.textContent).toMatch(/(Alt|Option)\+S/u);
 
     const clear = saveRow?.querySelector('[aria-label="Clear Save shortcut"]') as HTMLButtonElement;

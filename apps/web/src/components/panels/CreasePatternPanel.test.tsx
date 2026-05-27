@@ -14,6 +14,7 @@ import {
   getEditableCpModelBounds,
   modelPointToCpSvg,
 } from '../../lib/creasePatternViewport';
+import { handleShortcutRuntimeKeyDown } from '../../keyboard/shortcutRuntime';
 import type { ImportedCreasePatternDocument } from '../../lib/creasePatternImport';
 import { generatedCpLineage } from '../../lib/oristudioCpLineage';
 import { createStarterOristudioCpDocument } from '../../lib/oristudioCpStarterDocument';
@@ -561,22 +562,46 @@ describe('CreasePatternPanel', () => {
     expect(body).not.toBeNull();
 
     act(() => {
-      body?.dispatchEvent(new KeyboardEvent('keydown', { key: '=', metaKey: true, bubbles: true }));
+      handleShortcutRuntimeKeyDown(
+        new KeyboardEvent('keydown', { key: '=', metaKey: true, bubbles: true }),
+        {
+          context: { documentMode: 'crease-pattern', activeEditingSurface: 'crease-pattern' },
+          menu: vi.fn(),
+        }
+      );
     });
     expect(transformMocks.zoomIn).toHaveBeenCalledWith(0.35, 120);
 
     act(() => {
-      body?.dispatchEvent(new KeyboardEvent('keydown', { key: '-', metaKey: true, bubbles: true }));
+      handleShortcutRuntimeKeyDown(
+        new KeyboardEvent('keydown', { key: '-', metaKey: true, bubbles: true }),
+        {
+          context: { documentMode: 'crease-pattern', activeEditingSurface: 'crease-pattern' },
+          menu: vi.fn(),
+        }
+      );
     });
     expect(transformMocks.zoomOut).toHaveBeenCalledWith(0.35, 120);
 
     act(() => {
-      body?.dispatchEvent(new KeyboardEvent('keydown', { key: '0', metaKey: true, bubbles: true }));
+      handleShortcutRuntimeKeyDown(
+        new KeyboardEvent('keydown', { key: '0', metaKey: true, bubbles: true }),
+        {
+          context: { documentMode: 'crease-pattern', activeEditingSurface: 'crease-pattern' },
+          menu: vi.fn(),
+        }
+      );
     });
     expect(transformMocks.centerView).toHaveBeenLastCalledWith(expect.any(Number), 180);
 
     act(() => {
-      body?.dispatchEvent(new KeyboardEvent('keydown', { key: '1', metaKey: true, bubbles: true }));
+      handleShortcutRuntimeKeyDown(
+        new KeyboardEvent('keydown', { key: '1', metaKey: true, bubbles: true }),
+        {
+          context: { documentMode: 'crease-pattern', activeEditingSurface: 'crease-pattern' },
+          menu: vi.fn(),
+        }
+      );
     });
     expect(transformMocks.centerView).toHaveBeenLastCalledWith(1, 160);
 
@@ -751,8 +776,12 @@ describe('CreasePatternPanel', () => {
     expect(boxSelectButton?.hasAttribute('data-active')).toBe(true);
 
     act(() => {
-      container.querySelector<HTMLElement>('.cp-panel__body')?.dispatchEvent(
-        new KeyboardEvent('keydown', { bubbles: true, key: 'v' })
+      handleShortcutRuntimeKeyDown(
+        new KeyboardEvent('keydown', { bubbles: true, key: 'v' }),
+        {
+          context: { documentMode: 'crease-pattern', activeEditingSurface: 'crease-pattern' },
+          menu: vi.fn(),
+        }
       );
     });
     expect(container.querySelector('button[aria-label="Valley"]')?.getAttribute('data-active')).toBe(

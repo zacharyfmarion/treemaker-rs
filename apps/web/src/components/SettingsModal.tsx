@@ -4,7 +4,6 @@ import {
   classifyReservedKey,
   findShortcutConflict,
   formatKeyChord,
-  getResolvedShortcut,
   keyChordFromKeyboardEvent,
   SHORTCUT_DEFINITIONS,
   shortcutLabelForAction,
@@ -187,15 +186,15 @@ function ShortcutsTab() {
   const rows = useMemo(() => {
     const query = search.trim().toLowerCase();
     return SHORTCUT_DEFINITIONS.filter((definition) => {
-      const current = getResolvedShortcut(definition.id, overrides);
-      if (assignedOnly && !current) return false;
+      const currentLabel = shortcutLabelForAction(definition.id, overrides);
+      if (assignedOnly && !currentLabel) return false;
       if (!query) return true;
       return [
         definition.label,
         definition.category,
         definition.scope,
         definition.upstreamAction ?? '',
-        shortcutLabelForAction(definition.id, overrides) ?? '',
+        currentLabel ?? '',
       ]
         .join(' ')
         .toLowerCase()
@@ -257,8 +256,11 @@ function ShortcutsTab() {
           <h3 className="settings-section__title">{category}</h3>
           <div className="settings-shortcuts__table">
             {definitions.map((definition) => {
-              const current = getResolvedShortcut(definition.id, overrides);
-              const defaultChord = definition.defaultChord;
+              const currentLabel = shortcutLabelForAction(definition.id, overrides);
+              const defaultLabel =
+                definition.defaultChords.length > 0
+                  ? definition.defaultChords.map((chord) => formatKeyChord(chord)).join(' / ')
+                  : '-';
               const hasOverride = Object.prototype.hasOwnProperty.call(
                 overrides,
                 definition.id
@@ -283,12 +285,12 @@ function ShortcutsTab() {
                   >
                     {capturingId === definition.id
                       ? 'Press keys'
-                      : current
-                        ? formatKeyChord(current)
+                      : currentLabel
+                        ? currentLabel
                         : 'Unassigned'}
                   </button>
                   <span className="settings-shortcuts__default">
-                    {defaultChord ? formatKeyChord(defaultChord) : '-'}
+                    {defaultLabel}
                   </span>
                   <IconButton
                     size="sm"

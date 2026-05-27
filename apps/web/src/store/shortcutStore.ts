@@ -11,7 +11,7 @@ export const SHORTCUT_STORAGE_KEY = 'oristudio-shortcuts-v1';
 
 interface PersistedShortcutState {
   version: 1;
-  bindings: Record<string, KeyChord | null>;
+  bindings: Record<string, KeyChord | KeyChord[] | null>;
 }
 
 interface ShortcutState {
@@ -32,8 +32,15 @@ function loadShortcutOverrides(): ShortcutOverrides {
       return {};
     }
     const overrides: ShortcutOverrides = {};
-    for (const [id, chord] of Object.entries(parsed.bindings)) {
-      overrides[id as ShortcutActionId] = chord ? normalizeKeyChord(chord) : null;
+    for (const [id, binding] of Object.entries(parsed.bindings)) {
+      if (binding === null) {
+        overrides[id as ShortcutActionId] = null;
+        continue;
+      }
+      const chords = Array.isArray(binding) ? binding : [binding];
+      overrides[id as ShortcutActionId] = chords
+        .map((chord) => normalizeKeyChord(chord))
+        .filter((chord) => chord.key);
     }
     return overrides;
   } catch {
@@ -48,7 +55,7 @@ function saveShortcutOverrides(overrides: ShortcutOverrides): void {
       version: 1,
       bindings: Object.fromEntries(
         Object.entries(overrides).filter(
-          (entry): entry is [string, KeyChord | null] => entry[1] !== undefined
+          (entry): entry is [string, KeyChord[] | null] => entry[1] !== undefined
         )
       ),
     };
@@ -64,7 +71,7 @@ export const useShortcutStore = create<ShortcutState>()(
       overrides: loadShortcutOverrides(),
 
       setShortcut: (id, chord) => {
-        const overrides = { ...get().overrides, [id]: normalizeKeyChord(chord) };
+        const overrides = { ...get().overrides, [id]: [normalizeKeyChord(chord)] };
         saveShortcutOverrides(overrides);
         set({ overrides });
       },

@@ -22,7 +22,11 @@ import {
   RotateCw,
   ScanLine,
 } from 'lucide-react';
-import { handleShortcutKeyDown } from '../../keyboard/shortcutDispatcher';
+import {
+  registerCpActionShortcutExecutor,
+  registerViewportShortcutExecutor,
+  setActiveShortcutViewportSurface,
+} from '../../keyboard/shortcutRuntime';
 import {
   shortcutLabelForAction,
   type ShortcutOverrides,
@@ -1563,6 +1567,11 @@ export function CreasePatternPanel() {
     [handleCpToolAction]
   );
 
+  useEffect(
+    () => registerCpActionShortcutExecutor(handleCpShortcutAction),
+    [handleCpShortcutAction]
+  );
+
   useEffect(() => {
     if (!oristudioCpActionRequest) return;
 
@@ -3082,6 +3091,11 @@ export function CreasePatternPanel() {
     [fitToView, setActualSize]
   );
 
+  useEffect(
+    () => registerViewportShortcutExecutor('crease-pattern', handleViewportShortcut),
+    [handleViewportShortcut]
+  );
+
   const clearEditablePointerStatus = useCallback(() => {
     setCursorModelPoint(null);
     setSnapTarget(null);
@@ -3247,16 +3261,6 @@ export function CreasePatternPanel() {
         return;
       }
 
-      if (interactive) return;
-
-      handleShortcutKeyDown(event, {
-        scopeStack: ['viewport', 'crease-pattern'],
-        overrides: shortcutOverrides,
-        executors: {
-          cpAction: handleCpShortcutAction,
-          viewport: handleViewportShortcut,
-        },
-      });
     };
 
     const onKeyUp = (event: KeyboardEvent) => {
@@ -3282,12 +3286,8 @@ export function CreasePatternPanel() {
     cpToolState,
     editableCp,
     editableSelectionSize,
-    handleCpShortcutAction,
-    handleViewportShortcut,
     hasCreasePattern,
     selectionRotationPreview,
-    setActualSize,
-    shortcutOverrides,
   ]);
 
   useEffect(() => {
@@ -3364,7 +3364,8 @@ export function CreasePatternPanel() {
         ].join(' ')}
         data-space-pan={spacePressed || undefined}
         tabIndex={-1}
-        onPointerDown={(event) => {
+        onPointerDownCapture={(event) => {
+          setActiveShortcutViewportSurface('crease-pattern');
           if (editableCp) setActiveEditingSurface('crease-pattern');
           if (!isViewportInteractiveTarget(event.target)) containerRef.current?.focus();
         }}

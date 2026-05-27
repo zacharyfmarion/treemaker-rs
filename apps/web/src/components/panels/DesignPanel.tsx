@@ -24,7 +24,10 @@ import {
   Waypoints,
 } from 'lucide-react';
 import { handleMenuAction } from '../../commands/menuActions';
-import { handleShortcutKeyDown } from '../../keyboard/shortcutDispatcher';
+import {
+  registerViewportShortcutExecutor,
+  setActiveShortcutViewportSurface,
+} from '../../keyboard/shortcutRuntime';
 import type { ViewportShortcutId } from '../../keyboard/shortcuts';
 import { formatNumber, paperToSvg, type Point } from '../../lib/geometry';
 import {
@@ -65,7 +68,6 @@ import {
   symmetrySide,
 } from '../../lib/symmetryAuthoring';
 import { useWorkspaceStore } from '../../store/workspaceStore';
-import { useShortcutStore } from '../../store/shortcutStore';
 import { Button } from '../ui/Button';
 import { IconButton } from '../ui/IconButton';
 import { Toggle } from '../ui/Toggle';
@@ -480,7 +482,6 @@ export function DesignPanel() {
   const designViewportFitRequestId = useWorkspaceStore(
     (state) => state.designViewportFitRequestId
   );
-  const shortcutOverrides = useShortcutStore((state) => state.overrides);
   const mirrorMode = toolMode === 'symmetry';
   const inferredSymmetryMode = symmetrySelectValueForState({
     hasSymmetry: project.hasSymmetry,
@@ -634,6 +635,11 @@ export function DesignPanel() {
       }
     },
     [fitToView, setActualSize]
+  );
+
+  useEffect(
+    () => registerViewportShortcutExecutor('tree', handleViewportShortcut),
+    [handleViewportShortcut]
   );
 
   const lastFittedProjectLoadIdRef = useRef<number | null>(null);
@@ -816,15 +822,6 @@ export function DesignPanel() {
         return;
       }
 
-      if (interactive) return;
-
-      handleShortcutKeyDown(event, {
-        scopeStack: ['viewport'],
-        overrides: shortcutOverrides,
-        executors: {
-          viewport: handleViewportShortcut,
-        },
-      });
     };
 
     const onKeyUp = (event: KeyboardEvent) => {
@@ -842,7 +839,7 @@ export function DesignPanel() {
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', clearSpace);
     };
-  }, [handleViewportShortcut, shortcutOverrides]);
+  }, []);
 
   const onPaperPointerDown = (event: PointerEvent<SVGRectElement>) => {
     if (event.button !== 0 || spacePressed) return;
@@ -956,7 +953,8 @@ export function DesignPanel() {
         className="panel-body design-panel__body"
         data-space-pan={spacePressed || undefined}
         tabIndex={-1}
-        onPointerDown={(event) => {
+        onPointerDownCapture={(event) => {
+          setActiveShortcutViewportSurface('tree');
           setActiveEditingSurface('tree');
           if (!isViewportInteractiveTarget(event.target)) containerRef.current?.focus();
         }}

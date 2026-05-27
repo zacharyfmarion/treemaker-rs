@@ -20,7 +20,7 @@ describe('web menu definition', () => {
 
   it('reads shortcut labels from resolved shortcut bindings', () => {
     const fileMenu = getMenuBarDef({
-      'file.save': { primary: true, alt: true, key: 's' },
+      'file.save': [{ primary: true, alt: true, key: 's' }],
     }).find((menu) => menu.label === 'File');
     const save = fileMenu?.items.find((item) => item.type === 'action' && item.id === 'file.save');
 

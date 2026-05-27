@@ -1,5 +1,5 @@
 import {
-  getResolvedShortcut,
+  getResolvedShortcuts,
   keyChordEquals,
   keyChordFromKeyboardEvent,
   SHORTCUT_DEFINITIONS,
@@ -47,8 +47,9 @@ export function handleShortcutKeyDown(
   for (const scope of options.scopeStack) {
     const definition = SHORTCUT_DEFINITIONS.find((candidate) => {
       if (candidate.scope !== scope) return false;
-      const shortcut = getResolvedShortcut(candidate.id, options.overrides);
-      return shortcut ? keyChordEquals(shortcut, chord) : false;
+      return getResolvedShortcuts(candidate.id, options.overrides).some((shortcut) =>
+        keyChordEquals(shortcut, chord)
+      );
     });
 
     if (!definition) continue;

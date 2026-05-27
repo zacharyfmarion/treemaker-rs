@@ -922,6 +922,33 @@ describe('CreasePatternPanel', () => {
     expect(useWorkspaceStore.getState().oristudioCpSelection.lines).toEqual([1, 2, 3]);
   });
 
+  it('hides the selection transform controls while a selected-line tool is active', () => {
+    const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
+      documentMode: 'crease-pattern',
+      importedCreasePattern: importedCpDocument(),
+      oristudioCpDocument: editableCpState(),
+      oristudioCpSelection: {
+        lines: [1, 2],
+        vertices: [],
+        points: [],
+        circles: [],
+        texts: [],
+        faces: [],
+      },
+    });
+
+    expect(container.querySelector('.cp-selection-transform')).not.toBeNull();
+
+    act(() => {
+      container
+        .querySelector<HTMLButtonElement>('button[aria-label="Copy selected creases"]')
+        ?.click();
+    });
+
+    expect(container.querySelector('.cp-selection-transform')).toBeNull();
+    expect(container.textContent).toContain('Copy selected creases: Pick source point');
+  });
+
   it('uses an expanded canvas for imported editable CP documents', () => {
     const { container } = renderPanel(createSampleProject(), 'crease_pattern_ready', {
       documentMode: 'crease-pattern',

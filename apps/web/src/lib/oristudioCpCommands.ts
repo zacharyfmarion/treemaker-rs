@@ -261,9 +261,10 @@ export const ORISTUDIO_CP_COMMANDS: OristudioCpCommandDefinition[] = [
     toolSteps: ['Drag between existing points'],
     inputMode: 'drag-line',
   }),
-  ready('DrawCreaseSymmetric', 'Mirror selected creases', 'construct', 'copy-plus', 'MouseHandlerDrawCreaseSymmetric', {
+  ready('DrawCreaseSymmetric', 'Reflect selection over line', 'transform', 'flip-horizontal', 'MouseHandlerDrawCreaseSymmetric', {
     selectionRequirement: 'selected creases',
-    toolSteps: ['Pick mirror axis start', 'Pick mirror axis end'],
+    toolSteps: ['Pick reflection line start', 'Pick reflection line end'],
+    tooltip: 'Reflect selected creases across a line drawn with two points',
   }),
   ready('DrawCreaseAngleRestricted', 'Angle restricted crease', 'construct', 'drafting-compass', 'MouseHandlerDrawCreaseAngleRestricted', {
     toolSteps: ['Pick base start point', 'Pick base end point', 'Pick convergence candidate'],

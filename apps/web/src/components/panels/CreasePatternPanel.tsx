@@ -1188,6 +1188,13 @@ export function CreasePatternPanel() {
     () => activeActionInputMode(activeCpAction, activeCpCommand),
     [activeCpAction, activeCpCommand]
   );
+  const visibleSelectionTransformFrame = isDefaultSelectionMode(
+    cpToolState,
+    cpToolPoints.length,
+    cpToolPath.length
+  )
+    ? selectionTransformFrame
+    : null;
   const liveCommandPreviewPoints = useMemo(() => {
     if (cpToolPath.length > 0) return cpToolPath;
     if (!activeCpCommand || cpToolState.phase !== 'active') return cpToolPoints;
@@ -3404,7 +3411,7 @@ export function CreasePatternPanel() {
                         commandPreviewPoints={renderedCommandPreviewPoints}
                         commandPreviewSegments={renderedCommandPreviewSegments}
                         highlightedLineIds={pendingSquareBisectorLineIds}
-                        selectionTransformFrame={selectionTransformFrame}
+                        selectionTransformFrame={visibleSelectionTransformFrame}
                         selectionTransformPreview={selectionRotationPreview}
                         selectionTransformUiScale={cpUiScale}
                         activeDiagnosticId={oristudioCpActiveDiagnosticId}

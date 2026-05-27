@@ -182,3 +182,7 @@ targets editable Oristudio CP documents loaded in `documentMode ===
       geometry/panel tests, and browser smoke.
 - [x] Allow modifier-click line selection through the transform move overlay
       and validate with focused panel coverage plus browser smoke.
+- [x] Hide transform-box controls outside the default selection mode so
+      selected-line tools can capture their own source/destination input.
+- [x] Surface Oriedita's selected-crease reflection command as "Reflect
+      selection over line" in the Transform tools.

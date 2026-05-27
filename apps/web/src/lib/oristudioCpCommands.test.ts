@@ -42,6 +42,13 @@ describe('oristudio CP command registry', () => {
       uiStatus: 'ready',
       toolSteps: ['Pick source point', 'Pick destination point'],
     });
+    expect(cpCommandByOperation('DrawCreaseSymmetric')).toMatchObject({
+      uiStatus: 'ready',
+      label: 'Reflect selection over line',
+      group: 'transform',
+      selectionRequirement: 'selected creases',
+      toolSteps: ['Pick reflection line start', 'Pick reflection line end'],
+    });
     expect(cpCommandByOperation('CreaseMove4p')).toMatchObject({
       uiStatus: 'ready',
       toolSteps: [

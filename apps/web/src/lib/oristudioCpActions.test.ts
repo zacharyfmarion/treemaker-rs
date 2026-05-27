@@ -4,6 +4,7 @@ import {
   ORISTUDIO_CP_ACTION_GROUPS,
   ORISTUDIO_CP_LINE_TYPE_ACTIONS,
   cpActionById,
+  cpActionByOperation,
   cpRailActions,
 } from './oristudioCpActions';
 import { ORISTUDIO_CP_COMMANDS } from './oristudioCpCommands';
@@ -144,6 +145,14 @@ describe('oristudio CP action registry', () => {
       inputMode: 'drag-line',
       lineInputMode: 'aux-line',
       uiStatus: 'not-implemented',
+    });
+
+    expect(cpActionByOperation('DrawCreaseSymmetric')).toMatchObject({
+      kind: 'command',
+      operationId: 'DrawCreaseSymmetric',
+      label: 'Reflect selection over line',
+      group: 'transform',
+      toolSteps: ['Pick reflection line start', 'Pick reflection line end'],
     });
   });
 });

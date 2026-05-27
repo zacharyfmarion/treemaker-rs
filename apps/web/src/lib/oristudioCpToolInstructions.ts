@@ -318,7 +318,7 @@ const ORIEDITA_CP_TOOL_INSTRUCTIONS: Record<string, OristudioCpToolInstructions>
     notes: ['Points AB will form one side of polygon, which will be drawn clockwise.'],
   },
   reflectAction: {
-    intro: ['Mirror selected lines over 2 selected points.'],
+    intro: ['Reflect selected lines over a line drawn with 2 points.'],
   },
   selectAction: {
     intro: ['Select lines by drawing a rectangle.'],

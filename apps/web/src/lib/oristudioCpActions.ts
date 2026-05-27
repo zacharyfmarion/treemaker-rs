@@ -304,6 +304,8 @@ const ORIEDITA_RAIL_ACTION_OVERRIDES: Partial<
     upstreamMouseMode: 'DRAW_POINT_14',
   },
   DrawCreaseSymmetric: {
+    label: 'Reflect selection over line',
+    group: 'transform',
     upstreamAction: 'reflectAction',
     upstreamMouseMode: 'DRAW_CREASE_SYMMETRIC_12',
   },

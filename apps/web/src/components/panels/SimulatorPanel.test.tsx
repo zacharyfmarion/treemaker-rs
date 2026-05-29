@@ -50,8 +50,23 @@ describe('SimulatorPanel', () => {
     expect(rendered.querySelector('[aria-label="Fold percent"]')).not.toBeNull();
     expect(rendered.querySelector('[aria-label="Simulator scope"]')?.textContent).toContain('Whole');
     expect(rendered.querySelector('[aria-label="Step simulation accuracy"]')).toBeNull();
+    expect(rendered.querySelector('[aria-label="Lighting"]')?.getAttribute('data-active')).toBe(
+      'true'
+    );
+    expect(rendered.querySelector('.simulator-canvas')?.getAttribute('data-lighting')).toBe(
+      'true'
+    );
     expect(rendered.textContent).not.toContain('Manual preview');
     expect(putImageDataMock).toHaveBeenCalled();
+
+    act(() => {
+      rendered.querySelector<HTMLButtonElement>('[aria-label="Lighting"]')?.click();
+    });
+
+    expect(rendered.querySelector('[aria-label="Lighting"]')?.hasAttribute('data-active')).toBe(
+      false
+    );
+    expect(rendered.querySelector('.simulator-canvas')?.getAttribute('data-lighting')).toBeNull();
   });
 
   it('triangulates polygonal fold faces before rendering', () => {
@@ -245,12 +260,18 @@ function mockCanvasContext(): CanvasRenderingContext2D {
     closePath: vi.fn(),
     fill: vi.fn(),
     stroke: vi.fn(),
+    save: vi.fn(),
+    restore: vi.fn(),
     getImageData: vi.fn(() => imageData),
     putImageData: putImageDataMock,
     setLineDash: vi.fn(),
     getLineDash: vi.fn(() => []),
     globalAlpha: 1,
     fillStyle: '',
+    shadowBlur: 0,
+    shadowColor: '',
+    shadowOffsetX: 0,
+    shadowOffsetY: 0,
     strokeStyle: '',
     lineWidth: 1,
   } as unknown as CanvasRenderingContext2D;

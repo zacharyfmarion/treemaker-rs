@@ -18,6 +18,7 @@ import {
   RotateCcw,
   Square,
   StepForward,
+  Sun,
   Waves,
 } from 'lucide-react';
 import {
@@ -52,6 +53,7 @@ interface SimulatorViewSettings {
   showFaces: boolean;
   showEdges: boolean;
   showHiddenLines: boolean;
+  lighting: boolean;
 }
 
 interface SimulatorHighlights {
@@ -93,7 +95,9 @@ const DEFAULT_VIEW_SETTINGS: SimulatorViewSettings = {
   showFaces: true,
   showEdges: true,
   showHiddenLines: false,
+  lighting: true,
 };
+const PAPER_LIGHT_DIRECTION = normalizeVector({ x: -0.45, y: 0.58, z: 0.68 });
 const EMPTY_HIGHLIGHTS: SimulatorHighlights = {
   creases: new Set(),
   faces: new Set(),
@@ -627,12 +631,23 @@ export function SimulatorPanel() {
           >
             <Layers3 size={14} />
           </IconButton>
+          <IconButton
+            size="sm"
+            variant="toolbar"
+            title="Lighting"
+            tooltipSide="bottom"
+            isActive={viewSettings.lighting}
+            onClick={() => setViewSettings((current) => ({ ...current, lighting: !current.lighting }))}
+          >
+            <Sun size={14} />
+          </IconButton>
         </div>
       </div>
       <div className="panel-body simulator-panel__body">
         <canvas
           ref={canvasRef}
           className="simulator-canvas"
+          data-lighting={viewSettings.lighting || undefined}
           aria-label="Origami folded-base simulator. Drag to rotate, scroll to zoom, double-click to reset view."
           title="Drag to rotate, scroll to zoom, double-click to reset view"
           onPointerDown={handleCanvasPointerDown}
@@ -785,6 +800,9 @@ function drawFrame(
   const surfaceEdgeAlpha = settings.renderMode === 'xray' ? 0.5 : 0.92;
 
   if (settings.renderMode === 'paper' && settings.showFaces) {
+    if (settings.lighting) {
+      drawProjectedPaperShadow(ctx, triangles, projected, map, width, height, dpr);
+    }
     const depthSurface = drawPaperFacesWithDepth(
       ctx,
       model,
@@ -795,7 +813,8 @@ function drawFrame(
       width,
       height,
       palette,
-      highlights
+      highlights,
+      settings.lighting
     );
     if (depthSurface) {
       if (settings.showEdges) {
@@ -819,7 +838,13 @@ function drawFrame(
       ctx.lineTo(b.x, b.y);
       ctx.lineTo(c.x, c.y);
       ctx.closePath();
-      ctx.fillStyle = triangleColor(frame.colors, triangle.vertices, faceAlpha);
+      ctx.fillStyle = triangleColor(
+        frame.colors,
+        triangle.vertices,
+        faceAlpha,
+        projected,
+        settings.lighting
+      );
       ctx.fill();
       if (highlighted) {
         ctx.fillStyle = palette.highlightFace;
@@ -849,6 +874,16 @@ function drawFrame(
       highlights
     );
   }
+}
+
+function normalizeVector(vector: { x: number; y: number; z: number }): { x: number; y: number; z: number } {
+  const length = Math.hypot(vector.x, vector.y, vector.z);
+  if (length < 0.0001) return { x: 0, y: 0, z: 1 };
+  return {
+    x: vector.x / length,
+    y: vector.y / length,
+    z: vector.z / length,
+  };
 }
 
 function projectPositions(positions: Float32Array, view: SimulatorView): ProjectedPoint[] {
@@ -960,6 +995,40 @@ function triangleOrder(indices: Uint32Array, projected: ProjectedPoint[]): Order
   return triangles.sort((a, b) => averageDepth(a, projected) - averageDepth(b, projected));
 }
 
+function drawProjectedPaperShadow(
+  ctx: CanvasRenderingContext2D,
+  triangles: OrderedTriangle[],
+  projected: ProjectedPoint[],
+  map: (point: ProjectedPoint) => { x: number; y: number },
+  width: number,
+  height: number,
+  dpr: number
+): void {
+  const size = Math.min(width, height);
+  const shadowOffset = Math.max(5 * dpr, size * 0.018);
+  const shadowBlur = Math.max(10 * dpr, size * 0.03);
+  ctx.save();
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.24)';
+  ctx.shadowBlur = shadowBlur;
+  ctx.shadowOffsetX = shadowOffset;
+  ctx.shadowOffsetY = shadowOffset * 1.15;
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.08)';
+  ctx.beginPath();
+
+  for (const triangle of triangles) {
+    const a = map(projected[triangle.vertices[0]] ?? { x: 0, y: 0, depth: 0 });
+    const b = map(projected[triangle.vertices[1]] ?? { x: 0, y: 0, depth: 0 });
+    const c = map(projected[triangle.vertices[2]] ?? { x: 0, y: 0, depth: 0 });
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.lineTo(c.x, c.y);
+    ctx.closePath();
+  }
+
+  ctx.fill();
+  ctx.restore();
+}
+
 function averageDepth(triangle: OrderedTriangle, projected: ProjectedPoint[]): number {
   return triangle.vertices.reduce((total, vertex) => total + (projected[vertex]?.depth ?? 0), 0) / 3;
 }
@@ -974,7 +1043,8 @@ function drawPaperFacesWithDepth(
   width: number,
   height: number,
   palette: SimulatorPalette,
-  highlights: SimulatorHighlights
+  highlights: SimulatorHighlights,
+  lighting: boolean
 ): DepthSurface | null {
   let imageData: ImageData;
   try {
@@ -1000,7 +1070,9 @@ function drawPaperFacesWithDepth(
       frame.colors,
       triangle.vertices,
       highlights.faces.has(triangle.faceIndex),
-      palette
+      palette,
+      projected,
+      lighting
     );
     rasterizeDepthTriangle(imageData, depths, width, height, points, color);
   }
@@ -1064,30 +1136,104 @@ function edgeFunction(
   return (point.sx - a.sx) * (b.sy - a.sy) - (point.sy - a.sy) * (b.sx - a.sx);
 }
 
-function triangleColor(colors: Float32Array, triangle: number[], alpha = 1): string {
+function triangleColor(
+  colors: Float32Array,
+  triangle: number[],
+  alpha = 1,
+  projected?: ProjectedPoint[],
+  lighting = false
+): string {
+  const [r, g, b] = lighting && projected
+    ? shadeRgb(triangleRgb(colors, triangle), triangleLightIntensity(triangle, projected))
+    : triangleRgb(colors, triangle);
+  return alpha >= 1 ? `rgb(${r} ${g} ${b})` : `rgb(${r} ${g} ${b} / ${alpha})`;
+}
+
+function triangleRgb(colors: Float32Array, triangle: number[]): [number, number, number] {
   const channel = (offset: number) =>
     triangle.reduce((total, vertex) => total + (colors[vertex * 3 + offset] ?? 0.75), 0) / 3;
-  const r = Math.round(channel(0) * 255);
-  const g = Math.round(channel(1) * 255);
-  const b = Math.round(channel(2) * 255);
-  return alpha >= 1 ? `rgb(${r} ${g} ${b})` : `rgb(${r} ${g} ${b} / ${alpha})`;
+  return [
+    Math.round(channel(0) * 255),
+    Math.round(channel(1) * 255),
+    Math.round(channel(2) * 255),
+  ];
 }
 
 function triangleRasterColor(
   colors: Float32Array,
   triangle: number[],
   highlighted: boolean,
-  palette: SimulatorPalette
+  palette: SimulatorPalette,
+  projected: ProjectedPoint[],
+  lighting: boolean
 ): [number, number, number, number] {
-  const channel = (offset: number) =>
-    triangle.reduce((total, vertex) => total + (colors[vertex * 3 + offset] ?? 0.75), 0) / 3;
-  const color: [number, number, number] = [
-    Math.round(channel(0) * 255),
-    Math.round(channel(1) * 255),
-    Math.round(channel(2) * 255),
-  ];
-  const rgb = highlighted ? blendRgb(color, palette.highlightFaceRgb, 0.3) : color;
+  const shaded = lighting
+    ? shadeRgb(triangleRgb(colors, triangle), triangleLightIntensity(triangle, projected))
+    : triangleRgb(colors, triangle);
+  const rgb = highlighted ? blendRgb(shaded, palette.highlightFaceRgb, 0.3) : shaded;
   return [rgb[0], rgb[1], rgb[2], 255];
+}
+
+function triangleLightIntensity(triangle: number[], projected: ProjectedPoint[]): number {
+  const a = projected[triangle[0]];
+  const b = projected[triangle[1]];
+  const c = projected[triangle[2]];
+  if (!a || !b || !c) return 1;
+  const normal = triangleNormal(a, b, c);
+  if (!normal) return 1;
+  const oriented = normal.z < 0
+    ? { x: -normal.x, y: -normal.y, z: -normal.z }
+    : normal;
+  const diffuse = Math.max(0, dotVector(oriented, PAPER_LIGHT_DIRECTION));
+  return clamp(0.74 + diffuse * 0.3 + oriented.z * 0.04, 0.68, 1.08);
+}
+
+function triangleNormal(
+  a: ProjectedPoint,
+  b: ProjectedPoint,
+  c: ProjectedPoint
+): { x: number; y: number; z: number } | null {
+  const ux = b.x - a.x;
+  const uy = b.y - a.y;
+  const uz = b.depth - a.depth;
+  const vx = c.x - a.x;
+  const vy = c.y - a.y;
+  const vz = c.depth - a.depth;
+  const normal = {
+    x: uy * vz - uz * vy,
+    y: uz * vx - ux * vz,
+    z: ux * vy - uy * vx,
+  };
+  const length = Math.hypot(normal.x, normal.y, normal.z);
+  if (length < 0.0001) return null;
+  return {
+    x: normal.x / length,
+    y: normal.y / length,
+    z: normal.z / length,
+  };
+}
+
+function dotVector(
+  a: { x: number; y: number; z: number },
+  b: { x: number; y: number; z: number }
+): number {
+  return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+function shadeRgb(color: [number, number, number], intensity: number): [number, number, number] {
+  if (intensity <= 1) {
+    return [
+      Math.round(color[0] * intensity),
+      Math.round(color[1] * intensity),
+      Math.round(color[2] * intensity),
+    ];
+  }
+  const lift = Math.min(0.16, intensity - 1);
+  return [
+    Math.round(color[0] + (255 - color[0]) * lift),
+    Math.round(color[1] + (255 - color[1]) * lift),
+    Math.round(color[2] + (255 - color[2]) * lift),
+  ];
 }
 
 function blendRgb(

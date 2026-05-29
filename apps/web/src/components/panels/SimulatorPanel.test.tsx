@@ -13,6 +13,7 @@ let root: Root | null = null;
 let container: HTMLDivElement | null = null;
 let canvasContext: CanvasRenderingContext2D;
 let putImageDataMock: ReturnType<typeof vi.fn>;
+let fillMock: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   canvasContext = mockCanvasContext();
@@ -50,8 +51,24 @@ describe('SimulatorPanel', () => {
     expect(rendered.querySelector('[aria-label="Fold percent"]')).not.toBeNull();
     expect(rendered.querySelector('[aria-label="Simulator scope"]')?.textContent).toContain('Whole');
     expect(rendered.querySelector('[aria-label="Step simulation accuracy"]')).toBeNull();
+    expect(rendered.querySelector('[aria-label="Lighting"]')?.getAttribute('data-active')).toBe(
+      'true'
+    );
+    expect(rendered.querySelector('.simulator-canvas')?.getAttribute('data-lighting')).toBe(
+      'true'
+    );
     expect(rendered.textContent).not.toContain('Manual preview');
     expect(putImageDataMock).toHaveBeenCalled();
+    expect(fillMock).toHaveBeenCalledTimes(putImageDataMock.mock.calls.length);
+
+    act(() => {
+      rendered.querySelector<HTMLButtonElement>('[aria-label="Lighting"]')?.click();
+    });
+
+    expect(rendered.querySelector('[aria-label="Lighting"]')?.hasAttribute('data-active')).toBe(
+      false
+    );
+    expect(rendered.querySelector('.simulator-canvas')?.getAttribute('data-lighting')).toBeNull();
   });
 
   it('triangulates polygonal fold faces before rendering', () => {
@@ -236,6 +253,7 @@ function mockCanvasContext(): CanvasRenderingContext2D {
     colorSpace: 'srgb',
   } as ImageData;
   putImageDataMock = vi.fn();
+  fillMock = vi.fn();
   return {
     clearRect: vi.fn(),
     fillRect: vi.fn(),
@@ -243,14 +261,20 @@ function mockCanvasContext(): CanvasRenderingContext2D {
     moveTo: vi.fn(),
     lineTo: vi.fn(),
     closePath: vi.fn(),
-    fill: vi.fn(),
+    fill: fillMock,
     stroke: vi.fn(),
+    save: vi.fn(),
+    restore: vi.fn(),
     getImageData: vi.fn(() => imageData),
     putImageData: putImageDataMock,
     setLineDash: vi.fn(),
     getLineDash: vi.fn(() => []),
     globalAlpha: 1,
     fillStyle: '',
+    shadowBlur: 0,
+    shadowColor: '',
+    shadowOffsetX: 0,
+    shadowOffsetY: 0,
     strokeStyle: '',
     lineWidth: 1,
   } as unknown as CanvasRenderingContext2D;

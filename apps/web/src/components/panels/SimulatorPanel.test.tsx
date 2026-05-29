@@ -13,6 +13,7 @@ let root: Root | null = null;
 let container: HTMLDivElement | null = null;
 let canvasContext: CanvasRenderingContext2D;
 let putImageDataMock: ReturnType<typeof vi.fn>;
+let fillMock: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   canvasContext = mockCanvasContext();
@@ -58,6 +59,7 @@ describe('SimulatorPanel', () => {
     );
     expect(rendered.textContent).not.toContain('Manual preview');
     expect(putImageDataMock).toHaveBeenCalled();
+    expect(fillMock).toHaveBeenCalledTimes(putImageDataMock.mock.calls.length);
 
     act(() => {
       rendered.querySelector<HTMLButtonElement>('[aria-label="Lighting"]')?.click();
@@ -251,6 +253,7 @@ function mockCanvasContext(): CanvasRenderingContext2D {
     colorSpace: 'srgb',
   } as ImageData;
   putImageDataMock = vi.fn();
+  fillMock = vi.fn();
   return {
     clearRect: vi.fn(),
     fillRect: vi.fn(),
@@ -258,7 +261,7 @@ function mockCanvasContext(): CanvasRenderingContext2D {
     moveTo: vi.fn(),
     lineTo: vi.fn(),
     closePath: vi.fn(),
-    fill: vi.fn(),
+    fill: fillMock,
     stroke: vi.fn(),
     save: vi.fn(),
     restore: vi.fn(),

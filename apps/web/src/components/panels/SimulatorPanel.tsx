@@ -1013,19 +1013,19 @@ function drawProjectedPaperShadow(
   ctx.shadowOffsetX = shadowOffset;
   ctx.shadowOffsetY = shadowOffset * 1.15;
   ctx.fillStyle = 'rgba(0, 0, 0, 0.08)';
+  ctx.beginPath();
 
   for (const triangle of triangles) {
     const a = map(projected[triangle.vertices[0]] ?? { x: 0, y: 0, depth: 0 });
     const b = map(projected[triangle.vertices[1]] ?? { x: 0, y: 0, depth: 0 });
     const c = map(projected[triangle.vertices[2]] ?? { x: 0, y: 0, depth: 0 });
-    ctx.beginPath();
     ctx.moveTo(a.x, a.y);
     ctx.lineTo(b.x, b.y);
     ctx.lineTo(c.x, c.y);
     ctx.closePath();
-    ctx.fill();
   }
 
+  ctx.fill();
   ctx.restore();
 }
 

@@ -10,6 +10,7 @@ Make the Simulator pane's folded 3D shape easier to read by adding default-on di
 - Add a header icon control alongside existing simulator view controls.
 - Shade paper-face colors in the canvas rasterizer using a fixed upper-left/front light vector.
 - Draw a soft projected model shadow before rasterized paper faces when lighting is enabled.
+- Cast the shadow from one combined silhouette so full-folded triangulation does not stamp repeated dark shadows.
 - Update focused Simulator panel tests for the new header control and rendering hooks.
 
 ## Affected Areas

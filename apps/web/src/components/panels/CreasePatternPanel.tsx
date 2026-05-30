@@ -22,6 +22,16 @@ import {
   RotateCw,
   ScanLine,
 } from 'lucide-react';
+import {
+  registerCpActionShortcutExecutor,
+  registerViewportShortcutExecutor,
+  setActiveShortcutViewportSurface,
+} from '../../keyboard/shortcutRuntime';
+import {
+  shortcutLabelForAction,
+  type ShortcutOverrides,
+  type ViewportShortcutId,
+} from '../../keyboard/shortcuts';
 import type {
   OristudioCpCommandPayload,
   OristudioCpCommandPreview,
@@ -46,6 +56,7 @@ import {
   cpActionByOperation,
   cpActionById,
   type OristudioCpActionDefinition,
+  type OristudioCpActionId,
   type OristudioCpActionInputMode,
   type OristudioCpCommandActionDefinition,
 } from '../../lib/oristudioCpActions';
@@ -137,6 +148,7 @@ import {
   toggleFacetSelection,
 } from '../../lib/selection';
 import { useWorkspaceStore } from '../../store/workspaceStore';
+import { useShortcutStore } from '../../store/shortcutStore';
 import { IconButton } from '../ui/IconButton';
 import { SegmentedControl } from '../ui/SegmentedControl';
 import { Toggle } from '../ui/Toggle';
@@ -498,26 +510,32 @@ function cpLineTypeStatusLabel(lineColor: OristudioCpLineColor): string {
 function CpLineTypeToolbar({
   activeLineColor,
   onSelectLineColor,
+  shortcutOverrides,
 }: {
   activeLineColor: OristudioCpLineColor;
   onSelectLineColor: (lineColor: OristudioCpLineColor) => void;
+  shortcutOverrides: ShortcutOverrides;
 }) {
   return (
     <div className="cp-line-type-toolbar" aria-label="Active crease line type">
-      {ORISTUDIO_CP_LINE_TYPE_ACTIONS.map((action) => (
-        <IconButton
-          key={action.id}
-          size="sm"
-          variant="toolbar"
-          title={action.label}
-          className="cp-line-type-toolbar__button"
-          data-line-color={action.lineColor}
-          isActive={activeLineColor === action.lineColor}
-          onClick={() => onSelectLineColor(action.lineColor)}
-        >
-          <span aria-hidden="true">{action.railLabel}</span>
-        </IconButton>
-      ))}
+      {ORISTUDIO_CP_LINE_TYPE_ACTIONS.map((action) => {
+        const shortcut = shortcutLabelForAction(action.id, shortcutOverrides);
+        return (
+          <IconButton
+            key={action.id}
+            size="sm"
+            variant="toolbar"
+            title={shortcut ? `${action.label} (${shortcut})` : action.label}
+            aria-label={action.label}
+            className="cp-line-type-toolbar__button"
+            data-line-color={action.lineColor}
+            isActive={activeLineColor === action.lineColor}
+            onClick={() => onSelectLineColor(action.lineColor)}
+          >
+            <span aria-hidden="true">{action.railLabel}</span>
+          </IconButton>
+        );
+      })}
     </div>
   );
 }
@@ -1128,6 +1146,7 @@ export function CreasePatternPanel() {
   const transformOristudioCpSelection = useWorkspaceStore(
     (state) => state.transformOristudioCpSelection
   );
+  const shortcutOverrides = useShortcutStore((state) => state.overrides);
 
   const editableCp = oristudioCpDocument?.document ?? null;
   const editableCpHandle = oristudioCpDocument?.handle ?? null;
@@ -1537,6 +1556,20 @@ export function CreasePatternPanel() {
       })();
     },
     [buildCpCommandPayload, editableCp, executeOristudioCpCommand, oristudioCpSelection.lines]
+  );
+
+  const handleCpShortcutAction = useCallback(
+    (actionId: OristudioCpActionId) => {
+      const action = cpActionById(actionId);
+      if (!action) return;
+      handleCpToolAction(action);
+    },
+    [handleCpToolAction]
+  );
+
+  useEffect(
+    () => registerCpActionShortcutExecutor(handleCpShortcutAction),
+    [handleCpShortcutAction]
   );
 
   useEffect(() => {
@@ -3038,6 +3071,31 @@ export function CreasePatternPanel() {
     transformRef.current?.centerView(scale, 160);
   }, []);
 
+  const handleViewportShortcut = useCallback(
+    (id: ViewportShortcutId) => {
+      switch (id) {
+        case 'viewport.zoomIn':
+          transformRef.current?.zoomIn(0.35, 120);
+          break;
+        case 'viewport.zoomOut':
+          transformRef.current?.zoomOut(0.35, 120);
+          break;
+        case 'viewport.fit':
+          fitToView();
+          break;
+        case 'viewport.actualSize':
+          setActualSize();
+          break;
+      }
+    },
+    [fitToView, setActualSize]
+  );
+
+  useEffect(
+    () => registerViewportShortcutExecutor('crease-pattern', handleViewportShortcut),
+    [handleViewportShortcut]
+  );
+
   const clearEditablePointerStatus = useCallback(() => {
     setCursorModelPoint(null);
     setSnapTarget(null);
@@ -3203,28 +3261,6 @@ export function CreasePatternPanel() {
         return;
       }
 
-      if (interactive || (!event.metaKey && !event.ctrlKey)) return;
-
-      switch (event.key) {
-        case '=':
-        case '+':
-          event.preventDefault();
-          transformRef.current?.zoomIn(0.35, 120);
-          break;
-        case '-':
-        case '_':
-          event.preventDefault();
-          transformRef.current?.zoomOut(0.35, 120);
-          break;
-        case '0':
-          event.preventDefault();
-          fitToView();
-          break;
-        case '1':
-          event.preventDefault();
-          setActualSize();
-          break;
-      }
     };
 
     const onKeyUp = (event: KeyboardEvent) => {
@@ -3250,10 +3286,8 @@ export function CreasePatternPanel() {
     cpToolState,
     editableCp,
     editableSelectionSize,
-    fitToView,
     hasCreasePattern,
     selectionRotationPreview,
-    setActualSize,
   ]);
 
   useEffect(() => {
@@ -3330,7 +3364,8 @@ export function CreasePatternPanel() {
         ].join(' ')}
         data-space-pan={spacePressed || undefined}
         tabIndex={-1}
-        onPointerDown={(event) => {
+        onPointerDownCapture={(event) => {
+          setActiveShortcutViewportSurface('crease-pattern');
           if (editableCp) setActiveEditingSurface('crease-pattern');
           if (!isViewportInteractiveTarget(event.target)) containerRef.current?.focus();
         }}
@@ -3561,6 +3596,7 @@ export function CreasePatternPanel() {
                     <CpLineTypeToolbar
                       activeLineColor={activeCpLineColor}
                       onSelectLineColor={setActiveCpLineColor}
+                      shortcutOverrides={shortcutOverrides}
                     />
                   </>
                 )}

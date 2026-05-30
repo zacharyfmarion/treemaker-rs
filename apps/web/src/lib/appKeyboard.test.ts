@@ -1,14 +1,19 @@
 import { describe, expect, it, vi } from 'vitest';
-import { handleAppKeyDown } from './appKeyboard';
+import { handleAppKeyDown, installAppKeyboardListener } from './appKeyboard';
 import { createSampleProject, type Selection } from './sampleProject';
 import { selectEverything } from './selection';
 
 function createActions(
   selection: Selection,
-  options: { documentMode?: 'tree' | 'crease-pattern'; cpSelectionSize?: number } = {}
+  options: {
+    documentMode?: 'tree' | 'crease-pattern';
+    activeEditingSurface?: 'tree' | 'crease-pattern';
+    cpSelectionSize?: number;
+  } = {}
 ) {
   return {
     getDocumentMode: vi.fn(() => options.documentMode ?? 'tree'),
+    getActiveEditingSurface: vi.fn(() => options.activeEditingSurface ?? 'tree'),
     getCpSelectionSize: vi.fn(() => options.cpSelectionSize ?? 0),
     getSelection: vi.fn(() => selection),
     handleMenuAction: vi.fn(),
@@ -100,6 +105,16 @@ describe('app keyboard shortcuts', () => {
       ],
       [new KeyboardEvent('keydown', { key: 'o', metaKey: true, cancelable: true }), 'file.open'],
       [new KeyboardEvent('keydown', { key: 'n', metaKey: true, cancelable: true }), 'file.new'],
+      [new KeyboardEvent('keydown', { key: 'z', metaKey: true, cancelable: true }), 'edit.undo'],
+      [
+        new KeyboardEvent('keydown', {
+          key: 'z',
+          metaKey: true,
+          shiftKey: true,
+          cancelable: true,
+        }),
+        'edit.redo',
+      ],
       [new KeyboardEvent('keydown', { key: 'b', metaKey: true, cancelable: true }), 'cp.build'],
       [
         new KeyboardEvent('keydown', {
@@ -135,5 +150,89 @@ describe('app keyboard shortcuts', () => {
     expect(handleAppKeyDown(event, actions)).toBe(true);
 
     expect(actions.handleMenuAction).toHaveBeenCalledWith('edit.delete');
+  });
+
+  it('routes Backspace through the menu layer as a Delete alias', () => {
+    const actions = createActions({ kind: 'tree' });
+    const event = new KeyboardEvent('keydown', { key: 'Backspace', cancelable: true });
+
+    expect(handleAppKeyDown(event, actions)).toBe(true);
+
+    expect(actions.handleMenuAction).toHaveBeenCalledWith('edit.delete');
+  });
+
+  it('honors user shortcut overrides', () => {
+    const actions = {
+      ...createActions({ kind: 'tree' }),
+      getShortcutOverrides: vi.fn(() => ({
+        'file.save': [{ primary: true, alt: true, key: 's' }],
+      })),
+    };
+    const original = new KeyboardEvent('keydown', {
+      key: 's',
+      ctrlKey: true,
+      cancelable: true,
+    });
+    const rebound = new KeyboardEvent('keydown', {
+      key: 's',
+      ctrlKey: true,
+      altKey: true,
+      cancelable: true,
+    });
+
+    expect(handleAppKeyDown(original, actions)).toBe(false);
+    expect(handleAppKeyDown(rebound, actions)).toBe(true);
+
+    expect(actions.handleMenuAction).toHaveBeenCalledWith('file.save');
+  });
+
+  it('captures app shortcuts before focused controls can stop propagation', () => {
+    const actions = createActions({ kind: 'tree' });
+    const target = document.createElement('button');
+    document.body.append(target);
+    target.addEventListener('keydown', (event) => event.stopPropagation());
+    const uninstall = installAppKeyboardListener(actions);
+
+    try {
+      target.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'z',
+          metaKey: true,
+          bubbles: true,
+          cancelable: true,
+        })
+      );
+
+      expect(actions.handleMenuAction).toHaveBeenCalledWith('edit.undo');
+    } finally {
+      uninstall();
+      target.remove();
+    }
+  });
+
+  it('lets window capture handlers preempt app shortcuts for modal capture flows', () => {
+    const actions = createActions({ kind: 'tree' });
+    const target = document.createElement('button');
+    document.body.append(target);
+    const stopAtWindow = (event: KeyboardEvent) => event.stopPropagation();
+    window.addEventListener('keydown', stopAtWindow, true);
+    const uninstall = installAppKeyboardListener(actions);
+
+    try {
+      target.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'z',
+          metaKey: true,
+          bubbles: true,
+          cancelable: true,
+        })
+      );
+
+      expect(actions.handleMenuAction).not.toHaveBeenCalled();
+    } finally {
+      uninstall();
+      window.removeEventListener('keydown', stopAtWindow, true);
+      target.remove();
+    }
   });
 });

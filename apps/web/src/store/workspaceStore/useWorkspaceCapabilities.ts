@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { getWorkspaceCapabilities } from '../../lib/workspaceCapabilities';
+import { activeOrFallbackHistoryCount } from './capabilities';
 import { useWorkspaceStore } from './store';
 
 export function useWorkspaceCapabilities() {
@@ -31,10 +32,20 @@ export function useWorkspaceCapabilities() {
   const cpHistoryFutureCount = useWorkspaceStore((state) => state.oristudioCpHistoryFuture.length);
   const clipboard = useWorkspaceStore((state) => state.clipboard);
   const selection = useWorkspaceStore((state) => state.selection);
-  const historyPastCount =
-    activeEditingSurface === 'crease-pattern' ? cpHistoryPastCount : treeHistoryPastCount;
-  const historyFutureCount =
-    activeEditingSurface === 'crease-pattern' ? cpHistoryFutureCount : treeHistoryFutureCount;
+  const usableTreeHistoryPastCount = documentMode === 'tree' ? treeHistoryPastCount : 0;
+  const usableTreeHistoryFutureCount = documentMode === 'tree' ? treeHistoryFutureCount : 0;
+  const usableCpHistoryPastCount = hasEditableCreasePattern ? cpHistoryPastCount : 0;
+  const usableCpHistoryFutureCount = hasEditableCreasePattern ? cpHistoryFutureCount : 0;
+  const historyPastCount = activeOrFallbackHistoryCount(
+    activeEditingSurface,
+    usableTreeHistoryPastCount,
+    usableCpHistoryPastCount
+  );
+  const historyFutureCount = activeOrFallbackHistoryCount(
+    activeEditingSurface,
+    usableTreeHistoryFutureCount,
+    usableCpHistoryFutureCount
+  );
 
   return useMemo(
     () =>

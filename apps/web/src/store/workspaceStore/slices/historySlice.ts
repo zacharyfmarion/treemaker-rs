@@ -129,11 +129,11 @@ export const createHistorySlice: WorkspaceSliceCreator<HistorySlice> = (set, get
     }),
 
   undo: async () => {
-    if (get().activeEditingSurface === 'crease-pattern') {
+    const undoCreasePattern = async () => {
       const past = get().oristudioCpHistoryPast;
       const previous = past.at(-1);
       const current = get().oristudioCpDocument;
-      if (!previous || !current || get().historyBusy) return;
+      if (!previous || !current || get().historyBusy) return false;
       const currentSelection = get().oristudioCpSelection;
       set({ historyBusy: true, error: null, oristudioCpError: null });
       try {
@@ -164,49 +164,60 @@ export const createHistorySlice: WorkspaceSliceCreator<HistorySlice> = (set, get
           historyBusy: false,
         });
       }
-      return;
-    }
+      return true;
+    };
 
-    if (get().documentMode !== 'tree') return;
-    const past = get().historyPast;
-    const previous = past.at(-1);
-    if (!previous || get().historyBusy) return;
-    set({ historyBusy: true, error: null });
-    try {
-      const { api, treeHandle } = await ensureTreeHandle();
-      const current = await api.saveTmd5(treeHandle);
-      const engine = await getEngine();
-      const snapshot = await loadTreeFromText(engine, previous.text);
-      set({
-        ...projectStateFromSnapshot(snapshot, get().project.title),
-        historyPast: past.slice(0, -1),
-        historyFuture: [historyEntry(current, previous.label), ...get().historyFuture].slice(
-          0,
-          MAX_HISTORY
-        ),
-        historyBusy: false,
-        selection: { kind: 'tree' },
-        symmetryAuthoringPairs: [],
-        status: statusFromSnapshot(snapshot),
-        dirty: true,
-        projectMessage: `Undid ${previous.label}`,
-        lastOptimization: null,
-        ...staleFoldArtifactResourceState(get().foldArtifactRevision),
-        activeEditingSurface: 'tree',
-        oristudioCpLineage: markGeneratedCpLineageStale(get().oristudioCpLineage),
-      });
-      void get().autosaveProject();
-    } catch (error) {
-      set({ status: 'error', error: engineError(error), historyBusy: false });
+    const undoTree = async () => {
+      if (get().documentMode !== 'tree') return false;
+      const past = get().historyPast;
+      const previous = past.at(-1);
+      if (!previous || get().historyBusy) return false;
+      set({ historyBusy: true, error: null });
+      try {
+        const { api, treeHandle } = await ensureTreeHandle();
+        const current = await api.saveTmd5(treeHandle);
+        const engine = await getEngine();
+        const snapshot = await loadTreeFromText(engine, previous.text);
+        set({
+          ...projectStateFromSnapshot(snapshot, get().project.title),
+          historyPast: past.slice(0, -1),
+          historyFuture: [historyEntry(current, previous.label), ...get().historyFuture].slice(
+            0,
+            MAX_HISTORY
+          ),
+          historyBusy: false,
+          selection: { kind: 'tree' },
+          symmetryAuthoringPairs: [],
+          status: statusFromSnapshot(snapshot),
+          dirty: true,
+          projectMessage: `Undid ${previous.label}`,
+          lastOptimization: null,
+          ...staleFoldArtifactResourceState(get().foldArtifactRevision),
+          activeEditingSurface: 'tree',
+          oristudioCpLineage: markGeneratedCpLineageStale(get().oristudioCpLineage),
+        });
+        void get().autosaveProject();
+      } catch (error) {
+        set({ status: 'error', error: engineError(error), historyBusy: false });
+      }
+      return true;
+    };
+
+    if (get().activeEditingSurface === 'crease-pattern') {
+      if (await undoCreasePattern()) return;
+      await undoTree();
+    } else {
+      if (await undoTree()) return;
+      await undoCreasePattern();
     }
   },
 
   redo: async () => {
-    if (get().activeEditingSurface === 'crease-pattern') {
+    const redoCreasePattern = async () => {
       const future = get().oristudioCpHistoryFuture;
       const next = future[0];
       const current = get().oristudioCpDocument;
-      if (!next || !current || get().historyBusy) return;
+      if (!next || !current || get().historyBusy) return false;
       const currentSelection = get().oristudioCpSelection;
       set({ historyBusy: true, error: null, oristudioCpError: null });
       try {
@@ -233,37 +244,48 @@ export const createHistorySlice: WorkspaceSliceCreator<HistorySlice> = (set, get
           historyBusy: false,
         });
       }
-      return;
-    }
+      return true;
+    };
 
-    if (get().documentMode !== 'tree') return;
-    const future = get().historyFuture;
-    const next = future[0];
-    if (!next || get().historyBusy) return;
-    set({ historyBusy: true, error: null });
-    try {
-      const { api, treeHandle } = await ensureTreeHandle();
-      const current = await api.saveTmd5(treeHandle);
-      const engine = await getEngine();
-      const snapshot = await loadTreeFromText(engine, next.text);
-      set({
-        ...projectStateFromSnapshot(snapshot, get().project.title),
-        historyPast: [...get().historyPast, historyEntry(current, next.label)].slice(-MAX_HISTORY),
-        historyFuture: future.slice(1),
-        historyBusy: false,
-        selection: { kind: 'tree' },
-        symmetryAuthoringPairs: [],
-        status: statusFromSnapshot(snapshot),
-        dirty: true,
-        projectMessage: `Redid ${next.label}`,
-        lastOptimization: null,
-        ...staleFoldArtifactResourceState(get().foldArtifactRevision),
-        activeEditingSurface: 'tree',
-        oristudioCpLineage: markGeneratedCpLineageStale(get().oristudioCpLineage),
-      });
-      void get().autosaveProject();
-    } catch (error) {
-      set({ status: 'error', error: engineError(error), historyBusy: false });
+    const redoTree = async () => {
+      if (get().documentMode !== 'tree') return false;
+      const future = get().historyFuture;
+      const next = future[0];
+      if (!next || get().historyBusy) return false;
+      set({ historyBusy: true, error: null });
+      try {
+        const { api, treeHandle } = await ensureTreeHandle();
+        const current = await api.saveTmd5(treeHandle);
+        const engine = await getEngine();
+        const snapshot = await loadTreeFromText(engine, next.text);
+        set({
+          ...projectStateFromSnapshot(snapshot, get().project.title),
+          historyPast: [...get().historyPast, historyEntry(current, next.label)].slice(-MAX_HISTORY),
+          historyFuture: future.slice(1),
+          historyBusy: false,
+          selection: { kind: 'tree' },
+          symmetryAuthoringPairs: [],
+          status: statusFromSnapshot(snapshot),
+          dirty: true,
+          projectMessage: `Redid ${next.label}`,
+          lastOptimization: null,
+          ...staleFoldArtifactResourceState(get().foldArtifactRevision),
+          activeEditingSurface: 'tree',
+          oristudioCpLineage: markGeneratedCpLineageStale(get().oristudioCpLineage),
+        });
+        void get().autosaveProject();
+      } catch (error) {
+        set({ status: 'error', error: engineError(error), historyBusy: false });
+      }
+      return true;
+    };
+
+    if (get().activeEditingSurface === 'crease-pattern') {
+      if (await redoCreasePattern()) return;
+      await redoTree();
+    } else {
+      if (await redoTree()) return;
+      await redoCreasePattern();
     }
   },
 });

@@ -38,6 +38,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
       title,
       tooltipSide,
       'aria-label': ariaLabel,
+      disabled,
       ...props
     },
     ref
@@ -50,15 +51,23 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
         className={iconButton({ variant, size, className })}
         data-active={isActive || undefined}
         aria-label={accessibleLabel}
+        disabled={disabled}
         {...props}
       />
     );
 
     if (!title) return button;
+    const trigger = disabled ? (
+      <span className="ui-button-tooltip-trigger" data-disabled="true">
+        {button}
+      </span>
+    ) : (
+      button
+    );
 
     return (
       <Tooltip>
-        <TooltipTrigger asChild>{button}</TooltipTrigger>
+        <TooltipTrigger asChild>{trigger}</TooltipTrigger>
         <TooltipContent side={tooltipSide}>{title}</TooltipContent>
       </Tooltip>
     );

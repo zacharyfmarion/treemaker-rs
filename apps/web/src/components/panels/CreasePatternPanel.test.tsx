@@ -14,6 +14,7 @@ import {
   getEditableCpModelBounds,
   modelPointToCpSvg,
 } from '../../lib/creasePatternViewport';
+import { handleShortcutRuntimeKeyDown } from '../../keyboard/shortcutRuntime';
 import type { ImportedCreasePatternDocument } from '../../lib/creasePatternImport';
 import { generatedCpLineage } from '../../lib/oristudioCpLineage';
 import { createStarterOristudioCpDocument } from '../../lib/oristudioCpStarterDocument';
@@ -111,7 +112,7 @@ function renderPanel(
   root = createRoot(container);
   act(() => {
     root?.render(
-      <TooltipProvider>
+      <TooltipProvider delayDuration={0}>
         <CreasePatternPanel />
       </TooltipProvider>
     );
@@ -561,22 +562,46 @@ describe('CreasePatternPanel', () => {
     expect(body).not.toBeNull();
 
     act(() => {
-      body?.dispatchEvent(new KeyboardEvent('keydown', { key: '=', metaKey: true, bubbles: true }));
+      handleShortcutRuntimeKeyDown(
+        new KeyboardEvent('keydown', { key: '=', metaKey: true, bubbles: true }),
+        {
+          context: { documentMode: 'crease-pattern', activeEditingSurface: 'crease-pattern' },
+          menu: vi.fn(),
+        }
+      );
     });
     expect(transformMocks.zoomIn).toHaveBeenCalledWith(0.35, 120);
 
     act(() => {
-      body?.dispatchEvent(new KeyboardEvent('keydown', { key: '-', metaKey: true, bubbles: true }));
+      handleShortcutRuntimeKeyDown(
+        new KeyboardEvent('keydown', { key: '-', metaKey: true, bubbles: true }),
+        {
+          context: { documentMode: 'crease-pattern', activeEditingSurface: 'crease-pattern' },
+          menu: vi.fn(),
+        }
+      );
     });
     expect(transformMocks.zoomOut).toHaveBeenCalledWith(0.35, 120);
 
     act(() => {
-      body?.dispatchEvent(new KeyboardEvent('keydown', { key: '0', metaKey: true, bubbles: true }));
+      handleShortcutRuntimeKeyDown(
+        new KeyboardEvent('keydown', { key: '0', metaKey: true, bubbles: true }),
+        {
+          context: { documentMode: 'crease-pattern', activeEditingSurface: 'crease-pattern' },
+          menu: vi.fn(),
+        }
+      );
     });
     expect(transformMocks.centerView).toHaveBeenLastCalledWith(expect.any(Number), 180);
 
     act(() => {
-      body?.dispatchEvent(new KeyboardEvent('keydown', { key: '1', metaKey: true, bubbles: true }));
+      handleShortcutRuntimeKeyDown(
+        new KeyboardEvent('keydown', { key: '1', metaKey: true, bubbles: true }),
+        {
+          context: { documentMode: 'crease-pattern', activeEditingSurface: 'crease-pattern' },
+          menu: vi.fn(),
+        }
+      );
     });
     expect(transformMocks.centerView).toHaveBeenLastCalledWith(1, 160);
 
@@ -685,6 +710,16 @@ describe('CreasePatternPanel', () => {
     expect(container.querySelector('button[aria-label="Valley"]')?.textContent).toContain('V');
     expect(container.querySelector('button[aria-label="Edge"]')?.textContent).toContain('E');
     expect(container.querySelector('button[aria-label="Auxiliary"]')?.textContent).toContain('A');
+    const rabbitEarButton = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Rabbit Ear"]'
+    );
+    expect(rabbitEarButton?.getAttribute('title')).toBeNull();
+
+    await act(async () => {
+      rabbitEarButton?.focus();
+      await Promise.resolve();
+    });
+    expect(document.body.textContent).toMatch(/Rabbit Ear \((Ctrl|Cmd)\+B\)/u);
 
     const drawCreaseButton = container.querySelector<HTMLButtonElement>(
       'button[aria-label="Line"]'
@@ -732,8 +767,26 @@ describe('CreasePatternPanel', () => {
     expect(selectLassoButton?.getAttribute('data-ui-status')).toBe('ready');
     expect(foldEstimateButton?.getAttribute('aria-disabled')).toBe('true');
     expect(foldEstimateButton?.getAttribute('data-ui-status')).toBe('porting');
-    expect(foldEstimateButton?.title).toContain('Kernel port is in progress');
+    expect(foldEstimateButton?.getAttribute('title')).toBeNull();
+    await act(async () => {
+      foldEstimateButton?.focus();
+      await Promise.resolve();
+    });
+    expect(document.body.textContent).toContain('Kernel port is in progress');
     expect(boxSelectButton?.hasAttribute('data-active')).toBe(true);
+
+    act(() => {
+      handleShortcutRuntimeKeyDown(
+        new KeyboardEvent('keydown', { bubbles: true, key: 'v' }),
+        {
+          context: { documentMode: 'crease-pattern', activeEditingSurface: 'crease-pattern' },
+          menu: vi.fn(),
+        }
+      );
+    });
+    expect(container.querySelector('button[aria-label="Valley"]')?.getAttribute('data-active')).toBe(
+      'true'
+    );
 
     act(() => {
       drawCreaseButton?.click();

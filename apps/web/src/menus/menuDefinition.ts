@@ -1,4 +1,5 @@
 import type { MenuActionId } from '../commands/menuActions';
+import { shortcutLabelForAction, type ShortcutOverrides } from '../keyboard/shortcuts';
 
 export type MenuActionItem = {
   type: 'action';
@@ -24,24 +25,20 @@ export type MenuDef = {
   items: MenuItemDef[];
 };
 
-function modKey(): string {
-  const isMac =
-    typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
-  return isMac ? 'Cmd' : 'Ctrl';
+function shortcut(id: MenuActionId, overrides?: ShortcutOverrides): string | undefined {
+  return shortcutLabelForAction(id, overrides);
 }
 
-export function getMenuBarDef(): MenuDef[] {
-  const mod = modKey();
-
+export function getMenuBarDef(overrides?: ShortcutOverrides): MenuDef[] {
   return [
     {
       label: 'File',
       items: [
-        { type: 'action', id: 'file.new', label: 'New', shortcut: `${mod}+N` },
-        { type: 'action', id: 'file.open', label: 'Open...', shortcut: `${mod}+O` },
+        { type: 'action', id: 'file.new', label: 'New', shortcut: shortcut('file.new', overrides) },
+        { type: 'action', id: 'file.open', label: 'Open...', shortcut: shortcut('file.open', overrides) },
         { type: 'separator' },
-        { type: 'action', id: 'file.save', label: 'Save', shortcut: `${mod}+S` },
-        { type: 'action', id: 'file.saveAs', label: 'Save As...', shortcut: `${mod}+Shift+S` },
+        { type: 'action', id: 'file.save', label: 'Save', shortcut: shortcut('file.save', overrides) },
+        { type: 'action', id: 'file.saveAs', label: 'Save As...', shortcut: shortcut('file.saveAs', overrides) },
         { type: 'separator' },
         { type: 'action', id: 'file.exportV5', label: 'Export TreeMaker 5...' },
         { type: 'action', id: 'file.exportV4', label: 'Export TreeMaker 4...' },
@@ -50,26 +47,26 @@ export function getMenuBarDef(): MenuDef[] {
         { type: 'action', id: 'file.exportSvg', label: 'Export SVG...' },
         { type: 'action', id: 'file.exportPng', label: 'Export PNG...' },
         { type: 'separator' },
-        { type: 'action', id: 'file.settings', label: 'Settings', shortcut: `${mod}+,` },
+        { type: 'action', id: 'file.settings', label: 'Settings', shortcut: shortcut('file.settings', overrides) },
       ],
     },
     {
       label: 'Edit',
       items: [
-        { type: 'action', id: 'edit.undo', label: 'Undo', shortcut: `${mod}+Z` },
-        { type: 'action', id: 'edit.redo', label: 'Redo', shortcut: `${mod}+Shift+Z` },
+        { type: 'action', id: 'edit.undo', label: 'Undo', shortcut: shortcut('edit.undo', overrides) },
+        { type: 'action', id: 'edit.redo', label: 'Redo', shortcut: shortcut('edit.redo', overrides) },
         { type: 'separator' },
-        { type: 'action', id: 'edit.cut', label: 'Cut', shortcut: `${mod}+X` },
-        { type: 'action', id: 'edit.copy', label: 'Copy', shortcut: `${mod}+C` },
-        { type: 'action', id: 'edit.paste', label: 'Paste', shortcut: `${mod}+V` },
+        { type: 'action', id: 'edit.cut', label: 'Cut', shortcut: shortcut('edit.cut', overrides) },
+        { type: 'action', id: 'edit.copy', label: 'Copy', shortcut: shortcut('edit.copy', overrides) },
+        { type: 'action', id: 'edit.paste', label: 'Paste', shortcut: shortcut('edit.paste', overrides) },
         { type: 'separator' },
-        { type: 'action', id: 'edit.delete', label: 'Delete Selected', shortcut: 'Delete' },
+        { type: 'action', id: 'edit.delete', label: 'Delete Selected', shortcut: shortcut('edit.delete', overrides) },
         { type: 'separator' },
         {
           type: 'submenu',
           label: 'Select',
           items: [
-            { type: 'action', id: 'edit.selectAll', label: 'Select All', shortcut: `${mod}+A` },
+            { type: 'action', id: 'edit.selectAll', label: 'Select All', shortcut: shortcut('edit.selectAll', overrides) },
             { type: 'action', id: 'edit.deselectAll', label: 'Deselect All' },
             { type: 'action', id: 'edit.selectByIndex', label: 'Select By Index...' },
             { type: 'action', id: 'edit.selectMovableParts', label: 'Select Movable Parts' },
@@ -139,23 +136,23 @@ export function getMenuBarDef(): MenuDef[] {
     {
       label: 'Design',
       items: [
-        { type: 'action', id: 'optimize.scale', label: 'Optimize Scale', shortcut: `${mod}+R` },
+        { type: 'action', id: 'optimize.scale', label: 'Optimize Scale', shortcut: shortcut('optimize.scale', overrides) },
         { type: 'action', id: 'optimize.edges', label: 'Optimize Edges' },
         { type: 'action', id: 'optimize.strain', label: 'Optimize Strain' },
         { type: 'separator' },
-        { type: 'action', id: 'cp.build', label: 'Build Crease Pattern', shortcut: `${mod}+B` },
+        { type: 'action', id: 'cp.build', label: 'Build Crease Pattern', shortcut: shortcut('cp.build', overrides) },
       ],
     },
     {
       label: 'Crease Pattern',
       items: [
-        { type: 'action', id: 'cp.foldedPreview', label: 'Show Folded Preview', shortcut: `${mod}+Shift+F` },
+        { type: 'action', id: 'cp.foldedPreview', label: 'Show Folded Preview', shortcut: shortcut('cp.foldedPreview', overrides) },
         { type: 'separator' },
         {
           type: 'submenu',
           label: 'Selected Lines',
           items: [
-            { type: 'action', id: 'cp.deleteSelectedLines', label: 'Delete Selected Lines', shortcut: 'Delete' },
+            { type: 'action', id: 'cp.deleteSelectedLines', label: 'Delete Selected Lines' },
             { type: 'separator' },
             { type: 'action', id: 'cp.changeCreaseType', label: 'Change Crease Type' },
             { type: 'action', id: 'cp.advanceCreaseType', label: 'Advance Crease Type' },
@@ -185,7 +182,7 @@ export function getMenuBarDef(): MenuDef[] {
           type: 'submenu',
           label: 'Diagnostics',
           items: [
-            { type: 'action', id: 'cp.checkCamv', label: 'Check CAMV', shortcut: `${mod}+Shift+M` },
+            { type: 'action', id: 'cp.checkCamv', label: 'Check CAMV', shortcut: shortcut('cp.checkCamv', overrides) },
             { type: 'action', id: 'cp.check1', label: 'Check Overlaps' },
             { type: 'action', id: 'cp.check2', label: 'Check T-junctions' },
             { type: 'action', id: 'cp.check3', label: 'Check Vertex Foldability' },
@@ -214,7 +211,7 @@ export function getMenuBarDef(): MenuDef[] {
     {
       label: 'Help',
       items: [
-        { type: 'action', id: 'help.documentation', label: 'Ori Studio Help', shortcut: 'F1' },
+        { type: 'action', id: 'help.documentation', label: 'Ori Studio Help', shortcut: shortcut('help.documentation', overrides) },
         { type: 'separator' },
         { type: 'action', id: 'help.about', label: 'About Ori Studio' },
       ],

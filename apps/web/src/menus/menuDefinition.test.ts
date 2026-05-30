@@ -18,6 +18,15 @@ describe('web menu definition', () => {
     expect(actionIds.every((id) => isMenuActionId(id))).toBe(true);
   });
 
+  it('reads shortcut labels from resolved shortcut bindings', () => {
+    const fileMenu = getMenuBarDef({
+      'file.save': [{ primary: true, alt: true, key: 's' }],
+    }).find((menu) => menu.label === 'File');
+    const save = fileMenu?.items.find((item) => item.type === 'action' && item.id === 'file.save');
+
+    expect(save && 'shortcut' in save ? save.shortcut : '').toMatch(/(Alt|Option)\+S/u);
+  });
+
   it('keeps quit out of the web menu surface', () => {
     const actionIds = getMenuBarDef().flatMap((menu) => actionIdsFor(menu.items));
 

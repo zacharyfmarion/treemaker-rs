@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { handleMenuAction } from '../commands/menuActions';
 import { getMenuBarDef, type MenuItemDef } from '../menus/menuDefinition';
+import { useShortcutStore } from '../store/shortcutStore';
 import { useWorkspaceCapabilities } from '../store/workspaceStore/useWorkspaceCapabilities';
 import type { WorkspaceCapabilities, WorkspaceCapabilityId } from '../lib/workspaceCapabilities';
 import './MenuBar.css';
@@ -95,7 +96,8 @@ function MenuDropdown({
 export function MenuBar() {
   const [openMenu, setOpenMenu] = useState<number | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const menuDef = useMemo(() => getMenuBarDef(), []);
+  const shortcutOverrides = useShortcutStore((state) => state.overrides);
+  const menuDef = useMemo(() => getMenuBarDef(shortcutOverrides), [shortcutOverrides]);
   const capabilities = useWorkspaceCapabilities();
 
   const closeMenu = useCallback(() => {

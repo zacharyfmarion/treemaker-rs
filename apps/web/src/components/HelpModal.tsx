@@ -146,8 +146,8 @@ const HELP_TOPICS: HelpTopic[] = [
     steps: [
       'Use the View menu to activate Design, Crease Pattern, Simulator, Folded Base, Conditions, or Diagnostics panes.',
       'Drag pane headers to reorganize the workspace; Reset Layout restores the default pane arrangement.',
-      'Settings contains Appearance themes and Workspace layout controls.',
-      'Keyboard shortcuts cover common file, edit, optimize, build, and settings actions.',
+      'Settings contains Appearance themes, keyboard shortcuts, and Workspace layout controls.',
+      'Use the Shortcuts settings tab to inspect or rebind file, edit, viewport, and crease-pattern tool commands.',
     ],
   },
 ];

@@ -28,7 +28,7 @@ import { handleMenuAction } from './commands/menuActions';
 import { registerStartScreenRequestHandler } from './commands/startScreenController';
 import { useMacDownloadUrl } from './hooks/useMacDownloadUrl';
 import { useTauriOpenedFiles } from './hooks/useTauriOpenedFiles';
-import { handleAppKeyDown } from './lib/appKeyboard';
+import { installAppKeyboardListener } from './lib/appKeyboard';
 import { cpSelectionSize } from './lib/creasePatternViewport';
 import { useTauriMenuListener } from './menus/tauriMenuListener';
 import { isFeatureVisible } from './platform/features';
@@ -38,6 +38,7 @@ import { applyWindowTitle, formatWindowTitle } from './platform/windowTitle';
 import { requestConfirmation } from './store/commandDialogStore';
 import { applyDefaultLayout, useLayoutStore } from './store/layoutStore';
 import { useSettingsStore } from './store/settingsStore';
+import { useShortcutStore } from './store/shortcutStore';
 import { useThemeStore } from './store/themeStore';
 import { useWorkspaceStore } from './store/workspaceStore';
 import { useWorkspaceCapabilities } from './store/workspaceStore/useWorkspaceCapabilities';
@@ -239,18 +240,19 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      handleAppKeyDown(event, {
+    return installAppKeyboardListener(
+      {
         getDocumentMode: () => useWorkspaceStore.getState().documentMode,
+        getActiveEditingSurface: () => useWorkspaceStore.getState().activeEditingSurface,
         getCpSelectionSize: () =>
           cpSelectionSize(useWorkspaceStore.getState().oristudioCpSelection),
         getSelection: () => useWorkspaceStore.getState().selection,
         handleMenuAction,
         selectNone,
-      });
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+        getShortcutOverrides: () => useShortcutStore.getState().overrides,
+      },
+      document
+    );
   }, [selectNone]);
 
   const onReady = useCallback(

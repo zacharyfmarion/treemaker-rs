@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { getResolvedShortcuts } from '../keyboard/shortcuts';
 import { SHORTCUT_STORAGE_KEY, useShortcutStore } from './shortcutStore';
 
 const initialState = useShortcutStore.getInitialState();
@@ -39,5 +40,24 @@ describe('shortcutStore', () => {
     useShortcutStore.getState().resetAllShortcuts();
 
     expect(useShortcutStore.getState().overrides).toEqual({});
+  });
+
+  it('keeps protected undo defaults when clearing custom bindings', () => {
+    useShortcutStore.getState().setShortcut('edit.undo', {
+      primary: true,
+      alt: true,
+      key: 'z',
+    });
+    expect(getResolvedShortcuts('edit.undo', useShortcutStore.getState().overrides)).toEqual([
+      { primary: true, key: 'z' },
+      { primary: true, alt: true, key: 'z' },
+    ]);
+
+    useShortcutStore.getState().clearShortcut('edit.undo');
+
+    expect(useShortcutStore.getState().overrides['edit.undo']).toBeUndefined();
+    expect(getResolvedShortcuts('edit.undo', useShortcutStore.getState().overrides)).toEqual([
+      { primary: true, key: 'z' },
+    ]);
   });
 });

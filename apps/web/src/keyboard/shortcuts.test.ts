@@ -49,6 +49,22 @@ describe('shortcut registry', () => {
     expect(shortcutLabelForAction('edit.delete')).toContain('Delete / Backspace');
   });
 
+  it('keeps undo and redo defaults available even when overrides are stale or cleared', () => {
+    expect(getResolvedShortcuts('edit.undo', { 'edit.undo': null })).toEqual([
+      { primary: true, key: 'z' },
+    ]);
+    expect(
+      getResolvedShortcuts('edit.redo', {
+        'edit.redo': [{ primary: true, alt: true, key: 'z' }],
+      })
+    ).toEqual([
+      { primary: true, shift: true, key: 'z' },
+      { primary: true, alt: true, key: 'z' },
+    ]);
+    expect(findShortcutConflict('file.save', { primary: true, key: 'z' }, { 'edit.undo': null })?.id)
+      .toBe('edit.undo');
+  });
+
   it('detects conflicts only across overlapping scopes', () => {
     const conflict = findShortcutConflict('file.open', { primary: true, key: 's' });
     expect(conflict?.id).toBe('file.save');

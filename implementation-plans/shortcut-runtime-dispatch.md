@@ -42,5 +42,7 @@ as a menu-only follow-up.
 - [x] Update settings/menu/tooltips/tests for multiple shortcut labels.
 - [x] Make undo/redo resolve to a fallback editable history stack when the
   active surface is stale.
+- [x] Keep standard undo/redo default chords available when persisted overrides
+  are stale or cleared.
 - [x] Clarify the native Tauri accelerator sync plan.
 - [x] Validate with web checks and browser smoke tests.

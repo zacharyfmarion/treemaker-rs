@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import {
   normalizeKeyChord,
+  shortcutKeepsDefaultChords,
   type KeyChord,
   type ShortcutActionId,
   type ShortcutOverrides,
@@ -33,12 +34,15 @@ function loadShortcutOverrides(): ShortcutOverrides {
     }
     const overrides: ShortcutOverrides = {};
     for (const [id, binding] of Object.entries(parsed.bindings)) {
+      const actionId = id as ShortcutActionId;
       if (binding === null) {
-        overrides[id as ShortcutActionId] = null;
+        if (!shortcutKeepsDefaultChords(actionId)) {
+          overrides[actionId] = null;
+        }
         continue;
       }
       const chords = Array.isArray(binding) ? binding : [binding];
-      overrides[id as ShortcutActionId] = chords
+      overrides[actionId] = chords
         .map((chord) => normalizeKeyChord(chord))
         .filter((chord) => chord.key);
     }
@@ -77,7 +81,12 @@ export const useShortcutStore = create<ShortcutState>()(
       },
 
       clearShortcut: (id) => {
-        const overrides = { ...get().overrides, [id]: null };
+        const overrides = { ...get().overrides };
+        if (shortcutKeepsDefaultChords(id)) {
+          delete overrides[id];
+        } else {
+          overrides[id] = null;
+        }
         saveShortcutOverrides(overrides);
         set({ overrides });
       },

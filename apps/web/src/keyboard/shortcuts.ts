@@ -36,6 +36,11 @@ export interface ShortcutDefinition {
 
 export type ShortcutOverrides = Partial<Record<ShortcutActionId, KeyChord[] | null>>;
 
+const ALWAYS_AVAILABLE_DEFAULT_SHORTCUTS = new Set<ShortcutActionId>([
+  'edit.undo',
+  'edit.redo',
+]);
+
 export interface ShortcutRegistryDiagnostics {
   unmappedOrieditaActions: string[];
   duplicateDefaultChords: Array<{ scope: ShortcutScope; chord: string; actionIds: ShortcutActionId[] }>;
@@ -286,10 +291,33 @@ export function getResolvedShortcuts(
   id: ShortcutActionId,
   overrides: ShortcutOverrides = {}
 ): KeyChord[] {
+  const definition = getShortcutDefinition(id);
+  if (!definition) return [];
   if (Object.prototype.hasOwnProperty.call(overrides, id)) {
-    return (overrides[id] ?? []).map(normalizeKeyChord).filter((chord) => chord.key);
+    const overrideChords = (overrides[id] ?? [])
+      .map(normalizeKeyChord)
+      .filter((chord) => chord.key);
+    return shortcutKeepsDefaultChords(id)
+      ? mergeKeyChords(definition.defaultChords, overrideChords)
+      : overrideChords;
   }
-  return getShortcutDefinition(id)?.defaultChords ?? [];
+  return definition.defaultChords;
+}
+
+export function shortcutKeepsDefaultChords(id: ShortcutActionId): boolean {
+  return ALWAYS_AVAILABLE_DEFAULT_SHORTCUTS.has(id);
+}
+
+function mergeKeyChords(defaultChords: KeyChord[], overrideChords: KeyChord[]): KeyChord[] {
+  const seen = new Set<string>();
+  const merged: KeyChord[] = [];
+  for (const chord of [...defaultChords, ...overrideChords]) {
+    const key = keyChordId(chord);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push(chord);
+  }
+  return merged;
 }
 
 export function shortcutLabelForAction(
